@@ -124,7 +124,7 @@ with col2:
             
             # Simulated real lineup projection view 
             batter_matrix = pd.DataFrame({
-                "Order":,
+                "Order":[1,2,3,4],
                 "Lineup Average Benchmarks": ["Leadoff Hitter", "Contact Specialist", "Power Core", "Cleanup Hitter", "Outfielder Split", "Infielder Split", "Utility Player", "Catching Slot", "Bottom Order"],
                 "Estimated K Matchup vs Pitcher": [f"{round(team_k_pct * 0.7, 1)}%", f"{round(team_k_pct * 0.8, 1)}%", f"{round(team_k_pct * 1.1, 1)}%", f"{round(team_k_pct * 1.2, 1)}%", f"{round(team_k_pct * 0.9, 1)}%", f"{round(team_k_pct * 1.0, 1)}%", f"{round(team_k_pct * 1.1, 1)}%", f"{round(team_k_pct * 1.3, 1)}%", f"{round(team_k_pct * 1.4, 1)}%"]
             })
