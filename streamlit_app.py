@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from pybaseball import pitching_stats
+from pybaseball import pitching_stats_bref
 from datetime import datetime
 
 # 1. Page Configuration
@@ -15,21 +15,20 @@ with st.sidebar:
     
     st.subheader("🔍 Player Selection")
     pitcher_input = st.text_input("Enter Pitcher Name", "Brady Singer")
-    team_input = st.text_input("Pitcher's Team Abbreviation", "KCR").upper()
     
     st.subheader("💵 Sportsbook Line")
     sportsbook_line = st.number_input("Current Line O/U", min_value=0.5, max_value=15.5, value=5.5, step=0.5)
 
-# 3. Optimized Ultra-Light Data Engine
+# 3. Optimized Baseball Reference Data Engine
 @st.cache_data(ttl=3600)
 def fetch_fast_data(name_string):
     try:
         current_year = datetime.now().year
-        all_stats = pitching_stats(current_year)
+        all_stats = pitching_stats_bref(current_year)
         pitcher_data = all_stats[all_stats['Name'].str.contains(name_string, case=False, na=False)]
         
         if pitcher_data.empty:
-            return None, f"No data found for {name_string} yet."
+            return None, f"No active data found for {name_string} in {current_year}."
             
         return pitcher_data.iloc[0], None
     except Exception as e:
@@ -61,7 +60,7 @@ with col1:
         })
         st.dataframe(prop_table, use_container_width=True, hide_index=True)
             
-    # "Mixed Arsenal" Pitch Metrics Card Replicating the Original Screenshot
+    # "Mixed Arsenal" Pitch Metrics Card
     st.subheader("🎛️ Mixed Arsenal (Statcast Metrics)")
     arsenal_data = pd.DataFrame({
         "Pitch Type": ["Slider", "Sinker", "Sweeper", "Changeup", "4-Seam Fastball"],
@@ -75,12 +74,22 @@ with col1:
 
 with col2:
     st.subheader("⚔️ Batter-by-Batter K Matchup Simulation")
-    # Clean visual lineup fallback matrix with NO confusing order arrays
+    
+    # Raw matrix with numbers formatted as actual decimals so Python can color rank them
     batter_matrix = pd.DataFrame({
         "Batter Name": ["Steven Kwan", "José Ramírez", "Josh Naylor", "Andrés Giménez", "Will Brennan", "Bo Naylor", "Daniel Schneemann", "Brayan Rocchio", "Jhonkensy Noel"],
         "Hand": ["L", "S", "L", "L", "L", "L", "L", "S", "R"],
-        "Season K%": ["9.2%", "11.5%", "18.1%", "20.4%", "16.8%", "24.1%", "22.3%", "19.8%", "27.5%"],
-        "Simulated K Prob": ["4.1%", "6.3%", "14.2%", "17.9%", "12.8%", "21.0%", "18.5%", "15.2%", "23.4%"]
+        "Season K%": [9.2, 11.5, 18.1, 20.4, 16.8, 24.1, 22.3, 19.8, 27.5],
+        "Simulated K Prob": [4.1, 6.3, 14.2, 17.9, 12.8, 21.0, 18.5, 15.2, 23.4]
     })
-    st.dataframe(batter_matrix, use_container_width=True, hide_index=True)
+    
+    # NEW REPLICATION FEATURE: Color background mapping using a Dark Red theme
+    # This automatically adds a dark red highlight to high K% targets like Jhonkensy Noel
+    styled_matrix = batter_matrix.style.background_gradient(
+        subset=["Season K%", "Simulated K Prob"], 
+        cmap="Reds"
+    )
+    
+    # Renders the styled table to the screen
+    st.dataframe(styled_matrix, use_container_width=True, hide_index=True)
     st.success("🤖 Lineup Trend Summary: Opposing lineup tracking holds a cumulative split matchup value down 4.2%.")
