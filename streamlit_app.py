@@ -202,11 +202,10 @@ with col1:
     st.dataframe(arsenal_df, use_container_width=True, hide_index=True)
     # 5. Right Panel Render Engine
     with col2:
-    st.header("⚔️ Batter-by-Batter K Matchup")
-    st.caption("MLB PROJECTED — Real-Time Automated Web Feed Matrix")
-    if lineup_df is not None and not lineup_df.empty:
-        styled_lineup = lineup_df.style.background_gradient(
-            subset=["K% USED", "VS HAND", "SEASON"],
-            cmap="Purples")
-        st.dataframe(styled_lineup, use_container_width=True, hide_index=True)
-        st.info(app_status)
+        st.header("⚔️ Batter-by-Batter K Matchup")
+        st.caption("MLB PROJECTED — Real-Time Automated Web Feed Matrix")
+        
+        if lineup_df is not None and not lineup_df.empty:
+            styled_lineup = lineup_df.style.background_gradient(subset=["K% USED", "VS HAND", "SEASON"],cmap="Purples")
+            st.dataframe(styled_lineup, use_container_width=True, hide_index=True)
+            st.info(app_status)
