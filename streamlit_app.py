@@ -44,7 +44,7 @@ with st.sidebar:
 # Real-Time Web Scraper Engine targeting daily slate logs
 def fetch_live_announced_lineup(team_abbr):
     try:
-        url = "https://www.rotowire.com/baseball/daily-lineups.php"
+        url = "https://rotowire.com"
         headers = {"User-Agent": "Mozilla/5.0"}
         soup = BeautifulSoup(requests.get(url, headers=headers).text, "html.parser")
         
@@ -94,7 +94,6 @@ def fetch_dynamic_opposing_lineup(team_abbr):
         
         if live_names:
             status_msg = f"✅ Lineup Status: Confirmed starting lineup pulled live for {team_abbr}!"
-            # Filter rows based on names scraped from the field card
             team_hitters['Name_Lower'] = team_hitters['Name'].str.lower()
             lineup_data = pd.DataFrame()
             for name in live_names:
@@ -102,7 +101,6 @@ def fetch_dynamic_opposing_lineup(team_abbr):
                 if not match_row.empty:
                     lineup_data = pd.concat([lineup_data, match_row.head(1)])
                 else:
-                    # Fallback row builder for players with missing season data rows
                     new_row = pd.DataFrame([{"Name": name, "AB": 100, "SO": 22, "PA": 100}])
                     lineup_data = pd.concat([lineup_data, new_row])
         else:
@@ -199,3 +197,8 @@ with col1:
         "USE": ["45%", "29%", "14%", "6%", "5%"],
         "K%": ["14.2%", "38.5%", "42.0%", "22.1%", "19.5%"],
         "WHIFF": ["11.5%", "41.3%", "46.2%", "28.4%", "15.1%"],
+        "PUT": ["14.0%", "26.4%", "29.1%", "18.2%", "12.3%"]
+    })
+    st.dataframe(arsenal_df, use_container_width=True, hide_index=True)
+
+with col2:
