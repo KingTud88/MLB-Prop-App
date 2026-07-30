@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 from pybaseball import pitching_stats_bref, team_batting
 from datetime import datetime
 
-# 1. Custom CSS Theme & Card Layout Injection to Match the Gated UI Style
+# 1. Custom Theme & Layout Style Settings
 st.set_page_config(page_title="Prop Intel Modeling Dashboard", layout="wide")
 
 st.markdown("""
@@ -28,7 +28,7 @@ st.markdown("""
 
 st.title("🔮 Matchup Intel Modeling Dashboard")
 
-# 2. Sidebar Component Control Center
+# 2. Sidebar Layout Controls
 with st.sidebar:
     st.header("⚙️ Configuration")
     sport = st.selectbox("Select League", ["MLB"])
@@ -41,7 +41,7 @@ with st.sidebar:
     st.subheader("💵 Sportsbook Line")
     sportsbook_line = st.number_input("Current Line O/U", min_value=0.5, max_value=15.5, value=4.5, step=0.5)
 
-# Real-Time Web Scraper Engine targeting daily slate logs
+# Real-Time Live Lineup Web Scraper Engine
 def fetch_live_announced_lineup(team_abbr):
     try:
         url = "https://rotowire.com"
@@ -201,4 +201,6 @@ with col1:
     })
     st.dataframe(arsenal_df, use_container_width=True, hide_index=True)
 
+# 5. Right Panel Render Engine 
 with col2:
+    st.header("⚔️ Batter-by-Batter K Matchup")st.caption("MLB PROJECTED — Real-Time Automated Web Feed Matrix")if lineup_df is not None and not lineup_df.empty:styled_lineup = lineup_df.style.background_gradient(subset=["K% USED", "VS HAND", "SEASON"],cmap="Purples")st.dataframe(styled_lineup, use_container_width=True, hide_index=True)st.info(app_status)
