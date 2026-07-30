@@ -30,7 +30,7 @@ try:
         st.warning(f"No active data found for {pitcher_input} in {current_year}.")
     else:
         # Extract base calculations
-        row = pitcher_data.iloc
+        row = pitcher_data.iloc[0]
         games = int(row['G'])
         strikeouts = int(row['SO'])
         live_avg_k = round(strikeouts / games, 2)
