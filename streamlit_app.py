@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+import requests
+from bs4 import BeautifulSoup
 from pybaseball import pitching_stats_bref, team_batting_bref
 from datetime import datetime
 
@@ -20,61 +22,98 @@ with st.sidebar:
     st.subheader("💵 Sportsbook Line")
     sportsbook_line = st.number_input("Current Line O/U", min_value=0.5, max_value=15.5, value=5.5, step=0.5)
 
-# 3. Safe Public Data Fetcher
+# NEW REPLICATION FEATURE: Real-Time Live Lineup Web Scraper Engine
+def fetch_live_announced_lineup(team_abbr):
+    try:
+        url = "https://www.rotowire.com/baseball/daily-lineups.php"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        soup = BeautifulSoup(requests.get(url, headers=headers).text, "html.parser")
+        
+        # Scans the daily lineup containers on the webpage
+        for box in soup.select(".lineup__box"):
+            teams_text = box.select_one(".lineup__teams")
+            if teams_text and team_abbr in teams_text.get_text().upper():
+                # Isolate either home or away list matching our target team
+                lineup_list = box.select(f".lineup__list")
+                players = []
+                for player_row in lineup_list.select(".lineup__player a"):
+                    players.append(player_row.get_text(strip=True))
+                
+                if len(players) >= 9:
+                    return players[:9]
+        return None
+    except:
+        return None
+
+# 3. Main Data Orchestration Core
 def fetch_complete_matchup_data(pitcher_name, opp_team_abbr):
     try:
         current_year = datetime.now().year
         
-        # Fetch Pitcher Stats safely from Baseball Reference
+        # Fetch Pitcher Metrics
         all_pitchers = pitching_stats_bref(current_year)
         pitcher_data = all_pitchers[all_pitchers['Name'].str.contains(pitcher_name, case=False, na=False)]
+        avg_k = round(int(pitcher_data.iloc['SO']) / max(int(pitcher_data.iloc['G']), 1), 2) if not pitcher_data.empty else 0.0
         
-        # Pull matching data elements
-        if pitcher_data.empty:
-            p_res = None
-            avg_k = 0.0
-        else:
-            p_res = pitcher_data.iloc[0]
-            games = int(p_res['G']) if int(p_res['G']) > 0 else 1
-            strikeouts = int(p_res['SO'])
-            avg_k = round(strikeouts / games, 2)
-            
-        # Clean fall-back data matrix matching your visualization layout
-        sim_names = ["Leadoff Hitter", "Contact Specialist", "Power Core", "Cleanup Hitter", "Outfielder Split", "Infielder Split", "Utility Player", "Catching Slot", "Bottom Order"]
+        # Fetch Opposing Hitter Performance Records
+        all_hitters = team_batting_bref(opp_team_abbr, current_year)
         base_k = 22.4
         
-        # Fetch Opposing Hitter Stats securely
+        # Try to pull the individual historical stats to back-fill projections
         try:
-            all_hitters = team_batting_bref(opp_team_abbr, current_year)
-            if not all_hitters.empty:
-                # Calculate team average from the extracted stats sheet
-                lineup_data = all_hitters.dropna(subset=['G']).sort_values(by='PA', ascending=False).head(9)
-                if not lineup_data.empty:
-                    base_k = round((lineup_data['SO'].sum() / lineup_data['AB'].sum()) * 100, 1)
+            lineup_data = all_hitters.dropna(subset=['G']).sort_values(by='PA', ascending=False)
+            base_k = round((lineup_data.head(9)['SO'].sum() / lineup_data.head(9)['AB'].sum()) * 100, 1)
         except:
-            pass # Use stable fallback parameters if API connection delays
+            lineup_data = pd.DataFrame()
+
+        # AUTOMATED SWITCH LOGIC: Check if live lineups are officially out yet
+        live_names = fetch_live_announced_lineup(opp_team_abbr)
+        
+        if live_names:
+            # OPTION A: Lineups are OUT! Build matrix using the real names
+            status_msg = f"✅ Lineup Status: Confirmed starting lineup pulled live for {opp_team_abbr}!"
+            final_names = live_names
+        else:
+            # OPTION B: Lineups are not out yet. Pull expected top 9 active roster players instead
+            status_msg = f"⏳ Lineup Status: Pre-game depth charts active for {opp_team_abbr}. Orders update when put out."
+            if not lineup_data.empty:
+                final_names = lineup_data.head(9)['Name'].tolist()
+            else:
+                final_names = ["Leadoff Hitter", "Contact Hitter", "Power Core", "Cleanup Hitter", "Outfielder", "Infielder", "Utility Player", "Catcher", "Bottom Order"]
+
+        # Synthesize final stats matrix rows
+        k_list, prob_list, hands = [], [], []
+        for name in final_names:
+            p_row = lineup_data[lineup_data['Name'] == name] if not lineup_data.empty else pd.DataFrame()
+            if not p_row.empty:
+                k_rate = round((int(p_row.iloc['SO']) / max(int(p_row.iloc['AB']), 1)) * 100, 1)
+                hand_type = str(p_row.iloc['Bats'])
+            else:
+                k_rate = base_k
+                hand_type = "R"
             
+            k_list.append(k_rate)
+            prob_list.append(round(k_rate * 0.85, 1))
+            hands.append(hand_type)
+
         final_lineup = pd.DataFrame({
-            "Batter Name": sim_names,
-            "Hand": ["L", "R", "R", "L", "R", "L", "R", "R", "L"],
-            "Season K%": [round(base_k * 0.6, 1), round(base_k * 0.8, 1), round(base_k * 1.1, 1), round(base_k * 1.2, 1), round(base_k * 0.9, 1), round(base_k * 1.0, 1), round(base_k * 1.1, 1), round(base_k * 1.3, 1), round(base_k * 1.4, 1)],
-            "Simulated K Prob": [round(base_k * 0.5, 1), round(base_k * 0.7, 1), round(base_k * 1.0, 1), round(base_k * 1.1, 1), round(base_k * 0.8, 1), round(base_k * 0.9, 1), round(base_k * 1.0, 1), round(base_k * 1.2, 1), round(base_k * 1.3, 1)]
+            "Batter Name": final_names,
+            "Hand": hands,
+            "Season K%": k_list,
+            "Simulated K Prob": prob_list
         })
         
-        return p_res, avg_k, final_lineup, None
+        return pitcher_data.iloc if not pitcher_data.empty else None, avg_k, final_lineup, status_msg
     except Exception as e:
-        return None, 0.0, None, f"Sync Alert: {str(e)}"
+        return None, 0.0, None, f"Sync Notice: {str(e)}"
 
-# 4. Main Multi-Column Split Panel Layout
+# 4. Main Multi-Column Panel Layout Execution
 col1, col2 = st.columns(2)
-
-p_row, live_avg_k, lineup_df, error = fetch_complete_matchup_data(pitcher_input, opposing_team_input)
+p_res, live_avg_k, lineup_df, app_status = fetch_complete_matchup_data(pitcher_input, opposing_team_input)
 
 with col1:
     st.subheader("📋 Active Projections & Lines")
-    if error:
-        st.error(error)
-    else:
+    if p_res is not None:
         calculated_edge = round(((live_avg_k - sportsbook_line) / sportsbook_line) * 100, 1)
         rec_tag = "OVER" if live_avg_k > sportsbook_line else "UNDER"
         
@@ -87,7 +126,6 @@ with col1:
         })
         st.dataframe(prop_table, use_container_width=True, hide_index=True)
             
-    # "Mixed Arsenal" Pitch Metrics Card
     st.subheader("🎛️ Mixed Arsenal (Statcast Metrics)")
     arsenal_data = pd.DataFrame({
         "Pitch Type": ["Slider", "Sinker", "Sweeper", "Changeup", "4-Seam Fastball"],
@@ -97,14 +135,10 @@ with col1:
         "PUT %": ["26.4%", "14.0%", "29.1%", "18.2%", "12.3%"]
     })
     st.dataframe(arsenal_data, use_container_width=True, hide_index=True)
-    st.caption("⚡ Savant Success: Metrics generated using active tracking data clusters.")
 
 with col2:
     st.subheader("⚔️ Batter-by-Batter K Matchup Simulation")
     if lineup_df is not None:
-        styled_matrix = lineup_df.style.background_gradient(
-            subset=["Season K%", "Simulated K Prob"], 
-            cmap="Reds"
-        )
+        styled_matrix = lineup_df.style.background_gradient(subset=["Season K%", "Simulated K Prob"], cmap="Reds")
         st.dataframe(styled_matrix, use_container_width=True, hide_index=True)
-        st.success(f"🤖 Matchup Matrix: Live lineup data linked to {opposing_team_input}.")
+        st.info(app_status)
