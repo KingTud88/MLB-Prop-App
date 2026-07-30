@@ -9,15 +9,6 @@ from datetime import datetime
 st.set_page_config(page_title="Advanced MLB Prop Engine", layout="wide")
 st.title("🎯 Custom MLB Prop Dashboard")
 
-# Dictionary to clean up team abbreviation codes for lookup matching
-TEAM_MAP = {
-    'KAN': 'KCR', 'KCR': 'KCR', 'CLE': 'CLE', 'NYY': 'NYY', 'BOS': 'BOS', 'TOR': 'TOR', 'BAL': 'BAL',
-    'TAM': 'TBR', 'CHW': 'CHW', 'DET': 'DET', 'MIN': 'MIN', 'HOU': 'HOU', 'OAK': 'ATH',
-    'SEA': 'SEA', 'TEX': 'TEX', 'LAA': 'LAA', 'ATL': 'ATL', 'NYM': 'NYM', 'PHI': 'PHI',
-    'WSH': 'WSN', 'MIA': 'MIA', 'MIL': 'MIL', 'CHC': 'CHC', 'STL': 'STL', 'PIT': 'PIT',
-    'CIN': 'CIN', 'LAD': 'LAD', 'SFO': 'SFG', 'SDG': 'SDP', 'ARI': 'ARI', 'COL': 'COL'
-}
-
 # 2. Sidebar Setup
 with st.sidebar:
     st.header("⚙️ Configuration")
@@ -57,15 +48,16 @@ def fetch_complete_matchup_data(pitcher_name, opp_team_abbr):
     try:
         current_year = datetime.now().year
         
-        # --- PITChER DATA FETCH (LIGHTWEIGHT FIX) ---
-        # Restricting the download parameters to only pull historical logs speeds up filtering instantly
-        all_pitchers = pitching_stats(2023, 2025)
+        # --- PITChER DATA FETCH (DUAL ENGINE FIX) ---
+        # Pulls from 2023 up to the current active 2026 season rows simultaneously
+        all_pitchers = pitching_stats(2023, current_year)
         all_pitchers['Name_Lower'] = all_pitchers['Name'].str.lower()
         pitcher_data = all_pitchers[all_pitchers['Name_Lower'].str.contains(pitcher_name.lower(), na=False)]
             
         avg_k = 0.0
         p_res_to_return = None
         if not pitcher_data.empty:
+            # Grabs the most recent season data row available
             p_row = pitcher_data.sort_values(by='Season', ascending=False).iloc[0]
             p_res_to_return = p_row
             games = int(p_row['G']) if int(p_row['G']) > 0 else 1
@@ -121,6 +113,7 @@ with col1:
             "Recommendation": [rec_tag]
         })
         st.dataframe(prop_table, use_container_width=True, hide_index=True)
+        st.caption(f"📊 Displaying active statistical database logs for the {int(p_res['Season'])} tracking window.")
     else:
         st.warning(f"ℹ️ Could not find active data for '{pitcher_input}'. Try searching another starting pitcher!")
             
