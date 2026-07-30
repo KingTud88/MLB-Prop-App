@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-from pybaseball import pitching_stats
+from pybaseball import playerid_lookup, statcast_pitcher
 from datetime import datetime
 
 # 1. Page Configuration
@@ -47,22 +47,31 @@ def fetch_live_announced_lineup(team_abbr):
 def fetch_complete_matchup_data(pitcher_name, opp_team_abbr):
     try:
         current_year = datetime.now().year
+        names = pitcher_name.split()
+        if len(names) < 2:
+            return None, 0.0, None, "Please enter both a first and last name."
+            
+        # Fast, low-memory target lookup using unique MLB tracking IDs
+        lookup = playerid_lookup(names, names)
+        if lookup.empty:
+            return None, 0.0, None, f"Could not find player '{pitcher_name}'."
+            
+        player_id = int(lookup['key_mlbam'].iloc)
         
-        # --- PITChER DATA FETCH (DUAL ENGINE FIX) ---
-        # Pulls from 2023 up to the current active 2026 season rows simultaneously
-        all_pitchers = pitching_stats(2023, current_year)
-        all_pitchers['Name_Lower'] = all_pitchers['Name'].str.lower()
-        pitcher_data = all_pitchers[all_pitchers['Name_Lower'].str.contains(pitcher_name.lower(), na=False)]
+        # Pull exact pitch logs for the player without downloading the whole league
+        try:
+            sc_data = statcast_pitcher(f"{current_year}-03-01", f"{current_year}-11-01", player_id)
+        except:
+            sc_data = statcast_pitcher(f"{current_year-1}-03-01", f"{current_year-1}-11-01", player_id)
             
         avg_k = 0.0
-        p_res_to_return = None
-        if not pitcher_data.empty:
-            # Grabs the most recent season data row available
-            p_row = pitcher_data.sort_values(by='Season', ascending=False).iloc[0]
-            p_res_to_return = p_row
-            games = int(p_row['G']) if int(p_row['G']) > 0 else 1
-            strikeouts = int(p_row['SO'])
-            avg_k = round(strikeouts / games, 2)
+        if sc_data is not None and not sc_data.empty:
+            # Group pitches into game logs to calculate strikeouts accurately
+            game_logs = sc_data.groupby('game_pk').agg(
+                strikeouts=('events', lambda x: (x == 'strikeout').sum())
+            )
+            if not game_logs.empty:
+                avg_k = round(game_logs['strikeouts'].mean(), 2)
         
         # Standard Fallback Database Values
         base_k = 22.4
@@ -76,7 +85,6 @@ def fetch_complete_matchup_data(pitcher_name, opp_team_abbr):
             status_msg = f"⏳ Lineup Status: Pre-game depth charts active for {opp_team_abbr}. Orders update when put out."
             final_names = sim_names
 
-        # Synthesize final stats matrix rows cleanly
         k_list, prob_list, hands = [], [], []
         for i, name in enumerate(final_names):
             k_rate = round(base_k * [0.6, 0.8, 1.1, 1.2, 0.9, 1.0, 1.1, 1.3, 1.4][i], 1)
@@ -91,31 +99,30 @@ def fetch_complete_matchup_data(pitcher_name, opp_team_abbr):
             "Simulated K Prob": prob_list
         })
         
-        return p_res_to_return, avg_k, final_lineup, status_msg
+        return pitcher_name, avg_k, final_lineup, status_msg
     except Exception as e:
         return None, 0.0, None, f"Sync Notice: {str(e)}"
 
 # 4. Main Multi-Column Panel Layout Execution
 col1, col2 = st.columns(2)
-p_res, live_avg_k, lineup_df, app_status = fetch_complete_matchup_data(pitcher_input, opposing_team_input)
+p_name, live_avg_k, lineup_df, app_status = fetch_complete_matchup_data(pitcher_input, opposing_team_input)
 
 with col1:
     st.subheader("📋 Active Projections & Lines")
-    if p_res is not None:
+    if p_name is not None:
         calculated_edge = round(((live_avg_k - sportsbook_line) / sportsbook_line) * 100, 1)
         rec_tag = "OVER" if live_avg_k > sportsbook_line else "UNDER"
         
         prop_table = pd.DataFrame({
-            "Pitcher": [p_res['Name']],
+            "Pitcher": [p_name.title()],
             "Line": [sportsbook_line],
             "Proj K": [live_avg_k],
             "Edge %": [f"{calculated_edge}%" if calculated_edge < 0 else f"+{calculated_edge}%"],
             "Recommendation": [rec_tag]
         })
         st.dataframe(prop_table, use_container_width=True, hide_index=True)
-        st.caption(f"📊 Displaying active statistical database logs for the {int(p_res['Season'])} tracking window.")
     else:
-        st.warning(f"ℹ️ Could not find active data for '{pitcher_input}'. Try searching another starting pitcher!")
+        st.warning(f"ℹ️ {app_status if 'app_status' in locals() else 'Analyzing player metrics...'}")
             
     st.subheader("🎛️ Mixed Arsenal (Statcast Metrics)")
     arsenal_data = pd.DataFrame({
