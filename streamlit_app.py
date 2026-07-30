@@ -75,9 +75,8 @@ with col1:
 
 with col2:
     st.subheader("⚔️ Batter-by-Batter K Matchup Simulation")
-    # Clean visual lineup fallback matrix with perfectly formatted commas
+    # Clean visual lineup fallback matrix with NO confusing order arrays
     batter_matrix = pd.DataFrame({
-        "Order":,
         "Batter Name": ["Steven Kwan", "José Ramírez", "Josh Naylor", "Andrés Giménez", "Will Brennan", "Bo Naylor", "Daniel Schneemann", "Brayan Rocchio", "Jhonkensy Noel"],
         "Hand": ["L", "S", "L", "L", "L", "L", "L", "S", "R"],
         "Season K%": ["9.2%", "11.5%", "18.1%", "20.4%", "16.8%", "24.1%", "22.3%", "19.8%", "27.5%"],
