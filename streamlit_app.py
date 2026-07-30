@@ -53,7 +53,8 @@ def fetch_live_pitcher_and_lineup(name_string, team_abbr):
         
         # Pull Pitcher Season Stats
         all_stats = pitching_stats_range(f"{current_year}-03-01", f"{current_year}-11-01")
-        pitcher_data = all_stats[all_stats['mlbam_id'] == mlbam_id]
+        p_names = name_string.split()
+pitcher_data = all_stats[(all_stats['Name'].str.contains(p_names[1], case=False)) & (all_stats['Name'].str.contains(p_names[0], case=False))]
         
         if pitcher_data.empty:
             return None, None, f"No live season statistics tracking for {name_string} yet."
