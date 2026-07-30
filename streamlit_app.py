@@ -54,7 +54,8 @@ def fetch_pitcher_intel_metrics(pitcher_name):
             all_pitchers['Name_Lower'] = all_pitchers['Name'].str.lower()
             pitcher_data = all_pitchers[all_pitchers['Name_Lower'].str.contains(pitcher_name.lower(), na=False)]
             
-        return pitcher_data.iloc if not pitcher_data.empty else None
+        # Standardizes data structure format to satisfy modern Pandas indexing criteria
+        return pitcher_data.squeeze() if not pitcher_data.empty else None
     except:
         return None
 
@@ -66,9 +67,9 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.header(f"👤 {pitcher_input.title()}")
-    st.caption(f"⚾ MIL vs SF — MIL @ SF · RHP | Matchup Intel Final")
+    st.caption(f"⚾ Matchup Intel Analysis Summary Slate | RHP vs {opposing_team}")
     
-    if p_stats is not None:
+    if p_stats is not None and not isinstance(p_stats, pd.DataFrame):
         games = int(p_stats['G'])
         strikeouts = int(p_stats['SO'])
         live_avg = round(strikeouts / games, 2)
@@ -79,7 +80,9 @@ with col1:
         with c_p1:
             st.markdown(f"<div class='metric-card'><div class='metric-label'>PROJ K</div><div class='metric-value'>{live_avg}</div><div style='color:#FF5555;font-size:12px;'>{diff_val} vs {sportsbook_line}</div></div>", unsafe_allow_html=True)
         with c_p2:
-            st.markdown(f"<div class='metric-card'><div class='metric-label'>RECOMMENDATION</div><div class='metric-value' style='color:#FFB86C;'>UNDER</div><div style='font-size:12px;color:#8BE9FD;'>{sportsbook_line} Ks Line</div></div>", unsafe_allow_html=True)
+            rec_tag = "OVER" if live_avg > sportsbook_line else "UNDER"
+            rec_color = "#50FA7B" if rec_tag == "OVER" else "#FFB86C"
+            st.markdown(f"<div class='metric-card'><div class='metric-label'>RECOMMENDATION</div><div class='metric-value' style='color:{rec_color};'>{rec_tag}</div><div style='font-size:12px;color:#8BE9FD;'>{sportsbook_line} Ks Line</div></div>", unsafe_allow_html=True)
             
         # Micro Parameter Cards Row (Exactly matching his layout categories)
         st.subheader("📊 Advanced Profile Analytics")
