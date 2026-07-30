@@ -176,23 +176,23 @@ with col1:
         # Advanced Splits Bottom Metrics
         st.markdown("<div class='section-header'>Advanced Metrics</div>", unsafe_allow_html=True)
         bm1, bm2, bm3 = st.columns(3)
-        with bm1:
-            st.metric("PITCH K%", "18.5%")
-            st.metric("BF / GM", f"{round(int(p_stats.get('BFP', 100)) / games, 1)}")
-            st.metric("QUALITY", "0")
-        with bm2:
-            st.metric("OPP K%", "22.0%")st.metric("IP / GM", f"{round(innings_pitched / games, 2)}")
-            st.metric("BF GATE", "-")
-        with bm3:
-            st.metric("WHIFF", "—")
-            st.metric("SAVANT", "SUCCESS")
-            st.metric("SKILL", "—")
+         with bm1:
+             st.metric("PITCH K%", "18.5%")
+             st.metric("BF / GM", f"{round(int(p_stats.get('BFP', 100)) / games, 1)}")
+             st.metric("QUALITY", "0")
+         with bm2:
+             st.metric("OPP K%", "22.0%")st.metric("IP / GM", f"{round(innings_pitched / games, 2)}")
+             st.metric("BF GATE", "-")
+         with bm3:
+             st.metric("WHIFF", "—")
+             st.metric("SAVANT", "SUCCESS")
+             st.metric("SKILL", "—")
             
-        st.metric("ERA / FIP Discrepancy", f"— / {era}")
-    else:
-        st.warning("Data load error.")
+         st.metric("ERA / FIP Discrepancy", f"— / {era}")
+     else:
+         st.warning("Data load error.")
     
-    with col2:
-        st.markdown("Batter-by-batter K matchup", unsafe_allow_html=True)
-        st.caption(f"MLB PROJECTED - avg {round(lineup_df['K% USED'].mean(), 1)} | high-K {len(lineup_df[lineup_df['K% USED'] > 22])} | low-K {len(lineup_df[lineup_df['K% USED'] <= 15])}")
-        st.dataframe(lineup_df, use_container_width=True, hide_index=True)
+     with col2:
+         st.markdown("Batter-by-batter K matchup", unsafe_allow_html=True)
+         st.caption(f"MLB PROJECTED - avg {round(lineup_df['K% USED'].mean(), 1)} | high-K {len(lineup_df[lineup_df['K% USED'] > 22])} | low-K {len(lineup_df[lineup_df['K% USED'] <= 15])}")
+         st.dataframe(lineup_df, use_container_width=True, hide_index=True)
