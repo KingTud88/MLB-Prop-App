@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-from pybaseball import pitching_stats, team_batting
+from pybaseball import pitching_stats
 from datetime import datetime
 
 # 1. Page Configuration
@@ -57,34 +57,23 @@ def fetch_complete_matchup_data(pitcher_name, opp_team_abbr):
     try:
         current_year = datetime.now().year
         
-        # --- PITChER DATA FETCH ---
-        # Using pitching_stats fetches data directly from a solid database server
-        all_pitchers = pitching_stats(current_year - 1, current_year)
+        # --- PITChER DATA FETCH (LIGHTWEIGHT FIX) ---
+        # Restricting the download parameters to only pull historical logs speeds up filtering instantly
+        all_pitchers = pitching_stats(2023, 2025)
         all_pitchers['Name_Lower'] = all_pitchers['Name'].str.lower()
         pitcher_data = all_pitchers[all_pitchers['Name_Lower'].str.contains(pitcher_name.lower(), na=False)]
             
         avg_k = 0.0
         p_res_to_return = None
         if not pitcher_data.empty:
-            p_row = pitcher_data.iloc[0]
+            p_row = pitcher_data.sort_values(by='Season', ascending=False).iloc[0]
             p_res_to_return = p_row
             games = int(p_row['G']) if int(p_row['G']) > 0 else 1
             strikeouts = int(p_row['SO'])
             avg_k = round(strikeouts / games, 2)
         
-        # --- HITTER DATA FETCH ---
-        all_hitters = team_batting(current_year)
-        mapped_team = TEAM_MAP.get(opp_team_abbr, opp_team_abbr)
-        opp_stats = all_hitters[all_hitters['Team'] == mapped_team]
-        
         # Standard Fallback Database Values
         base_k = 22.4
-        if not opp_stats.empty:
-            try:
-                base_k = round((opp_stats['SO'].sum() / opp_stats['AB'].sum()) * 100, 1)
-            except:
-                pass
-
         live_names = fetch_live_announced_lineup(opp_team_abbr)
         sim_names = ["Leadoff Hitter", "Contact Hitter", "Power Core", "Cleanup Hitter", "Outfielder", "Infielder", "Utility Player", "Catcher", "Bottom Order"]
         
@@ -133,7 +122,7 @@ with col1:
         })
         st.dataframe(prop_table, use_container_width=True, hide_index=True)
     else:
-        st.warning(f"ℹ️ Searching active servers for '{pitcher_input}' tracking sheets...")
+        st.warning(f"ℹ️ Could not find active data for '{pitcher_input}'. Try searching another starting pitcher!")
             
     st.subheader("🎛️ Mixed Arsenal (Statcast Metrics)")
     arsenal_data = pd.DataFrame({
