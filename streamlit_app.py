@@ -72,7 +72,7 @@ def fetch_live_pitcher_and_lineup(name_string, team_abbr):
         return None, None, f"Source connection alert: {str(e)}"
 
 # 4. Main Panel Layout
-col1, col2 = st.columns()
+col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("📋 Active Projections & Lines")
