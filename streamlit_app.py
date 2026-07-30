@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-from pybaseball import pitching_stats_bref, team_batting
+from pybaseball import pitching_stats_bref, team_batting_bref
 from datetime import datetime
 
 # 1. Custom CSS Theme & Card Layout Injection to Match the Gated UI Style
@@ -83,42 +83,44 @@ def fetch_pitcher_intel_metrics(pitcher_name):
 def fetch_dynamic_opposing_lineup(team_abbr):
     try:
         current_year = datetime.now().year
-        all_hitters = team_batting(current_year)
-        team_hitters = all_hitters[all_hitters['Team'] == team_abbr].copy()
+        # FIX: Switched to team_batting_bref which connects to an open, unblocked server channel
+        all_hitters = team_batting_bref(team_abbr, current_year)
         
-        if team_hitters.empty:
-            team_hitters = all_hitters.head(15).copy()
+        if all_hitters.empty:
+            all_hitters = team_batting_bref(team_abbr, current_year - 1)
 
-        # RUN SCRAPER: Check if lines have been officially posted 
+        # RUN SCRAPER: Check if official morning lineups have been posted on the wire yet
         live_names = fetch_live_announced_lineup(team_abbr)
         
         if live_names:
             status_msg = f"✅ Lineup Status: Confirmed starting lineup pulled live for {team_abbr}!"
-            team_hitters['Name_Lower'] = team_hitters['Name'].str.lower()
+            all_hitters['Name_Lower'] = all_hitters['Name'].str.lower()
             lineup_data = pd.DataFrame()
             for name in live_names:
-                match_row = team_hitters[team_hitters['Name_Lower'] == name.lower()]
+                match_row = all_hitters[all_hitters['Name_Lower'] == name.lower()]
                 if not match_row.empty:
                     lineup_data = pd.concat([lineup_data, match_row.head(1)])
                 else:
-                    new_row = pd.DataFrame([{"Name": name, "AB": 100, "SO": 22, "PA": 100}])
+                    new_row = pd.DataFrame([{"Name": name, "AB": 100, "SO": 22, "PA": 100, "Bats": "R"}])
                     lineup_data = pd.concat([lineup_data, new_row])
         else:
-            status_msg = f"⏳ Lineup Status: Daily orders pending. Season depth charts active for {team_abbr}."
-            lineup_data = team_hitters.sort_values(by='PA', ascending=False).head(9)
+            status_msg = f"⏳ Lineup Status: Confirmed daily orders pending. Seasonal depth charts active for {team_abbr}."
+            lineup_data = all_hitters.dropna(subset=['G']).sort_values(by='PA', ascending=False).head(9)
         
         # Compute individual season strikeout metrics safely
         k_list = []
         final_names = []
+        hands = []
         for _, row in lineup_data.iterrows():
             ab_val = int(row['AB']) if int(row['AB']) > 0 else 1
             k_list.append(round((int(row['SO']) / ab_val) * 100, 1))
             final_names.append(str(row['Name']))
+            hands.append(str(row['Bats']) if 'Bats' in row else "R")
             
         # Build clean dataframe array panel
         display_df = pd.DataFrame({
             "BATTER": [f"{i+1}  {name}" for i, name in enumerate(final_names[:9])],
-            "HAND": ["R" if i % 2 == 0 else "L" for i in range(len(final_names[:9]))],
+            "HAND": hands[:9],
             "K% USED": k_list[:9],
             "VS HAND": [round(k * 0.95, 1) for k in k_list[:9]],
             "SEASON": k_list[:9]
@@ -169,7 +171,7 @@ with col1:
             st.markdown(f"<div class='metric-card'><div class='metric-label'>CEILING</div><div class='metric-value' style='color:#50FA7B;'>{int(live_avg + 2)}K</div></div>", unsafe_allow_html=True)
         with c_m3:
             st.markdown("<div class='metric-card'><div class='metric-label'>TOP PITCH</div><div style='font-size:11px;font-weight:bold;color:#BD93F9;margin-top:5px;'>Sinker<br>45% use</div></div>", unsafe_allow_html=True)
-        with c_m4:
+        with col1: # Wrapped directly inside col1 bounds
             st.markdown(f"<div class='metric-card'><div class='metric-label'>ARSENAL</div><div class='metric-value'>{int(p_stats['SO'])}</div></div>", unsafe_allow_html=True)
 
         # Macro Matrix Split Categories Block
@@ -197,14 +199,11 @@ with col1:
         "USE": ["45%", "29%", "14%", "6%", "5%"],
         "K%": ["14.2%", "38.5%", "42.0%", "22.1%", "19.5%"],
         "WHIFF": ["11.5%", "41.3%", "46.2%", "28.4%", "15.1%"],
-        "PUT": ["14.0%", "26.4%", "29.1%", "18.2%", "12.3%"]
-    })
+        "PUT": ["14.0%", "26.4%", "29.1%", "18.2%", "12.3%"]})
     st.dataframe(arsenal_df, use_container_width=True, hide_index=True)
-    # 5. Right Panel Render Engine
     with col2:
         st.header("⚔️ Batter-by-Batter K Matchup")
         st.caption("MLB PROJECTED — Real-Time Automated Web Feed Matrix")
-        
         if lineup_df is not None and not lineup_df.empty:
             styled_lineup = lineup_df.style.background_gradient(subset=["K% USED", "VS HAND", "SEASON"],cmap="Purples")
             st.dataframe(styled_lineup, use_container_width=True, hide_index=True)
