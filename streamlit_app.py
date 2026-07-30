@@ -45,7 +45,7 @@ try:
             st.metric(label="Calculated Line Edge %", value=f"{calculated_edge}%", delta=f"{rec_tag} Recommendation")
             
         # Display underlying table
-        st.dataframe(pitcher_data[['Name', 'Team', 'G', 'IP', 'SO']], use_container_width=True, hide_index=True)
+        st.dataframe(pitcher_data[['Name', 'Tm', 'G', 'IP', 'SO']], use_container_width=True, hide_index=True)
         
 except Exception as e:
     st.error(f"Waiting for input update: {str(e)}")
