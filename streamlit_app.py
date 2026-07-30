@@ -22,23 +22,21 @@ with st.sidebar:
     st.subheader("💵 Sportsbook Line")
     sportsbook_line = st.number_input("Current Line O/U", min_value=0.5, max_value=15.5, value=5.5, step=0.5)
 
-# NEW REPLICATION FEATURE: Real-Time Live Lineup Web Scraper Engine
+# Real-Time Live Lineup Web Scraper Engine
 def fetch_live_announced_lineup(team_abbr):
     try:
-        url = "https://www.rotowire.com/baseball/daily-lineups.php"
+        url = "https://rotowire.com"
         headers = {"User-Agent": "Mozilla/5.0"}
         soup = BeautifulSoup(requests.get(url, headers=headers).text, "html.parser")
         
-        # Scans the daily lineup containers on the webpage
         for box in soup.select(".lineup__box"):
             teams_text = box.select_one(".lineup__teams")
             if teams_text and team_abbr in teams_text.get_text().upper():
-                # Isolate either home or away list matching our target team
-                lineup_list = box.select(f".lineup__list")
+                lineup_lists = box.select(".lineup__list")
                 players = []
-                for player_row in lineup_list.select(".lineup__player a"):
-                    players.append(player_row.get_text(strip=True))
-                
+                for l_list in lineup_lists:
+                    for player_row in l_list.select(".lineup__player a"):
+                        players.append(player_row.get_text(strip=True))
                 if len(players) >= 9:
                     return players[:9]
         return None
@@ -53,41 +51,43 @@ def fetch_complete_matchup_data(pitcher_name, opp_team_abbr):
         # Fetch Pitcher Metrics
         all_pitchers = pitching_stats_bref(current_year)
         pitcher_data = all_pitchers[all_pitchers['Name'].str.contains(pitcher_name, case=False, na=False)]
-        avg_k = round(int(pitcher_data.iloc['SO']) / max(int(pitcher_data.iloc['G']), 1), 2) if not pitcher_data.empty else 0.0
+        
+        avg_k = 0.0
+        if not pitcher_data.empty:
+            p_row = pitcher_data.iloc
+            games = int(p_row['G']) if int(p_row['G']) > 0 else 1
+            strikeouts = int(p_row['SO'])
+            avg_k = round(strikeouts / games, 2)
         
         # Fetch Opposing Hitter Performance Records
         all_hitters = team_batting_bref(opp_team_abbr, current_year)
         base_k = 22.4
         
-        # Try to pull the individual historical stats to back-fill projections
-        try:
-            lineup_data = all_hitters.dropna(subset=['G']).sort_values(by='PA', ascending=False)
-            base_k = round((lineup_data.head(9)['SO'].sum() / lineup_data.head(9)['AB'].sum()) * 100, 1)
-        except:
-            lineup_data = pd.DataFrame()
-
-        # AUTOMATED SWITCH LOGIC: Check if live lineups are officially out yet
+        # Check if live lineups are officially out yet
         live_names = fetch_live_announced_lineup(opp_team_abbr)
         
+        sim_names = ["Leadoff Hitter", "Contact Hitter", "Power Core", "Cleanup Hitter", "Outfielder", "Infielder", "Utility Player", "Catcher", "Bottom Order"]
+        
         if live_names:
-            # OPTION A: Lineups are OUT! Build matrix using the real names
             status_msg = f"✅ Lineup Status: Confirmed starting lineup pulled live for {opp_team_abbr}!"
             final_names = live_names
         else:
-            # OPTION B: Lineups are not out yet. Pull expected top 9 active roster players instead
             status_msg = f"⏳ Lineup Status: Pre-game depth charts active for {opp_team_abbr}. Orders update when put out."
-            if not lineup_data.empty:
+            if not all_hitters.empty:
+                lineup_data = all_hitters.dropna(subset=['G']).sort_values(by='PA', ascending=False)
                 final_names = lineup_data.head(9)['Name'].tolist()
             else:
-                final_names = ["Leadoff Hitter", "Contact Hitter", "Power Core", "Cleanup Hitter", "Outfielder", "Infielder", "Utility Player", "Catcher", "Bottom Order"]
+                final_names = sim_names
 
-        # Synthesize final stats matrix rows
+        # Synthesize final stats matrix rows cleanly without positional indexing errors
         k_list, prob_list, hands = [], [], []
         for name in final_names:
-            p_row = lineup_data[lineup_data['Name'] == name] if not lineup_data.empty else pd.DataFrame()
-            if not p_row.empty:
-                k_rate = round((int(p_row.iloc['SO']) / max(int(p_row.iloc['AB']), 1)) * 100, 1)
-                hand_type = str(p_row.iloc['Bats'])
+            p_match = all_hitters[all_hitters['Name'] == name] if not all_hitters.empty else pd.DataFrame()
+            if not p_match.empty:
+                row_h = p_match.iloc
+                ab_val = int(row_h['AB']) if int(row_h['AB']) > 0 else 1
+                k_rate = round((int(row_h['SO']) / ab_val) * 100, 1)
+                hand_type = str(row_h['Bats']) if 'Bats' in row_h else "R"
             else:
                 k_rate = base_k
                 hand_type = "R"
@@ -125,6 +125,8 @@ with col1:
             "Recommendation": [rec_tag]
         })
         st.dataframe(prop_table, use_container_width=True, hide_index=True)
+    else:
+        st.warning(f"ℹ️ No active statistics found for {pitcher_input} in the current year dataset.")
             
     st.subheader("🎛️ Mixed Arsenal (Statcast Metrics)")
     arsenal_data = pd.DataFrame({
