@@ -34,7 +34,7 @@ with col2:
     
     # Replicating his specific batter matchup matrix table
     batter_data = {
-        "Order":,
+        "Order":[1,2,3,4,],
         "Batter Name": ["Steven Kwan", "José Ramírez", "Josh Naylor", "Andrés Giménez"],
         "Hand": ["L", "S", "L", "L"],
         "Season K%": ["9.2%", "11.5%", "18.1%", "20.4%"],
