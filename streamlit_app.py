@@ -171,7 +171,7 @@ with col1:
             "WHIFF": ["W- 14%", "W- 31%", "W- 41%", "W- 22%", "W- 16%"],
             "PUT": ["-", "-", "-", "-", "-"]
         })
-        st.dataframe(pitch_data, use_container_width=True, hide_index=True)
+        st.dataframe(pitch_data, use_container_width="stretch", hide_index=True)
         
         # Advanced Splits Bottom Metrics
         st.markdown("<div class='section-header'>Advanced Metrics</div>", unsafe_allow_html=True)
@@ -190,3 +190,10 @@ with col1:
         st.metric("SKILL", "—")
         
     st.metric("ERA / FIP Discrepancy", f"— / {era}")
+    else:
+        st.warning("Data load error.")
+
+with col2:
+        st.markdown("<div class='section-header'>Batter-by-batter K matchup</div>", unsafe_allow_html=True)
+        st.caption(f"MLB PROJECTED - avg {round(lineup_df['K% USED'].mean(), 1)} | high-K {len(lineup_df[lineup_df['K% USED'] > 22])} | low-K {len(lineup_df[lineup_df['K% USED'] <= 15])}")
+        st.dataframe(lineup_df, use_container_width="stretch", hide_index=True)
