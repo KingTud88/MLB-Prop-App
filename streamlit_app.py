@@ -105,7 +105,7 @@ def fetch_dynamic_opposing_lineup(team_abbr):
     })
     return display_df, status_msg
 
-# 4. Interface Rendering Framework Layout Pipeline
+    # 4. Interface Rendering Framework Layout Pipeline
 lineup_df, app_status = fetch_dynamic_opposing_lineup(opposing_team)
 
 @st.cache_data(ttl=3600)
