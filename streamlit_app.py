@@ -65,29 +65,36 @@ def fetch_live_announced_lineup(team_abbr):
     except: return None
 
 # Data Core
+import unicodedata
+
+def clean_string_accents(text):
+    if not isinstance(text, str): return ""
+    # Normalize strings to strip hidden accents or special character layers
+    normalized = unicodedata.normalize('NFD', text)
+    return "".join([c for c in normalized if unicodedata.category(c) != 'Mn']).lower().strip()
+
 @st.cache_data(ttl=1800)
 def fetch_pitcher_intel_metrics(pitcher_name):
     try:
         current_year = datetime.now().year
-        # Clean and lowercase the incoming user input string
-        clean_name = pitcher_name.strip().lower()
+        clean_input = clean_string_accents(pitcher_name)
         
-        # 1. Try pulling stats for the current year
+        # 1. Fetch current seasonal data frames
         all_pitchers = pitching_stats_bref(current_year)
         if not all_pitchers.empty:
-            all_pitchers['Name_Lower'] = all_pitchers['Name'].str.lower().str.strip()
-            pitcher_data = all_pitchers[all_pitchers['Name_Lower'].str.contains(clean_name, na=False)]
+            all_pitchers['Clean_Name'] = all_pitchers['Name'].apply(clean_string_accents)
+            pitcher_data = all_pitchers[all_pitchers['Clean_Name'].str.contains(clean_input, na=False)]
             if not pitcher_data.empty:
-                return pitcher_data.iloc[0]
+                return pitcher_data.iloc[0] # <-- Explicitly pulls the first clean dictionary match position!
         
-        # 2. Fallback to previous year data if current is blank
+        # 2. Year baseline tracking fallback layer 
         all_pitchers = pitching_stats_bref(current_year - 1)
-        all_pitchers['Name_Lower'] = all_pitchers['Name'].str.lower().str.strip()
-        pitcher_data = all_pitchers[all_pitchers['Name_Lower'].str.contains(clean_name, na=False)]
+        all_pitchers['Clean_Name'] = all_pitchers['Name'].apply(clean_string_accents)
+        pitcher_data = all_pitchers[all_pitchers['Clean_Name'].str.contains(clean_input, na=False)]
         
         return pitcher_data.iloc[0] if not pitcher_data.empty else None
     except Exception as e:
-        print(f"PITCHER ERROR LOG: {str(e)}")
+        print(f"CRITICAL ENGINE LOG: {str(e)}")
         return None
 
 def fetch_dynamic_opposing_lineup(team_abbr):
