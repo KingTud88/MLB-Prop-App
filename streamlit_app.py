@@ -65,16 +65,21 @@ def fetch_live_announced_lineup(team_abbr):
 def fetch_pitcher_intel_metrics(pitcher_name):
     try:
         current_year = datetime.now().year
+        # 1. Try pulling stats for the current year
         all_pitchers = pitching_stats_bref(current_year)
+        if not all_pitchers.empty:
+            all_pitchers['Name_Lower'] = all_pitchers['Name'].str.lower()
+            pitcher_data = all_pitchers[all_pitchers['Name_Lower'].str.contains(pitcher_name.lower(), na=False)]
+            if not pitcher_data.empty:
+                return pitcher_data.iloc[0]
+        
+        # 2. If empty (early in season/no data), fallback to previous year data
+        all_pitchers = pitching_stats_bref(current_year - 1)
         all_pitchers['Name_Lower'] = all_pitchers['Name'].str.lower()
         pitcher_data = all_pitchers[all_pitchers['Name_Lower'].str.contains(pitcher_name.lower(), na=False)]
         
-        if pitcher_data.empty:
-            all_pitchers = pitching_stats_bref(current_year - 1)
-            all_pitchers['Name_Lower'] = all_pitchers['Name'].str.lower()
-            pitcher_data = all_pitchers[all_pitchers['Name_Lower'].str.contains(pitcher_name.lower(), na=False)]
         return pitcher_data.iloc[0] if not pitcher_data.empty else None
-    except:
+    except Exception as e:
         return None
 
 def fetch_dynamic_opposing_lineup(team_abbr):
