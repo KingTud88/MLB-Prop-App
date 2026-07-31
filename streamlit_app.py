@@ -6,9 +6,7 @@ from datetime import datetime
 import unicodedata
 from injury_scanner import check_active_team_injuries
 
-# =====================================================================
 # 1. Page Configuration & Custom Theme Styling
-# =====================================================================
 st.set_page_config(page_title="Prop Intel Modeling Dashboard", layout="wide")
 st.markdown("""
 <style>
@@ -25,9 +23,7 @@ st.markdown("""
 
 st.title("🔮 Matchup Intel Modeling Dashboard")
 
-# =====================================================================
 # 2. Sidebar Component Controls
-# =====================================================================
 with st.sidebar:
     st.header("⚙️ Configuration")
     sport = st.selectbox("Select League", ["MLB"])
@@ -41,43 +37,11 @@ with st.sidebar:
     vegas_total = st.number_input("Vegas Game Total (O/U)", min_value=4.0, max_value=14.0, value=8.5, step=0.5)
     vegas_spread = st.number_input("Opponent Implied Total Runs", min_value=1.5, max_value=8.5, value=3.5, step=0.1)
 
-# =====================================================================
-# 3. String Sanitization & Automated Database Core
-# =====================================================================
 def clean_string_accents(text):
     if not isinstance(text, str): return ""
     normalized = unicodedata.normalize('NFD', text)
     return "".join([c for c in normalized if unicodedata.category(c) != 'Mn']).lower().strip()
 
-@st.cache_data(ttl=3600)
-def auto_generate_batter_fallback():
-    """Generates 270 baseline batter tracking slots for all 30 teams on the fly in cloud memory."""
-    teams = ["NYM","LAD","NYY","CLE","ARI","SDP","ATL","KC","BAL","CIN","PIT","CHC","STL","MIL","CWS","MIN","DET","KC","SEA","HOU","TEX","LAA","OAK","PHI","MIA","WSH","BOS","TBR","TOR","SF"]
-    data = [{"name": f"{t} Hitter {i}", "team": t, "hand": "R" if i%2==0 else "L", "season_k": round(18.5 + (i*1.2), 1), "vs_rhp_k": round(19.2 + (i*1.1), 1)} for t in teams for i in range(1, 10)]
-    df = pd.DataFrame(data)
-    df['name_clean'] = df['name'].astype(str).str.lower().str.strip()
-    return df
-
-@st.cache_data(ttl=3600)
-def load_github_pitcher_database():
-    try:
-        url = "https://githubusercontent.com"
-        df = pd.read_csv(url)
-        df['name_clean'] = df['name'].astype(str).str.lower().str.strip()
-        return df
-    except:
-        return pd.DataFrame()
-
-@st.cache_data(ttl=3600)
-def load_github_batter_database():
-    try:
-        url = "https://githubusercontent.com"
-        df = pd.read_csv(url)
-        df['name_clean'] = df['name'].astype(str).str.lower().str.strip()
-        return df
-    except:
-        return auto_generate_batter_fallback()
-        
 def fetch_live_announced_lineup(team_abbr):
     try:
         ROTOWIRE_HTML_MAP = {
@@ -119,7 +83,11 @@ def fetch_dynamic_opposing_lineup(team_abbr):
     seed_shift = sum(ord(char) for char in team_abbr) % 6
     dynamic_ks = [round(k + seed_shift - 3, 1) for k in base_ks]
     
-    batter_db = load_github_batter_database()
+    try:
+        batter_db = pd.read_csv("batter_database.csv")
+        batter_db['name_clean'] = batter_db['name'].str.lower().str.strip()
+    except:
+        batter_db = pd.DataFrame()
 
     if live_names:
         status_msg = f"✅ Lineup Status: Confirmed starting lineup pulled live for {team_abbr}!"
@@ -137,38 +105,43 @@ def fetch_dynamic_opposing_lineup(team_abbr):
             "LAD": ["S. Ohtani", "M. Betts", "F. Freeman", "T. Hernandez", "W. Smith", "M. Muncy", "G. Lux", "T. Edman", "M. Rojas"],
             "NYY": ["G. Torres", "J. Soto", "A. Judge", "G. Stanton", "J. Chisholm Jr.", "A. Volpe", "A. Verdugo", "A. Wells", "O. Cabrera"],
             "CLE": ["S. Kwan", "J. Ramirez", "J. Naylor", "L. Thomas", "A. Gimenez", "D. Fry", "W. Brennan", "B. Naylor", "B. Rocchio"],
-            "NYM": ["Francisco Lindor", "Brandon Nimmo", "Mark Vientos", "Pete Alonso", "J.D. Martinez", "Jose Iglesias", "Jeff McNeil", "Francisco Alvarez", "Harrison Bader"],
+            "NYM": ["F. Lindor", "B. Nimmo", "M. Vientos", "P. Alonso", "J. Martinez", "J. Iglesias", "J. McNeil", "F. Alvarez", "H. Bader"],
             "SDP": ["L. Arraez", "F. Tatis Jr.", "J. Cronenworth", "M. Machado", "X. Bogaerts", "J. Merrill", "H. Kim", "D. Peralta", "K. Higashioka"],
             "ATL": ["M. Harris II", "O. Albies", "M. Ozuna", "M. Olson", "J. Soler", "R. Laureano", "S. Murphy", "G. Urshela", "O. Arcia"]
         }
-        
-        raw_names = roster_database.get(team_abbr.upper().strip(), [f"Hitter {k}" for k in range(1, 10)])
-        for i, name in enumerate(raw_names):
+        fake_names = roster_database.get(team_abbr.upper().strip(), [f"Hitter {i}" for i in range(1, 10)])
+        for i, name in enumerate(fake_names):
             clean_target = name.lower().strip()
             if not batter_db.empty and clean_target in batter_db['name_clean'].values:
                 b_row = batter_db[batter_db['name_clean'] == clean_target].iloc[0]
-                lineup_rows.append({"Name": b_row['name'], "K%": float(b_row['vs_rhp_k']), "SEASON": float(b_row['season_k'])})
+                lineup_rows.append({"Name": name, "K%": float(b_row['vs_rhp_k']), "SEASON": float(b_row['season_k'])})
             else:
-                display_name = f"{team_abbr} {name}" if "Hitter" in name else name
-                lineup_rows.append({"Name": display_name, "K%": dynamic_ks[i], "SEASON": dynamic_ks[i]})
+                lineup_rows.append({"Name": f"{team_abbr} {name}" if "Hitter" in name else name, "K%": dynamic_ks[i], "SEASON": dynamic_ks[i]})
                 
     lineup_df = pd.DataFrame(lineup_rows)
     display_df = pd.DataFrame({
         "BATTER": [f"{i+1}  {row['Name']}" for i, row in lineup_df.iterrows()],
         "HAND": ["R" if i % 2 == 0 else "L" for i in range(len(lineup_df))],
-        "K% USED": lineup_df["K%"], 
-        "VS HAND": [round(k * 0.95, 1) for k in lineup_df["K%"]], 
-        "SEASON": lineup_df["SEASON"]
+        "K% USED": lineup_df["K%"], "VS HAND": [round(k * 0.95, 1) for k in lineup_df["K%"]], "SEASON": lineup_df["SEASON"]
     })
     return display_df, status_msg
 
-# =====================================================================
-# 5. Interface Rendering Framework Layout Pipeline
-# =====================================================================
+    # 4. Interface Rendering Framework Layout Pipeline
 lineup_df, app_status = fetch_dynamic_opposing_lineup(opposing_team)
-pitcher_db = load_github_pitcher_database()
+
+@st.cache_data(ttl=3600)
+def load_local_pitcher_database():
+    try:
+        df = pd.read_csv("pitcher_database.csv")
+        df['name_clean'] = df['name'].str.lower().str.strip()
+        return df
+    except:
+        return pd.DataFrame()
+
+pitcher_db = load_local_pitcher_database()
 lookup_key = pitcher_input.strip().lower()
 
+# FIXED PROFILES MAPPING LOOP: Safely unpacks single data rows from the CSV
 if not pitcher_db.empty and lookup_key in pitcher_db['name_clean'].values:
     p_row = pitcher_db[pitcher_db['name_clean'] == lookup_key].iloc[0]
     pitcher_base_avg = float(p_row['base_avg'])
@@ -212,8 +185,7 @@ with col1:
     st.info(app_status)
     
     c_p1, c_p2 = st.columns(2)
-    with c_p1: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>PROJ K</div><div class='metric-value' style='color:#FF79C6; font-size:32px;'>{live_avg}</div><div class='sub-text' style='color:#50FA7B;'>{'+' if diff_val >= 0 else ''}{diff_val} vs {sportsbook_line}</div></div>", unsafe_allow_html=True)
+    with c_p1: st.markdown(f"<div class='metric-card'><div class='metric-label'>PROJ K</div><div class='metric-value' style='color:#FF79C6; font-size:32px;'>{live_avg}</div><div class='sub-text' style='color:#50FA7B;'>{'+' if diff_val >= 0 else ''}{diff_val} vs {sportsbook_line}</div></div>", unsafe_allow_html=True)
     with c_p2:
         rec_tag = "OVER" if live_avg > sportsbook_line else "UNDER"
         rec_color = "#50FA7B" if rec_tag == "OVER" else "#FF5555"
@@ -223,12 +195,9 @@ with col1:
     with c_m1:
         grade = "A" if live_avg > 7.5 else "B" if live_avg > 6.0 else "C" if live_avg > 4.5 else "D"
         st.markdown(f"<div class='metric-card'><div class='metric-label'>K GRADE</div><div class='tag-grade'>{grade}</div></div>", unsafe_allow_html=True)
-    with c_m2: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>CEILING</div><div class='metric-value' style='color:#FFB86C;'>{int(live_avg + 3.0)}K</div></div>", unsafe_allow_html=True)
-    with c_m3: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>TOP PITCH</div><div class='sub-text' style='color:#BD93F9;font-weight:bold;margin-top:4px;'>{top_pitch_text}</div></div>", unsafe_allow_html=True)
-    with c_m4: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>ARSENAL</div><div class='metric-value'>{strikeouts}</div></div>", unsafe_allow_html=True)
+    with c_m2: st.markdown(f"<div class='metric-card'><div class='metric-label'>CEILING</div><div class='metric-value' style='color:#FFB86C;'>{int(live_avg + 3.0)}K</div></div>", unsafe_allow_html=True)
+    with c_m3: st.markdown(f"<div class='metric-card'><div class='metric-label'>TOP PITCH</div><div class='sub-text' style='color:#BD93F9;font-weight:bold;margin-top:4px;'>{top_pitch_text}</div></div>", unsafe_allow_html=True)
+    with c_m4: st.markdown(f"<div class='metric-card'><div class='metric-label'>ARSENAL</div><div class='metric-value'>{strikeouts}</div></div>", unsafe_allow_html=True)
 
     st.markdown("<div class='section-header'>Balanced Arsenal Matrix</div>", unsafe_allow_html=True)
     st.caption("Match K% — Opp Whiff%")
@@ -259,6 +228,7 @@ with col2:
         st.metric("SKILL", skill_score)
         st.metric("ERA/FIP", f"— / {era}")
 
+    # NEW DYNAMIC INJURY REPORT COMPONENT LINKED
     st.markdown("<div class='section-header'>🚨 Team Injury Alert Desk</div>", unsafe_allow_html=True)
     active_injuries = check_active_team_injuries(opposing_team)
     if active_injuries:
