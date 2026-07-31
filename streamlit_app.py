@@ -105,7 +105,7 @@ def fetch_dynamic_opposing_lineup(team_abbr):
     })
     return display_df, status_msg
 
-    # 4. Interface Rendering Framework Layout Pipeline
+# 4. Interface Rendering Framework Layout Pipeline
 lineup_df, app_status = fetch_dynamic_opposing_lineup(opposing_team)
 
 @st.cache_data(ttl=3600)
@@ -120,12 +120,15 @@ def load_local_pitcher_database():
 pitcher_db = load_local_pitcher_database()
 lookup_key = pitcher_input.strip().lower()
 
+# FIXED ENGINE DATAFRAME MATCHING METHOD: Safely reads the row object
 if not pitcher_db.empty and lookup_key in pitcher_db['name_clean'].values:
     p_row = pitcher_db[pitcher_db['name_clean'] == lookup_key].iloc[0]
     pitcher_base_avg = float(p_row['base_avg'])
-    games, strikeouts, innings_pitched, era = int(p_row['games']), int(p_row['strikeouts']), float(p_row['ip']), float(p_row['era'])
+    games, strikeouts = int(p_row['games']), int(p_row['strikeouts'])
+    innings_pitched, era = float(p_row['ip']), float(p_row['era'])
     top_pitch_text = str(p_row['top_pitch'])
     pitch_k_pct, whiff_pct, skill_score = str(p_row['pitch_k_pct']), str(p_row['whiff_pct']), str(p_row['skill_score'])
+    
     arsenal_list = []
     for i in range(1, 6):
         if f'p{i}' in p_row.index and str(p_row[f'p{i}']) != '—' and str(p_row[f'p{i}']) != 'nan':
