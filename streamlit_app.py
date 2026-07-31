@@ -170,20 +170,22 @@ def fetch_dynamic_opposing_lineup(team_abbr):
 # 4. Interface Rendering Framework Layout Pipeline
 lineup_df, app_status = fetch_dynamic_opposing_lineup(opposing_team)
 
-# UNBLOCKABLE ENGINE CORE: Loads global metrics safely from your local database file
+# Safe local csv data file mapping extraction loop
 @st.cache_data(ttl=3600)
 def load_local_pitcher_database():
     try:
         df = pd.read_csv("pitcher_database.csv")
         df['name_clean'] = df['name'].str.lower().str.strip()
         return df
-    except:
+    except Exception as e:
+        # Prints tracking bug straight to console if file name is misspelled
+        print(f"DATABASE FAULT LOG: {str(e)}")
         return pd.DataFrame()
 
 pitcher_db = load_local_pitcher_database()
 lookup_key = pitcher_input.strip().lower()
 
-# Check if pitcher exists inside the CSV file matrix rows
+# Verify if pitcher row parameters are localized inside the storage file
 if not pitcher_db.empty and lookup_key in pitcher_db['name_clean'].values:
     p_row = pitcher_db[pitcher_db['name_clean'] == lookup_key].iloc[0]
     pitcher_base_avg = float(p_row['base_avg'])
@@ -191,17 +193,17 @@ if not pitcher_db.empty and lookup_key in pitcher_db['name_clean'].values:
     top_pitch_text = str(p_row['top_pitch'])
     pitch_k_pct, whiff_pct, skill_score = str(p_row['pitch_k_pct']), str(p_row['whiff_pct']), str(p_row['skill_score'])
     
-    # Rebuild dynamic arsenal rows matrix on the fly using database columns
     arsenal_list = []
     for i in range(1, 6):
-        if str(p_row[f'p{i}']) != '—' and str(p_row[f'p{i}']) != 'nan':
+        p_name = str(p_row.get(f'p{i}', '—'))
+        if p_name != '—' and p_name != 'nan' and p_name.strip() != '':
             arsenal_list.append({
-                "PITCH": str(p_row[f'p{i}']), "USE": str(p_row[f'p{i}_use']),
-                "K%": "K:—", "WHIFF": str(p_row[f'p{i}_whiff']), "PUT": "—"
+                "PITCH": p_name, "USE": str(p_row.get(f'p{i}_use', '0%')),
+                "K%": "K:—", "WHIFF": str(p_row.get(f'p{i}_whiff', '0%')), "PUT": "—"
             })
     pitch_df = pd.DataFrame(arsenal_list)
 else:
-    # Safe backup defaults block if a new pitcher name isn't fully indexed inside your database yet
+    # Emergency letter-seed default fallback layer if a name isn't indexed yet
     pitcher_seed = sum(ord(char) for char in lookup_key) % 4
     pitcher_base_avg = 5.2 + (pitcher_seed * 0.5)
     games, strikeouts, innings_pitched, era = 24, int(pitcher_base_avg * 24), 138.0, 3.75
@@ -210,9 +212,7 @@ else:
     pitch_df = pd.DataFrame([
         {"PITCH": "Four-seam FB", "USE": "45%", "K%": "K:—", "WHIFF": "W:21%", "PUT": "—"},
         {"PITCH": "Changeup", "USE": "25%", "K%": "K:—", "WHIFF": "W:26%", "PUT": "—"}
-    ])
-
-col1, col2 = st.columns(2)
+    ])col1, col2 = st.columns(2)
 
 with col1:
     # Core Contextual Calculations
