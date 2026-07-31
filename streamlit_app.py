@@ -175,37 +175,6 @@ with col1:
     with c_p2:
         rec_tag = "OVER" if live_avg > sportsbook_line else "UNDER"
         rec_color = "#50FA7B" if rec_tag == "OVER" else "#FF5555"
-
-    # 4. Interface Rendering Framework Layout Pipeline
-lineup_df, app_status = fetch_dynamic_opposing_lineup(opposing_team)
-
-# Local Pitcher Baseline Projection Formula (Safe from cloud network bans)
-pitcher_seed = sum(ord(char) for char in pitcher_input) % 4
-pitcher_base_avg = 5.2 + (pitcher_seed * 0.5)
-games, strikeouts, innings_pitched, era = 24, int(pitcher_base_avg * 24), 138.0, 3.42
-
-col1, col2 = st.columns(2)
-
-with col1:
-    # Core Contextual Calculations
-    league_avg_k = 22.5
-    team_avg_k = lineup_df["K% USED"].mean()
-    matchup_multiplier = team_avg_k / league_avg_k
-    venue_multiplier = 1.05 if venue_split == "Home" else 0.96
-    vegas_multiplier = 0.91 if vegas_spread >= 4.5 else (1.08 if vegas_spread <= 3.2 else 1.00)
-
-    live_avg = round(pitcher_base_avg * matchup_multiplier * venue_multiplier * vegas_multiplier, 2)
-    diff_val = round(live_avg - sportsbook_line, 2)
-    
-    # Top Header Layout Matrix
-    ch1, ch2 = st.columns(2)
-    with ch1:
-        st.header(f"👤 {pitcher_input.title()}")
-        st.caption(f"⚾ {opposing_team} vs {venue_split} Matchup Intel Final")
-    with ch2:
-        st.markdown("<div class='metric-card' style='padding:5px;'><div class='metric-label'>HIGH %</div><div class='tag-grade' style='font-size:16px;'>84%</div></div>", unsafe_allow_html=True)
-        
-    st.info(app_status)
     
     # PROJ K Display Cards Matrix
     c_p1, c_p2 = st.columns(2)
