@@ -105,14 +105,17 @@ def fetch_pitcher_intel_metrics(pitcher_name):
 def fetch_dynamic_opposing_lineup(team_abbr):
     current_year = datetime.now().year
     
-    # 1. Fetch individual seasonal batter data frames
+    # 1. Fetch individual seasonal batter data frames (FIXED: Using 'Tm' instead of 'Team')
     all_hitters = batting_stats_bref(current_year)
     mapped_code = TEAM_MAP.get(team_abbr, team_abbr)
-    team_hitters = all_hitters[all_hitters['Team'] == mapped_code].copy()
+    
+    # Check if 'Tm' column exists, otherwise look for fallback structures
+    team_col = 'Tm' if 'Tm' in all_hitters.columns else ('Team' if 'Team' in all_hitters.columns else all_hitters.columns[2])
+    team_hitters = all_hitters[all_hitters[team_col] == mapped_code].copy()
     
     if team_hitters.empty:
         all_hitters = batting_stats_bref(current_year - 1)
-        team_hitters = all_hitters[all_hitters['Team'] == mapped_code].copy()
+        team_hitters = all_hitters[all_hitters[team_col] == mapped_code].copy()
 
     # 2. Comprehensive Multi-Tag Lineup Scraper Engine
     url = "https://rotowire.com"
@@ -144,11 +147,12 @@ def fetch_dynamic_opposing_lineup(team_abbr):
             match_row = team_hitters[team_hitters['Name_Lower'].str.contains(clean_target, na=False)]
             
             if not match_row.empty: 
+                # FIXED: Using .iloc[0] safely gets the clean text value instead of breaking arrays
                 lineup_rows.append({
-                    "Name": str(match_row['Name'].values[0]),
-                    "AB": int(match_row['AB'].values[0]),
-                    "SO": int(match_row['SO'].values[0]),
-                    "PA": int(match_row['PA'].values[0])
+                    "Name": str(match_row['Name'].iloc[0]),
+                    "AB": int(match_row['AB'].iloc[0]),
+                    "SO": int(match_row['SO'].iloc[0]),
+                    "PA": int(match_row['PA'].iloc[0])
                 })
             else: 
                 lineup_rows.append({"Name": name, "AB": 100, "SO": 22, "PA": 110})
