@@ -139,7 +139,8 @@ def fetch_dynamic_opposing_lineup(team_abbr):
             "WSH": ["C. Abrams", "A. Call", "J. Yepez", "L. García Jr.", "K. Ruiz", "J. Wood", "D. Chaparro", "I. Vargas", "J. Tena"],
             "WSN": ["C. Abrams", "A. Call", "J. Yepez", "L. García Jr.", "K. Ruiz", "J. Wood", "D. Chaparro", "I. Vargas", "J. Tena"],
             "CHC": ["I. Happ", "D. Swanson", "S. Suzuki", "C. Bellinger", "I. Paredes", "M. Busch", "N. Hoerner", "P. Crow-Armstrong", "M. Amaya"],
-        # 4. Interface Rendering Framework Layout Pipeline
+        
+            # 4. Interface Rendering Framework Layout Pipeline
 lineup_df, app_status = fetch_dynamic_opposing_lineup(opposing_team)
 
 # Core Safe Local CSV Database File Loader
