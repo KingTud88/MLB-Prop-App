@@ -182,7 +182,8 @@ with col1:
             "PUT": ["14.2%", "22.5%", "18.1%"]
         })
         st.dataframe(pitch_data, use_container_width="stretch", hide_index=True)
-         st.markdown("<div class='section-header'>Advanced Metrics</div>", unsafe_allow_html=True)
+        
+        st.markdown("<div class='section-header'>Advanced Metrics</div>", unsafe_allow_html=True)
         bm1, bm2, bm3 = st.columns(3)
         with bm1:
             st.metric("PITCH K%", f"{round((strikeouts / (innings_pitched * 4)) * 100, 1)}%")
