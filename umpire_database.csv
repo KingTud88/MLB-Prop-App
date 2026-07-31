@@ -1,0 +1,10 @@
+umpire_name,zone_style,k_mod,bb_mod,call_tendency
+pat hoberg,Extreme Precision,1.00,1.00,Perfect Metric Baseline
+hunter wendelstedt,Wide Pitcher Zone,1.06,0.91,Heavy Strike Caller (Ks Up)
+cb bucknor,Unpredictable Frame,0.97,1.04,High Chaos Expansion
+laz diaz,Tight Hitter Box,0.94,1.08,Strict Zone Mapping (Ks Down)
+ron kulpa,Tight Hitter Box,0.95,1.06,Strict Zone Mapping (Ks Down)
+vic carapazza,Wide Pitcher Zone,1.04,0.93,Heavy Strike Caller (Ks Up)
+lance barksdale,Wide Pitcher Zone,1.05,0.92,Heavy Strike Caller (Ks Up)
+doug eddings,Unpredictable Frame,0.98,1.03,High Chaos Expansion
+angel hernandez,Retired,1.00,1.00,Historical Baseline Empty
