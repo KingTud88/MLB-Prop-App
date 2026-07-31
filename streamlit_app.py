@@ -22,6 +22,15 @@ st.markdown("""
 
 st.title("🔮 Matchup Intel Modeling Dashboard")
 
+# Standardized MLB Team Mapping System
+TEAM_MAP = {
+    'KAN': 'KCR', 'KCR': 'KCR', 'CLE': 'CLE', 'NYY': 'NYY', 'BOS': 'BOS', 'TOR': 'TOR', 'BAL': 'BAL',
+    'TAM': 'TBR', 'CHW': 'CHW', 'DET': 'DET', 'MIN': 'MIN', 'HOU': 'HOU', 'OAK': 'ATH',
+    'SEA': 'SEA', 'TEX': 'TEX', 'LAA': 'LAA', 'ATL': 'ATL', 'NYM': 'NYM', 'PHI': 'PHI',
+    'WSH': 'WSN', 'MIA': 'MIA', 'MIL': 'MIL', 'CHC': 'CHC', 'STL': 'STL', 'PIT': 'PIT',
+    'CIN': 'CIN', 'LAD': 'LAD', 'SFO': 'SFG', 'SDG': 'SDP', 'ARI': 'ARI', 'COL': 'COL'
+}
+
 # 2. Sidebar Component Controls
 with st.sidebar:
     st.header("⚙️ Configuration")
@@ -29,9 +38,9 @@ with st.sidebar:
     market = st.selectbox("Market Type", ["Strikeouts (Ks)"])
     
     st.subheader("🔍 Matchup Selection")
-    pitcher_input = st.text_input("Enter Pitcher Name", "Tanner Bibee")
+    pitcher_input = st.text_input("Enter Pitcher Name", "Dylan Cease")
     opposing_team = st.text_input("Opposing Team", "NYM").upper().strip()
-    sportsbook_line = st.number_input("Current Line O/U", min_value=0.5, max_value=15.5, value=4.5, step=0.5)
+    sportsbook_line = st.number_input("Current Line O/U", min_value=0.5, max_value=15.5, value=6.5, step=0.5)
     
     st.subheader("🏟️ Contextual & Vegas Inputs")
     venue_split = st.radio("Pitcher Venue Assignment", ["Home", "Away"])
@@ -47,7 +56,6 @@ def clean_string_accents(text):
 # Real-Time Live Lineup Web Scraper Engine (Direct HTML Selector Extraction)
 def fetch_live_announced_lineup(team_abbr):
     try:
-        # Translates all user sidebar inputs to exact RotoWire HTML container classes
         ROTOWIRE_HTML_MAP = {
             'SDP': 'SD', 'SDG': 'SD', 'SD': 'SD', 'NYM': 'NYM', 'METS': 'NYM',
             'NYY': 'NYY', 'YANKEES': 'NYY', 'ARI': 'ARI', 'DIAMONDBACKS': 'ARI',
@@ -63,7 +71,6 @@ def fetch_live_announced_lineup(team_abbr):
             'TOR': 'TOR', 'BLUE JAYS': 'TOR', 'WSH': 'WSH', 'NATIONALS': 'WSH', 'WSN': 'WSH',
             'BOS': 'BOS', 'RED SOX': 'BOS', 'TBR': 'TB', 'TAMPA': 'TB', 'TB': 'TB'
         }
-        
         target_code = ROTOWIRE_HTML_MAP.get(team_abbr.upper().strip(), team_abbr.upper().strip())
         
         url = "https://rotowire.com"
@@ -78,8 +85,6 @@ def fetch_live_announced_lineup(team_abbr):
                     p.get_text(strip=True) 
                     for p in box.select(f".lineup__list.is-{target_code.lower()} .lineup__player-name a, .lineup__list.is-{target_code.lower()} .lineup__player a")
                 ]
-                
-                # Backup scanner layer if specific team side tags are unaligned
                 if not players_found:
                     lineup_lists = box.select(".lineup__list")
                     for l_list in lineup_lists:
@@ -87,7 +92,6 @@ def fetch_live_announced_lineup(team_abbr):
                         if len(p_list) >= 9:
                             if target_code in box.get_text().upper():
                                 players_found = p_list
-                
                 if len(players_found) >= 9: 
                     return players_found[:9]
         return None
@@ -99,7 +103,6 @@ def fetch_dynamic_opposing_lineup(team_abbr):
     live_names = fetch_live_announced_lineup(team_abbr)
     lineup_rows = []
     
-    # Secure real-world standard strikeout parameters bound to the string seed
     base_ks = [16.2, 23.4, 19.1, 27.8, 14.3, 21.0, 25.5, 18.1, 20.3]
     seed_shift = sum(ord(char) for char in team_abbr) % 6
     dynamic_ks = [round(k + seed_shift - 3, 1) for k in base_ks]
@@ -110,8 +113,6 @@ def fetch_dynamic_opposing_lineup(team_abbr):
             lineup_rows.append({"Name": name, "K%": dynamic_ks[i]})
     else:
         status_msg = f"⏳ Lineup Status: Daily webpage data unlisted. Active roster baseline rendered for {team_abbr}."
-        
-        # COMPLETE GLOBAL MLB ROSTER MATRIX DATABASE (ALL 30 TEAMS UNIFIED)
         roster_database = {
             "ARI": ["C. Carroll", "K. Marte", "L. Gurriel Jr.", "C. Walker", "G. Moreno", "E. Suárez", "A. Thomas", "G. Perdomo", "J. McCarthy"],
             "LAD": ["S. Ohtani", "M. Betts", "F. Freeman", "T. Hernández", "W. Smith", "M. Muncy", "G. Lux", "T. Edman", "M. Rojas"],
@@ -138,54 +139,22 @@ def fetch_dynamic_opposing_lineup(team_abbr):
             "WSH": ["C. Abrams", "A. Call", "J. Yepez", "L. García Jr.", "K. Ruiz", "J. Wood", "D. Chaparro", "I. Vargas", "J. Tena"],
             "WSN": ["C. Abrams", "A. Call", "J. Yepez", "L. García Jr.", "K. Ruiz", "J. Wood", "D. Chaparro", "I. Vargas", "J. Tena"],
             "CHC": ["I. Happ", "D. Swanson", "S. Suzuki", "C. Bellinger", "I. Paredes", "M. Busch", "N. Hoerner", "P. Crow-Armstrong", "M. Amaya"],
-            "MIL": ["B. Turang", "J. Chourio", "W. Contreras", "G. Sánchez", "A. Adames", "R. Hoskins", "S. Frelick", "J. Ortiz", "B. Perkins"],
-            "STL": ["M. Wynn", "A. Burleson", "W. Contreras", "N. Arenado", "P. Goldschmidt", "B. Donovan", "L. Nootbaar", "N. Gorman", "V. Scott II"],
-            "PIT": ["I. Kiner-Falefa", "B. Reynolds", "J. Bart", "A. McCutchen", "R. Tellez", "B. De La Cruz", "J. Triolo", "O. Cruz", "M. Taylor"],
-            "CIN": ["J. India", "E. De La Cruz", "T. Stephenson", "S. Steer", "T. France", "T. Friedl", "S. Fairchild", "S. Rosario", "W. Benson"],
-            "SFO": ["M. Yastrzemski", "L. Wade Jr.", "J. Ramos", "M. Conforto", "P. Bailey", "M. Chapman", "J. Encarnacion", "B. Wisely", "T. Fitzgerald"],
-            "SFG": ["M. Yastrzemski", "L. Wade Jr.", "J. Ramos", "M. Conforto", "P. Bailey", "M. Chapman", "J. Encarnacion", "B. Wisely", "T. Fitzgerald"],
-            "COL": ["C. Blackmon", "E. Tovar", "B. Doyle", "R. McMahon", "M. Toglia", "B. Rodgers", "N. Jones", "J. Stallings", "S. Hilliard"],
-            "ATH": ["L. Butler", "M. Schuemann", "B. Rooker", "S. Langeliers", "J. Bleday", "Z. Gelof", "T. Soderstrom", "J. Bride", "A. Toro"],
-            "OAK": ["L. Butler", "M. Schuemann", "B. Rooker", "S. Langeliers", "J. Bleday", "Z. Gelof", "T. Soderstrom", "J. Bride", "A. Toro"]
-        }
-        
-        # Pull exact data matching clean upper user sidebar configurations safely
-        fake_names = roster_database.get(team_abbr.upper().strip(), [f"Hitter {i}" for i in range(1, 10)])
-        for i, name in enumerate(fake_names):
-            lineup_rows.append({
-                "Name": f"{team_abbr} {name}" if "Hitter" in name else name,
-                "K%": dynamic_ks[i]
-            })
-
-    lineup_df = pd.DataFrame(lineup_rows)
-    display_df = pd.DataFrame({
-        "BATTER": [f"{i+1}  {row['Name']}" for i, row in lineup_df.iterrows()],
-        "HAND": ["R" if i % 2 == 0 else "L" for i in range(len(lineup_df))],
-        "K% USED": lineup_df["K%"],
-        "VS HAND": [round(k * 0.95, 1) for k in lineup_df["K%"]],
-        "SEASON": lineup_df["K%"]
-    })
-    return display_df, status_msg
-
-# 4. Interface Rendering Framework Layout Pipeline
+        # 4. Interface Rendering Framework Layout Pipeline
 lineup_df, app_status = fetch_dynamic_opposing_lineup(opposing_team)
 
-# Safe local csv data file mapping extraction loop
+# Core Safe Local CSV Database File Loader
 @st.cache_data(ttl=3600)
 def load_local_pitcher_database():
     try:
         df = pd.read_csv("pitcher_database.csv")
         df['name_clean'] = df['name'].str.lower().str.strip()
         return df
-    except Exception as e:
-        # Prints tracking bug straight to console if file name is misspelled
-        print(f"DATABASE FAULT LOG: {str(e)}")
+    except:
         return pd.DataFrame()
 
 pitcher_db = load_local_pitcher_database()
 lookup_key = pitcher_input.strip().lower()
 
-# Verify if pitcher row parameters are localized inside the storage file
 if not pitcher_db.empty and lookup_key in pitcher_db['name_clean'].values:
     p_row = pitcher_db[pitcher_db['name_clean'] == lookup_key].iloc[0]
     pitcher_base_avg = float(p_row['base_avg'])
@@ -203,7 +172,6 @@ if not pitcher_db.empty and lookup_key in pitcher_db['name_clean'].values:
             })
     pitch_df = pd.DataFrame(arsenal_list)
 else:
-    # Emergency letter-seed default fallback layer if a name isn't indexed yet
     pitcher_seed = sum(ord(char) for char in lookup_key) % 4
     pitcher_base_avg = 5.2 + (pitcher_seed * 0.5)
     games, strikeouts, innings_pitched, era = 24, int(pitcher_base_avg * 24), 138.0, 3.75
@@ -212,21 +180,20 @@ else:
     pitch_df = pd.DataFrame([
         {"PITCH": "Four-seam FB", "USE": "45%", "K%": "K:—", "WHIFF": "W:21%", "PUT": "—"},
         {"PITCH": "Changeup", "USE": "25%", "K%": "K:—", "WHIFF": "W:26%", "PUT": "—"}
-    ])col1, col2 = st.columns(2)
+    ])
+
+col1, col2 = st.columns(2)
 
 with col1:
-    # Core Contextual Calculations
     league_avg_k = 22.5
     team_avg_k = lineup_df["K% USED"].mean()
     matchup_multiplier = team_avg_k / league_avg_k
     venue_multiplier = 1.06 if venue_split == "Home" else 0.95
     vegas_multiplier = 0.92 if vegas_spread >= 4.5 else (1.12 if vegas_spread <= 3.2 else 1.00)
 
-    # Compounded Smart Projection Calculation
     live_avg = round(pitcher_base_avg * matchup_multiplier * venue_multiplier * vegas_multiplier, 2)
     diff_val = round(live_avg - sportsbook_line, 2)
     
-    # Top Header Layout Matrix
     ch1, ch2 = st.columns(2)
     with ch1:
         st.header(f"👤 {pitcher_input.title()}")
@@ -237,7 +204,6 @@ with col1:
         
     st.info(app_status)
     
-    # PROJ K Display Cards Matrix
     c_p1, c_p2 = st.columns(2)
     with c_p1:
         st.markdown(f"<div class='metric-card'><div class='metric-label'>PROJ K</div><div class='metric-value' style='color:#FF79C6; font-size:32px;'>{live_avg}</div><div class='sub-text' style='color:#50FA7B;'>{'+' if diff_val >= 0 else ''}{diff_val} vs {sportsbook_line}</div></div>", unsafe_allow_html=True)
@@ -246,7 +212,6 @@ with col1:
         rec_color = "#50FA7B" if rec_tag == "OVER" else "#FF5555"
         st.markdown(f"<div class='metric-card'><div class='metric-label'>RECOMMENDATION</div><div class='metric-value' style='color:{rec_color}; font-size:24px;'>{rec_tag}</div><div class='sub-text' style='color:#8BE9FD;'>{sportsbook_line} Ks Line</div></div>", unsafe_allow_html=True)
         
-    # 4-Box Profile Analytics
     c_m1, c_m2, c_m3, c_m4 = st.columns(4)
     with c_m1: 
         grade = "A" if live_avg > 7.5 else "B" if live_avg > 6.0 else "C" if live_avg > 4.5 else "D"
@@ -270,7 +235,6 @@ with col2:
     )
     st.dataframe(styled_lineup, width="stretch", hide_index=True)
 
-    # 3x4 High-Density Sub-Metrics Matrix Block
     st.markdown("<div class='section-header'>Advanced Contextual Metrics</div>", unsafe_allow_html=True)
     bm1, bm2, bm3 = st.columns(3)
     with bm1:
