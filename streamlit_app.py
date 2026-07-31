@@ -189,7 +189,7 @@ with col1:
         st.metric("SAVANT", "SUCCESS")
         st.metric("SKILL", "—")
         
-    st.metric("ERA / FIP Discrepancy", f"— / {era}")
+        st.metric("ERA / FIP Discrepancy", f"— / {era}")
     else:
         st.warning("Data load error.")
 
