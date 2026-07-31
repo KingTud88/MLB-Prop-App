@@ -175,7 +175,7 @@ with col1:
         
         # Advanced Splits Bottom Metrics
         st.markdown("<div class='section-header'>Advanced Metrics</div>", unsafe_allow_html=True)
-       bm1, bm2, bm3 = st.columns(3)
+    bm1, bm2, bm3 = st.columns(3)
     with bm1:
         st.metric("PITCH K%", "18.5%")
         st.metric("BF / GM", f"{round(int(p_stats.get('BFP', 100)) / games, 1)}")
