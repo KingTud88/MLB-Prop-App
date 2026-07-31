@@ -115,7 +115,7 @@ def fetch_dynamic_opposing_lineup(team_abbr):
             team_hitters = all_hitters[all_hitters['Team'] == mapped_code].copy()
 
         # 2. Comprehensive Multi-Tag Lineup Scraper Engine
-        url = "https://www.rotowire.com/baseball/daily-lineups.php"
+        url = "https://rotowire.com"
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         soup = BeautifulSoup(requests.get(url, headers=headers).text, "html.parser")
         
@@ -123,39 +123,52 @@ def fetch_dynamic_opposing_lineup(team_abbr):
         for box in soup.select(".lineup__box"):
             teams_text = box.select_one(".lineup__teams")
             if teams_text and team_abbr in teams_text.get_text().upper():
-                # Extract text strings using multiple tag layers to cover design updates
                 players_found = [
                     p.get_text(strip=True) 
                     for p in box.select(".lineup__player-name a, .lineup__player a, [title]")
                     if p.get_text(strip=True) and not p.find_parent(class_="lineup__pitcher")
                 ]
-                # Filter out generic position abbreviations
                 players_found = [name for name in players_found if len(name) > 3]
                 if len(players_found) >= 9:
                     live_names = players_found[:9]
                     break
         
-        # 3. Process Roster Matching Lists 
+        # 3. Process Roster Matching Lists (FIXED STRIP VALUE ASSIGNMENTS)
+        lineup_rows = []
         if live_names:
             status_msg = f"✅ Lineup Status: Confirmed starting lineup pulled live for {team_abbr}!"
             team_hitters['Name_Lower'] = team_hitters['Name'].apply(clean_string_accents)
-            lineup_data = []
+            
             for name in live_names:
                 clean_target = clean_string_accents(name)
                 match_row = team_hitters[team_hitters['Name_Lower'].str.contains(clean_target, na=False)]
+                
                 if not match_row.empty: 
-                    lineup_data.append(match_row.iloc[0].to_dict())
+                    # CRITICAL FIX: Pull out raw values directly instead of using .to_dict() mapping leaks
+                    lineup_rows.append({
+                        "Name": str(match_row['Name'].values[0]),
+                        "AB": int(match_row['AB'].values[0]),
+                        "SO": int(match_row['SO'].values[0]),
+                        "PA": int(match_row['PA'].values[0])
+                    })
                 else: 
-                    # Default matrix if player is a recent call-up or missing seasonal stats
-                    lineup_data.append({"Name": name, "AB": 100, "SO": 22, "PA": 110})
-            lineup_df = pd.DataFrame(lineup_data)
+                    lineup_rows.append({"Name": name, "AB": 100, "SO": 22, "PA": 110})
+            lineup_df = pd.DataFrame(lineup_rows)
         else:
-            # Smart Fallback: Pull actual player names from team seasonal records if live page is missing
-            status_msg = f"⏳ Lineup Status: Orders pending. Active seasonal depth chart for {team_abbr} populated."
+            status_msg = f"⏳ Lineup Status: Orders pending. Active depth chart for {team_abbr} loaded."
             if not team_hitters.empty:
-                lineup_df = team_hitters.sort_values(by='PA', ascending=False).head(9)
+                # Fallback to standard roster names if page scraper returns blank fields
+                depth_chart = team_hitters.sort_values(by='PA', ascending=False).head(9)
+                for _, r in depth_chart.iterrows():
+                    lineup_rows.append({
+                        "Name": str(r['Name']),
+                        "AB": int(r['AB']),
+                        "SO": int(r['SO']),
+                        "PA": int(r['PA'])
+                    })
+                lineup_df = pd.DataFrame(lineup_rows)
             else:
-                raise ValueError(f"No stat parameters found for team abbreviation {team_abbr}")
+                raise ValueError(f"No statistical logs localized for team abbreviation {team_abbr}")
         
         # 4. Vector Calculations Loop 
         k_list, final_names = [], []
@@ -175,8 +188,7 @@ def fetch_dynamic_opposing_lineup(team_abbr):
         return display_df, status_msg
         
     except Exception as e:
-        print(f"CRITICAL DATA FAULT: {str(e)}")
-        # Deep fallback generates dynamic identifiers tied explicitly to team parameters
+        print(f"CRITICAL ENGINE LOG: {str(e)}")
         base_ks = [16.2, 23.4, 19.1, 27.8, 14.3, 21.0, 25.5, 18.1, 20.3]
         fake_names = [f"Hitter {i}" for i in range(1, 10)]
         fallback_df = pd.DataFrame({
