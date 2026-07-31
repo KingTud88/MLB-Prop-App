@@ -77,19 +77,30 @@ def fetch_live_announced_lineup(team_abbr):
 def fetch_pitcher_intel_metrics(pitcher_name):
     try:
         current_year = datetime.now().year
-        clean_input = clean_string_accents(pitcher_name)
+        # Strip spaces and lowercase the input completely
+        clean_input = pitcher_name.strip().lower()
         
+        # 1. Pull current year stats
         all_pitchers = pitching_stats_bref(current_year)
         if not all_pitchers.empty:
-            all_pitchers['Clean_Name'] = all_pitchers['Name'].apply(clean_string_accents)
-            pitcher_data = all_pitchers[all_pitchers['Clean_Name'].str.contains(clean_input, na=False)]
-            if not pitcher_data.empty: return pitcher_data.iloc[0]
+            all_pitchers['Name_Lower'] = all_pitchers['Name'].str.lower().str.strip()
+            # Fuzzy match check
+            pitcher_data = all_pitchers[all_pitchers['Name_Lower'].str.contains(clean_input, na=False)]
+            if not pitcher_data.empty:
+                return pitcher_data.iloc[0] # <-- CRITICAL FIX: Explicit row index added
         
+        # 2. Fallback to previous year stats if current year is empty
         all_pitchers = pitching_stats_bref(current_year - 1)
-        all_pitchers['Clean_Name'] = all_pitchers['Name'].apply(clean_string_accents)
-        pitcher_data = all_pitchers[all_pitchers['Clean_Name'].str.contains(clean_input, na=False)]
-        return pitcher_data.iloc[0] if not pitcher_data.empty else None
-    except: return None
+        if not all_pitchers.empty:
+            all_pitchers['Name_Lower'] = all_pitchers['Name'].str.lower().str.strip()
+            pitcher_data = all_pitchers[all_pitchers['Name_Lower'].str.contains(clean_input, na=False)]
+            if not pitcher_data.empty:
+                return pitcher_data.iloc[0] # <-- CRITICAL FIX: Explicit row index added
+                
+        return None
+    except Exception as e:
+        print(f"PITCHER ERROR LOG: {str(e)}")
+        return None
 
 def fetch_dynamic_opposing_lineup(team_abbr):
     try:
