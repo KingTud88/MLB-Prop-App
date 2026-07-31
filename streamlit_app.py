@@ -188,8 +188,8 @@ with col1:
         live_avg = round(pitcher_base_avg * matchup_multiplier * venue_multiplier * vegas_multiplier, 2)
         diff_val = round(live_avg - sportsbook_line, 2)
         
-        # 1. NEW: Top Header Layout with High Probability Tag
-        ch1, ch2 = st.columns([3, 1])
+        # 1. Top Header Layout with High Probability Tag
+        ch1, ch2 = st.columns(2)
         with ch1:
             st.header(f"👤 {pitcher_input.title()}")
             st.caption(f"⚾ {opposing_team} vs {venue_split} Matchup Intel Final")
@@ -217,7 +217,7 @@ with col1:
         with c_m3: st.markdown("<div class='metric-card'><div class='metric-label'>TOP PITCH</div><div class='sub-text' style='color:#BD93F9;font-weight:bold;margin-top:4px;'>Four-seam<br>27% use</div></div>", unsafe_allow_html=True)
         with c_m4: st.markdown(f"<div class='metric-card'><div class='metric-label'>ARSENAL</div><div class='metric-value'>{int(strikeouts // 3)}</div></div>", unsafe_allow_html=True)
 
-        # 4. NEW: Arsenal Risk Table Matrix
+        # 4. Arsenal Risk Table Matrix
         st.markdown("<div class='section-header'>Arsenal Risk</div>", unsafe_allow_html=True)
         st.caption("Match K% — Opp Whiff%")
         pitch_data = pd.DataFrame({
@@ -228,8 +228,16 @@ with col1:
             "PUT": ["—", "—", "—", "—", "—"]
         })
         st.dataframe(pitch_data, width="stretch", hide_index=True)
-        
-        # 5. NEW: 3x4 High-Density Sub-Metrics Matrix Block
+    else:
+        st.warning("Data load error: Profile could not be localized.")
+
+with col2:
+    st.markdown("<div class='section-header'>Batter-by-batter K matchup</div>", unsafe_allow_html=True)
+    st.caption(f"MLB PROJECTED - avg {round(lineup_df['K% USED'].mean(), 1)} | high-K {len(lineup_df[lineup_df['K% USED'] > 22])} | low-K {len(lineup_df[lineup_df['K% USED'] <= 15])}")
+    st.dataframe(lineup_df, width="stretch", hide_index=True)
+
+    # 5. MOVED: 3x4 High-Density Sub-Metrics Matrix Block (Now under Batter Matchups)
+    if p_stats is not None:
         st.markdown("<div class='section-header'>Advanced Contextual Metrics</div>", unsafe_allow_html=True)
         bm1, bm2, bm3 = st.columns(3)
         with bm1:
@@ -247,11 +255,3 @@ with col1:
             st.metric("SAVANT", "SUCCESS")
             st.metric("SKILL", "—")
             st.metric("ERA/FIP", f"— / {era}")
-            
-    else:
-        st.warning("Data load error: Profile could not be localized.")
-
-with col2:
-    st.markdown("<div class='section-header'>Batter-by-batter K matchup</div>", unsafe_allow_html=True)
-    st.caption(f"MLB PROJECTED - avg {round(lineup_df['K% USED'].mean(), 1)} | high-K {len(lineup_df[lineup_df['K% USED'] > 22])} | low-K {len(lineup_df[lineup_df['K% USED'] <= 15])}")
-    st.dataframe(lineup_df, width="stretch", hide_index=True)
