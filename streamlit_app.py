@@ -190,8 +190,6 @@ with col1:
         st.metric("SKILL", "—")
         
         st.metric("ERA / FIP Discrepancy", f"— / {era}")
-    else:
-        st.warning("Data load error.")
 
 with col2:
         st.markdown("<div class='section-header'>Batter-by-batter K matchup</div>", unsafe_allow_html=True)
