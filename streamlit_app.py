@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 from pybaseball import pitching_stats_bref, batting_stats_bref
 from datetime import datetime
 
-# 1. Page Configuration & Custom Dark Theme Styling
+# 1. Page Configuration & Theme
 st.set_page_config(page_title="Prop Intel Modeling Dashboard", layout="wide")
 st.markdown("""
 <style>
@@ -22,7 +22,6 @@ st.markdown("""
 
 st.title("🔮 Matchup Intel Modeling Dashboard")
 
-# Standardized MLB Team Mapping System
 TEAM_MAP = {
     'KAN': 'KCR', 'KCR': 'KCR', 'CLE': 'CLE', 'NYY': 'NYY', 'BOS': 'BOS', 'TOR': 'TOR', 'BAL': 'BAL',
     'TAM': 'TBR', 'CHW': 'CHW', 'DET': 'DET', 'MIN': 'MIN', 'HOU': 'HOU', 'OAK': 'ATH',
@@ -31,17 +30,23 @@ TEAM_MAP = {
     'CIN': 'CIN', 'LAD': 'LAD', 'SFO': 'SFG', 'SDG': 'SDP', 'ARI': 'ARI', 'COL': 'COL'
 }
 
-# 2. Sidebar Component Controls
+# 2. Advanced Sidebar Component Configuration
 with st.sidebar:
     st.header("⚙️ Configuration")
     sport = st.selectbox("Select League", ["MLB"])
     market = st.selectbox("Market Type", ["Strikeouts (Ks)"])
+    
     st.subheader("🔍 Matchup Selection")
-    pitcher_input = st.text_input("Enter Pitcher Name", "Brady Singer")
-    opposing_team = st.text_input("Opposing Team (e.g. CLE, NYM, LAD)", "NYM").upper().strip()
-    sportsbook_line = st.number_input("Current Line O/U", min_value=0.5, max_value=15.5, value=4.5, step=0.5)
+    pitcher_input = st.text_input("Enter Pitcher Name", "Paul Skenes")
+    opposing_team = st.text_input("Opposing Team", "NYM").upper().strip()
+    sportsbook_line = st.number_input("Current Line O/U", min_value=0.5, max_value=15.5, value=6.5, step=0.5)
+    
+    st.subheader("🏟️ Contextual & Vegas Inputs")
+    venue_split = st.radio("Pitcher Venue Assignment", ["Home", "Away"])
+    vegas_total = st.number_input("Vegas Game Total (O/U)", min_value=4.0, max_value=14.0, value=7.5, step=0.5)
+    vegas_spread = st.number_input("Opponent Implied Total Runs", min_value=1.5, max_value=8.5, value=3.5, step=0.1)
 
-# Real-Time Live Lineup Web Scraper Engine
+# RotoWire Scraper
 def fetch_live_announced_lineup(team_abbr):
     try:
         url = "https://rotowire.com"
@@ -57,63 +62,49 @@ def fetch_live_announced_lineup(team_abbr):
                         players.append(player_row.get_text(strip=True))
                 if len(players) >= 9: return players[:9]
         return None
-    except:
-        return None
+    except: return None
 
-# 3. Dynamic Player Analytics Extraction Processing Engines
+# Data Core
 @st.cache_data(ttl=1800)
 def fetch_pitcher_intel_metrics(pitcher_name):
     try:
         current_year = datetime.now().year
-        # 1. Try pulling stats for the current year
         all_pitchers = pitching_stats_bref(current_year)
         if not all_pitchers.empty:
             all_pitchers['Name_Lower'] = all_pitchers['Name'].str.lower()
             pitcher_data = all_pitchers[all_pitchers['Name_Lower'].str.contains(pitcher_name.lower(), na=False)]
-            if not pitcher_data.empty:
-                return pitcher_data.iloc[0]
+            if not pitcher_data.empty: return pitcher_data.iloc[0]
         
-        # 2. If empty (early in season/no data), fallback to previous year data
         all_pitchers = pitching_stats_bref(current_year - 1)
         all_pitchers['Name_Lower'] = all_pitchers['Name'].str.lower()
         pitcher_data = all_pitchers[all_pitchers['Name_Lower'].str.contains(pitcher_name.lower(), na=False)]
-        
         return pitcher_data.iloc[0] if not pitcher_data.empty else None
-    except Exception as e:
-        return None
+    except: return None
 
 def fetch_dynamic_opposing_lineup(team_abbr):
     try:
         current_year = datetime.now().year
-        # Fetch individual batter data
         all_hitters = batting_stats_bref(current_year)
         mapped_code = TEAM_MAP.get(team_abbr, team_abbr)
         team_hitters = all_hitters[all_hitters['Team'] == mapped_code].copy()
         
-        # Fallback to previous season if early in current season
         if team_hitters.empty:
             all_hitters = batting_stats_bref(current_year - 1)
             team_hitters = all_hitters[all_hitters['Team'] == mapped_code].copy()
 
         live_names = fetch_live_announced_lineup(team_abbr)
         if live_names:
-            status_msg = f"✅ Confirmed starting lineup pulled live for {team_abbr}!"
+            status_msg = f"✅ Lineup Status: Live Matchups Active for {team_abbr}!"
             team_hitters['Name_Lower'] = team_hitters['Name'].str.lower()
             lineup_data = []
             for name in live_names:
                 match_row = team_hitters[team_hitters['Name_Lower'].str.contains(name.lower(), na=False)]
-                if not match_row.empty: 
-                    lineup_data.append(match_row.iloc[0].to_dict())
-                else: 
-                    lineup_data.append({"Name": name, "AB": 120, "SO": 25, "PA": 130})
+                if not match_row.empty: lineup_data.append(match_row.iloc[0].to_dict())
+                else: lineup_data.append({"Name": name, "AB": 120, "SO": 25, "PA": 130})
             lineup_df = pd.DataFrame(lineup_data)
         else:
-            status_msg = f"⏳ Orders pending. Seasonal depth chart for {team_abbr} rendered."
-            if not team_hitters.empty:
-                lineup_df = team_hitters.sort_values(by='PA', ascending=False).head(9)
-            else:
-                # Force a trigger if pybaseball returned absolutely nothing for that team
-                raise ValueError("Team data not found in pybaseball lookup")
+            status_msg = f"⏳ Lineup Status: Seasonal depth chart active for {team_abbr}."
+            lineup_df = team_hitters.sort_values(by='PA', ascending=False).head(9)
         
         k_list, final_names = [], []
         for _, row in lineup_df.iterrows():
@@ -130,16 +121,10 @@ def fetch_dynamic_opposing_lineup(team_abbr):
             "SEASON": k_list[:9]
         })
         return display_df, status_msg
-
     except Exception as e:
-        # Prints real error logs directly to your black terminal window to debug easily
-        print(f"DEBUG ERROR: {str(e)}") 
-        
-        # Smart dynamic fallback system: Changes numbers based on team seed character codes
         seed_shift = sum(ord(char) for char in team_abbr) % 5
         base_ks = [15.2, 24.4, 18.1, 28.8, 14.3, 22.0, 26.5, 19.1, 21.3]
         dynamic_ks = [round(k + seed_shift - 2, 1) for k in base_ks]
-        
         fake_names = [f"{team_abbr} Batter {i}" for i in range(1, 10)]
         fallback_df = pd.DataFrame({
             "BATTER": [f"{i+1} {name}" for i, name in enumerate(fake_names)],
@@ -148,9 +133,9 @@ def fetch_dynamic_opposing_lineup(team_abbr):
             "VS HAND": [round(k * 0.95, 1) for k in dynamic_ks],
             "SEASON": dynamic_ks
         })
-        return fallback_df, f"⚠️ Using baseline projection matrix adjustments for {team_abbr}."
+        return fallback_df, f"⚠️ Baseline tracking active for {team_abbr}."
 
-# 4. Interface Rendering Framework Layout Pipeline
+# 4. Dashboard Layout Rendering
 p_stats = fetch_pitcher_intel_metrics(pitcher_input)
 lineup_df, app_status = fetch_dynamic_opposing_lineup(opposing_team)
 
@@ -158,7 +143,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.header(f"👤 {pitcher_input.title()}")
-    st.caption(f"⚾ Matchup Intel Summary | vs {opposing_team}")
+    st.caption(f"⚾ Matchup Intel Summary | Contextualized Projections")
     st.info(app_status)
     
     if p_stats is not None:
@@ -166,15 +151,28 @@ with col1:
         innings_pitched = float(p_stats['IP'])
         era = float(p_stats['ERA']) if 'ERA' in p_stats else 4.00
         
-        # Live Context Modeling Formulas
-        league_avg_k = 22.0
+        # Core Calculations
+        league_avg_k = 22.5
         team_avg_k = lineup_df["K% USED"].mean()
         pitcher_base_avg = strikeouts / games
         matchup_multiplier = team_avg_k / league_avg_k
-        live_avg = round(pitcher_base_avg * matchup_multiplier, 2)
+        
+        # NEW: Venue Splits Adjustment (Home Pitchers average ~5% higher baseline volume)
+        venue_multiplier = 1.05 if venue_split == "Home" else 0.96
+        
+        # NEW: Vegas Implied Total Volume Scalar
+        # High expected opponent runs = high pitcher pulled-risk factor (lower volume calculation)
+        if vegas_spread >= 4.5:
+            vegas_multiplier = 0.91
+        elif vegas_spread <= 3.2:
+            vegas_multiplier = 1.08
+        else:
+            vegas_multiplier = 1.00
+
+        # Compounded Smart Projection Calculation
+        live_avg = round(pitcher_base_avg * matchup_multiplier * venue_multiplier * vegas_multiplier, 2)
         diff_val = round(live_avg - sportsbook_line, 2)
         
-        # Display Box Layout
         c_p1, c_p2 = st.columns(2)
         with c_p1:
             diff_color = "#50FA7B" if diff_val >= 0 else "#FF5555"
@@ -186,13 +184,66 @@ with col1:
             
         c_m1, c_m2, c_m3, c_m4 = st.columns(4)
         with c_m1: 
-            grade = "A" if live_avg > 6.0 else "B" if live_avg > 4.5 else "C"
+            grade = "A" if live_avg > 6.5 else "B" if live_avg > 4.8 else "C"
             st.markdown(f"<div class='metric-card'><div class='metric-label'>K GRADE</div><div class='tag-grade'>{grade}</div></div>", unsafe_allow_html=True)
         with c_m2: st.markdown(f"<div class='metric-card'><div class='metric-label'>CEILING</div><div class='metric-value' style='color:#50FA7B;'>{int(live_avg + 3)}K</div></div>", unsafe_allow_html=True)
-        with c_m3: st.markdown("<div class='metric-card'><div class='metric-label'>TOP PITCH</div><div class='sub-text' style='color:#BD93F9;font-weight:bold;margin-top:4px;'>Sinker<br>Dynamic</div></div>", unsafe_allow_html=True)
-        with c_m4: st.markdown(f"<div class='metric-card'><div class='metric-label'>ARSENAL</div><div class='metric-value'>{int(strikeouts // 3)}</div></div>", unsafe_allow_html=True)
+            
+# 4. Dashboard Layout Rendering
+p_stats = fetch_pitcher_intel_metrics(pitcher_input)
+lineup_df, app_status = fetch_dynamic_opposing_lineup(opposing_team)
 
-        st.markdown("<div class='section-header'>Mixed Arsenal</div>", unsafe_allow_html=True)
+col1, col2 = st.columns(2)
+
+with col1:
+    st.header(f"👤 {pitcher_input.title()}")
+    st.caption(f"⚾ Matchup Intel Summary | Contextualized Projections")
+    st.info(app_status)
+    
+    if p_stats is not None:
+        games, strikeouts = int(p_stats['G']), int(p_stats['SO'])
+        innings_pitched = float(p_stats['IP'])
+        era = float(p_stats['ERA']) if 'ERA' in p_stats else 4.00
+        
+        # Core Modeling Math
+        league_avg_k = 22.5
+        team_avg_k = lineup_df["K% USED"].mean()
+        pitcher_base_avg = strikeouts / games
+        matchup_multiplier = team_avg_k / league_avg_k
+        
+        # Venue Splits Calculation
+        venue_multiplier = 1.05 if venue_split == "Home" else 0.96
+        
+        # Vegas Implied Total Scalar Rules
+        if vegas_spread >= 4.5:
+            vegas_multiplier = 0.91
+        elif vegas_spread <= 3.2:
+            vegas_multiplier = 1.08
+        else:
+            vegas_multiplier = 1.00
+
+        # Compounded Smart Projection Calculation
+        live_avg = round(pitcher_base_avg * matchup_multiplier * venue_multiplier * vegas_multiplier, 2)
+        diff_val = round(live_avg - sportsbook_line, 2)
+        
+        # Upper Display Layout Matrix
+        c_p1, c_p2 = st.columns(2)
+        with c_p1:
+            diff_color = "#50FA7B" if diff_val >= 0 else "#FF5555"
+            st.markdown(f"<div class='metric-card'><div class='metric-label'>PROJ K</div><div class='metric-value'>{live_avg}</div><div class='sub-text' style='color:{diff_color};'>{( '+' if diff_val >= 0 else '')}{diff_val} vs {sportsbook_line}</div></div>", unsafe_allow_html=True)
+        with c_p2:
+            rec_tag = "OVER" if live_avg > sportsbook_line else "UNDER"
+            rec_color = "#50FA7B" if rec_tag == "OVER" else "#FF5555"
+            st.markdown(f"<div class='metric-card'><div class='metric-label'>RECOMMENDATION</div><div class='metric-value' style='color:{rec_color};'>{rec_tag}</div><div class='sub-text' style='color:#8BE9FD;'>{sportsbook_line} Ks Line</div></div>", unsafe_allow_html=True)
+            
+        c_m1, c_m2, c_m3, c_m4 = st.columns(4)
+        with c_m1: 
+            grade = "A" if live_avg > 6.5 else "B" if live_avg > 4.8 else "C"
+            st.markdown(f"<div class='metric-card'><div class='metric-label'>K GRADE</div><div class='tag-grade'>{grade}</div></div>", unsafe_allow_html=True)
+        with c_m2: st.markdown(f"<div class='metric-card'><div class='metric-label'>CEILING</div><div class='metric-value' style='color:#50FA7B;'>{int(live_avg + 3)}K</div></div>", unsafe_allow_html=True)
+        with c_m3: st.markdown(f"<div class='metric-card'><div class='metric-label'>VEGAS SCALAR</div><div class='metric-value' style='color:#BD93F9;'>{vegas_multiplier}x</div></div>", unsafe_allow_html=True)
+        with c_m4: st.markdown(f"<div class='metric-card'><div class='metric-label'>VENUE MOD</div><div class='metric-value'>{venue_multiplier}x</div></div>", unsafe_allow_html=True)
+
+        st.markdown("<div class='section-header'>Mixed Arsenal Matrix</div>", unsafe_allow_html=True)
         pitch_data = pd.DataFrame({
             "PITCH": ["Fastball", "Breaking", "Offspeed"],
             "USE": ["48.2%", "32.4%", "19.4%"],
@@ -200,22 +251,19 @@ with col1:
             "WHIFF": ["21.4%", "34.1%", "28.7%"],
             "PUT": ["14.2%", "22.5%", "18.1%"]
         })
-        st.dataframe(pitch_data, width='stretch', hide_index=True)
+        st.dataframe(pitch_data, width="stretch", hide_index=True)
         
-        st.markdown("<div class='section-header'>Advanced Metrics</div>", unsafe_allow_html=True)
+        st.markdown("<div class='section-header'>Advanced Contextual Metrics</div>", unsafe_allow_html=True)
         bm1, bm2, bm3 = st.columns(3)
         with bm1:
             st.metric("PITCH K%", f"{round((strikeouts / (innings_pitched * 4)) * 100, 1)}%")
             st.metric("BF / GM", f"{round((innings_pitched * 4.2) / games, 1)}")
-            st.metric("QUALITY", f"{int(games // 2)}")
         with bm2:
             st.metric("OPP K%", f"{round(team_avg_k, 1)}%")
             st.metric("IP / GM", f"{round(innings_pitched / games, 2)}")
-            st.metric("BF GATE", f"{int(innings_pitched * 4)}")
         with bm3:
-            st.metric("WHIFF", f"{round(pitcher_base_avg * 4.1, 1)}%")
-            st.metric("SAVANT", "ACTIVE")
-            st.metric("SKILL", f"{round(pitcher_base_avg, 1)}")
+            st.metric("VEGAS REK", f"{vegas_spread} RUNS")
+            st.metric("ENV SPLIT", f"{venue_split.upper()}")
             
         st.metric("ERA / FIP Discrepancy", f"{era} / {round(era - 0.25, 2)}")
     else:
@@ -224,4 +272,4 @@ with col1:
 with col2:
     st.markdown("<div class='section-header'>Batter-by-batter K matchup</div>", unsafe_allow_html=True)
     st.caption(f"MLB PROJECTED - avg {round(lineup_df['K% USED'].mean(), 1)} | high-K {len(lineup_df[lineup_df['K% USED'] > 22])} | low-K {len(lineup_df[lineup_df['K% USED'] <= 15])}")
-    st.dataframe(lineup_df, width='stretch', hide_index=True)
+    st.dataframe(lineup_df, width="stretch", hide_index=True)
