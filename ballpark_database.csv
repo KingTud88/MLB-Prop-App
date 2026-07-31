@@ -1,0 +1,35 @@
+team,park_name,k_scalar,run_scalar,top_trait
+ARI,Chase Field,0.96,1.08,High Alt Altitude (Runs Up / Ks Down)
+LAD,Dodger Stadium,1.02,0.95,Pitcher Friendly Venue (Ks Up)
+NYY,Yankee Stadium,0.99,1.04,Short Right Porch (Runs Up)
+CLE,Progressive Field,1.01,0.97,Neutral Environment Balance
+NYM,Citi Field,1.04,0.88,Extreme Pitcher Sanctuary (Ks Up)
+SDP,Petco Park,1.03,0.86,Deep Outfield Fences (Ks Up)
+ATL,Truist Park,1.00,1.01,Neutral Standard Baseline
+BOS,Fenway Park,0.95,1.09,Green Monster Slicing (Ks Down)
+BAL,Camden Yards,1.01,0.96,Deep Left Wall Extension
+TOR,Rogers Centre,0.98,1.02,Controlled Dome Environment
+TBR,Tropicana Field,1.02,0.92,Low Ceiling Turf (Ks Up)
+CHW,Guaranteed Rate,0.97,1.05,Launch Pad Air Structure
+DET,Comerica Park,1.02,0.94,Deep Center Alleys (Ks Up)
+MIN,Target Field,1.00,0.98,Cold Air Variable Base
+KAN,Kauffman Stadium,0.94,1.04,Massive Outfield Gaps (Ks Down)
+KCR,Kauffman Stadium,0.94,1.04,Massive Outfield Gaps (Ks Down)
+HOU,Minute Maid Park,0.99,1.03,Short Left Crawford Boxes
+SEA,T-Mobile Park,1.05,0.84,Heavy Marine Air Layer (Ks Max)
+TEX,Globe Life Field,0.98,1.01,Controlled Retractable Roof
+LAA,Angel Stadium,0.99,1.03,Warm Night Ball Carrying
+MIA,LoanDepot Park,1.02,0.91,Humid Retractable Dome (Ks Up)
+PHI,Citizens Bank,0.96,1.07,Small Dimensions Matrix (Runs Up)
+WSH,Nationals Park,0.99,1.00,Neutral Standard Grid
+WSN,Nationals Park,0.99,1.00,Neutral Standard Grid
+CHC,Wrigley Field,1.00,1.00,Wind Dynamic Vector Core
+MIL,American Family,0.98,1.02,Hitters Retractable Box
+STL,Busch Stadium,1.01,0.93,Dense Summer Midwest Air (Ks Up)
+PIT,PNC Park,1.01,0.97,Deep Left Field Notch
+CIN,Great American,0.95,1.12,Tiny Outer Fences (Runs Max)
+SFO,Oracle Park,1.04,0.85,Cool San Francisco Bay Fog (Ks Up)
+SFG,Oracle Park,1.04,0.85,Cool San Francisco Bay Fog (Ks Up)
+COL,Coors Field,0.88,1.24,Extreme Thin Mile-High Air (Ks Min)
+OAK,Sutter Health Park,0.98,1.04,Minor League Sized Base
+ATH,Sutter Health Park,0.98,1.04,Minor League Sized Base
