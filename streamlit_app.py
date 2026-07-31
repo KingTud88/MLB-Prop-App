@@ -186,7 +186,7 @@ with col1:
             "WHIFF": ["21.4%", "34.1%", "28.7%"],
             "PUT": ["14.2%", "22.5%", "18.1%"]
         })
-        st.dataframe(pitch_data, use_container_width="stretch", hide_index=True)
+        st.dataframe(pitch_data, use_container_width='stretch', hide_index=True)
         
         st.markdown("<div class='section-header'>Advanced Metrics</div>", unsafe_allow_html=True)
         bm1, bm2, bm3 = st.columns(3)
@@ -210,4 +210,4 @@ with col1:
 with col2:
     st.markdown("<div class='section-header'>Batter-by-batter K matchup</div>", unsafe_allow_html=True)
     st.caption(f"MLB PROJECTED - avg {round(lineup_df['K% USED'].mean(), 1)} | high-K {len(lineup_df[lineup_df['K% USED'] > 22])} | low-K {len(lineup_df[lineup_df['K% USED'] <= 15])}")
-    st.dataframe(lineup_df, use_container_width="stretch", hide_index=True)
+    st.dataframe(lineup_df, use_container_width='stretch', hide_index=True)
