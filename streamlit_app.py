@@ -151,59 +151,6 @@ with col1:
         innings_pitched = float(p_stats['IP'])
         era = float(p_stats['ERA']) if 'ERA' in p_stats else 4.00
         
-        # Core Calculations
-        league_avg_k = 22.5
-        team_avg_k = lineup_df["K% USED"].mean()
-        pitcher_base_avg = strikeouts / games
-        matchup_multiplier = team_avg_k / league_avg_k
-        
-        # NEW: Venue Splits Adjustment (Home Pitchers average ~5% higher baseline volume)
-        venue_multiplier = 1.05 if venue_split == "Home" else 0.96
-        
-        # NEW: Vegas Implied Total Volume Scalar
-        # High expected opponent runs = high pitcher pulled-risk factor (lower volume calculation)
-        if vegas_spread >= 4.5:
-            vegas_multiplier = 0.91
-        elif vegas_spread <= 3.2:
-            vegas_multiplier = 1.08
-        else:
-            vegas_multiplier = 1.00
-
-        # Compounded Smart Projection Calculation
-        live_avg = round(pitcher_base_avg * matchup_multiplier * venue_multiplier * vegas_multiplier, 2)
-        diff_val = round(live_avg - sportsbook_line, 2)
-        
-        c_p1, c_p2 = st.columns(2)
-        with c_p1:
-            diff_color = "#50FA7B" if diff_val >= 0 else "#FF5555"
-            st.markdown(f"<div class='metric-card'><div class='metric-label'>PROJ K</div><div class='metric-value'>{live_avg}</div><div class='sub-text' style='color:{diff_color};'>{( '+' if diff_val >= 0 else '')}{diff_val} vs {sportsbook_line}</div></div>", unsafe_allow_html=True)
-        with c_p2:
-            rec_tag = "OVER" if live_avg > sportsbook_line else "UNDER"
-            rec_color = "#50FA7B" if rec_tag == "OVER" else "#FF5555"
-            st.markdown(f"<div class='metric-card'><div class='metric-label'>RECOMMENDATION</div><div class='metric-value' style='color:{rec_color};'>{rec_tag}</div><div class='sub-text' style='color:#8BE9FD;'>{sportsbook_line} Ks Line</div></div>", unsafe_allow_html=True)
-            
-        c_m1, c_m2, c_m3, c_m4 = st.columns(4)
-        with c_m1: 
-            grade = "A" if live_avg > 6.5 else "B" if live_avg > 4.8 else "C"
-            st.markdown(f"<div class='metric-card'><div class='metric-label'>K GRADE</div><div class='tag-grade'>{grade}</div></div>", unsafe_allow_html=True)
-        with c_m2: st.markdown(f"<div class='metric-card'><div class='metric-label'>CEILING</div><div class='metric-value' style='color:#50FA7B;'>{int(live_avg + 3)}K</div></div>", unsafe_allow_html=True)
-            
-# 4. Dashboard Layout Rendering
-p_stats = fetch_pitcher_intel_metrics(pitcher_input)
-lineup_df, app_status = fetch_dynamic_opposing_lineup(opposing_team)
-
-col1, col2 = st.columns(2)
-
-with col1:
-    st.header(f"👤 {pitcher_input.title()}")
-    st.caption(f"⚾ Matchup Intel Summary | Contextualized Projections")
-    st.info(app_status)
-    
-    if p_stats is not None:
-        games, strikeouts = int(p_stats['G']), int(p_stats['SO'])
-        innings_pitched = float(p_stats['IP'])
-        era = float(p_stats['ERA']) if 'ERA' in p_stats else 4.00
-        
         # Core Modeling Math
         league_avg_k = 22.5
         team_avg_k = lineup_df["K% USED"].mean()
