@@ -453,7 +453,7 @@ if not pitcher_db.empty and not batter_database.empty if 'batter_database' in lo
             "EDGE GAP": arbitrage_edge, "BET SIDE": "OVER" if arbitrage_edge >= 0 else "UNDER",
             "EDGE TIER STATUS": edge_tier
         })
- master_slate_df = pd.DataFrame(global_tracker_rows)
+    master_slate_df = pd.DataFrame(global_tracker_rows)
     styled_master_board = master_slate_df.style.set_properties(**{
         'background-color': '#1A1423', 'color': '#E5D4ED', 'border-color': '#372549', 'text-align': 'center'
     }).map(
