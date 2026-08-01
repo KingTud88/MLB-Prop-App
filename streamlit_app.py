@@ -144,7 +144,7 @@ def fetch_live_announced_lineup(team_abbr):
                 if len(players_found) >= 9: return players_found[:9]
         return None
     except: return None
-        def fetch_dynamic_opposing_lineup(team_abbr, pitcher_arm="R"):
+def fetch_dynamic_opposing_lineup(team_abbr, pitcher_arm="R"):
     """Isolates batter lines and compounds platoon alignment scalars natively."""
     live_names = fetch_live_announced_lineup(team_abbr)
     lineup_rows = []
