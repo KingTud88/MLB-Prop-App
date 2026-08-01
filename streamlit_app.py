@@ -173,44 +173,50 @@ if not pitcher_db.empty and lookup_key in pitcher_db['name_clean'].values:
             arsenal_list.append({"PITCH": str(p_row[f'p{i}']), "USE": str(p_row[f'p{i}_use']), "WHIFF": str(p_row[f'p{i}_whiff'])})
     pitch_df = pd.DataFrame(arsenal_list)
 
+# Execute Platoon Lineup Query
 lineup_df, app_status = fetch_dynamic_opposing_lineup(opposing_team, pitcher_arm=pitcher_throws)
 
-# 1. EXPANDED BALLPARK & BULLPEN MATRIX LOOKUPS
+# 1. FIXED: Ballpark Factor Connector with Safe String Extraction
 park_multiplier, stadium_text, stadium_trait = 1.00, "Neutral Factor: 1.0x", "Standard Environment Base"
 bullpen_multiplier = 1.00
-home_team_target = pitcher_db[pitcher_db['name_clean'] == lookup_key]['team'].values if (venue_split == "Home" and lookup_key in pitcher_db['name_clean'].values) else opposing_team
+
+# Safely extract the home team name as a plain string rather than an array object
+if venue_split == "Home" and not pitcher_db.empty and lookup_key in pitcher_db['name_clean'].values:
+    pitcher_team_series = pitcher_db[pitcher_db['name_clean'] == lookup_key]['team']
+    home_team_target = str(pitcher_team_series.values[0]).upper().strip() if not pitcher_team_series.empty else opposing_team
+else:
+    home_team_target = opposing_team
 
 if not ballpark_db.empty and home_team_target in ballpark_db['team_clean'].values:
-    park_row = ballpark_db[ballpark_db['team_clean'] == home_team_target].iloc
+    # CRITICAL FIX: Changed from raw property access .iloc to standard bracket query .iloc[0]
+    park_row = ballpark_db[ballpark_db['team_clean'] == home_team_target].iloc[0]
     park_multiplier = float(park_row['k_scalar'])
-    # NEW PARAMETER: Extracts the opposing relief crew k-modifier safely
     bullpen_multiplier = float(park_row['bullpen_k_factor']) if 'bullpen_k_factor' in park_row.index else 1.00
     stadium_text = f"{str(park_row['park_name']).title()}: {park_multiplier}x"
     stadium_trait = str(park_row['top_trait'])
 
-# 2. FIXED UMPIRE PARSER LOOKUP
+# 2. FIXED: Umpire Strike Zone Connector with Safe Bracket Query Indexing
 ump_multiplier, umpire_text, umpire_trait = 1.00, "Standard Zone: 1.0x", "Balanced Strike Zone"
 with st.sidebar:
     st.subheader("⚖️ Official Assignments")
     umpire_input = st.text_input("Home Plate Umpire", "Standard").strip().lower()
     
-    # NEW PARAMETER: Interactive Wind-Vector selector additions
     st.subheader("💨 Meteorological Conditions")
     wind_vector = st.radio("Wind Vector Assignment", ["Neutral / Dome", "Blowing In (Ks Up)", "Blowing Out (Ks Down)"])
 
 if not umpire_db.empty and umpire_input in umpire_db['name_clean'].values:
-    ump_row = umpire_db[umpire_db['name_clean'] == umpire_input].iloc
+    # CRITICAL FIX: Changed from raw property access .iloc to standard bracket query .iloc[0]
+    ump_row = umpire_db[umpire_db['name_clean'] == umpire_input].iloc[0]
     ump_multiplier = float(ump_row['k_mod'])
     umpire_text = f"{umpire_input.title()}: {ump_multiplier}x"
     umpire_trait = str(ump_row['call_tendency'])
 
-# 3. NEW ADVANCED COMPONENT MULTIPLIER SCALARS CALCULATIONS
+# 3. ADVANCED COMPONENT MULTIPLIER SCALARS CALCULATIONS
 wind_multiplier = 1.00
 if wind_vector == "Blowing In (Ks Up)": wind_multiplier = 1.05
 elif wind_vector == "Blowing Out (Ks Down)": wind_multiplier = 0.94
 
 fatigue_multiplier = 1.00
-# Shaves opportunity math down automatically if workload fatigue leash thresholds trigger
 if rolling_pitches >= 100: fatigue_multiplier = 0.95
 
 col1, col2 = st.columns(2)
