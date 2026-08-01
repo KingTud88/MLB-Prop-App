@@ -79,6 +79,7 @@ def fetch_live_announced_lineup(team_abbr):
 def fetch_dynamic_opposing_lineup(team_abbr):
     live_names = fetch_live_announced_lineup(team_abbr)
     lineup_rows = []
+    
     base_ks = [16.2, 23.4, 19.1, 27.8, 14.3, 21.0, 25.5, 18.1, 20.3]
     seed_shift = sum(ord(char) for char in team_abbr) % 6
     dynamic_ks = [round(k + seed_shift - 3, 1) for k in base_ks]
@@ -96,26 +97,43 @@ def fetch_dynamic_opposing_lineup(team_abbr):
             clean_target = name.lower().strip()
             if not batter_db.empty and clean_target in batter_db['name_clean'].values:
                 b_row = batter_db[batter_db['name_clean'] == clean_target].iloc[0]
-                lineup_rows.append({"Name": name, "Team": str(b_row['team']).upper().strip(), "K%": float(b_row['vs_rhp_k']), "SEASON": float(b_row['season_k'])})
+                lineup_rows.append({
+                    "Name": name, 
+                    "Team": str(b_row['team']).upper().strip(), 
+                    "Hand": str(b_row['hand']).upper().strip(),
+                    "K%": float(b_row['vs_rhp_k']), 
+                    "SEASON": float(b_row['season_k'])
+                })
             else:
-                lineup_rows.append({"Name": name, "Team": team_abbr.upper(), "K%": dynamic_ks[i], "SEASON": dynamic_ks[i]})
+                lineup_rows.append({"Name": name, "Team": team_abbr.upper(), "Hand": "R" if i % 2 == 0 else "L", "K%": dynamic_ks[i], "SEASON": dynamic_ks[i]})
     else:
         status_msg = f"⏳ Lineup Status: Live webpage data unlisted. Active roster baseline rendered for {team_abbr}."
         if not batter_db.empty and team_abbr.upper() in batter_db['team_clean'].values:
             team_roster = batter_db[batter_db['team_clean'] == team_abbr.upper()]
             for _, r in team_roster.head(9).iterrows():
-                lineup_rows.append({"Name": str(r['name']).title(), "Team": str(r['team']).upper().strip(), "K%": float(r['vs_rhp_k']), "SEASON": float(r['season_k'])})
+                lineup_rows.append({
+                    "Name": str(r['name']).title(), 
+                    "Team": str(r['team']).upper().strip(), 
+                    "Hand": str(r['hand']).upper().strip(),
+                    "K%": float(r['vs_rhp_k']), 
+                    "SEASON": float(r['season_k'])
+                })
         else:
             fake_names = [f"Hitter {i}" for i in range(1, 10)]
             for i, name in enumerate(fake_names):
-                lineup_rows.append({"Name": name, "Team": team_abbr.upper(), "K%": dynamic_ks[i], "SEASON": dynamic_ks[i]})
+                lineup_rows.append({"Name": name, "Team": team_abbr.upper(), "Hand": "R" if i % 2 == 0 else "L", "K%": dynamic_ks[i], "SEASON": dynamic_ks[i]})
                 
     lineup_df = pd.DataFrame(lineup_rows)
+    
+    # DYNAMIC TWEAK: Maps true player hitting sides directly instead of using alternating placeholder strings
     display_df = pd.DataFrame({
         "BATTER": [f"{i+1}  {row['Name']}" for i, row in lineup_df.iterrows()],
         "TEAM": lineup_df["Team"],
-        "HAND": ["R" if i % 2 == 0 else "L" for i in range(len(lineup_df))],
-        "K% USED": lineup_df["K%"], "VS HAND": [round(k * 0.95, 1) for k in lineup_df["K%"]], "SEASON": lineup_df["SEASON"]
+        "HAND": lineup_df["Hand"],
+        "K% USED": lineup_df["K%"], 
+        # Platoon adjustment calculation logic applied natively
+        "VS HAND": [round(row["K%"] * 1.12, 1) if row["Hand"] == "L" else round(row["K%"] * 0.92, 1) for i, row in lineup_df.iterrows()], 
+        "SEASON": lineup_df["SEASON"]
     })
     return display_df, status_msg
 
