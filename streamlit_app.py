@@ -347,7 +347,7 @@ with col1:
             calc_put = round(whiff_val * 0.58, 1)
             updated_arsenal.append({"PITCH TYPE": row["PITCH"], "USAGE": row["USE"], "K% EXPECTED": f"K:{calc_k}%", "WHIFF RATE": row["WHIFF"], "PUTAWAY": f"{calc_put}%"})
         styled_arsenal = pd.DataFrame(updated_arsenal).style.set_properties(**{'text-align': 'center', 'background-color': '#1A1423', 'color': '#E5D4ED', 'border-color': '#372549'})
-        st.dataframe(styled_arsenal, use_container_width=True, hide_index=True)
+        st.dataframe(styled_arsenal, use_container_width="stretch", hide_index=True)
         st.markdown("<div class='section-header'>📊 Automated Global Slate Edge Tracker Matrix</div>", unsafe_allow_html=True)
     if not pitcher_db.empty:
         global_tracker_rows = []
@@ -432,7 +432,7 @@ with col1:
                 else ('background-color: #BD93F9; color: #0E0B16; font-weight: bold; text-align: center;' if val == "📈 A-Tier Value" else 'text-align: center;'),
                 subset=["STATUS"]
             )
-            st.dataframe(styled_master_board, use_container_width=True, hide_index=True)
+            st.dataframe(styled_master_board, use_container_width="stretch", hide_index=True)
 
 with col2:
     st.markdown("<div class='section-header'>Batter-by-batter K matchup</div>", unsafe_allow_html=True)
@@ -447,7 +447,7 @@ with col2:
         else ('background-color: #50FA7B; color: #0E0B16; font-weight: bold; text-align: center;' if isinstance(val, (int, float)) and val <= 15.0 else 'text-align: center;'),
         subset=["K% USED", "VS HAND", "SEASON"]
     )
-    st.dataframe(styled_lineup, use_container_width=True, hide_index=True)
+    st.dataframe(styled_lineup, use_container_width="stretch", hide_index=True)
 
     st.markdown("<div class='section-header'>Advanced Contextual Metrics Matrix</div>", unsafe_allow_html=True)
     am_c1, am_c2, am_c3 = st.columns(3)
