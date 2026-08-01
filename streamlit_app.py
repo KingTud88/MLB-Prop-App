@@ -157,9 +157,9 @@ top_pitch_text, pitch_k_pct, whiff_pct, skill_score = "Four-seam<br>27% use", "2
 pitch_df = pd.DataFrame([{"PITCH": "Four-seam FB", "USE": "45%", "WHIFF": "W:21%"}])
 
 if not pitcher_db.empty and lookup_key in pitcher_db['name_clean'].values:
+    # Safely get the direct under-lying data row values
     p_row = pitcher_db[pitcher_db['name_clean'] == lookup_key].iloc[0]
     pitcher_base_avg = float(p_row['base_avg'])
-    # DYNAMIC LOGIC ACTIVATED: Unpacks pitcher's arm orientation column from file
     pitcher_throws = str(p_row['throws']).upper().strip() if 'throws' in p_row.index else "R"
     games, strikeouts = int(p_row['games']), int(p_row['strikeouts'])
     innings_pitched, era = float(p_row['ip']), float(p_row['era'])
@@ -167,9 +167,18 @@ if not pitcher_db.empty and lookup_key in pitcher_db['name_clean'].values:
     pitch_k_pct, whiff_pct, skill_score = str(p_row['pitch_k_pct']), str(p_row['whiff_pct']), str(p_row['skill_score'])
     
     arsenal_list = []
+    # Explicitly check and append all five pitch variations safely
     for i in range(1, 6):
-        if f'p{i}' in p_row.index and str(p_row[f'p{i}']) != '—' and str(p_row[f'p{i}']) != 'nan':
-            arsenal_list.append({"PITCH": str(p_row[f'p{i}']), "USE": str(p_row[f'p{i}_use']), "WHIFF": str(p_row[f'p{i}_whiff'])})
+        pitch_col = f'p{i}'
+        use_col = f'p{i}_use'
+        whiff_col = f'p{i}_whiff'
+        
+        if pitch_col in p_row.index and pd.notna(p_row[pitch_col]) and str(p_row[pitch_col]) != '—' and str(p_row[pitch_col]) != 'nan':
+            arsenal_list.append({
+                "PITCH": str(p_row[pitch_col]), 
+                "USE": str(p_row[use_col]) if use_col in p_row.index else "0%", 
+                "WHIFF": str(p_row[whiff_col]) if whiff_col in p_row.index else "W:0%"
+            })
     pitch_df = pd.DataFrame(arsenal_list)
 
 lineup_df, app_status = fetch_dynamic_opposing_lineup(opposing_team, pitcher_arm=pitcher_throws)
