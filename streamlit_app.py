@@ -218,7 +218,7 @@ with st.sidebar:
     game_temp = st.slider("Game-Time Temperature (°F)", min_value=30, max_value=105, value=72, step=1)
 
 if not umpire_db.empty and umpire_input in umpire_db['name_clean'].values:
-    ump_row = umpire_db[umpire_db['name_clean'] == umpire_input].iloc
+    ump_row = umpire_db[umpire_db['name_clean'] == umpire_input].squeeze()
     base_k_mod = float(ump_row['k_mod']) if 'k_mod' in ump_row.index else 1.00
     ump_accuracy = float(ump_row['accuracy_coefficient']) if 'accuracy_coefficient' in ump_row.index else 1.00
     
