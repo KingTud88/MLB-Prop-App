@@ -86,6 +86,7 @@ def fetch_dynamic_opposing_lineup(team_abbr):
     try:
         batter_db = pd.read_csv("batter_database.csv")
         batter_db['name_clean'] = batter_db['name'].str.lower().str.strip()
+        batter_db['team_clean'] = batter_db['team'].str.upper().str.strip()
     except:
         batter_db = pd.DataFrame()
 
@@ -95,53 +96,51 @@ def fetch_dynamic_opposing_lineup(team_abbr):
             clean_target = name.lower().strip()
             if not batter_db.empty and clean_target in batter_db['name_clean'].values:
                 b_row = batter_db[batter_db['name_clean'] == clean_target].iloc[0]
-                lineup_rows.append({"Name": name, "K%": float(b_row['vs_rhp_k']), "SEASON": float(b_row['season_k'])})
+                lineup_rows.append({"Name": name, "Team": str(b_row['team']).upper().strip(), "K%": float(b_row['vs_rhp_k']), "SEASON": float(b_row['season_k'])})
             else:
-                lineup_rows.append({"Name": name, "K%": dynamic_ks[i], "SEASON": dynamic_ks[i]})
+                lineup_rows.append({"Name": name, "Team": team_abbr.upper(), "K%": dynamic_ks[i], "SEASON": dynamic_ks[i]})
     else:
         status_msg = f"⏳ Lineup Status: Live webpage data unlisted. Active roster baseline rendered for {team_abbr}."
-        roster_database = {
-            "ARI": ["C. Carroll", "K. Marte", "L. Gurriel Jr.", "C. Walker", "G. Moreno", "E. Suarez", "A. Thomas", "G. Perdomo", "J. McCarthy"],
-            "LAD": ["S. Ohtani", "M. Betts", "F. Freeman", "T. Hernandez", "W. Smith", "M. Muncy", "G. Lux", "T. Edman", "M. Rojas"],
-            "NYY": ["G. Torres", "J. Soto", "A. Judge", "G. Stanton", "J. Chisholm Jr.", "A. Volpe", "A. Verdugo", "A. Wells", "O. Cabrera"],
-            "CLE": ["S. Kwan", "J. Ramirez", "J. Naylor", "L. Thomas", "A. Gimenez", "D. Fry", "W. Brennan", "B. Naylor", "B. Rocchio"],
-            "NYM": ["F. Lindor", "B. Nimmo", "M. Vientos", "P. Alonso", "J. Martinez", "J. Iglesias", "J. McNeil", "F. Alvarez", "H. Bader"],
-            "SDP": ["L. Arraez", "F. Tatis Jr.", "J. Cronenworth", "M. Machado", "X. Bogaerts", "J. Merrill", "H. Kim", "D. Peralta", "K. Higashioka"],
-            "ATL": ["M. Harris II", "O. Albies", "M. Ozuna", "M. Olson", "J. Soler", "R. Laureano", "S. Murphy", "G. Urshela", "O. Arcia"]
-        }
-        fake_names = roster_database.get(team_abbr.upper().strip(), [f"Hitter {i}" for i in range(1, 10)])
-        for i, name in enumerate(fake_names):
-            clean_target = name.lower().strip()
-            if not batter_db.empty and clean_target in batter_db['name_clean'].values:
-                b_row = batter_db[batter_db['name_clean'] == clean_target].iloc[0]
-                lineup_rows.append({"Name": name, "K%": float(b_row['vs_rhp_k']), "SEASON": float(b_row['season_k'])})
-            else:
-                lineup_rows.append({"Name": f"{team_abbr} {name}" if "Hitter" in name else name, "K%": dynamic_ks[i], "SEASON": dynamic_ks[i]})
+        if not batter_db.empty and team_abbr.upper() in batter_db['team_clean'].values:
+            team_roster = batter_db[batter_db['team_clean'] == team_abbr.upper()]
+            for _, r in team_roster.head(9).iterrows():
+                lineup_rows.append({"Name": str(r['name']).title(), "Team": str(r['team']).upper().strip(), "K%": float(r['vs_rhp_k']), "SEASON": float(r['season_k'])})
+        else:
+            fake_names = [f"Hitter {i}" for i in range(1, 10)]
+            for i, name in enumerate(fake_names):
+                lineup_rows.append({"Name": name, "Team": team_abbr.upper(), "K%": dynamic_ks[i], "SEASON": dynamic_ks[i]})
                 
     lineup_df = pd.DataFrame(lineup_rows)
     display_df = pd.DataFrame({
         "BATTER": [f"{i+1}  {row['Name']}" for i, row in lineup_df.iterrows()],
+        "TEAM": lineup_df["Team"],
         "HAND": ["R" if i % 2 == 0 else "L" for i in range(len(lineup_df))],
         "K% USED": lineup_df["K%"], "VS HAND": [round(k * 0.95, 1) for k in lineup_df["K%"]], "SEASON": lineup_df["SEASON"]
     })
     return display_df, status_msg
 
-    # 4. Interface Rendering Framework Layout Pipeline
+# 4. Interface Rendering Framework Layout Pipeline
 lineup_df, app_status = fetch_dynamic_opposing_lineup(opposing_team)
 
 @st.cache_data(ttl=3600)
-def load_local_pitcher_database():
+def load_contextual_databases():
     try:
-        df = pd.read_csv("pitcher_database.csv")
-        df['name_clean'] = df['name'].str.lower().str.strip()
-        return df
-    except:
-        return pd.DataFrame()
+        p_db = pd.read_csv("pitcher_database.csv")
+        p_db['name_clean'] = p_db['name'].str.lower().str.strip()
+    except: p_db = pd.DataFrame()
+    try:
+        park_db = pd.read_csv("ballpark_database.csv")
+        park_db['team_clean'] = park_db['team'].str.upper().str.strip()
+    except: park_db = pd.DataFrame()
+    try:
+        ump_db = pd.read_csv("umpire_database.csv")
+        ump_db['name_clean'] = ump_db['name'].str.lower().str.strip()
+    except: ump_db = pd.DataFrame()
+    return p_db, park_db, ump_db
 
-pitcher_db = load_local_pitcher_database()
+pitcher_db, ballpark_db, umpire_db = load_contextual_databases()
 lookup_key = pitcher_input.strip().lower()
 
-# FIXED PROFILES MAPPING LOOP: Safely unpacks single data rows from the CSV
 if not pitcher_db.empty and lookup_key in pitcher_db['name_clean'].values:
     p_row = pitcher_db[pitcher_db['name_clean'] == lookup_key].iloc[0]
     pitcher_base_avg = float(p_row['base_avg'])
@@ -163,6 +162,14 @@ else:
     pitch_k_pct, whiff_pct, skill_score = "24.6%", "—", "—"
     pitch_df = pd.DataFrame([{"PITCH": "Four-seam FB", "USE": "45%", "K%": "K:—", "WHIFF": "W:21%", "PUT": "—"}, {"PITCH": "Changeup", "USE": "25%", "K%": "K:—", "WHIFF": "W:26%", "PUT": "—"}])
 
+park_multiplier, stadium_text = 1.00, "Neutral Dimension Baseline"
+if not ballpark_db.empty and opposing_team in ballpark_db['team_clean'].values:
+    park_row = ballpark_db[ballpark_db['team_clean'] == opposing_team].iloc[0]
+    park_multiplier = float(park_row['k_modifier']) if 'k_modifier' in park_row.index else 1.00
+    stadium_text = f"Stadium K-Boost: {park_multiplier}x"
+
+ump_multiplier, umpire_text = 1.00, "Standard Zone Umpire"
+
 col1, col2 = st.columns(2)
 
 with col1:
@@ -171,7 +178,7 @@ with col1:
     matchup_multiplier = team_avg_k / league_avg_k
     venue_multiplier = 1.06 if venue_split == "Home" else 0.95
     vegas_multiplier = 0.92 if vegas_spread >= 4.5 else (1.12 if vegas_spread <= 3.2 else 1.00)
-    live_avg = round(pitcher_base_avg * matchup_multiplier * venue_multiplier * vegas_multiplier, 2)
+    live_avg = round(pitcher_base_avg * matchup_multiplier * venue_multiplier * vegas_multiplier * park_multiplier * ump_multiplier, 2)
     diff_val = round(live_avg - sportsbook_line, 2)
     
     ch1, ch2 = st.columns(2)
@@ -220,15 +227,12 @@ with col2:
     with bm2:
         st.metric("OPP K%", f"{round(team_avg_k, 1)}%")
         st.metric("IP", f"{round(innings_pitched / games, 2)}")
-        st.metric("BF GATE", "—")
-        st.metric("BB/9", "—")
+        st.metric("STADIUM", stadium_text)
     with bm3:
         st.metric("WHIFF", whiff_pct)
         st.metric("SAVANT", "SUCCESS")
-        st.metric("SKILL", skill_score)
-        st.metric("ERA/FIP", f"— / {era}")
+        st.metric("UMPIRE", umpire_text)
 
-    # NEW DYNAMIC INJURY REPORT COMPONENT LINKED
     st.markdown("<div class='section-header'>🚨 Team Injury Alert Desk</div>", unsafe_allow_html=True)
     active_injuries = check_active_team_injuries(opposing_team)
     if active_injuries:
