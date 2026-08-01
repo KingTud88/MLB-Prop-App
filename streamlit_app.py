@@ -346,10 +346,41 @@ with col2:
     else: 
         st.success(f"✨ No critical active batter injuries reported for {opposing_team} today.")
 # ==========================================
-# 🔮 GLOBAL DAILY MASTER SLATE TRACKER (100% ALIGNED PRECISION ENGINE)
+# 🔮 GLOBAL DAILY MASTER SLATE TRACKER (DYNAMIC SCHEDULE EDITION)
 # ==========================================
 st.markdown("<div class='section-header'>📊 Automated Global Slate Edge Tracker Matrix</div>", unsafe_allow_html=True)
-st.caption("Advanced Precision Engine — Compounds Matchups, Vegas, Platoons, Stadiums, and Umpires across All 48 Rotations Automatically.")
+st.caption("Live Matchup Crawling Engine — Dynamically Maps Real-World Scheduled Opponents Across All 48 Rotations Automatically.")
+
+def fetch_live_slate_matchups():
+    """Crawls real-time schedule grids to identify the true active opponent for every MLB team today."""
+    matchups_map = {}
+    try:
+        url = "https://rotowire.com"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        res = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(res.text, "html.parser")
+        
+        # Standard structural abbreviations mapping layer
+        ROTOWIRE_CLEAN_MAP = {
+            'SD': 'SDP', 'SDG': 'SDP', 'CWS': 'CHW', 'KC': 'KCR', 'SF': 'SFG', 'TB': 'TBR', 'WSH': 'WSN'
+        }
+        
+        for box in soup.select(".lineup__box"):
+            teams = box.select(".lineup__team a, .lineup__teams a")
+            if len(teams) >= 2:
+                t1 = teams[0].get_text(strip=True).upper()
+                t2 = teams[1].get_text(strip=True).upper()
+                
+                # Standardize abbreviation vectors
+                t1 = ROTOWIRE_CLEAN_MAP.get(t1, t1)
+                t2 = ROTOWIRE_CLEAN_MAP.get(t2, t2)
+                
+                # Cross-reference opposing slots reciprocally
+                matchups_map[t1] = t2
+                matchups_map[t2] = t1
+        return matchups_map
+    except:
+        return matchups_map
 
 def fetch_live_sportsbook_lines():
     props_map = {}
@@ -370,6 +401,8 @@ def fetch_live_sportsbook_lines():
         return props_map
     except: return props_map
 
+# Run Background Live Data Harvesting Services
+live_schedule_grid = fetch_live_slate_matchups()
 live_market_lines = fetch_live_sportsbook_lines()
 
 if not pitcher_db.empty:
@@ -389,13 +422,20 @@ if not pitcher_db.empty:
         p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data.index else "R"
         p_fatigue = int(p_data['rolling_pitches']) if 'rolling_pitches' in p_data.index else 90
         
+        # 1. Pull Live Sportsbook Line Vector
         current_book_line = live_market_lines.get(p_name_clean, sportsbook_line if p_name_clean == lookup_key else 5.5)
-        opp_team_target = opposing_team if p_name_clean == lookup_key else (opposing_team if p_team_code != opposing_team else "NYM")
         
+        # 2. AUTOMATED SCHEDULE DISCOVERY Core Loop Hook
+        # Crawls live grid map to discover who this pitcher's team is truly facing today
+        opp_team_target = live_schedule_grid.get(p_team_code, "NYM")
+        
+        # Override to match sidebar context if analyzing your primary single target
         if p_name_clean == lookup_key:
             simulated_proj = live_avg
             current_book_line = sportsbook_line
+            opp_team_target = opposing_team
         else:
+            # 3. BULK PRECISION SCANNERS: Process full 9-way matrices with live mapped opponents
             p_matchup_mult = 1.00
             if not b_db_bulk.empty and opp_team_target in b_db_bulk['team_clean'].values:
                 team_hitters = b_db_bulk[b_db_bulk['team_clean'] == opp_team_target]
@@ -416,7 +456,7 @@ if not pitcher_db.empty:
             p_park_mult, p_bullpen_mult = 1.00, 1.00
             stadium_home = p_team_code if venue_split == "Home" else opp_team_target
             if not ballpark_db.empty and stadium_home in ballpark_db['team_clean'].values:
-                p_row_park = ballpark_db[ballpark_db['team_clean'] == stadium_home].iloc[0]
+                p_row_park = ballpark_db[ballpark_db['team_clean'] == stadium_home].iloc
                 p_park_mult = float(p_row_park['k_scalar'])
                 p_bullpen_mult = float(p_row_park['bullpen_k_factor']) if 'bullpen_k_factor' in p_row_park.index else 1.00
 
