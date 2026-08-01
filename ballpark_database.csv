@@ -1,32 +1,32 @@
-team,park_name,k_scalar,run_scalar,top_trait
-ARI,Chase Field,0.96,1.08,High Alt Altitude (Runs Up / Ks Down)
-LAD,Dodger Stadium,1.02,0.95,Pitcher Friendly Venue (Ks Up)
-NYY,Yankee Stadium,0.99,1.04,Short Right Porch (Runs Up)
-CLE,Progressive Field,1.01,0.97,Neutral Environment Balance
-NYM,Citi Field,1.04,0.88,Extreme Pitcher Sanctuary (Ks Up)
-SDP,Petco Park,1.03,0.86,Deep Outfield Fences (Ks Up)
-ATL,Truist Park,1.00,1.01,Neutral Standard Baseline
-BOS,Fenway Park,0.95,1.09,Green Monster Slicing (Ks Down)
-BAL,Camden Yards,1.01,0.96,Deep Left Wall Extension
-TOR,Rogers Centre,0.98,1.02,Controlled Dome Environment
-TBR,Tropicana Field,1.02,0.92,Low Ceiling Turf (Ks Up)
-CHW,Guaranteed Rate,0.97,1.05,Launch Pad Air Structure
-DET,Comerica Park,1.02,0.94,Deep Center Alleys (Ks Up)
-MIN,Target Field,1.00,0.98,Cold Air Variable Base
-KAN,Kauffman Stadium,0.94,1.04,Massive Outfield Gaps (Ks Down)
-KCR,Kauffman Stadium,0.94,1.04,Massive Outfield Gaps (Ks Down)
-HOU,Minute Maid Park,0.99,1.03,Short Left Crawford Boxes
-SEA,T-Mobile Park,1.05,0.84,Heavy Marine Air Layer (Ks Max)
-TEX,Globe Life Field,0.98,1.01,Controlled Retractable Roof
-CHC,Wrigley Field,0.98,1.02,Wind Vector Variable Shifts
-CIN,Great American,1.01,1.12,Batter Friendly Launchpad
-COL,Coors Field,1.14,1.34,Thin Mountain Air Elevation
-MIA,LoanDepot Park,0.94,0.92,Deep Coastal Air Sanctuary
-MIL,American Family,1.01,1.03,Closed Roof Ball Carrier
-OAK,Sutter Health Park,0.94,0.95,Minor League Outfield Shifts
-PHI,Citizens Bank,1.02,1.08,Short Power Alleys (Runs Up)
-PIT,PNC Park,0.97,0.96,Deep Left Center Notch
-SFO,Oracle Park,0.93,0.84,Heavy Coastal Marine Layer
-SFG,Oracle Park,0.93,0.84,Heavy Coastal Marine Layer
-STL,Busch Stadium,0.96,0.93,Deep Outfield Pitcher Base
-WSH,Nationals Park,0.98,0.99,Neutral East Coast Base
+team,park_name,k_scalar,run_scalar,bullpen_k_factor,top_trait
+ARI,Chase Field,0.96,1.08,0.98,High Alt Altitude (Runs Up / Ks Down)
+LAD,Dodger Stadium,1.02,0.95,1.03,Pitcher Friendly Venue (Ks Up)
+NYY,Yankee Stadium,0.99,1.04,1.02,Short Right Porch (Runs Up)
+CLE,Progressive Field,1.01,0.97,1.01,Neutral Environment Balance
+NYM,Citi Field,1.04,0.88,1.04,Extreme Pitcher Sanctuary (Ks Up)
+SDP,Petco Park,1.03,0.86,1.03,Deep Outfield Fences (Ks Up)
+ATL,Truist Park,1.00,1.01,1.00,Neutral Standard Baseline
+BOS,Fenway Park,0.95,1.09,0.97,Green Monster Slicing (Ks Down)
+BAL,Camden Yards,1.01,0.96,1.02,Deep Left Wall Extension
+TOR,Rogers Centre,0.98,1.02,1.01,Controlled Dome Environment
+TBR,Tropicana Field,1.02,0.92,1.03,Low Ceiling Turf (Ks Up)
+CHW,Guaranteed Rate,0.97,1.05,0.95,Launch Pad Air Structure
+DET,Comerica Park,1.02,0.94,0.99,Deep Center Alleys (Ks Up)
+MIN,Target Field,1.00,0.98,1.00,Cold Air Variable Base
+KAN,Kauffman Stadium,0.94,1.04,0.96,Massive Outfield Gaps (Ks Down)
+KCR,Kauffman Stadium,0.94,1.04,0.96,Massive Outfield Gaps (Ks Down)
+HOU,Minute Maid Park,0.99,1.03,1.01,Short Left Crawford Boxes
+SEA,T-Mobile Park,1.05,0.84,1.05,Heavy Marine Air Layer (Ks Max)
+TEX,Globe Life Field,0.98,1.01,0.99,Controlled Retractable Roof
+CHC,Wrigley Field,0.98,1.02,0.98,Wind Vector Variable Shifts
+CIN,Great American,1.01,1.12,0.97,Batter Friendly Launchpad
+COL,Coors Field,1.14,1.34,0.92,Thin Mountain Air Elevation
+MIA,LoanDepot Park,0.94,0.92,0.99,Deep Coastal Air Sanctuary
+MIL,American Family,1.01,1.03,1.02,Closed Roof Ball Carrier
+OAK,Sutter Health Park,0.94,0.95,0.96,Minor League Outfield Shifts
+PHI,Citizens Bank,1.02,1.08,1.00,Short Power Alleys (Runs Up)
+PIT,PNC Park,0.97,0.96,0.98,Deep Left Center Notch
+SFO,Oracle Park,0.93,0.84,1.02,Heavy Coastal Marine Layer
+SFG,Oracle Park,0.93,0.84,1.02,Heavy Coastal Marine Layer
+STL,Busch Stadium,0.96,0.93,0.98,Deep Outfield Pitcher Base
+WSH,Nationals Park,0.98,0.99,0.99,Neutral East Coast Base
