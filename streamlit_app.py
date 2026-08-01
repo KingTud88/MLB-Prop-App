@@ -217,7 +217,7 @@ with col2:
     styled_lineup = lineup_df.style.map(lambda val: 'background-color: #FF5555; color: #0E0B16; font-weight: bold;' if isinstance(val, (int, float)) and val >= 24.0 else ('background-color: #50FA7B; color: #0E0B16;' if isinstance(val, (int, float)) and val <= 15.0 else ''), subset=["K% USED", "VS HAND", "SEASON"])
     st.dataframe(styled_lineup, width="stretch", hide_index=True)
 
-     st.markdown("<div class='section-header'>Advanced Contextual Metrics</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-header'>Advanced Contextual Metrics</div>", unsafe_allow_html=True)
     bm1, bm2, bm3 = st.columns(3)
     with bm1:
         st.metric("PITCH K%", pitch_k_pct)
