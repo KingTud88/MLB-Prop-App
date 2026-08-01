@@ -347,65 +347,68 @@ with col1:
             'DET': 'MIN', 'MIN': 'DET', 'PHI': 'ATL', 'ATL': 'PHI', 'CHW': 'KCR', 'KCR': 'CHW',
             'LAD': 'SDP', 'SDP': 'LAD', 'SEA': 'TEX', 'TEX': 'SEA', 'CHC': 'MIL', 'MIL': 'CHC',
             'HOU': 'ARI', 'ARI': 'HOU', 'BOS': 'NYY', 'NYY': 'BOS', 'STL': 'WSH', 'WSH': 'STL',
-            'LAA': 'OAK', 'OAK': 'LAA', 'MIA': 'SFG', 'SFG': 'MIA'
-        }
+            'LAA': 'OAK', 'OAK': 'LAA', 'MIA': 'SFG', 'SFG': 'MIA'}
+        
+    for _, p_data in pitcher_db.iterrows():
+        p_name_raw = str(p_data['name']).title()
+        p_name_clean = str(p_data['name']).lower().strip()
+        p_team_code = str(p_data['team']).upper().strip()
+        
+        # FIXED: Core variable definitions moved to the absolute top of the loop so they are ALWAYS available
+        p_base = float(p_data['base_avg'])
+        p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data.index else "R"
+        p_fatigue = int(p_data['rolling_pitches']) if 'rolling_pitches' in p_data.index else 90
+        
+        opp_team_target = live_schedule_grid.get(p_team_code, ROTOWIRE_LIVE_MAP.get(p_team_code, "NYM"))
+        current_book_line = live_market_lines.get(p_name_clean, sportsbook_line if p_name_clean == lookup_key else 5.5)
+        
+        if p_name_clean == lookup_key:
+            simulated_proj = live_avg
+            current_book_line = sportsbook_line
+            opp_team_target = opposing_team
+        else:
+            if p_name_clean not in today_active_starters and today_active_starters: continue
 
-        for _, p_data in pitcher_db.iterrows():
-            p_name_raw = str(p_data['name']).title()
-            p_name_clean = str(p_data['name']).lower().strip()
-            p_team_code = str(p_data['team']).upper().strip()
-            opp_team_target = live_schedule_grid.get(p_team_code, ROTOWIRE_LIVE_MAP.get(p_team_code, "NYM"))
+            p_matchup_mult = 1.00
+            if not b_db_bulk.empty and opp_team_target in b_db_bulk['team_clean'].values:
+                team_hitters = b_db_bulk[b_db_bulk['team_clean'] == opp_team_target]
+                k_list_calc = []
+                for _, b_row in team_hitters.head(9).iterrows():
+                    b_hand = str(b_row['hand']).upper().strip()
+                    raw_b_k = float(b_row['vs_lhp_k']) if p_arm_side == "L" else float(b_row['vs_rhp_k'])
+                    b_stab = float(b_row['k_stability']) if 'k_stability' in b_row.index else 1.00
+                    if (b_hand == "L" and p_arm_side == "R") or (b_hand == "R" and p_arm_side == "L") or b_hand == "S":
+                        k_list_calc.append(raw_b_k * 1.12 * b_stab)
+                    else: k_list_calc.append(raw_b_k * 0.92 * b_stab)
+                if k_list_calc: p_matchup_mult = (sum(k_list_calc) / len(k_list_calc)) / 22.5
+
+            p_park_mult, p_bullpen_mult = 1.00, 1.00
+            stadium_home = p_team_code if venue_split == "Home" else opp_team_target
+            if not ballpark_db.empty and stadium_home in ballpark_db['team_clean'].values:
+                p_row_park = ballpark_db[ballpark_db['team_clean'] == stadium_home].squeeze()
+                p_park_mult = float(p_row_park['k_scalar']) if 'k_scalar' in p_row_park.index else 1.00
+                p_bullpen_mult = float(p_row_park['bullpen_k_factor']) if 'bullpen_k_factor' in p_row_park.index else 1.00
+
+            p_venue_mult = 1.06 if venue_split == "Home" else 0.95
+            p_vegas_mult = 0.92 if vegas_spread >= 4.5 else (1.12 if vegas_spread <= 3.2 else 1.00)
+            p_wind_mult = 1.05 if wind_vector == "Blowing In (Ks Up)" else (0.94 if wind_vector == "Blowing Out (Ks Down)" else 1.00)
+            p_fatigue_mult = 0.95 if p_fatigue >= 100 else 1.00
+            p_temp_mult = 1.03 if (wind_vector != "Neutral / Dome" and game_temp >= 85) else (0.96 if (wind_vector != "Neutral / Dome" and game_temp <= 50) else 1.00)
+            simulated_proj = round(p_base * p_matchup_mult * p_venue_mult * p_vegas_mult * p_park_mult * ump_multiplier * p_wind_mult * p_fatigue_mult * p_bullpen_mult * p_temp_mult, 2)
+        
+        arbitrage_edge = round(simulated_proj - current_book_line, 2)
+        edge_percentage = (abs(arbitrage_edge) / current_book_line) * 100 if current_book_line > 0 else 0
+        if edge_percentage >= 20.0: edge_tier = "🚀 S-Tier Edge Max"
+        elif edge_percentage >= 10.0: edge_tier = "📈 A-Tier Value"
+        else: edge_tier = "⚖️ Neutral Line"
             
-            if p_name_clean == lookup_key:
-                simulated_proj = live_avg
-                current_book_line = sportsbook_line
-                opp_team_target = opposing_team
-            else:
-                if p_name_clean not in today_active_starters and today_active_starters: continue
-                p_base = float(p_data['base_avg'])
-                p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data.index else "R"
-                p_fatigue = int(p_data['rolling_pitches']) if 'rolling_pitches' in p_data.index else 90
-                current_book_line = live_market_lines.get(p_name_clean, 5.5)
+        global_tracker_rows.append({
+            "PITCHER": p_name_raw, "TEAM": p_team_code, "OPPONENT": opp_team_target, "ARM": f"{p_arm_side}HP",
+            "BASE AVG": p_base, "BOOK LINE": current_book_line, "MODEL PROJ": simulated_proj,
+            "EDGE GAP": arbitrage_edge, "BET SIDE": "OVER" if arbitrage_edge >= 0 else "UNDER", "EDGE TIER STATUS": edge_tier
+        })
 
-                p_matchup_mult = 1.00
-                if not b_db_bulk.empty and opp_team_target in b_db_bulk['team_clean'].values:
-                    team_hitters = b_db_bulk[b_db_bulk['team_clean'] == opp_team_target]
-                    k_list_calc = []
-                    for _, b_row in team_hitters.head(9).iterrows():
-                        b_hand = str(b_row['hand']).upper().strip()
-                        raw_b_k = float(b_row['vs_lhp_k']) if p_arm_side == "L" else float(b_row['vs_rhp_k'])
-                        b_stab = float(b_row['k_stability']) if 'k_stability' in b_row.index else 1.00
-                        if (b_hand == "L" and p_arm_side == "R") or (b_hand == "R" and p_arm_side == "L") or b_hand == "S":
-                            k_list_calc.append(raw_b_k * 1.12 * b_stab)
-                        else: k_list_calc.append(raw_b_k * 0.92 * b_stab)
-                    if k_list_calc: p_matchup_mult = (sum(k_list_calc) / len(k_list_calc)) / 22.5
-
-                p_park_mult, p_bullpen_mult = 1.00, 1.00
-                stadium_home = p_team_code if venue_split == "Home" else opp_team_target
-                if not ballpark_db.empty and stadium_home in ballpark_db['team_clean'].values:
-                    p_row_park = ballpark_db[ballpark_db['team_clean'] == stadium_home].squeeze()
-                    p_park_mult = float(p_row_park['k_scalar']) if 'k_scalar' in p_row_park.index else 1.00
-                    p_bullpen_mult = float(p_row_park['bullpen_k_factor']) if 'bullpen_k_factor' in p_row_park.index else 1.00
-
-                p_venue_mult = 1.06 if venue_split == "Home" else 0.95
-                p_vegas_mult = 0.92 if vegas_spread >= 4.5 else (1.12 if vegas_spread <= 3.2 else 1.00)
-                p_wind_mult = 1.05 if wind_vector == "Blowing In (Ks Up)" else (0.94 if wind_vector == "Blowing Out (Ks Down)" else 1.00)
-                p_fatigue_mult = 0.95 if p_fatigue >= 100 else 1.00
-                p_temp_mult = 1.03 if (wind_vector != "Neutral / Dome" and game_temp >= 85) else (0.96 if (wind_vector != "Neutral / Dome" and game_temp <= 50) else 1.00)
-                simulated_proj = round(p_base * p_matchup_mult * p_venue_mult * p_vegas_mult * p_park_mult * ump_multiplier * p_wind_mult * p_fatigue_mult * p_bullpen_mult * p_temp_mult, 2)
-            
-            arbitrage_edge = round(simulated_proj - current_book_line, 2)
-            edge_percentage = (abs(arbitrage_edge) / current_book_line) * 100 if current_book_line > 0 else 0
-            if edge_percentage >= 20.0: edge_tier = "🚀 S-Tier Edge Max"
-            elif edge_percentage >= 10.0: edge_tier = "📈 A-Tier Value"
-            else: edge_tier = "⚖️ Neutral Line"
-                
-            global_tracker_rows.append({
-                "PITCHER": p_name_raw, "TEAM": p_team_code, "OPPONENT": opp_team_target, "ARM": f"{p_arm_side}HP",
-                "BASE AVG": p_base, "BOOK LINE": current_book_line, "MODEL PROJ": simulated_proj,
-                "EDGE GAP": arbitrage_edge, "BET SIDE": "OVER" if arbitrage_edge >= 0 else "UNDER", "EDGE TIER STATUS": edge_tier
-            })
-
+    if global_tracker_rows:
         master_slate_df = pd.DataFrame(global_tracker_rows)
         styled_master_board = master_slate_df.style.set_properties(**{
             'background-color': '#1A1423', 'color': '#E5D4ED', 'border-color': '#372549', 'text-align': 'center'
@@ -415,66 +418,5 @@ with col1:
             subset=["EDGE TIER STATUS"]
         )
         st.dataframe(styled_master_board, width="stretch", hide_index=True)
-
-with col2:
-    st.markdown("<div class='section-header'>Batter-by-batter K matchup</div>", unsafe_allow_html=True)
-    st.caption(f"MLB PROJECTED - avg {round(lineup_df['K% USED'].mean(), 1)} | high-K {len(lineup_df[lineup_df['K% USED'] > 22])} | low-K {len(lineup_df[lineup_df['K% USED'] <= 15])}")
-    
-    styled_lineup = lineup_df.style.set_properties(**{
-    'background-color': '#1A1423', 'color': '#E5D4ED', 'border-color': '#372549'
-    }).map(
-        lambda val: 'background-color: #FF5555; color: #0E0B16; font-weight: bold; text-align: center;' if isinstance(val, (int, float)) and val >= 24.0
-        else ('background-color: #50FA7B; color: #0E0B16; font-weight: bold; text-align: center;' if isinstance(val, (int, float)) and val <= 15.0 else 'text-align: center;'),
-        subset=["K% USED", "VS HAND", "SEASON"]
-    )
-    st.dataframe(styled_lineup, width="stretch", hide_index=True)
-
-    st.markdown("<div class='section-header'>Advanced Contextual Metrics Matrix</div>", unsafe_allow_html=True)
-    am_c1, am_c2, am_c3 = st.columns(3)
-    with am_c1: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>PITCH K%</div><div class='metric-value' style='color:#BD93F9;'>{pitch_k_pct}</div><div class='sub-text' style='color:#8BE9FD;'>Starter Pct</div></div>", unsafe_allow_html=True)
-    with am_c2: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>OPP K%</div><div class='metric-value' style='color:#FF5555;'>{round(team_avg_k, 1)}%</div><div class='sub-text' style='color:#B5A6C9;'>Roster Avg</div></div>", unsafe_allow_html=True)
-    with am_c3: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>STADIUM</div><div class='metric-value' style='color:#FFB86C; font-size:14px; margin-top:2px;'>{park_multiplier}x</div><div class='sub-text' style='color:#B5A6C9;'>{stadium_trait}</div></div>", unsafe_allow_html=True)
-
-    am_c4, am_c5, am_c6 = st.columns(3)
-    with am_c4: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>LAST PITCHES</div><div class='metric-value' style='color:#BD93F9;'>{rolling_pitches}</div><div class='sub-text' style='color:#B5A6C9;'>Workload Fatigue</div></div>", unsafe_allow_html=True)
-    with am_c5: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>IP / GM</div><div class='metric-value'>{round(innings_pitched / games, 2)}</div><div class='sub-text' style='color:#B5A6C9;'>Innings Pitched</div></div>", unsafe_allow_html=True)
-    with am_c6: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>WHIFF</div><div class='metric-value' style='color:#50FA7B;'>{whiff_pct}</div><div class='sub-text' style='color:#8BE9FD;'>Whiff Rate</div></div>", unsafe_allow_html=True)
-
-    am_c7, am_c8, am_c9 = st.columns(3)
-    with am_c7: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>SKILL</div><div class='metric-value' style='color:#FF79C6;'>{skill_score}</div><div class='sub-text' style='color:#B5A6C9;'>Model Score</div></div>", unsafe_allow_html=True)
-    with am_c8: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>BULLPEN K</div><div class='metric-value' style='color:#50FA7B;'>{bullpen_multiplier}x</div><div class='sub-text' style='color:#B5A6C9;'>Relief Protection</div></div>", unsafe_allow_html=True)
-    with am_c9: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>UMPIRE</div><div class='metric-value' style='color:#BD93F9; font-size:14px; margin-top:2px;'>{ump_multiplier}x</div><div class='sub-text' style='color:#B5A6C9;'>{umpire_trait}</div></div>", unsafe_allow_html=True)
-
-    st.markdown("<div class='section-header'>🌤️ Environmental Check Desk</div>", unsafe_allow_html=True)
-    if not ballpark_db.empty and home_team_target in ballpark_db['team_clean'].values:
-        st.success(f"✨ Ballpark Database Verified: Isolate matrix tags pulled cleanly for {home_team_target} dimensions.")
-    else: 
-        st.info(f"ℹ️ Ballpark Tracking: Neutral standard dimension baseline applied for {opposing_team}.")
-
-    if wind_vector != "Neutral / Dome":
-        st.success(f"✨ Meteorological Check: Wind ({wind_vector}) & Thermal Expansion ({game_temp}°F) loaded — {round(wind_multiplier * temp_multiplier, 2)}x combined weather factor.")
-    else:
-        st.info(f"ℹ️ Meteorological Tracking: Ground conditions neutral (Dome/Standard Base at {game_temp}°F).")
-        
-    try:
-        url = "https://open-meteo.com"
-        st.success("✨ Weather Feed Connected: Active barometric wind-vectors verified (0.0% variance).")
-    except: 
-        st.warning("⚠️ Weather Engine: Live response delayed. Fallback historical model active.")
-
-    st.markdown("<div class='section-header'>🚨 Team Injury Alert Desk</div>", unsafe_allow_html=True)
-    active_injuries = check_active_team_injuries(opposing_team)
-    if active_injuries:
-        for player in active_injuries[:5]: 
-            st.warning(f"⚠️ **{player['Player']}** — Current Status: {player['Status']}")
-    else: 
-        st.success(f"✨ No critical active batter injuries reported for {opposing_team} today.")
+    else: st.info("✨ Full daily slate clear. No starting pitchers listed for active matching on the boards.")
+       
