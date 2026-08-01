@@ -280,7 +280,7 @@ with col2:
     am_c1, am_c2, am_c3 = st.columns(3)
     with am_c1: st.markdown(f"<div class='metric-card'><div class='metric-label'>PITCH K%</div><div class='metric-value' style='color:#BD93F9;'>{pitch_k_pct}</div><div class='sub-text' style='color:#8BE9FD;'>Starter Pct</div></div>", unsafe_allow_html=True)
     with am_c2: st.markdown(f"<div class='metric-card'><div class='metric-label'>OPP K%</div><div class='metric-value' style='color:#FF5555;'>{round(team_avg_k, 1)}%</div><div class='sub-text' style='color:#B5A6C9;'>Roster Avg</div></div>", unsafe_allow_html=True)
-   with am_c3: 
+    with am_c3: 
         st.markdown(f"<div class='metric-card'><div class='metric-label'>STADIUM</div><div class='metric-value' style='color:#FFB86C; font-size:14px; margin-top:2px;'>{park_multiplier}x</div><div class='sub-text' style='color:#B5A6C9;'>{stadium_trait}</div></div>", unsafe_allow_html=True)
 
     am_c4, am_c5, am_c6 = st.columns(3)
