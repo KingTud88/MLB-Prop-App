@@ -411,17 +411,26 @@ if not pitcher_db.empty:
     except: 
         b_db_bulk = pd.DataFrame()
 
-    for _, p_data in pitcher_db.iterrows():
+     for _, p_data in pitcher_db.iterrows():
         p_name_raw = str(p_data['name']).title()
         p_name_clean = str(p_data['name']).lower().strip()
         p_team_code = str(p_data['team']).upper().strip()
-        if p_name_clean != lookup_key and p_name_clean not in today_active_starters: 
+        
+        # Discover true active scheduled opponent out of the crawling layer grid
+        opp_team_target = live_schedule_grid.get(p_team_code, None)
+        
+        # AUTOMATED FILTER: If it's not your sidebar pitcher AND their team has no scheduled matchup today, skip them
+        if p_name_clean != lookup_key and not opp_team_target:
             continue
+            
+        # Fallback to keep manual testing active if needed
+        if not opp_team_target:
+            opp_team_target = opposing_team if p_name_clean == lookup_key else "NYM"
+            
         p_base = float(p_data['base_avg'])
         p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data.index else "R"
         p_fatigue = int(p_data['rolling_pitches']) if 'rolling_pitches' in p_data.index else 90
         current_book_line = live_market_lines.get(p_name_clean, sportsbook_line if p_name_clean == lookup_key else 5.5)
-        opp_team_target = live_schedule_grid.get(p_team_code, "NYM" if p_team_code != "NYM" else "PHI")
         
         if p_name_clean == lookup_key:
             simulated_proj = live_avg
