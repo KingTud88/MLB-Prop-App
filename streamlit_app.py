@@ -470,7 +470,7 @@ with col2:
         st.success(f"✨ Ballpark Database Verified: Isolate matrix tags pulled cleanly for {home_team_target} dimensions.")
     else: st.info(f"ℹ️ Ballpark Tracking: Neutral standard dimension baseline applied for {opposing_team}.")
     
-    if wind_vector != "Neutral / Dome": if wind_vector != "Neutral / Dome":
+    if wind_vector != "Neutral / Dome":
         st.success(f"✨ Meteorological Check: Wind ({wind_vector}) & Thermal Expansion ({game_temp}°F) loaded — {round(wind_multiplier * temp_multiplier, 2)}x combined weather factor.")
     else:
         st.info(f"ℹ️ Meteorological Tracking: Ground conditions neutral (Dome/Standard Base at {game_temp}°F).")
