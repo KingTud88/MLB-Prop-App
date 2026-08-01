@@ -364,7 +364,7 @@ def fetch_live_sportsbook_lines():
             if name_cell and line_cell:
                 clean_pname = name_cell.get_text(strip=True).lower()
                 try:
-                    raw_line_val = float(line_cell.get_text(strip=True).split()[0])
+                    raw_line_val = float(line_cell.get_text(strip=True).split())
                     props_map[clean_pname] = raw_line_val
                 except: continue
         return props_map
@@ -393,27 +393,24 @@ if not pitcher_db.empty and not batter_database.empty if 'batter_database' in lo
         # 1. Pull Live Sportsbook Line
         current_book_line = live_market_lines.get(p_name_clean, sportsbook_line if p_name_clean == lookup_key else 5.5)
         
+        # Identify opponent (Defaults to your sidebar team choice for the selected pitcher, handles slate mapping for the rest)
+        opp_team_target = opposing_team if p_name_clean == lookup_key else (opposing_team if p_team_code != opposing_team else "NYM")
+        
         # 2. IF SELECTED PITCHER: Lock to exact live sidebar variables instantly
         if p_name_clean == lookup_key:
             simulated_proj = live_avg
             current_book_line = sportsbook_line
         else:
             # 3. BULK PRECISION ENGINE: Run the full 9-way matrix calculations for the rest of the league
-            # Identify opponent (Defaults to your sidebar team choice for easy slate stacking)
-            opp_team_target = opposing_team if p_team_code != opposing_team else "NYM"
-            
-            # Extract Opposing Hitter Matchup Multiplier & Platoon Splits from Database
             p_matchup_mult = 1.00
             if not b_db_bulk.empty and opp_team_target in b_db_bulk['team_clean'].values:
                 team_hitters = b_db_bulk[b_db_bulk['team_clean'] == opp_team_target]
                 k_list_calc = []
                 for _, b_row in team_hitters.head(9).iterrows():
                     b_hand = str(b_row['hand']).upper().strip()
-                    # Check left/right splits column dynamically based on pitcher arm side
                     raw_b_k = float(b_row['vs_lhp_k']) if p_arm_side == "L" else float(b_row['vs_rhp_k'])
                     b_stab = float(b_row['k_stability']) if 'k_stability' in b_row.index else 1.00
                     
-                    # Apply Platoon Multipliers
                     if (b_hand == "L" and p_arm_side == "R") or (b_hand == "R" and p_arm_side == "L") or b_hand == "S":
                         k_list_calc.append(raw_b_k * 1.12 * b_stab)
                     else:
@@ -426,7 +423,7 @@ if not pitcher_db.empty and not batter_database.empty if 'batter_database' in lo
             p_park_mult, p_bullpen_mult = 1.00, 1.00
             stadium_home = p_team_code if venue_split == "Home" else opp_team_target
             if not ballpark_db.empty and stadium_home in ballpark_db['team_clean'].values:
-                p_row_park = ballpark_db[ballpark_db['team_clean'] == stadium_home].iloc[0]
+                p_row_park = ballpark_db[ballpark_db['team_clean'] == stadium_home].iloc
                 p_park_mult = float(p_row_park['k_scalar'])
                 p_bullpen_mult = float(p_row_park['bullpen_k_factor']) if 'bullpen_k_factor' in p_row_park.index else 1.00
 
@@ -448,11 +445,18 @@ if not pitcher_db.empty and not batter_database.empty if 'batter_database' in lo
         else: edge_tier = "⚖️ Neutral Line"
             
         global_tracker_rows.append({
-            "PITCHER": p_name_raw, "TEAM": p_team_code, "ARM": f"{p_arm_side}HP",
-            "BASE AVG": p_base, "BOOK LINE": current_book_line, "MODEL PROJ": simulated_proj,
-            "EDGE GAP": arbitrage_edge, "BET SIDE": "OVER" if arbitrage_edge >= 0 else "UNDER",
+            "PITCHER": p_name_raw, 
+            "TEAM": p_team_code, 
+            "OPPONENT": opp_team_target,
+            "ARM": f"{p_arm_side}HP",
+            "BASE AVG": p_base, 
+            "BOOK LINE": current_book_line, 
+            "MODEL PROJ": simulated_proj,
+            "EDGE GAP": arbitrage_edge, 
+            "BET SIDE": "OVER" if arbitrage_edge >= 0 else "UNDER",
             "EDGE TIER STATUS": edge_tier
         })
+
     master_slate_df = pd.DataFrame(global_tracker_rows)
     styled_master_board = master_slate_df.style.set_properties(**{
         'background-color': '#1A1423', 'color': '#E5D4ED', 'border-color': '#372549', 'text-align': 'center'
@@ -460,5 +464,7 @@ if not pitcher_db.empty and not batter_database.empty if 'batter_database' in lo
         lambda val: 'background-color: #FFB86C; color: #0E0B16; font-weight: bold; text-align: center;' if val == "🚀 S-Tier Edge Max"
         else ('background-color: #BD93F9; color: #0E0B16; font-weight: bold; text-align: center;' if val == "📈 A-Tier Value" else 'text-align: center;'),
         subset=["EDGE TIER STATUS"]
+    )
+    st.dataframe(styled_master_board, width="stretch", hide_index=True)
     )
     st.dataframe(styled_master_board, width="stretch", hide_index=True)
