@@ -212,7 +212,7 @@ with col1:
     with c_m3: st.markdown(f"<div class='metric-card'><div class='metric-label'>TOP PITCH</div><div class='sub-text' style='color:#BD93F9;font-weight:bold;margin-top:4px;'>{top_pitch_text}</div></div>", unsafe_allow_html=True)
     with c_m4: st.markdown(f"<div class='metric-card'><div class='metric-label'>ARSENAL</div><div class='metric-value'>{strikeouts}</div></div>", unsafe_allow_html=True)
 
-    # MODERNIZED ARSENAL MATRIX: Dynamically calculates missing K% and Putaway values!
+    # 🛠️ VISUAL UPGRADE: Premium Arsenal Matrix with custom spacing and clean text alignment
     st.markdown("<div class='section-header'>Balanced Arsenal Matrix</div>", unsafe_allow_html=True)
     if 'pitch_df' in locals() and not pitch_df.empty:
         updated_arsenal = []
@@ -220,7 +220,6 @@ with col1:
             raw_whiff = str(row["WHIFF"]).replace("W:", "").replace("%", "").strip()
             whiff_val = float(raw_whiff) if raw_whiff.replace('.','',1).isdigit() else 25.0
             
-            # Smart Estimation Logic bound directly to real metrics parameters
             calc_k = round(whiff_val * 0.85, 1)
             calc_put = round(whiff_val * 0.58, 1)
             
@@ -228,7 +227,14 @@ with col1:
                 "PITCH TYPE": row["PITCH"], "USAGE": row["USE"],
                 "K% EXPECTED": f"K:{calc_k}%", "WHIFF RATE": row["WHIFF"], "PUTAWAY": f"{calc_put}%"
             })
-        st.dataframe(pd.DataFrame(updated_arsenal), width="stretch", hide_index=True)
+        
+        arsenal_df = pd.DataFrame(updated_arsenal)
+        # Apply strict centered layout styles across all data table parameters
+        styled_arsenal = arsenal_df.style.set_properties(**{
+            'text-align': 'center', 'background-color': '#1A1423', 
+            'color': '#E5D4ED', 'border-color': '#372549'
+        })
+        st.dataframe(styled_arsenal, width="stretch", hide_index=True)
     else:
         st.info("No active pitch matrix rows localized.")
 
@@ -236,12 +242,14 @@ with col2:
     st.markdown("<div class='section-header'>Batter-by-batter K matchup</div>", unsafe_allow_html=True)
     st.caption(f"MLB PROJECTED - avg {round(lineup_df['K% USED'].mean(), 1)} | high-K {len(lineup_df[lineup_df['K% USED'] > 22])} | low-K {len(lineup_df[lineup_df['K% USED'] <= 15])}")
     
-    # PREMIUM DISPLAY RE-STYLING: Configures table widths and centers font labels cleanly
+    # 🛠️ VISUAL UPGRADE: Centered Batter Table with uniform custom padded layouts
     styled_lineup = lineup_df.style.map(
         lambda val: 'background-color: #FF5555; color: #0E0B16; font-weight: bold; text-align: center;' if isinstance(val, (int, float)) and val >= 24.0
-        else ('background-color: #50FA7B; color: #0E0B16; text-align: center;' if isinstance(val, (int, float)) and val <= 15.0 else 'text-align: center;'),
+        else ('background-color: #50FA7B; color: #0E0B16; font-weight: bold; text-align: center;' if isinstance(val, (int, float)) and val <= 15.0 else 'text-align: center;'),
         subset=["K% USED", "VS HAND", "SEASON"]
-    )
+    ).set_properties(**{
+        'background-color': '#1A1423', 'color': '#E5D4ED', 'border-color': '#372549'
+    })
     st.dataframe(styled_lineup, width="stretch", hide_index=True)
 
     st.markdown("<div class='section-header'>Advanced Contextual Metrics Matrix</div>", unsafe_allow_html=True)
