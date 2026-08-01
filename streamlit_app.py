@@ -214,14 +214,14 @@ with st.sidebar:
     
     st.subheader("💨 Meteorological Conditions")
     wind_vector = st.radio("Wind Vector Assignment", ["Neutral / Dome", "Blowing In (Ks Up)", "Blowing Out (Ks Down)"])
+    # NEW COMPONENT: Interactive game-time temperature selector slider
+    game_temp = st.slider("Game-Time Temperature (°F)", min_value=30, max_value=105, value=72, step=1)
 
 if not umpire_db.empty and umpire_input in umpire_db['name_clean'].values:
     ump_row = umpire_db[umpire_db['name_clean'] == umpire_input].iloc
-    # Extracts both zone boundaries AND accuracy performance ratios natively
     base_k_mod = float(ump_row['k_mod']) if 'k_mod' in ump_row.index else 1.00
     ump_accuracy = float(ump_row['accuracy_coefficient']) if 'accuracy_coefficient' in ump_row.index else 1.00
     
-    # Compounds the two umpire dimensions into a single master multiplier
     ump_multiplier = base_k_mod * ump_accuracy
     umpire_text = f"{umpire_input.title()}: {round(ump_multiplier, 2)}x"
     umpire_trait = str(ump_row['call_tendency'])
@@ -234,6 +234,14 @@ elif wind_vector == "Blowing Out (Ks Down)": wind_multiplier = 0.94
 fatigue_multiplier = 1.00
 if rolling_pitches >= 100: fatigue_multiplier = 0.95
 
+# NEW MATH: Real-time air density thermal expansion modifier calculation
+temp_multiplier = 1.00
+if wind_vector != "Neutral / Dome":  # Only applies to open-air stadiums
+    if game_temp >= 85: 
+        temp_multiplier = 1.03  # Hot air expands and carries balls farther -> expands pitch counts and opportunities
+    elif game_temp <= 50: 
+        temp_multiplier = 0.96  # Dense cold air creates heavy friction -> compresses deep starter hooks
+
 col1, col2 = st.columns(2)
 
 with col1:
@@ -243,8 +251,8 @@ with col1:
     venue_multiplier = 1.06 if venue_split == "Home" else 0.95
     vegas_multiplier = 0.92 if vegas_spread >= 4.5 else (1.12 if vegas_spread <= 3.2 else 1.00)
     
-    # ULTIMATE 8-WAY VEGAS-GRADE COMPOUNDED CALCULATION MATRIX
-    live_avg = round(pitcher_base_avg * matchup_multiplier * venue_multiplier * vegas_multiplier * park_multiplier * ump_multiplier * wind_multiplier * fatigue_multiplier * bullpen_multiplier, 2)
+    # ULTIMATE 9-WAY VEGAS-GRADE FULL COMPOUNDED PROJECTION MATRIX
+    live_avg = round(pitcher_base_avg * matchup_multiplier * venue_multiplier * vegas_multiplier * park_multiplier * ump_multiplier * wind_multiplier * fatigue_multiplier * bullpen_multiplier * temp_multiplier, 2)
     diff_val = round(live_avg - sportsbook_line, 2)
     
     ch1, ch2 = st.columns(2)
@@ -301,35 +309,28 @@ with col2:
     am_c1, am_c2, am_c3 = st.columns(3)
     with am_c1: st.markdown(f"<div class='metric-card'><div class='metric-label'>PITCH K%</div><div class='metric-value' style='color:#BD93F9;'>{pitch_k_pct}</div><div class='sub-text' style='color:#8BE9FD;'>Starter Pct</div></div>", unsafe_allow_html=True)
     with am_c2: st.markdown(f"<div class='metric-card'><div class='metric-label'>OPP K%</div><div class='metric-value' style='color:#FF5555;'>{round(team_avg_k, 1)}%</div><div class='sub-text' style='color:#B5A6C9;'>Roster Avg</div></div>", unsafe_allow_html=True)
-    with am_c3: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>STADIUM</div><div class='metric-value' style='color:#FFB86C; font-size:14px; margin-top:2px;'>{park_multiplier}x</div><div class='sub-text' style='color:#B5A6C9;'>{stadium_trait}</div></div>", unsafe_allow_html=True)
+    with am_c3: st.markdown(f"<div class='metric-card'><div class='metric-label'>STADIUM</div><div class='metric-value' style='color:#FFB86C; font-size:14px; margin-top:2px;'>{park_multiplier}x</div><div class='sub-text' style='color:#B5A6C9;'>{stadium_trait}</div></div>", unsafe_allow_html=True)
 
     am_c4, am_c5, am_c6 = st.columns(3)
-    with am_c4: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>LAST PITCHES</div><div class='metric-value' style='color:#BD93F9;'>{rolling_pitches}</div><div class='sub-text' style='color:#B5A6C9;'>Workload Fatigue</div></div>", unsafe_allow_html=True)
-    with am_c5: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>IP / GM</div><div class='metric-value'>{round(innings_pitched / games, 2)}</div><div class='sub-text' style='color:#B5A6C9;'>Innings Pitched</div></div>", unsafe_allow_html=True)
-    with am_c6: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>WHIFF</div><div class='metric-value' style='color:#50FA7B;'>{whiff_pct}</div><div class='sub-text' style='color:#8BE9FD;'>Whiff Rate</div></div>", unsafe_allow_html=True)
+    with am_c4: st.markdown(f"<div class='metric-card'><div class='metric-label'>LAST PITCHES</div><div class='metric-value' style='color:#BD93F9;'>{rolling_pitches}</div><div class='sub-text' style='color:#B5A6C9;'>Workload Fatigue</div></div>", unsafe_allow_html=True)
+    with am_c5: st.markdown(f"<div class='metric-card'><div class='metric-label'>IP / GM</div><div class='metric-value'>{round(innings_pitched / games, 2)}</div><div class='sub-text' style='color:#B5A6C9;'>Innings Pitched</div></div>", unsafe_allow_html=True)
+    with am_c6: st.markdown(f"<div class='metric-card'><div class='metric-label'>WHIFF</div><div class='metric-value' style='color:#50FA7B;'>{whiff_pct}</div><div class='sub-text' style='color:#8BE9FD;'>Whiff Rate</div></div>", unsafe_allow_html=True)
 
     am_c7, am_c8, am_c9 = st.columns(3)
-    with am_c7: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>SKILL</div><div class='metric-value' style='color:#FF79C6;'>{skill_score}</div><div class='sub-text' style='color:#B5A6C9;'>Model Score</div></div>", unsafe_allow_html=True)
-    with am_c8: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>BULLPEN K</div><div class='metric-value' style='color:#50FA7B;'>{bullpen_multiplier}x</div><div class='sub-text' style='color:#B5A6C9;'>Relief Protection</div></div>", unsafe_allow_html=True)
-    with am_c9: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>UMPIRE</div><div class='metric-value' style='color:#BD93F9; font-size:14px; margin-top:2px;'>{ump_multiplier}x</div><div class='sub-text' style='color:#B5A6C9;'>{umpire_trait}</div></div>", unsafe_allow_html=True)
+    with am_c7: st.markdown(f"<div class='metric-card'><div class='metric-label'>SKILL</div><div class='metric-value' style='color:#FF79C6;'>{skill_score}</div><div class='sub-text' style='color:#B5A6C9;'>Model Score</div></div>", unsafe_allow_html=True)
+    with am_c8: st.markdown(f"<div class='metric-card'><div class='metric-label'>BULLPEN K</div><div class='metric-value' style='color:#50FA7B;'>{bullpen_multiplier}x</div><div class='sub-text' style='color:#B5A6C9;'>Relief Protection</div></div>", unsafe_allow_html=True)
+    with am_c9: st.markdown(f"<div class='metric-card'><div class='metric-label'>UMPIRE</div><div class='metric-value' style='color:#BD93F9; font-size:14px; margin-top:2px;'>{ump_multiplier}x</div><div class='sub-text' style='color:#B5A6C9;'>{umpire_trait}</div></div>", unsafe_allow_html=True)
 
     st.markdown("<div class='section-header'>🌤️ Environmental Check Desk</div>", unsafe_allow_html=True)
     if not ballpark_db.empty and home_team_target in ballpark_db['team_clean'].values:
         st.success(f"✨ Ballpark Database Verified: Isolate matrix tags pulled cleanly for {home_team_target} dimensions.")
-    else: 
-        st.info(f"ℹ️ Ballpark Tracking: Neutral standard dimension baseline applied for {opposing_team}.")
-        
+    else: st.info(f"ℹ️ Ballpark Tracking: Neutral standard dimension baseline applied for {opposing_team}.")
+    
+    # Updated: Dynamic log logging confirmation including the game temperature coefficient
     if wind_vector != "Neutral / Dome":
-        st.success(f"✨ Meteorological Check: Wind tracking assigned cleanly ({wind_vector}) — {wind_multiplier}x multiplier loaded.")
+       st.success(f"✨ Meteorological Check: Wind ({wind_vector}) & Thermal Expansion ({game_temp}°F) loaded — {round(wind_multiplier * temp_multiplier, 2)}x combined weather factor.")
     else:
-        st.info("ℹ️ Meteorological Tracking: Ground wind-vectors neutral. Standard core active.")
+        st.info(f"ℹ️ Meteorological Tracking: Ground conditions neutral (Dome/Standard Base at {game_temp}°F).")
         
     try:
         url = "https://open-meteo.com"
