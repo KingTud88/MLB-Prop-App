@@ -366,7 +366,6 @@ def fetch_live_slate_matchups():
         }
         
         for box in soup.select(".lineup__box"):
-            # FIXED: Safely isolate individual team links out of the sub-array wrapper elements
             team_links = box.select(".lineup__team.is-visit a, .lineup__team.is-home a, .lineup__teams a")
             if len(team_links) >= 2:
                 t1 = team_links[0].get_text(strip=True).upper()
@@ -378,11 +377,11 @@ def fetch_live_slate_matchups():
                 matchups_map[t1] = t2
                 matchups_map[t2] = t1
             
-            # FIXED: Collect names of starting pitchers officially listed on today's active schedule board
             pitcher_links = box.select(".lineup__player-name a, .lineup__player a")
             for p_link in pitcher_links:
                 p_name_text = p_link.get_text(strip=True).lower()
-                if "pitcher" in p_link.get_parent().get_text().lower() or "p" in p_link.get_parent().get_text().lower():
+                parent_text = p_link.get_parent().get_text().lower() if p_link.get_parent() else ""
+                if "pitcher" in parent_text or "p " in parent_text or "(p)" in parent_text:
                     active_pitchers.add(p_name_text)
                     
         return matchups_map, active_pitchers
@@ -426,8 +425,7 @@ if not pitcher_db.empty:
         p_name_clean = str(p_data['name']).lower().strip()
         p_team_code = str(p_data['team']).upper().strip()
         
-        # FIXED: Core schedule filtration layout logic hook
-        # If the player isn't actively listed on today's schedule matrix, skip them entirely!
+        # Check if the player is listed on today's active schedule board
         if p_name_clean != lookup_key and p_name_clean not in today_active_starters:
             continue
             
@@ -436,8 +434,6 @@ if not pitcher_db.empty:
         p_fatigue = int(p_data['rolling_pitches']) if 'rolling_pitches' in p_data.index else 90
         
         current_book_line = live_market_lines.get(p_name_clean, sportsbook_line if p_name_clean == lookup_key else 5.5)
-        
-        # Discover true active scheduled opponent or apply default
         opp_team_target = live_schedule_grid.get(p_team_code, "NYM" if p_team_code != "NYM" else "PHI")
         
         if p_name_clean == lookup_key:
@@ -508,5 +504,4 @@ if not pitcher_db.empty:
         )
         st.dataframe(styled_master_board, width="stretch", hide_index=True)
     else:
-        st.info("✨ Full daily slate clear. Checking for tomorrow's early morning opener listings.")
-        st.dataframe(styled_master_board, width="stretch", hide_index=True)
+        st.info("✨ Full daily slate clear. No starting pitchers listed for active matching on the boards.")
