@@ -19,31 +19,63 @@ george kirby,SEA,R,5.80,24,139,151.0,3.35,Four-seam<br>39% use,22.1%,21.2%,6.4,F
 kevin gausman,TOR,R,6.05,23,139,138.0,3.98,Four-seam<br>48% use,24.3%,26.4%,7.1,Four-seam FB,48%,W:22%,Splitter,38%,W:45%,Slider,11%,W:27%,Sinker,3%,W:12%,—,0%,—
 pablo lopez,MIN,R,6.25,23,144,135.1,4.22,Four-seam<br>36% use,25.9%,25.8%,7.2,Four-seam FB,36%,W:23%,Changeup,22%,W:36%,Sweeper,21%,W:39%,Sinker,14%,W:16%,Curveball,7%,W:24%
 ronel blanco,HOU,R,5.85,22,129,131.1,2.98,Changeup<br>34% use,22.8%,23.1%,6.7,Changeup,34%,W:33%,Four-seam FB,28%,W:21%,Slider,25%,W:31%,Slider,13%,W:24%,—,0%,—
-framber valdez,HOU,L,5.65,21,119,132.0,3.15,Sinker<br>46% use,20.4%,21.8%,6.1,Sinker,46%,W:14%,Curveball,28%,W:38%,Changeup,18%,W:31%,Cutter,8%,W:19%,—,0%,—
 grayson rodriguez,BAL,R,6.35,21,133,116.2,3.85,Four-seam<br>44% use,25.8%,27.1%,7.6,Four-seam FB,44%,W:25%,Changeup,25%,W:38%,Slider,18%,W:33%,Cutter,9%,W:22%,Curveball,4%,W:21%
 reiver sanmartin,CIN,L,4.20,18,72,82.0,4.65,Sinker<br>52% use,18.1%,16.4%,4.1,Sinker,52%,W:12%,Slider,28%,W:26%,Changeup,20%,W:22%,—,0%,—,—,0%,—
 sonny gray,STL,R,6.40,22,148,128.0,3.78,Sweeper<br>32% use,29.8%,31.4%,8.1,Sweeper,32%,W:38%,Four-seam FB,24%,W:22%,Sinker,21%,W:14%,Cutter,13%,W:24%,Curveball,10%,W:32%
 kutter crawford,BOS,R,5.45,23,124,136.2,4.12,Four-seam<br>36% use,23.1%,22.8%,6.3,Four-seam FB,36%,W:24%,Cutter,28%,W:29%,Sweeper,18%,W:36%,Splitter,12%,W:33%,Slider,6%,W:21%
 bryan woo,SDP,R,5.20,17,88,93.1,2.35,Four-seam<br>48% use,24.2%,21.5%,6.5,Four-seam FB,48%,W:21%,Sinker,26%,W:12%,Slider,15%,W:31%,Changeup,11%,W:28%,—,0%,—
-hunter greene,CIN,R,7.55,22,168,130.1,2.90,Four-seam<br>56% use,34.8%,32.1.,8.9,Four-seam FB,56%,W:29%,Slider,28%,W:39%,Splitter,16%,W:35%,—,0%,—,—,0%,—
-reid detmers,LAA,L,6.10,20,122,112.0,4.52,Four-seam<br>42% use,26.4%,28.1%,7.1,Four-seam FB,42%,W:24%,Slider,28%,W:36%,Curveball,18%,W:33.,Changeup,12%,W:24%,—,0%,—
-mac kenzie gore,WSH,L,6.25,23,139,124.1,4.20,Four-seam<br>46% use,27.1%,26.4%,7.3,Four-seam FB,46%,W:23.,Slider,24%,W:36%,Curveball,18%,W:31%,Changeup,12%,W:22%,—,0%,—
+hunter greene,CIN,R,7.55,22,168,130.1,2.90,Four-seam<br>56% use,34.8%,32.1%,8.9,Four-seam FB,56%,W:29%,Slider,28%,W:39%,Splitter,16%,W:35%,—,0%,—,—,0%,—
+reid detmers,LAA,L,6.10,20,122,112.0,4.52,Four-seam<br>42% use,26.4%,28.1%,7.1,Four-seam FB,42%,W:24%,Slider,28%,W:36%,Curveball,18%,W:33%,Changeup,12%,W:24%,—,0%,—
+mac kenzie gore,WSH,L,6.25,23,139,124.1,4.20,Four-seam<br>46% use,27.1%,26.4%,7.3,Four-seam FB,46%,W:23%,Slider,24%,W:36%,Curveball,18%,W:31%,Changeup,12%,W:22%,—,0%,—
 cristopher sanchez,PHI,L,5.10,22,112,132.2,3.32,Changeup<br>34% use,21.8%,24.5%,6.0,Changeup,34%,W:36%,Sinker,32%,W:12%,Slider,24%,W:31%,Four-seam FB,10%,W:19%,—,0%,—
 reynaldo lopez,ATL,R,5.60,20,115,118.2,2.12,Four-seam<br>48% use,25.2%,23.4%,6.7,Four-seam FB,48%,W:21%,Slider,32%,W:33%,Curveball,14%,W:24%,Changeup,6%,W:18%,—,0%,—
 mitch keller,PIT,R,5.55,23,128,139.1,3.56,Four-seam<br>32% use,22.4%,21.8%,6.4,Four-seam FB,32%,W:19%,Sinker,24%,W:12%,Cutter,20%,W:21%,Sweeper,14%,W:32%,Curveball,10%,W:26%
 nestor cortes,NYY,L,5.35,23,122,134.2,4.05,Four-seam<br>44% use,22.1%,22.5%,6.1,Four-seam FB,44%,W:21%,Cutter,28%,W:23%,Sweeper,18%,W:31%,Changeup,10%,W:26%,—,0%,—
 carlos rodon,NYY,L,6.30,23,142,131.0,4.22,Four-seam<br>48% use,26.8%,28.4%,7.4,Four-seam FB,48%,W:26%,Slider,34%,W:38%,Changeup,12%,W:29%,Cutter,6%,W:18%,—,0%,—
-marcus stroman,NYY,R,4.85,22,94,121.2,3.98,Sinker<br>38% use,18.4%,17.2%,5.1,Sinker,38%,W:11%,Slurve,26%,W:29%,Cutter,18%,W:19%,Splitter,12%,W:31%,Four-seam FB,6%,W:16%
-yusei kikuchi,HOU,L,6.65,23,148,127.1,4.12,Four-seam<br>46% use,29.1%,31.4%,8.0,Four-seam FB,46%,W:27%,Slider,28%,W:39%,Changeup,18%,W:33%,Curveball,8%,W:26%,—,0%,—
+yusei kikuchi,HOU,L,6.65,23,148,127.1,4.12,Four-seam<br>46% use,29.1%,31.4%,8.0,Four-seam FB,46%,W:27%,Slider,28%,W:39%,Changeup,18%,W:33.,Curveball,8%,W:26%,—,0%,—
 brandon pfaadt,ARI,R,5.40,23,124,136.2,4.35,Four-seam<br>38% use,22.8%,21.4%,6.2,Four-seam FB,38%,W:21%,Sweeper,32%,W:34%,Sinker,18%,W:13%,Changeup,12%,W:25%,—,0%,—
 ryne nelson,ARI,R,4.95,22,102,122.1,4.52,Four-seam<br>52% use,20.1%,19.5%,5.6,Four-seam FB,52%,W:19%,Cutter,22%,W:21%,Slider,14%,W:26%,Changeup,12%,W:24%,—,0%,—
 miles mikolas,STL,R,4.55,24,96,143.0,5.12,Sinker<br>32% use,17.2%,16.8%,4.8,Sinker,32%,W:11%,Slider,26%,W:24%,Four-seam FB,22%,W:15%,Curveball,12%,W:22%,Changeup,8%,W:19%
 lance lynn,STL,R,5.15,22,112,118.1,4.06,Four-seam<br>38% use,22.4%,21.5%,5.9,Four-seam FB,38%,W:21%,Cutter,26%,W:22%,Sinker,18%,W:14%,Slider,12%,W:28%,Changeup,6%,W:19%
 kyle gibson,STL,R,4.90,23,108,131.2,4.25,Sinker<br>34% use,19.5%,18.4%,5.5,Sinker,34%,W:12%,Sweeper,24%,W:31%,Cutter,18%,W:18%,Changeup,14%,W:26%,Curveball,10%,W:22%
-bailey ober,MIN,R,6.15,22,134,128.2,3.82,Four-seam<br>42% use,26.8%,27.4%,7.5,Four-seam FB,42%,W:25%,Changeup,26%,W:33.,Cutter,18%,W:21%,Slider,14%,W:29%,—,0%,—
+bailey ober,MIN,R,6.15,22,134,128.2,3.82,Four-seam<br>42% use,26.8%,27.4%,7.5,Four-seam FB,42%,W:25%,Changeup,26%,W:33%,Cutter,18%,W:21%,Slider,14%,W:29%,—,0%,—
 chris bassitt,TOR,R,5.30,24,124,142.1,4.15,Sinker<br>28% use,21.2%,19.8%,6.1,Sinker,28%,W:12%,Cutter,22%,W:18%,Slider,16%,W:28%,Curveball,14%,W:26%,Splitter,12%,W:29%
 jose berrios,TOR,R,5.15,24,121,146.0,3.95,Slurve<br>32% use,20.4%,21.2%,6.0,Slurve,32%,W:31%,Sinker,30%,W:13%,Four-seam FB,22%,W:18%,Changeup,16%,W:26%,—,0%,—
 tanner houck,BOS,R,5.60,23,126,141.2,3.15,Sinker<br>44% use,23.8%,22.1%,6.6,Sinker,44%,W:14%,Slider,36%,W:39%,Splitter,14%,W:34%,Cutter,6%,W:18%,—,0%,—
 nick pivetta,BOS,R,6.45,21,132,112.2,4.45,Four-seam<br>48% use,29.4%,28.7%,7.9,Four-seam FB,48%,W:27%,Sweeper,26%,W:38%,Slider,18%,W:33%,Curveball,8%,W:24%,—,0%,—
 gavin williams,CLE,R,5.70,15,84,81.1,4.22,Four-seam<br>52% use,25.4%,24.8%,6.8,Four-seam FB,52%,W:23%,Slider,24%,W:33%,Curveball,16%,W:31%,Changeup,8%,W:21%,—,0%,—
 ben lively,CLE,R,4.85,21,98,115.0,3.85,Four-seam<br>36% use,19.2%,18.4%,5.4,Four-seam FB,36%,W:18%,Slider,28%,W:26%,Sinker,20%,W:12%,Changeup,16%,W:22%,—,0%,—
+jacob degrom,TEX,R,6.95,15,102,78.2,3.12,Four-seam FB<br>48% use,34.5%,36.8%,9.2,Four-seam FB,48%,W:32%,Slider,38%,W:44%,Changeup,10%,W:35%,Curveball,4%,W:28%,—,0%,—
+gerrit cole,NYY,R,6.35,22,144,136.0,3.52,Four-seam<br>46% use,27.4%,26.8%,7.9,Four-seam FB,46%,W:25%,Slider,22%,W:36%,Knuckle Curve,16%,W:38%,Changeup,10%,W:24%,Cutter,6%,W:18%
+justin verlander,HOU,R,5.40,20,108,114.2,3.95,Four-seam<br>48% use,22.1%,21.4%,6.2,Four-seam FB,48%,W:22%,Slider,24%,W:29%,Curveball,18%,W:31.,Changeup,10%,W:22%,—,0%,—
+framber valdez,HOU,L,5.85,24,142,156.1,3.05,Sinker<br>44% use,23.5%,22.8%,6.9,Sinker,44%,W:14%,Curveball,28%,W:39%,Changeup,16%,W:32%,Cutter,12%,W:21%,—,0%,—
+marcus stroman,NYY,R,4.85,22,94,121.2,3.98,Sinker<br>38% use,18.4%,17.2%,5.1,Sinker,38%,W:11%,Slurve,26%,W:29%,Cutter,18%,W:19%,Splitter,12%,W:31%,Four-seam FB,6%,W:16%
+andrew heaney,TEX,L,5.45,24,122,126.0,4.02,Four-seam<br>52% use,23.1%,24.5%,6.3,Four-seam FB,52%,W:23%,Slider,28%,W:36%,Changeup,20%,W:28%,—,0%,—,—,0%,—
+nathan eovaldi,TEX,R,5.80,23,134,140.2,3.65,Four-seam<br>38% use,24.5%,23.1%,6.8,Four-seam FB,38%,W:21%,Splitter,28%,W:39%,Cutter,18%,W:19%,Curveball,16%,W:28%,—,0%,—
+jon gray,TEX,R,5.10,21,102,118.0,4.22,Four-seam<br>42% use,21.4%,22.1%,5.9,Four-seam FB,42%,W:19%,Slider,36%,W:34%,Changeup,14%,W:22%,Curveball,8%,W:18%,—,0%,—
+cody bradford,TEX,L,5.35,14,76,79.1,3.42,Four-seam<br>48% use,23.8%,22.5%,6.4,Four-seam FB,48%,W:21%,Changeup,32%,W:29%,Curveball,20%,W:24%,—,0%,—,—,0%,—
+bryce miller,SEA,R,5.65,24,136,145.2,3.15,Four-seam<br>54% use,24.8%,23.4%,6.7,Four-seam FB,54%,W:22%,Splitter,22%,W:34%,Sweeper,14%,W:36%,Slider,10%,W:24%,—,0%,—
+bryan woo,SEA,R,5.50,18,89,98.1,2.42,Four-seam<br>51% use,23.9%,21.8%,6.6,Four-seam FB,51%,W:21%,Sinker,27%,W:13%,Slider,14%,W:32%,Changeup,8%,W:25%,—,0%,—
+zack littell,TBR,R,5.15,23,115,124.0,3.92,Slider<br>36% use,21.4%,22.8%,5.8,Slider,36%,W:29%,Four-seam FB,34%,W:21%,Splitter,18%,W:31%,Sinker,12%,W:14%,—,0%,—
+taj bradley,TBR,R,6.20,20,132,115.1,3.75,Four-seam<br>44% use,27.9%,28.4%,7.4,Four-seam FB,44%,W:27%,Splitter,28%,W:42%,Cutter,22%,W:26%,Curveball,6%,W:22%,—,0%,—
+shane baz,TBR,R,5.45,12,74,68.2,3.48,Four-seam<br>48% use,23.5%,24.2%,6.5,Four-seam FB,48%,W:24%,Slider,32%,W:38%,Curveball,16%,W:31%,Changeup,4%,W:22%,—,0%,—
+ryan pepiot,TBR,R,5.75,21,121,111.0,3.62,Four-seam<br>42% use,26.1%,27.5%,7.0,Four-seam FB,42%,W:26%,Changeup,32%,W:41%,Slider,20%,W:33%,Curveball,6%,W:24%,—,0%,—
+jeffrey springs,TBR,L,5.30,10,58,52.1,3.98,Changeup<br>38% use,23.4%,26.1%,6.3,Changeup,38%,W:37%,Four-seam FB,36%,W:21%,Slider,22%,W:33%,Curveball,4%,W:22%,—,0%,—
+hunter brown,HOU,R,5.90,24,142,138.0,3.82,Four-seam<br>34% use,25.4%,26.1%,6.9,Four-seam FB,34%,W:23%,Cutter,26%,W:25%,Knuckle Curve,22%,W:36%,Sinker,12%,W:14%,Slider,6%,W:28%
+spencer arrighetti,HOU,R,5.70,22,126,111.1,4.92,Four-seam<br>42% use,25.8%,26.4%,6.7,Four-seam FB,42%,W:25%,Sweeper,28%,W:38%,Curveball,18%,W:33%,Changeup,12%,W:24%,—,0%,—
+albert suarez,BAL,R,4.95,24,94,112.0,3.45,Four-seam<br>46% use,19.2%,18.4%,5.4,Four-seam FB,46%,W:18%,Cutter,24%,W:21%,Changeup,20%,W:26%,Curveball,10%,W:22%,—,0%,—
+dean kremer,BAL,R,5.10,20,98,105.1,4.35,Four-seam<br>36% use,21.1%,22.4%,5.8,Four-seam FB,36%,W:21%,Cutter,26%,W:19%,Splitter,18%,W:28%,Curveball,14%,W:25%,Sinker,6%,W:12%
+reese olson,DET,R,5.15,19,96,101.1,3.32,Slider<br>32% use,21.5%,23.4%,6.1,Slider,32%,W:34%,Four-seam FB,28%,W:21%,Sinker,22%,W:12%,Changeup,14%,W:28%,Curveball,4%,W:22%
+keider montero,DET,R,4.60,14,64,74.2,5.15,Four-seam<br>48% use,18.5%,17.1%,5.0,Four-seam FB,48%,W:18%,Slider,28%,W:26%,Curveball,18%,W:29%,Changeup,6%,W:19%,—,0%,—
+casey mize,DET,R,4.75,18,72,81.0,4.42,Four-seam<br>38% use,19.1%,17.9%,5.2,Four-seam FB,38%,W:19%,Splitter,26%,W:25%,Slider,22%,W:22%,Sinker,14%,W:12%,—,0%,—
+simeon woods richardson,MIN,R,4.90,22,98,111.1,4.12,Four-seam<br>41% use,19.5%,18.8%,5.5,Four-seam FB,41%,W:19%,Slider,27%,W:26%,Changeup,18%,W:22%,Curveball,14%,W:24%,—,0%,—
+david festa,MIN,R,5.45,10,54,48.2,5.20,Four-seam<br>46% use,24.8%,26.1%,6.2,Four-seam FB,46%,W:25%,Slider,32%,W:38%,Changeup,22%,W:33%,—,0%,—,—,0%,—
+alec marsh,KCR,R,5.10,21,102,112.1,4.65,Four-seam<br>38% use,21.2%,20.5%,5.7,Four-seam FB,38%,W:21%,Slider,28%,W:29%,Sinker,18%,W:13%,Curveball,12%,W:24%,Changeup,4%,W:21%
+michael lorenzen,KCR,R,4.85,22,92,121.0,3.85,Four-seam<br>32% use,18.4%,17.1%,5.3,Four-seam FB,32%,W:17%,Changeup,24%,W:24%,Sinker,22%,W:11%,Slider,14%,W:26%,Cutter,8%,W:18%
+reid detmers,LAA,L,5.95,12,78,63.1,6.15,Four-seam<br>42% use,25.4%,28.1%,6.7,Four-seam FB,42%,W:24%,Slider,28%,W:36%,Curveball,18%,W:33%,Changeup,12%,W:24%,—,0%,—
+griffin canning,LAA,R,4.70,24,105,134.1,5.22,Four-seam<br>36% use,18.1%,18.8%,5.1,Four-seam FB,36%,W:19%,Slider,26%,W:25%,Changeup,22%,W:28%,Curveball,16%,W:22%,—,0%,—
+jack kochanowicz,LAA,R,3.80,6,24,32.2,4.95,Sinker<br>58% use,13.2%,12.8%,3.9,Sinker,58%,W:11%,Slider,26%,W:21%,Four-seam FB,16%,W:14%,—,0%,—,—,0%,—
+mitch spence,OAK,R,4.80,24,96,115.1,4.35,Cutter<br>34% use,19.1%,18.4%,5.5,Cutter,34%,W:19%,Slider,28%,W:28%,Sinker,22%,W:12%,Four-seam FB,16%,W:16%,—,0%,—
+osvaldo bido,OAK,R,5.15,12,62,58.0,3.85,Four-seam<br>44% use,22.4%,21.5%,5.8,Four-seam FB,44%,W:21%,Slider,32%,W:29%,Changeup,18%,W:24%,Curveball,6%,W:19%,—,0%,—
+joey estes,OAK,R,4.65,18,74,96.2,4.82,Four-seam<br>51% use,17.9%,17.1%,5.3,Four-seam FB,51%,W:19%,Slider,26%,W:24%,Changeup,15%,W:21%,Curveball,8%,W:18%,—,0%,—
+ross stripling,OAK,R,4.25,14,52,72.1,5.45,Sinker<br>32% use,15.2%,14.8%,4.5,Sinker,32%,W:11%,Slider,26%,W:22%,Changeup,22%,W:24%,Four-seam FB,12%,W:16%,Cutter,8%,W:18%
