@@ -233,6 +233,10 @@ wind_multiplier = 1.05 if wind_vector == "Blowing In (Ks Up)" else (0.94 if wind
 fatigue_multiplier = 0.95 if rolling_pitches >= 100 else 1.00
 temp_multiplier = 1.03 if (wind_vector != "Neutral / Dome" and game_temp >= 85) else (0.96 if (wind_vector != "Neutral / Dome" and game_temp <= 50) else 1.00)
 
+# FIXED: Harvesting scripts moved above layout creation to prevent execution order failures
+live_schedule_grid, today_active_starters = fetch_live_slate_matchups()
+live_market_lines = fetch_live_sportsbook_lines()
+
 col1, col2 = st.columns(2)
 
 with col1:
@@ -282,7 +286,6 @@ with col1:
         styled_arsenal = pd.DataFrame(updated_arsenal).style.set_properties(**{'text-align': 'center', 'background-color': '#1A1423', 'color': '#E5D4ED', 'border-color': '#372549'})
         st.dataframe(styled_arsenal, width="stretch", hide_index=True)
 
-    # RELOCATED & BULLETPROOFED: Dynamic Slate Tracker Matrix now lives perfectly inside Column 1
     st.markdown("<div class='section-header'>📊 Automated Global Slate Edge Tracker Matrix</div>", unsafe_allow_html=True)
     if not pitcher_db.empty:
         global_tracker_rows = []
@@ -291,7 +294,6 @@ with col1:
             b_db_bulk['team_clean'] = b_db_bulk['team'].str.upper().str.strip()
         except: b_db_bulk = pd.DataFrame()
 
-        # Premium Fallback Router Map fixing the fragile HTML web-scraping dependencies completely
         ROTOWIRE_LIVE_MAP = {
             'TOR': 'BAL', 'BAL': 'TOR', 'CLE': 'NYM', 'NYM': 'CLE', 'PIT': 'CIN', 'CIN': 'PIT',
             'DET': 'MIN', 'MIN': 'DET', 'PHI': 'ATL', 'ATL': 'PHI', 'CHW': 'KCR', 'KCR': 'CHW',
