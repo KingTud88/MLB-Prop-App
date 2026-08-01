@@ -243,11 +243,14 @@ with col2:
     st.markdown("<div class='section-header'>Batter-by-batter K matchup</div>", unsafe_allow_html=True)
     st.caption(f"MLB PROJECTED - avg {round(lineup_df['K% USED'].mean(), 1)} | high-K {len(lineup_df[lineup_df['K% USED'] > 22])} | low-K {len(lineup_df[lineup_df['K% USED'] <= 15])}")
     
-    styled_lineup = lineup_df.style.map(
+    # FIX: Chained styling sequence ensuring properties don't override the highlight colors
+    styled_lineup = lineup_df.style.set_properties(**{
+        'background-color': '#1A1423', 'color': '#E5D4ED', 'border-color': '#372549'
+    }).map(
         lambda val: 'background-color: #FF5555; color: #0E0B16; font-weight: bold; text-align: center;' if isinstance(val, (int, float)) and val >= 24.0
-       else ('background-color: #50FA7B; color: #0E0B16; font-weight: bold; text-align: center;' if isinstance(val, (int, float)) and val <= 15.0 else 'text-align: center;'),
+        else ('background-color: #50FA7B; color: #0E0B16; font-weight: bold; text-align: center;' if isinstance(val, (int, float)) and val <= 15.0 else 'text-align: center;'),
         subset=["K% USED", "VS HAND", "SEASON"]
-    ).set_properties(**{'background-color': '#1A1423', 'color': '#E5D4ED', 'border-color': '#372549'})
+    )
     st.dataframe(styled_lineup, width="stretch", hide_index=True)
 
     st.markdown("<div class='section-header'>Advanced Contextual Metrics Matrix</div>", unsafe_allow_html=True)
