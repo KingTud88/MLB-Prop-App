@@ -364,7 +364,7 @@ def fetch_live_sportsbook_lines():
             if name_cell and line_cell:
                 clean_pname = name_cell.get_text(strip=True).lower()
                 try:
-                    raw_line_val = float(line_cell.get_text(strip=True).split())
+                    raw_line_val = float(line_cell.get_text(strip=True).split()[0])
                     props_map[clean_pname] = raw_line_val
                 except: continue
         return props_map
@@ -372,10 +372,9 @@ def fetch_live_sportsbook_lines():
 
 live_market_lines = fetch_live_sportsbook_lines()
 
-if not pitcher_db.empty and not batter_database.empty if 'batter_database' in locals() else True:
+if not pitcher_db.empty:
     global_tracker_rows = []
     
-    # Load batter db locally for rapid bulk processing
     try:
         b_db_bulk = pd.read_csv("batter_database.csv")
         b_db_bulk['team_clean'] = b_db_bulk['team'].str.upper().str.strip()
@@ -390,18 +389,13 @@ if not pitcher_db.empty and not batter_database.empty if 'batter_database' in lo
         p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data.index else "R"
         p_fatigue = int(p_data['rolling_pitches']) if 'rolling_pitches' in p_data.index else 90
         
-        # 1. Pull Live Sportsbook Line
         current_book_line = live_market_lines.get(p_name_clean, sportsbook_line if p_name_clean == lookup_key else 5.5)
-        
-        # Identify opponent (Defaults to your sidebar team choice for the selected pitcher, handles slate mapping for the rest)
         opp_team_target = opposing_team if p_name_clean == lookup_key else (opposing_team if p_team_code != opposing_team else "NYM")
         
-        # 2. IF SELECTED PITCHER: Lock to exact live sidebar variables instantly
         if p_name_clean == lookup_key:
             simulated_proj = live_avg
             current_book_line = sportsbook_line
         else:
-            # 3. BULK PRECISION ENGINE: Run the full 9-way matrix calculations for the rest of the league
             p_matchup_mult = 1.00
             if not b_db_bulk.empty and opp_team_target in b_db_bulk['team_clean'].values:
                 team_hitters = b_db_bulk[b_db_bulk['team_clean'] == opp_team_target]
@@ -419,22 +413,19 @@ if not pitcher_db.empty and not batter_database.empty if 'batter_database' in lo
                 if k_list_calc:
                     p_matchup_mult = (sum(k_list_calc) / len(k_list_calc)) / 22.5
 
-            # Extract Stadium Factors for the game venue
             p_park_mult, p_bullpen_mult = 1.00, 1.00
             stadium_home = p_team_code if venue_split == "Home" else opp_team_target
             if not ballpark_db.empty and stadium_home in ballpark_db['team_clean'].values:
-                p_row_park = ballpark_db[ballpark_db['team_clean'] == stadium_home].iloc
+                p_row_park = ballpark_db[ballpark_db['team_clean'] == stadium_home].iloc[0]
                 p_park_mult = float(p_row_park['k_scalar'])
                 p_bullpen_mult = float(p_row_park['bullpen_k_factor']) if 'bullpen_k_factor' in p_row_park.index else 1.00
 
-            # Apply Contextual Wind, Temperature and Fatigue Modifiers
             p_venue_mult = 1.06 if venue_split == "Home" else 0.95
             p_vegas_mult = 0.92 if vegas_spread >= 4.5 else (1.12 if vegas_spread <= 3.2 else 1.00)
             p_wind_mult = 1.05 if wind_vector == "Blowing In (Ks Up)" else (0.94 if wind_vector == "Blowing Out (Ks Down)" else 1.00)
             p_fatigue_mult = 0.95 if p_fatigue >= 100 else 1.00
             p_temp_mult = 1.03 if ('game_temp' in locals() and game_temp >= 85 and wind_vector != "Neutral / Dome") else (0.96 if ('game_temp' in locals() and game_temp <= 50 and wind_vector != "Neutral / Dome") else 1.00)
 
-            # Compound Ultimate 9-Way Metric Matrix
             simulated_proj = round(p_base * p_matchup_mult * p_venue_mult * p_vegas_mult * p_park_mult * ump_multiplier * p_wind_mult * p_fatigue_mult * p_bullpen_mult * p_temp_mult, 2)
         
         arbitrage_edge = round(simulated_proj - current_book_line, 2)
