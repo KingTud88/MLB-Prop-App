@@ -204,8 +204,10 @@ if not ballpark_db.empty and home_team_target in ballpark_db['team_clean'].value
     stadium_text = f"{str(park_row['park_name']).title()}: {park_multiplier}x"
     stadium_trait = str(park_row['top_trait'])
 
-# 2. FIXED: Umpire Strike Zone Connector with Safe Bracket Query Indexing
+# 2. FIXED: Umpire Strike Zone Connector with Accuracy Coefficients
 ump_multiplier, umpire_text, umpire_trait = 1.00, "Standard Zone: 1.0x", "Balanced Strike Zone"
+ump_accuracy = 1.00
+
 with st.sidebar:
     st.subheader("⚖️ Official Assignments")
     umpire_input = st.text_input("Home Plate Umpire", "Standard").strip().lower()
@@ -214,10 +216,14 @@ with st.sidebar:
     wind_vector = st.radio("Wind Vector Assignment", ["Neutral / Dome", "Blowing In (Ks Up)", "Blowing Out (Ks Down)"])
 
 if not umpire_db.empty and umpire_input in umpire_db['name_clean'].values:
-    # CRITICAL FIX: Changed from raw property access .iloc to standard bracket query .iloc[0]
-    ump_row = umpire_db[umpire_db['name_clean'] == umpire_input].iloc[0]
-    ump_multiplier = float(ump_row['k_mod'])
-    umpire_text = f"{umpire_input.title()}: {ump_multiplier}x"
+    ump_row = umpire_db[umpire_db['name_clean'] == umpire_input].iloc
+    # Extracts both zone boundaries AND accuracy performance ratios natively
+    base_k_mod = float(ump_row['k_mod']) if 'k_mod' in ump_row.index else 1.00
+    ump_accuracy = float(ump_row['accuracy_coefficient']) if 'accuracy_coefficient' in ump_row.index else 1.00
+    
+    # Compounds the two umpire dimensions into a single master multiplier
+    ump_multiplier = base_k_mod * ump_accuracy
+    umpire_text = f"{umpire_input.title()}: {round(ump_multiplier, 2)}x"
     umpire_trait = str(ump_row['call_tendency'])
 
 # 3. ADVANCED COMPONENT MULTIPLIER SCALARS CALCULATIONS
