@@ -217,7 +217,7 @@ with col2:
     styled_lineup = lineup_df.style.map(lambda val: 'background-color: #FF5555; color: #0E0B16; font-weight: bold;' if isinstance(val, (int, float)) and val >= 24.0 else ('background-color: #50FA7B; color: #0E0B16;' if isinstance(val, (int, float)) and val <= 15.0 else ''), subset=["K% USED", "VS HAND", "SEASON"])
     st.dataframe(styled_lineup, width="stretch", hide_index=True)
 
-    st.markdown("<div class='section-header'>Advanced Contextual Metrics</div>", unsafe_allow_html=True)
+     st.markdown("<div class='section-header'>Advanced Contextual Metrics</div>", unsafe_allow_html=True)
     bm1, bm2, bm3 = st.columns(3)
     with bm1:
         st.metric("PITCH K%", pitch_k_pct)
@@ -233,10 +233,11 @@ with col2:
         st.metric("SAVANT", "SUCCESS")
         st.metric("UMPIRE", umpire_text)
 
-    st.markdown("<div class='section-header'>🚨 Team Injury Alert Desk</div>", unsafe_allow_html=True)
-    active_injuries = check_active_team_injuries(opposing_team)
-    if active_injuries:
-        for player in active_injuries[:5]:
-            st.warning(f"⚠️ **{player['Player']}** — Current Status: {player['Status']}")
+    # NEW: Unified Environmental Check Desk Matrix (Displays Stadium & Weather Validation)
+    st.markdown("<div class='section-header'>🌤️ Environmental Check Desk</div>", unsafe_allow_html=True)
+    
+    # 1. Stadium Database Structural Verification Check
+    if not ballpark_db.empty and opposing_team in ballpark_db['team_clean'].values:
+        st.success(f"✨ Ballpark Database Verified: Isolate matrix tags pulled cleanly for {opposing_team} dimensions.")
     else:
-        st.success(f"✨ No critical active batter injuries reported for {opposing_team} today.")
+        st.info(f"ℹ️ Ballpark Tracking: Neutral standard dimension baseline applied for {opposing_team}.")
