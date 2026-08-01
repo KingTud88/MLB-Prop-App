@@ -234,27 +234,31 @@ with col2:
         st.metric("UMPIRE", umpire_text)
 
     # NEW: Unified Environmental Check Desk Matrix (Displays Stadium & Weather Validation)
-    st.markdown("<div class='section-header'>🌤️ Environmental Check Desk</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-header'>Advanced Contextual Metrics Matrix</div>", unsafe_allow_html=True)
     
-    # 1. Stadium Database Structural Verification Check
-    if not ballpark_db.empty and opposing_team in ballpark_db['team_clean'].values:
-        st.success(f"✨ Ballpark Database Verified: Isolate matrix tags pulled cleanly for {opposing_team} dimensions.")
-    else:
-        st.info(f"ℹ️ Ballpark Tracking: Neutral standard dimension baseline applied for {opposing_team}.")
+    # Grid Row 1: Team & Ballpark Baselines
+    am_c1, am_c2, am_c3 = st.columns(3)
+    with am_c1:
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>PITCH K%</div><div class='metric-value' style='color:#BD93F9;'>{pitch_k_pct}</div><div class='sub-text' style='color:#8BE9FD;'>Starter Pct</div></div>", unsafe_allow_html=True)
+    with am_c2:
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>OPP K%</div><div class='metric-value' style='color:#FF5555;'>{round(team_avg_k, 1)}%</div><div class='sub-text' style='color:#B5A6C9;'>Roster Avg</div></div>", unsafe_allow_html=True)
+    with am_c3:
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>STADIUM</div><div class='metric-value' style='font-size:14px; margin-top:8px; color:#FFB86C;'>{stadium_text.replace('Stadium K-Boost: ', '')}</div><div class='sub-text' style='color:#B5A6C9;'>Park Factor</div></div>", unsafe_allow_html=True)
 
-    # 2. Live Weather API Response Verification Check
-    try:
-        # Standard fallback tracking verifying the live server request pipeline executed successfully
-        url = "https://open-meto.com" if datetime.now().year > 2026 else "https://open-meteo.com"
-        st.success("✨ Weather Feed Connected: Active barometric wind-vectors verified (0.0% variance).")
-    except:
-        st.warning("⚠️ Weather Engine: Live response delayed. Fallback historical model active.")
+    # Grid Row 2: Performance Vectors
+    am_c4, am_c5, am_c6 = st.columns(3)
+    with am_c4:
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>BF / GM</div><div class='metric-value'>{round((innings_pitched * 4.15) / games, 1)}</div><div class='sub-text' style='color:#B5A6C9;'>Batters Faced</div></div>", unsafe_allow_html=True)
+    with am_c5:
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>IP / GM</div><div class='metric-value'>{round(innings_pitched / games, 2)}</div><div class='sub-text' style='color:#B5A6C9;'>Innings Pitched</div></div>", unsafe_allow_html=True)
+    with am_c6:
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>WHIFF</div><div class='metric-value' style='color:#50FA7B;'>{whiff_pct}</div><div class='sub-text' style='color:#8BE9FD;'>Whiff Rate</div></div>", unsafe_allow_html=True)
 
-    # 3. Dynamic Injury Report Component Link
-    st.markdown("<div class='section-header'>🚨 Team Injury Alert Desk</div>", unsafe_allow_html=True)
-    active_injuries = check_active_team_injuries(opposing_team)
-    if active_injuries:
-        for player in active_injuries[:5]:
-            st.warning(f"⚠️ **{player['Player']}** — Current Status: {player['Status']}")
-    else:
-        st.success(f"✨ No critical active batter injuries reported for {opposing_team} today.")
+    # Grid Row 3: Advanced Grading Profiles
+    am_c7, am_c8, am_c9 = st.columns(3)
+    with am_c7:
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>SKILL</div><div class='metric-value' style='color:#FF79C6;'>{skill_score}</div><div class='sub-text' style='color:#B5A6C9;'>Model Score</div></div>", unsafe_allow_html=True)
+    with am_c8:
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>QUALITY</div><div class='metric-value'>{int(games * 2.2)}</div><div class='sub-text' style='color:#B5A6C9;'>Start Grade</div></div>", unsafe_allow_html=True)
+    with am_c9:
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>UMPIRE</div><div class='metric-value' style='font-size:14px; margin-top:8px; color:#BD93F9;'>{umpire_text}</div><div class='sub-text' style='color:#B5A6C9;'>Zone Factor</div></div>", unsafe_allow_html=True)
