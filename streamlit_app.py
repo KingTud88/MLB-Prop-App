@@ -306,7 +306,7 @@ with col1:
             p_team_code = str(p_data['team']).upper().strip()
             
             # Bulletproof Schedule Resolution
-            opp_team_target = live_schedule_grid.get(p_team_code, ROTOWIRE_LIVE_MAP.get(p_team_code, "NYM")
+            opp_team_target = live_schedule_grid.get(p_team_code, ROTOWIRE_LIVE_MAP.get(p_team_code, "NYM"))
             
             if p_name_clean == lookup_key:
                 simulated_proj = live_avg
