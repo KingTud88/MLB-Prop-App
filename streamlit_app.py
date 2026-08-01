@@ -509,5 +509,4 @@ if not pitcher_db.empty:
         st.dataframe(styled_master_board, width="stretch", hide_index=True)
     else:
         st.info("✨ Full daily slate clear. Checking for tomorrow's early morning opener listings.")
-    )
-    st.dataframe(styled_master_board, width="stretch", hide_index=True)
+        st.dataframe(styled_master_board, width="stretch", hide_index=True)
