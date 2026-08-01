@@ -6,49 +6,67 @@ from datetime import datetime
 import unicodedata
 from injury_scanner import check_active_team_injuries
 
-# 1. Page Configuration & Custom Theme Styling
-st.set_page_config(page_title="Prop Intel Modeling Dashboard", layout="wide")
-st.markdown("""
-<style>
-    body { background-color: #0E0B16; color: #E5D4ED; }
-    .reportview-container { background: #0E0B16; }
-    .metric-card { background-color: #1A1423; border: 1px solid #372549; padding: 12px; border-radius: 8px; text-align: center; margin-bottom: 8px; }
-    .metric-label { color: #B5A6C9; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
-    .metric-value { color: #E5D4ED; font-size: 22px; font-weight: bold; margin-top: 2px; }
-    .tag-grade { color: #FF79C6; font-weight: bold; font-size: 24px; }
-    .sub-text { font-size: 11px; margin-top: 2px; }
-    .section-header { border-bottom: 1px solid #372549; padding-bottom: 4px; margin-top: 15px; margin-bottom: 10px; color: #BD93F9; font-size: 16px; font-weight: bold; }
-</style>
-""", unsafe_allow_html=True)
+# ==========================================
+# 1. CORE DATA HARVESTING CRAWLER MODULES (DEFINED FIRST)
+# ==========================================
+def fetch_live_slate_matchups():
+    """Crawls real-time schedule grids by parsing text nodes directly to avoid fragile class dependencies."""
+    matchups_map = {}
+    active_pitchers = set()
+    try:
+        url = "https://rotowire.com"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        res = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(res.text, "html.parser")
+        
+        ROTOWIRE_CLEAN_MAP = {
+            'SD': 'SDP', 'SDG': 'SDP', 'CWS': 'CHW', 'KC': 'KCR', 'SF': 'SFG', 'TB': 'TBR', 'WSH': 'WSN'
+        }
+        
+        for box in soup.select(".lineup__box, [class*='lineup__box']"):
+            teams_header = box.select_one(".lineup__teams, .lineup__top, [class*='teams']")
+            if teams_header:
+                raw_header_text = teams_header.get_text(strip=True).upper()
+                for char in ["@", "VS", "AT", "\n", "\r"]:
+                    raw_header_text = raw_header_text.replace(char, " ")
+                
+                tokens = [t.strip() for t in raw_header_text.split() if len(t.strip()) >= 2][:2]
+                if len(tokens) == 2:
+                    t1 = ROTOWIRE_CLEAN_MAP.get(tokens[0], tokens[0])
+                    t2 = ROTOWIRE_CLEAN_MAP.get(tokens[1], tokens[1])
+                    matchups_map[t1] = t2
+                    matchups_map[t2] = t1
+            
+            p_anchors = box.select("a[href*='player']")
+            for p_a in p_anchors:
+                p_text = p_a.get_text(strip=True).lower()
+                parent_text = p_a.find_parent().get_text().lower() if p_a.find_parent() else ""
+                if any(k in parent_text for k in ["pitcher", "p:", "(p)", "starting"]):
+                    if len(p_text) > 3:
+                        active_pitchers.add(p_text)
+                        
+        return matchups_map, active_pitchers
+    except:
+        return matchups_map, active_pitchers
 
-st.title("🔮 Matchup Intel Modeling Dashboard")
-
-# 2. Sidebar Component Controls
-with st.sidebar:
-    st.header("⚙️ Configuration")
-    sport = st.selectbox("Select League", ["MLB"])
-    market = st.selectbox("Market Type", ["Strikeouts (Ks)"])
-    
-    st.subheader("🔍 Matchup Selection")
-    pitcher_input = st.text_input("Enter Pitcher Name", "Dylan Cease")
-    opposing_team = st.text_input("Opposing Team", "NYM").upper().strip()
-    sportsbook_line = st.number_input("Current Line O/U", min_value=0.5, max_value=15.5, value=6.5, step=0.5)
-    
-    st.subheader("🏟️ Contextual & Vegas Inputs")
-    venue_split = st.radio("Pitcher Venue Assignment", ["Home", "Away"])
-    vegas_total = st.number_input("Vegas Game Total (O/U)", min_value=4.0, max_value=14.0, value=8.5, step=0.5)
-    vegas_spread = st.number_input("Opponent Implied Total Runs", min_value=1.5, max_value=8.5, value=3.5, step=0.1)
-
-    st.subheader("🛠️ Manual Metric Overrides")
-    activate_override = st.checkbox("Activate Pitcher Overrides", value=False, help="Enable this toggle to force manual overrides over database values.")
-    override_base_avg = st.slider("Override Base Average K", min_value=2.0, max_value=12.0, value=6.0, step=0.05, disabled=not activate_override)
-    override_throws = st.radio("Override Throwing Arm", ["R", "L"], index=0, disabled=not activate_override)
-    override_pitches = st.slider("Override Rolling Pitch Count", min_value=30, max_value=115, value=90, step=1, disabled=not activate_override)
-
-def clean_string_accents(text):
-    if not isinstance(text, str): return ""
-    normalized = unicodedata.normalize('NFD', text)
-    return "".join([c for c in normalized if unicodedata.category(c) != 'Mn']).lower().strip()
+def fetch_live_sportsbook_lines():
+    props_map = {}
+    try:
+        url = "https://rotowire.com"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        res = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(res.text, "html.parser")
+        for row in soup.select("tbody tr"):
+            name_cell = row.select_one(".player-name, td:nth-of-type(1)")
+            line_cell = row.select_one(".prop-line, td:nth-of-type(4)")
+            if name_cell and line_cell:
+                clean_pname = name_cell.get_text(strip=True).lower()
+                try:
+                    raw_line_val = float(line_cell.get_text(strip=True).split()[0])
+                    props_map[clean_pname] = raw_line_val
+                except: continue
+        return props_map
+    except: return props_map
 
 def fetch_live_announced_lineup(team_abbr):
     try:
@@ -142,7 +160,35 @@ def fetch_dynamic_opposing_lineup(team_abbr, pitcher_arm="R"):
     })
     return display_df, status_msg
 
-# 4. Interface Rendering Framework Layout Pipeline
+# ==========================================
+# 2. STREAMLIT INTERFACE CONFIGURATION
+# ==========================================
+with st.sidebar:
+    st.header("⚙️ Configuration")
+    sport = st.selectbox("Select League", ["MLB"])
+    market = st.selectbox("Market Type", ["Strikeouts (Ks)"])
+    
+    st.subheader("🔍 Matchup Selection")
+    pitcher_input = st.text_input("Enter Pitcher Name", "Dylan Cease")
+    opposing_team = st.text_input("Opposing Team", "NYM").upper().strip()
+    sportsbook_line = st.number_input("Current Line O/U", min_value=0.5, max_value=15.5, value=6.5, step=0.5)
+    
+    st.subheader("🏟️ Contextual & Vegas Inputs")
+    venue_split = st.radio("Pitcher Venue Assignment", ["Home", "Away"])
+    vegas_total = st.number_input("Vegas Game Total (O/U)", min_value=4.0, max_value=14.0, value=8.5, step=0.5)
+    vegas_spread = st.number_input("Opponent Implied Total Runs", min_value=1.5, max_value=8.5, value=3.5, step=0.1)
+
+    st.subheader("🛠️ Manual Metric Overrides")
+    activate_override = st.checkbox("Activate Pitcher Overrides", value=False)
+    override_base_avg = st.slider("Override Base Average K", min_value=2.0, max_value=12.0, value=6.0, step=0.05, disabled=not activate_override)
+    override_throws = st.radio("Override Throwing Arm", ["R", "L"], index=0, disabled=not activate_override)
+    override_pitches = st.slider("Override Rolling Pitch Count", min_value=30, max_value=115, value=90, step=1, disabled=not activate_override)
+
+def clean_string_accents(text):
+    if not isinstance(text, str): return ""
+    normalized = unicodedata.normalize('NFD', text)
+    return "".join([c for c in normalized if unicodedata.category(c) != 'Mn']).lower().strip()
+
 @st.cache_data(ttl=3600)
 def load_contextual_databases():
     try:
@@ -170,7 +216,7 @@ pitch_df = pd.DataFrame([{"PITCH": "Four-seam FB", "USE": "45%", "WHIFF": "W:21%
 if not pitcher_db.empty and lookup_key in pitcher_db['name_clean'].values:
     p_row = pitcher_db[pitcher_db['name_clean'] == lookup_key].squeeze()
     pitcher_base_avg = float(p_row['base_avg'])
-    pitcher_throws = str(p_row['throws']).upper().strip() if 'throws' in p_row.index else "R" 
+    pitcher_throws = str(p_row['throws']).upper().strip() if 'throws' in p_row.index else "R"
     rolling_pitches = int(p_row['rolling_pitches']) if 'rolling_pitches' in p_row.index else 90
     games, strikeouts = int(p_row['games']), int(p_row['strikeouts'])
     innings_pitched, era = float(p_row['ip']), float(p_row['era'])
@@ -228,19 +274,21 @@ if not umpire_db.empty and umpire_input in umpire_db['name_clean'].values:
     ump_multiplier = base_k_mod * ump_accuracy
     umpire_text = f"{umpire_input.title()}: {round(ump_multiplier, 2)}x"
     umpire_trait = str(ump_row['call_tendency'])
+    wind_multiplier = 1.05 if wind_vector == "Blowing In (Ks Up)" else (0.94 if wind_vector == "Blowing Out (Ks Down)" else 1.00)
+    fatigue_multiplier = 0.95 if rolling_pitches >= 100 else 1.00
+    temp_multiplier = 1.03 if (wind_vector != "Neutral / Dome" and game_temp >= 85) else (0.96 if (wind_vector != "Neutral / Dome" and game_temp <= 50) else 1.00)
 
-wind_multiplier = 1.05 if wind_vector == "Blowing In (Ks Up)" else (0.94 if wind_vector == "Blowing Out (Ks Down)" else 1.00)
-fatigue_multiplier = 0.95 if rolling_pitches >= 100 else 1.00
-temp_multiplier = 1.03 if (wind_vector != "Neutral / Dome" and game_temp >= 85) else (0.96 if (wind_vector != "Neutral / Dome" and game_temp <= 50) else 1.00)
-
-# FIXED: Harvesting scripts moved above layout creation to prevent execution order failures
+# ==========================================
+# 3. BACKGROUND HARVESTING SERVICE SIGNALS
+# ==========================================
 live_schedule_grid, today_active_starters = fetch_live_slate_matchups()
 live_market_lines = fetch_live_sportsbook_lines()
-
+# ==========================================
+# 4. VIEW LAYOUT GRID BLOCKS
+# ==========================================
 col1, col2 = st.columns(2)
 
 with col1:
-    # Core Contextual Calculations
     league_avg_k = 22.5
     team_avg_k = lineup_df["K% USED"].mean()
     matchup_multiplier = team_avg_k / league_avg_k
@@ -306,8 +354,6 @@ with col1:
             p_name_raw = str(p_data['name']).title()
             p_name_clean = str(p_data['name']).lower().strip()
             p_team_code = str(p_data['team']).upper().strip()
-            
-            # Bulletproof Schedule Resolution
             opp_team_target = live_schedule_grid.get(p_team_code, ROTOWIRE_LIVE_MAP.get(p_team_code, "NYM"))
             
             if p_name_clean == lookup_key:
@@ -315,9 +361,7 @@ with col1:
                 current_book_line = sportsbook_line
                 opp_team_target = opposing_team
             else:
-                # Filter out players not on today's active schedule boards
-                if p_name_clean not in today_active_starters and today_active_starters:
-                    continue
+                if p_name_clean not in today_active_starters and today_active_starters: continue
                 p_base = float(p_data['base_avg'])
                 p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data.index else "R"
                 p_fatigue = int(p_data['rolling_pitches']) if 'rolling_pitches' in p_data.index else 90
@@ -377,7 +421,7 @@ with col2:
     st.caption(f"MLB PROJECTED - avg {round(lineup_df['K% USED'].mean(), 1)} | high-K {len(lineup_df[lineup_df['K% USED'] > 22])} | low-K {len(lineup_df[lineup_df['K% USED'] <= 15])}")
     
     styled_lineup = lineup_df.style.set_properties(**{
-        'background-color': '#1A1423', 'color': '#E5D4ED', 'border-color': '#372549'
+    'background-color': '#1A1423', 'color': '#E5D4ED', 'border-color': '#372549'
     }).map(
         lambda val: 'background-color: #FF5555; color: #0E0B16; font-weight: bold; text-align: center;' if isinstance(val, (int, float)) and val >= 24.0
         else ('background-color: #50FA7B; color: #0E0B16; font-weight: bold; text-align: center;' if isinstance(val, (int, float)) and val <= 15.0 else 'text-align: center;'),
