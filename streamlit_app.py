@@ -170,7 +170,8 @@ pitch_df = pd.DataFrame([{"PITCH": "Four-seam FB", "USE": "45%", "WHIFF": "W:21%
 if not pitcher_db.empty and lookup_key in pitcher_db['name_clean'].values:
     p_row = pitcher_db[pitcher_db['name_clean'] == lookup_key].squeeze()
     pitcher_base_avg = float(p_row['base_avg'])
-    pitcher_throws = str(p_row['throws']).upper().strip() if 'throws' in p_row.index else "R" rolling_pitches = int(p_row['rolling_pitches']) if 'rolling_pitches' in p_row.index else 90
+    pitcher_throws = str(p_row['throws']).upper().strip() if 'throws' in p_row.index else "R" 
+    rolling_pitches = int(p_row['rolling_pitches']) if 'rolling_pitches' in p_row.index else 90
     games, strikeouts = int(p_row['games']), int(p_row['strikeouts'])
     innings_pitched, era = float(p_row['ip']), float(p_row['era'])
     top_pitch_text = str(p_row['top_pitch'])
