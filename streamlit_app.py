@@ -426,7 +426,6 @@ if not pitcher_db.empty:
         current_book_line = live_market_lines.get(p_name_clean, sportsbook_line if p_name_clean == lookup_key else 5.5)
         
         # 2. AUTOMATED SCHEDULE DISCOVERY Core Loop Hook
-        # Crawls live grid map to discover who this pitcher's team is truly facing today
         opp_team_target = live_schedule_grid.get(p_team_code, "NYM")
         
         # Override to match sidebar context if analyzing your primary single target
@@ -456,8 +455,9 @@ if not pitcher_db.empty:
             p_park_mult, p_bullpen_mult = 1.00, 1.00
             stadium_home = p_team_code if venue_split == "Home" else opp_team_target
             if not ballpark_db.empty and stadium_home in ballpark_db['team_clean'].values:
-                p_row_park = ballpark_db[ballpark_db['team_clean'] == stadium_home].iloc
-                p_park_mult = float(p_row_park['k_scalar'])
+                # FIXED: Swapped raw .iloc property mapping for a secure .squeeze() Series conversion
+                p_row_park = ballpark_db[ballpark_db['team_clean'] == stadium_home].squeeze()
+                p_park_mult = float(p_row_park['k_scalar']) if 'k_scalar' in p_row_park.index else 1.00
                 p_bullpen_mult = float(p_row_park['bullpen_k_factor']) if 'bullpen_k_factor' in p_row_park.index else 1.00
 
             p_venue_mult = 1.06 if venue_split == "Home" else 0.95
