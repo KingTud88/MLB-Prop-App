@@ -18,18 +18,15 @@ KCR,Kauffman Stadium,0.94,1.04,Massive Outfield Gaps (Ks Down)
 HOU,Minute Maid Park,0.99,1.03,Short Left Crawford Boxes
 SEA,T-Mobile Park,1.05,0.84,Heavy Marine Air Layer (Ks Max)
 TEX,Globe Life Field,0.98,1.01,Controlled Retractable Roof
-LAA,Angel Stadium,0.99,1.03,Warm Night Ball Carrying
-MIA,LoanDepot Park,1.02,0.91,Humid Retractable Dome (Ks Up)
-PHI,Citizens Bank,0.96,1.07,Small Dimensions Matrix (Runs Up)
-WSH,Nationals Park,0.99,1.00,Neutral Standard Grid
-WSN,Nationals Park,0.99,1.00,Neutral Standard Grid
-CHC,Wrigley Field,1.00,1.00,Wind Dynamic Vector Core
-MIL,American Family,0.98,1.02,Hitters Retractable Box
-STL,Busch Stadium,1.01,0.93,Dense Summer Midwest Air (Ks Up)
-PIT,PNC Park,1.01,0.97,Deep Left Field Notch
-CIN,Great American,0.95,1.12,Tiny Outer Fences (Runs Max)
-SFO,Oracle Park,1.04,0.85,Cool San Francisco Bay Fog (Ks Up)
-SFG,Oracle Park,1.04,0.85,Cool San Francisco Bay Fog (Ks Up)
-COL,Coors Field,0.88,1.24,Extreme Thin Mile-High Air (Ks Min)
-OAK,Sutter Health Park,0.98,1.04,Minor League Sized Base
-ATH,Sutter Health Park,0.98,1.04,Minor League Sized Base
+CHC,Wrigley Field,0.98,1.02,Wind Vector Variable Shifts
+CIN,Great American,1.01,1.12,Batter Friendly Launchpad
+COL,Coors Field,1.14,1.34,Thin Mountain Air Elevation
+MIA,LoanDepot Park,0.94,0.92,Deep Coastal Air Sanctuary
+MIL,American Family,1.01,1.03,Closed Roof Ball Carrier
+OAK,Sutter Health Park,0.94,0.95,Minor League Outfield Shifts
+PHI,Citizens Bank,1.02,1.08,Short Power Alleys (Runs Up)
+PIT,PNC Park,0.97,0.96,Deep Left Center Notch
+SFO,Oracle Park,0.93,0.84,Heavy Coastal Marine Layer
+SFG,Oracle Park,0.93,0.84,Heavy Coastal Marine Layer
+STL,Busch Stadium,0.96,0.93,Deep Outfield Pitcher Base
+WSH,Nationals Park,0.98,0.99,Neutral East Coast Base
