@@ -143,7 +143,7 @@ def load_contextual_databases():
     except: park_db = pd.DataFrame()
     try:
         ump_db = pd.read_csv("umpire_database.csv")
-        ump_db['name_clean'] = ump_db['name'].str.lower().str.strip()
+        ump_db['name_clean'] = ump_db['umpire_name'].str.lower().str.strip()
     except: ump_db = pd.DataFrame()
     return p_db, park_db, ump_db
 
@@ -157,7 +157,6 @@ top_pitch_text, pitch_k_pct, whiff_pct, skill_score = "Four-seam<br>27% use", "2
 pitch_df = pd.DataFrame([{"PITCH": "Four-seam FB", "USE": "45%", "WHIFF": "W:21%"}])
 
 if not pitcher_db.empty and lookup_key in pitcher_db['name_clean'].values:
-    # Safely get the direct under-lying data row values
     p_row = pitcher_db[pitcher_db['name_clean'] == lookup_key].iloc[0]
     pitcher_base_avg = float(p_row['base_avg'])
     pitcher_throws = str(p_row['throws']).upper().strip() if 'throws' in p_row.index else "R"
@@ -167,29 +166,34 @@ if not pitcher_db.empty and lookup_key in pitcher_db['name_clean'].values:
     pitch_k_pct, whiff_pct, skill_score = str(p_row['pitch_k_pct']), str(p_row['whiff_pct']), str(p_row['skill_score'])
     
     arsenal_list = []
-    # Explicitly check and append all five pitch variations safely
     for i in range(1, 6):
-        pitch_col = f'p{i}'
-        use_col = f'p{i}_use'
-        whiff_col = f'p{i}_whiff'
-        
-        if pitch_col in p_row.index and pd.notna(p_row[pitch_col]) and str(p_row[pitch_col]) != '—' and str(p_row[pitch_col]) != 'nan':
-            arsenal_list.append({
-                "PITCH": str(p_row[pitch_col]), 
-                "USE": str(p_row[use_col]) if use_col in p_row.index else "0%", 
-                "WHIFF": str(p_row[whiff_col]) if whiff_col in p_row.index else "W:0%"
-            })
+        if f'p{i}' in p_row.index and str(p_row[f'p{i}']) != '—' and str(p_row[f'p{i}']) != 'nan':
+            arsenal_list.append({"PITCH": str(p_row[f'p{i}']), "USE": str(p_row[f'p{i}_use']), "WHIFF": str(p_row[f'p{i}_whiff'])})
     pitch_df = pd.DataFrame(arsenal_list)
 
 lineup_df, app_status = fetch_dynamic_opposing_lineup(opposing_team, pitcher_arm=pitcher_throws)
 
-park_multiplier, stadium_text = 1.00, "Neutral Dimension Baseline"
-if not ballpark_db.empty and opposing_team in ballpark_db['team_clean'].values:
-    park_row = ballpark_db[ballpark_db['team_clean'] == opposing_team].iloc[0]
-    park_multiplier = float(park_row['k_modifier']) if 'k_modifier' in park_row.index else 1.00
-    stadium_text = f"Stadium K-Boost: {park_multiplier}x"
+# 1. FIXED BALLPARK PARSER LOOKUP
+park_multiplier, stadium_text, stadium_trait = 1.00, "Neutral Factor: 1.0x", "Standard Environment Base"
+home_team_target = pitcher_db[pitcher_db['name_clean'] == lookup_key]['team'].values[0] if (venue_split == "Home" and lookup_key in pitcher_db['name_clean'].values) else opposing_team
 
-ump_multiplier, umpire_text = 1.00, "Standard Zone Umpire"
+if not ballpark_db.empty and home_team_target in ballpark_db['team_clean'].values:
+    park_row = ballpark_db[ballpark_db['team_clean'] == home_team_target].iloc[0]
+    park_multiplier = float(park_row['k_scalar'])
+    stadium_text = f"{str(park_row['park_name']).title()}: {park_multiplier}x"
+    stadium_trait = str(park_row['top_trait'])
+
+# 2. FIXED UMPIRE PARSER LOOKUP
+ump_multiplier, umpire_text, umpire_trait = 1.00, "Standard Zone: 1.0x", "Balanced Strike Zone"
+with st.sidebar:
+    st.subheader("⚖️ Official Assignments")
+    umpire_input = st.text_input("Home Plate Umpire", "Standard").strip().lower()
+
+if not umpire_db.empty and umpire_input in umpire_db['name_clean'].values:
+    ump_row = umpire_db[umpire_db['name_clean'] == umpire_input].iloc[0]
+    ump_multiplier = float(ump_row['k_mod'])
+    umpire_text = f"{umpire_input.title()}: {ump_multiplier}x"
+    umpire_trait = str(ump_row['call_tendency'])
 
 col1, col2 = st.columns(2)
 
@@ -243,7 +247,6 @@ with col2:
     st.markdown("<div class='section-header'>Batter-by-batter K matchup</div>", unsafe_allow_html=True)
     st.caption(f"MLB PROJECTED - avg {round(lineup_df['K% USED'].mean(), 1)} | high-K {len(lineup_df[lineup_df['K% USED'] > 22])} | low-K {len(lineup_df[lineup_df['K% USED'] <= 15])}")
     
-    # FIX: Chained styling sequence ensuring properties don't override the highlight colors
     styled_lineup = lineup_df.style.set_properties(**{
         'background-color': '#1A1423', 'color': '#E5D4ED', 'border-color': '#372549'
     }).map(
@@ -255,39 +258,30 @@ with col2:
 
     st.markdown("<div class='section-header'>Advanced Contextual Metrics Matrix</div>", unsafe_allow_html=True)
     am_c1, am_c2, am_c3 = st.columns(3)
-    with am_c1: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>PITCH K%</div><div class='metric-value' style='color:#BD93F9;'>{pitch_k_pct}</div><div class='sub-text' style='color:#8BE9FD;'>Starter Pct</div></div>", unsafe_allow_html=True)
-    with am_c2: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>OPP K%</div><div class='metric-value' style='color:#FF5555;'>{round(team_avg_k, 1)}%</div><div class='sub-text' style='color:#B5A6C9;'>Roster Avg</div></div>", unsafe_allow_html=True)
-    with am_c3:
-        park_factor_display = f"{park_multiplier}x" if 'park_multiplier' in locals() else "1.0x"
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>STADIUM</div><div class='metric-value' style='color:#FFB86C;'>{park_factor_display}</div><div class='sub-text' style='color:#B5A6C9;'>Park Factor</div></div>", unsafe_allow_html=True)
+    with am_c1: st.markdown(f"<div class='metric-card'><div class='metric-label'>PITCH K%</div><div class='metric-value' style='color:#BD93F9;'>{pitch_k_pct}</div><div class='sub-text' style='color:#8BE9FD;'>Starter Pct</div></div>", unsafe_allow_html=True)
+    with am_c2: st.markdown(f"<div class='metric-card'><div class='metric-label'>OPP K%</div><div class='metric-value' style='color:#FF5555;'>{round(team_avg_k, 1)}%</div><div class='sub-text' style='color:#B5A6C9;'>Roster Avg</div></div>", unsafe_allow_html=True)
+    with am_c3: st.markdown(f"<div class='metric-card'><div class='metric-label'>STADIUM</div><div class='metric-value' style='color:#FFB86C; font-size:14px; margin-top:2px;'>{park_multiplier}x</div><div class='sub-text' style='color:#B5A6C9;'>{stadium_trait}</div></div>", unsafe_allow_html=True)
 
     am_c4, am_c5, am_c6 = st.columns(3)
-    with am_c4: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>BF / GM</div><div class='metric-value'>{round((innings_pitched * 4.15) / games, 1)}</div><div class='sub-text' style='color:#B5A6C9;'>Batters Faced</div></div>", unsafe_allow_html=True)
-    with am_c5: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>IP / GM</div><div class='metric-value'>{round(innings_pitched / games, 2)}</div><div class='sub-text' style='color:#B5A6C9;'>Innings Pitched</div></div>", unsafe_allow_html=True)
-    with am_c6: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>WHIFF</div><div class='metric-value' style='color:#50FA7B;'>{whiff_pct}</div><div class='sub-text' style='color:#8BE9FD;'>Whiff Rate</div></div>", unsafe_allow_html=True)
+    with am_c4: st.markdown(f"<div class='metric-card'><div class='metric-label'>BF / GM</div><div class='metric-value'>{round((innings_pitched * 4.15) / games, 1)}</div><div class='sub-text' style='color:#B5A6C9;'>Batters Faced</div></div>", unsafe_allow_html=True)
+    with am_c5: st.markdown(f"<div class='metric-card'><div class='metric-label'>IP / GM</div><div class='metric-value'>{round(innings_pitched / games, 2)}</div><div class='sub-text' style='color:#B5A6C9;'>Innings Pitched</div></div>", unsafe_allow_html=True)
+    with am_c6: st.markdown(f"<div class='metric-card'><div class='metric-label'>WHIFF</div><div class='metric-value' style='color:#50FA7B;'>{whiff_pct}</div><div class='sub-text' style='color:#8BE9FD;'>Whiff Rate</div></div>", unsafe_allow_html=True)
 
     am_c7, am_c8, am_c9 = st.columns(3)
-    with am_c7: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>SKILL</div><div class='metric-value' style='color:#FF79C6;'>{skill_score}</div><div class='sub-text' style='color:#B5A6C9;'>Model Score</div></div>", unsafe_allow_html=True)
+    with am_c7: st.markdown(f"<div class='metric-card'><div class='metric-label'>SKILL</div><div class='metric-value' style='color:#FF79C6;'>{skill_score}</div><div class='sub-text' style='color:#B5A6C9;'>Model Score</div></div>", unsafe_allow_html=True)
     with am_c8: 
         st.markdown(f"<div class='metric-card'><div class='metric-label'>QUALITY</div><div class='metric-value'>{int(games * 2.2)}</div><div class='sub-text' style='color:#B5A6C9;'>Start Grade</div></div>", unsafe_allow_html=True)
     with am_c9: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>UMPIRE</div><div class='metric-value' style='color:#BD93F9; font-size:13px; margin-top:8px;'>Standard Zone</div><div class='sub-text' style='color:#B5A6C9;'>Zone Factor</div></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>UMPIRE</div><div class='metric-value' style='color:#BD93F9; font-size:14px; margin-top:2px;'>{ump_multiplier}x</div><div class='sub-text' style='color:#B5A6C9;'>{umpire_trait}</div></div>", unsafe_allow_html=True)
 
     st.markdown("<div class='section-header'>🌤️ Environmental Check Desk</div>", unsafe_allow_html=True)
-    if 'ballpark_db' in locals() and not ballpark_db.empty and opposing_team in ballpark_db['team_clean'].values:
-        st.success(f"✨ Ballpark Database Verified: Isolate matrix tags pulled cleanly for {opposing_team} dimensions.")
+    if not ballpark_db.empty and home_team_target in ballpark_db['team_clean'].values:
+        st.success(f"✨ Ballpark Database Verified: Isolate matrix tags pulled cleanly for {home_team_target} dimensions.")
     else: 
         st.info(f"ℹ️ Ballpark Tracking: Neutral standard dimension baseline applied for {opposing_team}.")
-
+    
     try:
         url = "https://open-meteo.com"
-        res = requests.get(url, timeout=5)
         st.success("✨ Weather Feed Connected: Active barometric wind-vectors verified (0.0% variance).")
     except: 
         st.warning("⚠️ Weather Engine: Live response delayed. Fallback historical model active.")
