@@ -346,89 +346,114 @@ with col2:
     else: 
         st.success(f"✨ No critical active batter injuries reported for {opposing_team} today.")
 # ==========================================
-# 🔮 GLOBAL DAILY MASTER SLATE TRACKER (ALL 3 ELITE IMPROVEMENTS INTEGRATED)
+# 🔮 GLOBAL DAILY MASTER SLATE TRACKER (100% ALIGNED PRECISION ENGINE)
 # ==========================================
 st.markdown("<div class='section-header'>📊 Automated Global Slate Edge Tracker Matrix</div>", unsafe_allow_html=True)
-st.caption("Live Sportsbook Scraping Sync Engine — Compounds All 9-Way Matrix Multipliers Automatically Across the Full Slate.")
+st.caption("Advanced Precision Engine — Compounds Matchups, Vegas, Platoons, Stadiums, and Umpires across All 48 Rotations Automatically.")
 
-# 1. LIVE SPORTSBOOK PROPS SCRAPER FUNCTION
 def fetch_live_sportsbook_lines():
-    """Scrapes up-to-the-minute pitcher strikeout market lines directly from consensus indices."""
     props_map = {}
     try:
         url = "https://rotowire.com"
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         res = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(res.text, "html.parser")
-        
         for row in soup.select("tbody tr"):
             name_cell = row.select_one(".player-name, td:nth-of-type(1)")
             line_cell = row.select_one(".prop-line, td:nth-of-type(4)")
             if name_cell and line_cell:
                 clean_pname = name_cell.get_text(strip=True).lower()
                 try:
-                    # Isolate clean numerical lines safely (e.g. 6.5)
                     raw_line_val = float(line_cell.get_text(strip=True).split()[0])
                     props_map[clean_pname] = raw_line_val
-                except:
-                    continue
+                except: continue
         return props_map
-    except:
-        return props_map
+    except: return props_map
 
-# Run Live Sportsbook Sync Engine
 live_market_lines = fetch_live_sportsbook_lines()
 
-if not pitcher_db.empty:
+if not pitcher_db.empty and not batter_database.empty if 'batter_database' in locals() else True:
     global_tracker_rows = []
     
-    # 2. RUN BULK CROSS-LINKED VALUE ARBITRAGE DASHBOARD
+    # Load batter db locally for rapid bulk processing
+    try:
+        b_db_bulk = pd.read_csv("batter_database.csv")
+        b_db_bulk['team_clean'] = b_db_bulk['team'].str.upper().str.strip()
+    except:
+        b_db_bulk = pd.DataFrame()
+
     for _, p_data in pitcher_db.iterrows():
         p_name_raw = str(p_data['name']).title()
         p_name_clean = str(p_data['name']).lower().strip()
         p_team_code = str(p_data['team']).upper().strip()
         p_base = float(p_data['base_avg'])
         p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data.index else "R"
+        p_fatigue = int(p_data['rolling_pitches']) if 'rolling_pitches' in p_data.index else 90
         
-        # Pull live consensus market lines or apply standard baseline default if unlisted
-        current_book_line = live_market_lines.get(p_name_clean, 5.5)
+        # 1. Pull Live Sportsbook Line
+        current_book_line = live_market_lines.get(p_name_clean, sportsbook_line if p_name_clean == lookup_key else 5.5)
         
-        # Execute 9-Way Compounded Multiplier Pipeline Matrix
-        sim_mult = 1.00
-        if venue_split == "Home": sim_mult *= 1.06
-        if wind_vector == "Blowing In (Ks Up)": sim_mult *= 1.05
-        elif wind_vector == "Blowing Out (Ks Down)": sim_mult *= 0.94
-        if 'game_temp' in locals() and game_temp >= 85 and wind_vector != "Neutral / Dome": sim_mult *= 1.03
-        elif 'game_temp' in locals() and game_temp <= 50 and wind_vector != "Neutral / Dome": sim_mult *= 0.96
-        
-        simulated_proj = round(p_base * sim_mult * park_multiplier * ump_multiplier, 2)
-        arbitrage_edge = round(simulated_proj - current_book_line, 2)
-        
-        # 3. AUTOMATED EDGE TIER GRADING LOGIC Engine
-        edge_percentage = (abs(arbitrage_edge) / current_book_line) * 100
-        
-        if edge_percentage >= 20.0:
-            edge_tier = "🚀 S-Tier Edge Max"
-        elif edge_percentage >= 10.0:
-            edge_tier = "📈 A-Tier Value"
+        # 2. IF SELECTED PITCHER: Lock to exact live sidebar variables instantly
+        if p_name_clean == lookup_key:
+            simulated_proj = live_avg
+            current_book_line = sportsbook_line
         else:
-            edge_tier = "⚖️ Neutral Line"
+            # 3. BULK PRECISION ENGINE: Run the full 9-way matrix calculations for the rest of the league
+            # Identify opponent (Defaults to your sidebar team choice for easy slate stacking)
+            opp_team_target = opposing_team if p_team_code != opposing_team else "NYM"
+            
+            # Extract Opposing Hitter Matchup Multiplier & Platoon Splits from Database
+            p_matchup_mult = 1.00
+            if not b_db_bulk.empty and opp_team_target in b_db_bulk['team_clean'].values:
+                team_hitters = b_db_bulk[b_db_bulk['team_clean'] == opp_team_target]
+                k_list_calc = []
+                for _, b_row in team_hitters.head(9).iterrows():
+                    b_hand = str(b_row['hand']).upper().strip()
+                    # Check left/right splits column dynamically based on pitcher arm side
+                    raw_b_k = float(b_row['vs_lhp_k']) if p_arm_side == "L" else float(b_row['vs_rhp_k'])
+                    b_stab = float(b_row['k_stability']) if 'k_stability' in b_row.index else 1.00
+                    
+                    # Apply Platoon Multipliers
+                    if (b_hand == "L" and p_arm_side == "R") or (b_hand == "R" and p_arm_side == "L") or b_hand == "S":
+                        k_list_calc.append(raw_b_k * 1.12 * b_stab)
+                    else:
+                        k_list_calc.append(raw_b_k * 0.92 * b_stab)
+                
+                if k_list_calc:
+                    p_matchup_mult = (sum(k_list_calc) / len(k_list_calc)) / 22.5
+
+            # Extract Stadium Factors for the game venue
+            p_park_mult, p_bullpen_mult = 1.00, 1.00
+            stadium_home = p_team_code if venue_split == "Home" else opp_team_target
+            if not ballpark_db.empty and stadium_home in ballpark_db['team_clean'].values:
+                p_row_park = ballpark_db[ballpark_db['team_clean'] == stadium_home].iloc[0]
+                p_park_mult = float(p_row_park['k_scalar'])
+                p_bullpen_mult = float(p_row_park['bullpen_k_factor']) if 'bullpen_k_factor' in p_row_park.index else 1.00
+
+            # Apply Contextual Wind, Temperature and Fatigue Modifiers
+            p_venue_mult = 1.06 if venue_split == "Home" else 0.95
+            p_vegas_mult = 0.92 if vegas_spread >= 4.5 else (1.12 if vegas_spread <= 3.2 else 1.00)
+            p_wind_mult = 1.05 if wind_vector == "Blowing In (Ks Up)" else (0.94 if wind_vector == "Blowing Out (Ks Down)" else 1.00)
+            p_fatigue_mult = 0.95 if p_fatigue >= 100 else 1.00
+            p_temp_mult = 1.03 if ('game_temp' in locals() and game_temp >= 85 and wind_vector != "Neutral / Dome") else (0.96 if ('game_temp' in locals() and game_temp <= 50 and wind_vector != "Neutral / Dome") else 1.00)
+
+            # Compound Ultimate 9-Way Metric Matrix
+            simulated_proj = round(p_base * p_matchup_mult * p_venue_mult * p_vegas_mult * p_park_mult * ump_multiplier * p_wind_mult * p_fatigue_mult * p_bullpen_mult * p_temp_mult, 2)
+        
+        arbitrage_edge = round(simulated_proj - current_book_line, 2)
+        edge_percentage = (abs(arbitrage_edge) / current_book_line) * 100 if current_book_line > 0 else 0
+        
+        if edge_percentage >= 20.0: edge_tier = "🚀 S-Tier Edge Max"
+        elif edge_percentage >= 10.0: edge_tier = "📈 A-Tier Value"
+        else: edge_tier = "⚖️ Neutral Line"
             
         global_tracker_rows.append({
-            "PITCHER": p_name_raw,
-            "TEAM": p_team_code,
-            "ARM": f"{p_arm_side}HP",
-            "BASE AVG": p_base,
-            "BOOK LINE": current_book_line,
-            "MODEL PROJ": simulated_proj,
-            "EDGE GAP": arbitrage_edge,
-            "BET SIDE": "OVER" if arbitrage_edge >= 0 else "UNDER",
+            "PITCHER": p_name_raw, "TEAM": p_team_code, "ARM": f"{p_arm_side}HP",
+            "BASE AVG": p_base, "BOOK LINE": current_book_line, "MODEL PROJ": simulated_proj,
+            "EDGE GAP": arbitrage_edge, "BET SIDE": "OVER" if arbitrage_edge >= 0 else "UNDER",
             "EDGE TIER STATUS": edge_tier
         })
-        
-    master_slate_df = pd.DataFrame(global_tracker_rows)
-    
-    # Render Custom Dark Neon Color Highlights
+ master_slate_df = pd.DataFrame(global_tracker_rows)
     styled_master_board = master_slate_df.style.set_properties(**{
         'background-color': '#1A1423', 'color': '#E5D4ED', 'border-color': '#372549', 'text-align': 'center'
     }).map(
@@ -436,5 +461,4 @@ if not pitcher_db.empty:
         else ('background-color: #BD93F9; color: #0E0B16; font-weight: bold; text-align: center;' if val == "📈 A-Tier Value" else 'text-align: center;'),
         subset=["EDGE TIER STATUS"]
     )
-    
     st.dataframe(styled_master_board, width="stretch", hide_index=True)
