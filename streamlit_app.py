@@ -157,7 +157,7 @@ top_pitch_text, pitch_k_pct, whiff_pct, skill_score = "Four-seam<br>27% use", "2
 pitch_df = pd.DataFrame([{"PITCH": "Four-seam FB", "USE": "45%", "WHIFF": "W:21%"}])
 
 if not pitcher_db.empty and lookup_key in pitcher_db['name_clean'].values:
-    p_row = pitcher_db[pitcher_db['name_clean'] == lookup_key].iloc
+    p_row = pitcher_db[pitcher_db['name_clean'] == lookup_key].iloc[0]
     pitcher_base_avg = float(p_row['base_avg'])
     # DYNAMIC LOGIC ACTIVATED: Unpacks pitcher's arm orientation column from file
     pitcher_throws = str(p_row['throws']).upper().strip() if 'throws' in p_row.index else "R"
