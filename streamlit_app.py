@@ -7,7 +7,54 @@ import unicodedata
 from injury_scanner import check_active_team_injuries
 
 # ==========================================
-# 1. CORE DATA HARVESTING CRAWLER MODULES (DEFINED FIRST)
+# 1. PAGE LAYOUT CONFIGURATION & NEON STYLING
+# ==========================================
+st.set_page_config(page_title="Prop Intel Modeling Dashboard", layout="wide")
+st.markdown("""
+<style>
+    body { background-color: #0E0B16; color: #E5D4ED; }
+    .reportview-container { background: #0E0B16; }
+    .metric-card { background-color: #1A1423; border: 1px solid #372549; padding: 12px; border-radius: 8px; text-align: center; margin-bottom: 8px; }
+    .metric-label { color: #B5A6C9; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+    .metric-value { color: #E5D4ED; font-size: 22px; font-weight: bold; margin-top: 2px; }
+    .tag-grade { color: #FF79C6; font-weight: bold; font-size: 24px; }
+    .sub-text { font-size: 11px; margin-top: 2px; }
+    .section-header { border-bottom: 1px solid #372549; padding-bottom: 4px; margin-top: 15px; margin-bottom: 10px; color: #BD93F9; font-size: 16px; font-weight: bold; }
+</style>
+""", unsafe_allow_html=True)
+
+st.title("🔮 Matchup Intel Modeling Dashboard")
+
+# ==========================================
+# 2. INTERACTIVE SIDEBAR CONTROL PANEL
+# ==========================================
+with st.sidebar:
+    st.header("⚙️ Configuration")
+    sport = st.selectbox("Select League", ["MLB"])
+    market = st.selectbox("Market Type", ["Strikeouts (Ks)"])
+    
+    st.subheader("🔍 Matchup Selection")
+    pitcher_input = st.text_input("Enter Pitcher Name", "Dylan Cease")
+    opposing_team = st.text_input("Opposing Team", "NYM").upper().strip()
+    sportsbook_line = st.number_input("Current Line O/U", min_value=0.5, max_value=15.5, value=6.5, step=0.5)
+    
+    st.subheader("🏟️ Contextual & Vegas Inputs")
+    venue_split = st.radio("Pitcher Venue Assignment", ["Home", "Away"])
+    vegas_total = st.number_input("Vegas Game Total (O/U)", min_value=4.0, max_value=14.0, value=8.5, step=0.5)
+    vegas_spread = st.number_input("Opponent Implied Total Runs", min_value=1.5, max_value=8.5, value=3.5, step=0.1)
+
+    st.subheader("🛠️ Manual Metric Overrides")
+    activate_override = st.checkbox("Activate Pitcher Overrides", value=False)
+    override_base_avg = st.slider("Override Base Average K", min_value=2.0, max_value=12.0, value=6.0, step=0.05, disabled=not activate_override)
+    override_throws = st.radio("Override Throwing Arm", ["R", "L"], index=0, disabled=not activate_override)
+    override_pitches = st.slider("Override Rolling Pitch Count", min_value=30, max_value=115, value=90, step=1, disabled=not activate_override)
+
+def clean_string_accents(text):
+    if not isinstance(text, str): return ""
+    normalized = unicodedata.normalize('NFD', text)
+    return "".join([c for c in normalized if unicodedata.category(c) != 'Mn']).lower().strip()
+# ==========================================
+# 3. LIVE WEB DATA HARVESTING CRAWLER MODULES
 # ==========================================
 def fetch_live_slate_matchups():
     """Crawls real-time schedule grids by parsing text nodes directly to avoid fragile class dependencies."""
@@ -19,10 +66,7 @@ def fetch_live_slate_matchups():
         res = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(res.text, "html.parser")
         
-        ROTOWIRE_CLEAN_MAP = {
-            'SD': 'SDP', 'SDG': 'SDP', 'CWS': 'CHW', 'KC': 'KCR', 'SF': 'SFG', 'TB': 'TBR', 'WSH': 'WSN'
-        }
-        
+        ROTOWIRE_CLEAN_MAP = {'SD': 'SDP', 'SDG': 'SDP', 'CWS': 'CHW', 'KC': 'KCR', 'SF': 'SFG', 'TB': 'TBR', 'WSH': 'WSN'}
         for box in soup.select(".lineup__box, [class*='lineup__box']"):
             teams_header = box.select_one(".lineup__teams, .lineup__top, [class*='teams']")
             if teams_header:
@@ -50,6 +94,7 @@ def fetch_live_slate_matchups():
         return matchups_map, active_pitchers
 
 def fetch_live_sportsbook_lines():
+    """Scrapes up-to-the-minute pitcher market lines directly from consensus indices."""
     props_map = {}
     try:
         url = "https://rotowire.com"
@@ -69,6 +114,7 @@ def fetch_live_sportsbook_lines():
     except: return props_map
 
 def fetch_live_announced_lineup(team_abbr):
+    """Pulls starting batter lineups for the day from live web panels."""
     try:
         ROTOWIRE_HTML_MAP = {
             'SDP': 'SD', 'SDG': 'SD', 'SD': 'SD', 'NYM': 'NYM', 'METS': 'NYM',
@@ -98,8 +144,8 @@ def fetch_live_announced_lineup(team_abbr):
                 if len(players_found) >= 9: return players_found[:9]
         return None
     except: return None
-
-def fetch_dynamic_opposing_lineup(team_abbr, pitcher_arm="R"):
+        def fetch_dynamic_opposing_lineup(team_abbr, pitcher_arm="R"):
+    """Isolates batter lines and compounds platoon alignment scalars natively."""
     live_names = fetch_live_announced_lineup(team_abbr)
     lineup_rows = []
     base_ks = [16.2, 23.4, 19.1, 27.8, 14.3, 21.0, 25.5, 18.1, 20.3]
@@ -110,8 +156,7 @@ def fetch_dynamic_opposing_lineup(team_abbr, pitcher_arm="R"):
         batter_db = pd.read_csv("batter_database.csv")
         batter_db['name_clean'] = batter_db['name'].str.lower().str.strip()
         batter_db['team_clean'] = batter_db['team'].str.upper().str.strip()
-    except:
-        batter_db = pd.DataFrame()
+    except: batter_db = pd.DataFrame()
 
     if live_names:
         status_msg = f"✅ Lineup Status: Confirmed starting lineup pulled live for {team_abbr}!"
@@ -144,14 +189,12 @@ def fetch_dynamic_opposing_lineup(team_abbr, pitcher_arm="R"):
                 lineup_rows.append({"Name": name, "Team": team_abbr.upper(), "Hand": "R" if i % 2 == 0 else "L", "K%": dynamic_ks[i], "SEASON": dynamic_ks[i], "STABILITY": 1.00})
                 
     lineup_df = pd.DataFrame(lineup_rows)
-    
     v_hand_list = []
     for _, row in lineup_df.iterrows():
         b_hand, p_arm, b_stab = str(row["Hand"]), str(pitcher_arm), float(row["STABILITY"])
         if (b_hand == "L" and p_arm == "R") or (b_hand == "R" and p_arm == "L") or b_hand == "S":
             v_hand_list.append(round(row["K%"] * 1.12 * b_stab, 1))
-        else:
-            v_hand_list.append(round(row["K%"] * 0.92 * b_stab, 1))
+        else: v_hand_list.append(round(row["K%"] * 0.92 * b_stab, 1))
 
     display_df = pd.DataFrame({
         "BATTER": [f"{i+1}  {r['Name']}" for i, r in lineup_df.iterrows()],
@@ -161,34 +204,8 @@ def fetch_dynamic_opposing_lineup(team_abbr, pitcher_arm="R"):
     return display_df, status_msg
 
 # ==========================================
-# 2. STREAMLIT INTERFACE CONFIGURATION
+# 4. REFERENCE REGISTRY FILES INITIALIZATION
 # ==========================================
-with st.sidebar:
-    st.header("⚙️ Configuration")
-    sport = st.selectbox("Select League", ["MLB"])
-    market = st.selectbox("Market Type", ["Strikeouts (Ks)"])
-    
-    st.subheader("🔍 Matchup Selection")
-    pitcher_input = st.text_input("Enter Pitcher Name", "Dylan Cease")
-    opposing_team = st.text_input("Opposing Team", "NYM").upper().strip()
-    sportsbook_line = st.number_input("Current Line O/U", min_value=0.5, max_value=15.5, value=6.5, step=0.5)
-    
-    st.subheader("🏟️ Contextual & Vegas Inputs")
-    venue_split = st.radio("Pitcher Venue Assignment", ["Home", "Away"])
-    vegas_total = st.number_input("Vegas Game Total (O/U)", min_value=4.0, max_value=14.0, value=8.5, step=0.5)
-    vegas_spread = st.number_input("Opponent Implied Total Runs", min_value=1.5, max_value=8.5, value=3.5, step=0.1)
-
-    st.subheader("🛠️ Manual Metric Overrides")
-    activate_override = st.checkbox("Activate Pitcher Overrides", value=False)
-    override_base_avg = st.slider("Override Base Average K", min_value=2.0, max_value=12.0, value=6.0, step=0.05, disabled=not activate_override)
-    override_throws = st.radio("Override Throwing Arm", ["R", "L"], index=0, disabled=not activate_override)
-    override_pitches = st.slider("Override Rolling Pitch Count", min_value=30, max_value=115, value=90, step=1, disabled=not activate_override)
-
-def clean_string_accents(text):
-    if not isinstance(text, str): return ""
-    normalized = unicodedata.normalize('NFD', text)
-    return "".join([c for c in normalized if unicodedata.category(c) != 'Mn']).lower().strip()
-
 @st.cache_data(ttl=3600)
 def load_contextual_databases():
     try:
@@ -243,14 +260,12 @@ if activate_override:
     rolling_pitches = override_pitches
 
 lineup_df, app_status = fetch_dynamic_opposing_lineup(opposing_team, pitcher_arm=pitcher_throws)
-
 park_multiplier, stadium_text, stadium_trait = 1.00, "Neutral Factor: 1.0x", "Standard Environment Base"
 bullpen_multiplier = 1.00
 if venue_split == "Home" and not pitcher_db.empty and lookup_key in pitcher_db['name_clean'].values:
     pitcher_team_series = pitcher_db[pitcher_db['name_clean'] == lookup_key]['team']
     home_team_target = str(pitcher_team_series.values).upper().strip() if not pitcher_team_series.empty else opposing_team
-else:
-    home_team_target = opposing_team
+else: home_team_target = opposing_team
 
 if not ballpark_db.empty and home_team_target in ballpark_db['team_clean'].values:
     p_row_park = ballpark_db[ballpark_db['team_clean'] == home_team_target].squeeze()
@@ -274,18 +289,17 @@ if not umpire_db.empty and umpire_input in umpire_db['name_clean'].values:
     ump_multiplier = base_k_mod * ump_accuracy
     umpire_text = f"{umpire_input.title()}: {round(ump_multiplier, 2)}x"
     umpire_trait = str(ump_row['call_tendency'])
-    wind_multiplier = 1.05 if wind_vector == "Blowing In (Ks Up)" else (0.94 if wind_vector == "Blowing Out (Ks Down)" else 1.00)
-    fatigue_multiplier = 0.95 if rolling_pitches >= 100 else 1.00
-    temp_multiplier = 1.03 if (wind_vector != "Neutral / Dome" and game_temp >= 85) else (0.96 if (wind_vector != "Neutral / Dome" and game_temp <= 50) else 1.00)
 
-# ==========================================
-# 3. BACKGROUND HARVESTING SERVICE SIGNALS
-# ==========================================
+wind_multiplier = 1.05 if wind_vector == "Blowing In (Ks Up)" else (0.94 if wind_vector == "Blowing Out (Ks Down)" else 1.00)
+fatigue_multiplier = 0.95 if rolling_pitches >= 100 else 1.00
+temp_multiplier = 1.03 if (wind_vector != "Neutral / Dome" and game_temp >= 85) else (0.96 if (wind_vector != "Neutral / Dome" and game_temp <= 50) else 1.00)
+
+# Load background live signals before starting view grid mounting
 live_schedule_grid, today_active_starters = fetch_live_slate_matchups()
 live_market_lines = fetch_live_sportsbook_lines()
 
 # ==========================================
-# 4. VIEW LAYOUT GRID BLOCKS
+# 5. WORKSPACE INTERFACE GENERATION CORE
 # ==========================================
 col1, col2 = st.columns(2)
 
@@ -333,10 +347,8 @@ with col1:
             calc_put = round(whiff_val * 0.58, 1)
             updated_arsenal.append({"PITCH TYPE": row["PITCH"], "USAGE": row["USE"], "K% EXPECTED": f"K:{calc_k}%", "WHIFF RATE": row["WHIFF"], "PUTAWAY": f"{calc_put}%"})
         styled_arsenal = pd.DataFrame(updated_arsenal).style.set_properties(**{'text-align': 'center', 'background-color': '#1A1423', 'color': '#E5D4ED', 'border-color': '#372549'})
-        # FIXED: Added use_container_width to force full physical expansion
         st.dataframe(styled_arsenal, use_container_width=True, hide_index=True)
-
-    st.markdown("<div class='section-header'>📊 Automated Global Slate Edge Tracker Matrix</div>", unsafe_allow_html=True)
+        st.markdown("<div class='section-header'>📊 Automated Global Slate Edge Tracker Matrix</div>", unsafe_allow_html=True)
     if not pitcher_db.empty:
         global_tracker_rows = []
         try:
@@ -360,7 +372,6 @@ with col1:
             p_base = float(p_data['base_avg'])
             p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data.index else "R"
             p_fatigue = int(p_data['rolling_pitches']) if 'rolling_pitches' in p_data.index else 90
-            
             opp_team_target = live_schedule_grid.get(p_team_code, ROTOWIRE_LIVE_MAP.get(p_team_code, "NYM"))
             current_book_line = live_market_lines.get(p_name_clean, sportsbook_line if p_name_clean == lookup_key else 5.5)
             
@@ -412,7 +423,6 @@ with col1:
 
         if global_tracker_rows:
             master_slate_df = pd.DataFrame(global_tracker_rows)
-            # FIXED: Hardcoded exact cell decimal string formatting to strip out the .000000 ghost trailing values
             styled_master_board = master_slate_df.style.format({
                 "BASE": "{:.2f}", "LINE": "{:.1f}", "PROJ": "{:.2f}", "GAP": "{:+.2f}"
             }).set_properties(**{
@@ -428,7 +438,6 @@ with col2:
     st.markdown("<div class='section-header'>Batter-by-batter K matchup</div>", unsafe_allow_html=True)
     st.caption(f"MLB PROJECTED - avg {round(lineup_df['K% USED'].mean(), 1)} | high-K {len(lineup_df[lineup_df['K% USED'] > 22])} | low-K {len(lineup_df[lineup_df['K% USED'] <= 15])}")
     
-    # FIXED: Added float rounding formatting to clean up the hitter table cell text displays
     styled_lineup = lineup_df.style.format({
         "K% USED": "{:.1f}%", "VS HAND": "{:.1f}%", "SEASON": "{:.1f}%"
     }).set_properties(**{
@@ -442,36 +451,26 @@ with col2:
 
     st.markdown("<div class='section-header'>Advanced Contextual Metrics Matrix</div>", unsafe_allow_html=True)
     am_c1, am_c2, am_c3 = st.columns(3)
-    with am_c1: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>PITCH K%</div><div class='metric-value' style='color:#BD93F9;'>{pitch_k_pct}</div><div class='sub-text' style='color:#8BE9FD;'>Starter Pct</div></div>", unsafe_allow_html=True)
-    with am_c2: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>OPP K%</div><div class='metric-value' style='color:#FF5555;'>{round(team_avg_k, 1)}%</div><div class='sub-text' style='color:#B5A6C9;'>Roster Avg</div></div>", unsafe_allow_html=True)
-    with am_c3: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>STADIUM</div><div class='metric-value' style='color:#FFB86C; font-size:14px; margin-top:2px;'>{park_multiplier}x</div><div class='sub-text' style='color:#B5A6C9;'>{stadium_trait}</div></div>", unsafe_allow_html=True)
+    with am_c1: st.markdown(f"<div class='metric-card'><div class='metric-label'>PITCH K%</div><div class='metric-value' style='color:#BD93F9;'>{pitch_k_pct}</div><div class='sub-text' style='color:#8BE9FD;'>Starter Pct</div></div>", unsafe_allow_html=True)
+    with am_c2: st.markdown(f"<div class='metric-card'><div class='metric-label'>OPP K%</div><div class='metric-value' style='color:#FF5555;'>{round(team_avg_k, 1)}%</div><div class='sub-text' style='color:#B5A6C9;'>Roster Avg</div></div>", unsafe_allow_html=True)
+    with am_c3: st.markdown(f"<div class='metric-card'><div class='metric-label'>STADIUM</div><div class='metric-value' style='color:#FFB86C; font-size:14px; margin-top:2px;'>{park_multiplier}x</div><div class='sub-text' style='color:#B5A6C9;'>{stadium_trait}</div></div>", unsafe_allow_html=True)
 
     am_c4, am_c5, am_c6 = st.columns(3)
-    with am_c4: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>LAST PITCHES</div><div class='metric-value' style='color:#BD93F9;'>{rolling_pitches}</div><div class='sub-text' style='color:#B5A6C9;'>Workload Fatigue</div></div>", unsafe_allow_html=True)
-    with am_c5: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>IP / GM</div><div class='metric-value'>{round(innings_pitched / games, 2)}</div><div class='sub-text' style='color:#B5A6C9;'>Innings Pitched</div></div>", unsafe_allow_html=True)
-    with am_c6: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>WHIFF</div><div class='metric-value' style='color:#50FA7B;'>{whiff_pct}</div><div class='sub-text' style='color:#8BE9FD;'>Whiff Rate</div></div>", unsafe_allow_html=True)
+    with am_c4: st.markdown(f"<div class='metric-card'><div class='metric-label'>LAST PITCHES</div><div class='metric-value' style='color:#BD93F9;'>{rolling_pitches}</div><div class='sub-text' style='color:#B5A6C9;'>Workload Fatigue</div></div>", unsafe_allow_html=True)
+    with am_c5: st.markdown(f"<div class='metric-card'><div class='metric-label'>IP / GM</div><div class='metric-value'>{round(innings_pitched / games, 2)}</div><div class='sub-text' style='color:#B5A6C9;'>Innings Pitched</div></div>", unsafe_allow_html=True)
+    with am_c6: st.markdown(f"<div class='metric-card'><div class='metric-label'>WHIFF</div><div class='metric-value' style='color:#50FA7B;'>{whiff_pct}</div><div class='sub-text' style='color:#8BE9FD;'>Whiff Rate</div></div>", unsafe_allow_html=True)
 
     am_c7, am_c8, am_c9 = st.columns(3)
-    with am_c7: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>SKILL</div><div class='metric-value' style='color:#FF79C6;'>{skill_score}</div><div class='sub-text' style='color:#B5A6C9;'>Model Score</div></div>", unsafe_allow_html=True)
-    with am_c8: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>BULLPEN K</div><div class='metric-value' style='color:#50FA7B;'>{bullpen_multiplier}x</div><div class='sub-text' style='color:#B5A6C9;'>Relief Protection</div></div>", unsafe_allow_html=True)
-    with am_c9: 
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>UMPIRE</div><div class='metric-value' style='color:#BD93F9; font-size:14px; margin-top:2px;'>{ump_multiplier}x</div><div class='sub-text' style='color:#B5A6C9;'>{umpire_trait}</div></div>", unsafe_allow_html=True)
+    with am_c7: st.markdown(f"<div class='metric-card'><div class='metric-label'>SKILL</div><div class='metric-value' style='color:#FF79C6;'>{skill_score}</div><div class='sub-text' style='color:#B5A6C9;'>Model Score</div></div>", unsafe_allow_html=True)
+    with am_c8: st.markdown(f"<div class='metric-card'><div class='metric-label'>BULLPEN K</div><div class='metric-value' style='color:#50FA7B;'>{bullpen_multiplier}x</div><div class='sub-text' style='color:#B5A6C9;'>Relief Protection</div></div>", unsafe_allow_html=True)
+    with am_c9: st.markdown(f"<div class='metric-card'><div class='metric-label'>UMPIRE</div><div class='metric-value' style='color:#BD93F9; font-size:14px; margin-top:2px;'>{ump_multiplier}x</div><div class='sub-text' style='color:#B5A6C9;'>{umpire_trait}</div></div>", unsafe_allow_html=True)
 
     st.markdown("<div class='section-header'>🌤️ Environmental Check Desk</div>", unsafe_allow_html=True)
     if not ballpark_db.empty and home_team_target in ballpark_db['team_clean'].values:
         st.success(f"✨ Ballpark Database Verified: Isolate matrix tags pulled cleanly for {home_team_target} dimensions.")
-    else: 
-        st.info(f"ℹ️ Ballpark Tracking: Neutral standard dimension baseline applied for {opposing_team}.")
-
-    if wind_vector != "Neutral / Dome":
+    else: st.info(f"ℹ️ Ballpark Tracking: Neutral standard dimension baseline applied for {opposing_team}.")
+    
+    if wind_vector != "Neutral / Dome": if wind_vector != "Neutral / Dome":
         st.success(f"✨ Meteorological Check: Wind ({wind_vector}) & Thermal Expansion ({game_temp}°F) loaded — {round(wind_multiplier * temp_multiplier, 2)}x combined weather factor.")
     else:
         st.info(f"ℹ️ Meteorological Tracking: Ground conditions neutral (Dome/Standard Base at {game_temp}°F).")
