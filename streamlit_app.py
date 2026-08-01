@@ -95,33 +95,43 @@ def fetch_dynamic_opposing_lineup(team_abbr, pitcher_arm="R"):
         for i, name in enumerate(live_names):
             clean_target = name.lower().strip()
             if not batter_db.empty and clean_target in batter_db['name_clean'].values:
-                b_row = batter_db[batter_db['name_clean'] == clean_target].iloc
-                lineup_rows.append({"Name": name, "Team": str(b_row['team']).upper().strip(), "Hand": str(b_row['hand']).upper().strip(), "K%": float(b_row['vs_rhp_k']), "SEASON": float(b_row['season_k'])})
+                b_row = batter_db[batter_db['name_clean'] == clean_target].squeeze()
+                # FIXED: Dynamically isolates the correct column based on pitcher arm throwing vector
+                chosen_k_col = 'vs_lhp_k' if str(pitcher_arm).upper() == 'L' else 'vs_rhp_k'
+                lineup_rows.append({
+                    "Name": name, "Team": str(b_row['team']).upper().strip(), 
+                    "Hand": str(b_row['hand']).upper().strip(), "K%": float(b_row[chosen_k_col]), 
+                    "SEASON": float(b_row['season_k']), "STABILITY": float(b_row['k_stability'])
+                })
             else:
-                lineup_rows.append({"Name": name, "Team": team_abbr.upper(), "Hand": "R" if i % 2 == 0 else "L", "K%": dynamic_ks[i], "SEASON": dynamic_ks[i]})
+                lineup_rows.append({"Name": name, "Team": team_abbr.upper(), "Hand": "R" if i % 2 == 0 else "L", "K%": dynamic_ks[i], "SEASON": dynamic_ks[i], "STABILITY": 1.00})
     else:
-        status_msg = f"⏳ Lineup Status: Live webpage data unlisted. Active roster baseline rendered for {team_abbr}."
+        status_msg = f"⏳ Orders pending. Future schedule slot detected — Active baseline depth chart rendered for {team_abbr}."
         if not batter_db.empty and team_abbr.upper() in batter_db['team_clean'].values:
             team_roster = batter_db[batter_db['team_clean'] == team_abbr.upper()]
             for _, r in team_roster.head(9).iterrows():
-                lineup_rows.append({"Name": str(r['name']).title(), "Team": str(r['team']).upper().strip(), "Hand": str(r['hand']).upper().strip(), "K%": float(r['vs_rhp_k']), "SEASON": float(r['season_k'])})
+                chosen_k_col = 'vs_lhp_k' if str(pitcher_arm).upper() == 'L' else 'vs_rhp_k'
+                lineup_rows.append({
+                    "Name": str(r['name']).title(), "Team": str(r['team']).upper().strip(), 
+                    "Hand": str(r['hand']).upper().strip(), "K%": float(r[chosen_k_col]), 
+                    "SEASON": float(r['season_k']),
+                    "STABILITY": float(r['k_stability']) if 'k_stability' in r.index else 1.00
+                })
         else:
             fake_names = [f"Hitter {i}" for i in range(1, 10)]
             for i, name in enumerate(fake_names):
-                lineup_rows.append({"Name": name, "Team": team_abbr.upper(), "Hand": "R" if i % 2 == 0 else "L", "K%": dynamic_ks[i], "SEASON": dynamic_ks[i]})
+                lineup_rows.append({"Name": name, "Team": team_abbr.upper(), "Hand": "R" if i % 2 == 0 else "L", "K%": dynamic_ks[i], "SEASON": dynamic_ks[i], "STABILITY": 1.00})
                 
     lineup_df = pd.DataFrame(lineup_rows)
     
-    # ADVANCED MATCHUP CORE TWEAK: Cross-references batter hand versus pitcher throws column dynamically
     v_hand_list = []
     for _, row in lineup_df.iterrows():
-        b_hand, p_arm = str(row["Hand"]), str(pitcher_arm)
-        # Opposite sides = Platoon Advantage (K rate scales UP by 1.12x)
+        b_hand, p_arm, b_stab = str(row["Hand"]), str(pitcher_arm), float(row["STABILITY"])
+        # Cross-matches orientation for final compound multiplier adjustments
         if (b_hand == "L" and p_arm == "R") or (b_hand == "R" and p_arm == "L") or b_hand == "S":
-            v_hand_list.append(round(row["K%"] * 1.12, 1))
+            v_hand_list.append(round(row["K%"] * 1.12 * b_stab, 1))
         else:
-            # Same side = Pitcher Advantage (Batter K rate shrinks DOWN to 0.92x)
-            v_hand_list.append(round(row["K%"] * 0.92, 1))
+            v_hand_list.append(round(row["K%"] * 0.92 * b_stab, 1))
 
     display_df = pd.DataFrame({
         "BATTER": [f"{i+1}  {r['Name']}" for i, r in lineup_df.iterrows()],
@@ -129,7 +139,6 @@ def fetch_dynamic_opposing_lineup(team_abbr, pitcher_arm="R"):
         "K% USED": lineup_df["K%"], "VS HAND": v_hand_list, "SEASON": lineup_df["SEASON"]
     })
     return display_df, status_msg
-
 # 4. Interface Rendering Framework Layout Pipeline
 @st.cache_data(ttl=3600)
 def load_contextual_databases():
