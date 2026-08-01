@@ -457,5 +457,3 @@ if not pitcher_db.empty:
         subset=["EDGE TIER STATUS"]
     )
     st.dataframe(styled_master_board, width="stretch", hide_index=True)
-    )
-    st.dataframe(styled_master_board, width="stretch", hide_index=True)
