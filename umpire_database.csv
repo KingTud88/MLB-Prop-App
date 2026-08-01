@@ -1,22 +1,22 @@
-umpire_name,zone_style,k_mod,bb_mod,call_tendency
-pat hoberg,Extreme Precision,1.00,1.00,Perfect Metric Baseline
-hunter wendelstedt,Wide Pitcher Zone,1.06,0.91,Heavy Strike Caller (Ks Up)
-cb bucknor,Unpredictable Frame,0.97,1.04,High Chaos Expansion
-laz diaz,Tight Hitter Box,0.94,1.08,Strict Zone Mapping (Ks Down)
-ron kulpa,Tight Hitter Box,0.95,1.06,Strict Zone Mapping (Ks Down)
-vic carapazza,Wide Pitcher Zone,1.04,0.93,Heavy Strike Caller (Ks Up)
-lance barksdale,Wide Pitcher Zone,1.05,0.92,Heavy Strike Caller (Ks Up)
-doug eddings,Unpredictable Frame,0.98,1.03,High Chaos Expansion
-angel hernandez,Retired,1.00,1.00,Historical Baseline Empty
-standard,Standard Neutral,1.00,1.00,Balanced Strike Zone
-alan porter,Standard Neutral,1.01,0.98,Balanced Strike Zone
-bill miller,Wide Pitcher Zone,1.02,0.94,Slight Strike Edge
-dan iassogna,Wide Pitcher Zone,1.03,0.95,Slight Strike Edge
-mark carlson,Standard Neutral,1.01,0.99,Balanced Strike Zone
-phil cuzzi,Tight Hitter Box,0.93,1.07,Strict Zone Mapping (Ks Down)
-ted barrett,Tight Hitter Box,0.96,1.03,Slight Batter Edge
-greg gibson,Tight Hitter Box,0.95,1.04,Slight Batter Edge
-brian o'nora,Wide Pitcher Zone,1.02,0.96,Slight Strike Edge
-todd tichenor,Wide Pitcher Zone,1.02,0.95,Slight Strike Edge
-jerry layne,Wide Pitcher Zone,1.04,0.91,Heavy Strike Caller (Ks Up)
-lance barrett,Wide Pitcher Zone,1.05,0.89,Heavy Strike Caller (Ks Up)
+umpire_name,zone_style,k_mod,bb_mod,call_tendency,accuracy_coefficient
+pat hoberg,Extreme Precision,1.00,1.00,Perfect Metric Baseline,1.05
+hunter wendelstedt,Wide Pitcher Zone,1.06,0.91,Heavy Strike Caller (Ks Up),1.01
+cb bucknor,Unpredictable Frame,0.97,1.04,High Chaos Expansion,0.94
+laz diaz,Tight Hitter Box,0.94,1.08,Strict Zone Mapping (Ks Down),0.96
+ron kulpa,Tight Hitter Box,0.95,1.06,Strict Zone Mapping (Ks Down),0.97
+vic carapazza,Wide Pitcher Zone,1.04,0.93,Heavy Strike Caller (Ks Up),0.98
+lance barksdale,Wide Pitcher Zone,1.05,0.92,Heavy Strike Caller (Ks Up),0.96
+doug eddings,Unpredictable Frame,0.98,1.03,High Chaos Expansion,0.93
+angel hernandez,Retired,1.00,1.00,Historical Baseline Empty,1.00
+standard,Standard Neutral,1.00,1.00,Balanced Strike Zone,1.00
+alan porter,Standard Neutral,1.01,0.98,Balanced Strike Zone,1.02
+bill miller,Wide Pitcher Zone,1.02,0.94,Slight Strike Edge,1.01
+dan iassogna,Wide Pitcher Zone,1.03,0.95,Slight Strike Edge,0.99
+mark carlson,Standard Neutral,1.01,0.99,Balanced Strike Zone,1.02
+phil cuzzi,Tight Hitter Box,0.93,1.07,Strict Zone Mapping (Ks Down),0.95
+ted barrett,Tight Hitter Box,0.96,1.03,Slight Batter Edge,1.01
+greg gibson,Tight Hitter Box,0.95,1.04,Slight Batter Edge,1.00
+brian o'nora,Wide Pitcher Zone,1.02,0.96,Slight Strike Edge,0.97
+todd tichenor,Wide Pitcher Zone,1.02,0.95,Slight Strike Edge,1.02
+jerry layne,Wide Pitcher Zone,1.04,0.91,Heavy Strike Caller (Ks Up),0.96
+lance barrett,Wide Pitcher Zone,1.05,0.89,Heavy Strike Caller (Ks Up),1.03
