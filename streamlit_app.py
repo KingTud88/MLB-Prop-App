@@ -411,7 +411,7 @@ if not pitcher_db.empty:
     except: 
         b_db_bulk = pd.DataFrame()
 
-     for _, p_data in pitcher_db.iterrows():
+    for _, p_data in pitcher_db.iterrows():
         p_name_raw = str(p_data['name']).title()
         p_name_clean = str(p_data['name']).lower().strip()
         p_team_code = str(p_data['team']).upper().strip()
