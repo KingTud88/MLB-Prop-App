@@ -176,7 +176,7 @@ lineup_df, app_status = fetch_dynamic_opposing_lineup(opposing_team, pitcher_arm
 
 park_multiplier, stadium_text = 1.00, "Neutral Dimension Baseline"
 if not ballpark_db.empty and opposing_team in ballpark_db['team_clean'].values:
-    park_row = ballpark_db[ballpark_db['team_clean'] == opposing_team].iloc
+    park_row = ballpark_db[ballpark_db['team_clean'] == opposing_team].iloc[0]
     park_multiplier = float(park_row['k_modifier']) if 'k_modifier' in park_row.index else 1.00
     stadium_text = f"Stadium K-Boost: {park_multiplier}x"
 
