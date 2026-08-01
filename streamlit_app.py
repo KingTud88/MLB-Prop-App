@@ -349,38 +349,45 @@ with col2:
 # 🔮 GLOBAL DAILY MASTER SLATE TRACKER (DYNAMIC SCHEDULE EDITION)
 # ==========================================
 st.markdown("<div class='section-header'>📊 Automated Global Slate Edge Tracker Matrix</div>", unsafe_allow_html=True)
-st.caption("Live Matchup Crawling Engine — Dynamically Maps Real-World Scheduled Opponents Across All 48 Rotations Automatically.")
+st.caption("Live Matchup Crawling Engine — Dynamically Maps Real-World Scheduled Opponents and Filters for Active Starting Pitchers Automatically.")
 
 def fetch_live_slate_matchups():
-    """Crawls real-time schedule grids to identify the true active opponent for every MLB team today."""
+    """Crawls real-time schedule grids to identify the true active opponent and starting pitchers for today."""
     matchups_map = {}
+    active_pitchers = set()
     try:
         url = "https://rotowire.com"
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         res = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(res.text, "html.parser")
         
-        # Standard structural abbreviations mapping layer
         ROTOWIRE_CLEAN_MAP = {
             'SD': 'SDP', 'SDG': 'SDP', 'CWS': 'CHW', 'KC': 'KCR', 'SF': 'SFG', 'TB': 'TBR', 'WSH': 'WSN'
         }
         
         for box in soup.select(".lineup__box"):
-            teams = box.select(".lineup__team a, .lineup__teams a")
-            if len(teams) >= 2:
-                t1 = teams[0].get_text(strip=True).upper()
-                t2 = teams[1].get_text(strip=True).upper()
+            # FIXED: Safely isolate individual team links out of the sub-array wrapper elements
+            team_links = box.select(".lineup__team.is-visit a, .lineup__team.is-home a, .lineup__teams a")
+            if len(team_links) >= 2:
+                t1 = team_links[0].get_text(strip=True).upper()
+                t2 = team_links[1].get_text(strip=True).upper()
                 
-                # Standardize abbreviation vectors
                 t1 = ROTOWIRE_CLEAN_MAP.get(t1, t1)
                 t2 = ROTOWIRE_CLEAN_MAP.get(t2, t2)
                 
-                # Cross-reference opposing slots reciprocally
                 matchups_map[t1] = t2
                 matchups_map[t2] = t1
-        return matchups_map
+            
+            # FIXED: Collect names of starting pitchers officially listed on today's active schedule board
+            pitcher_links = box.select(".lineup__player-name a, .lineup__player a")
+            for p_link in pitcher_links:
+                p_name_text = p_link.get_text(strip=True).lower()
+                if "pitcher" in p_link.get_parent().get_text().lower() or "p" in p_link.get_parent().get_text().lower():
+                    active_pitchers.add(p_name_text)
+                    
+        return matchups_map, active_pitchers
     except:
-        return matchups_map
+        return matchups_map, active_pitchers
 
 def fetch_live_sportsbook_lines():
     props_map = {}
@@ -402,7 +409,7 @@ def fetch_live_sportsbook_lines():
     except: return props_map
 
 # Run Background Live Data Harvesting Services
-live_schedule_grid = fetch_live_slate_matchups()
+live_schedule_grid, today_active_starters = fetch_live_slate_matchups()
 live_market_lines = fetch_live_sportsbook_lines()
 
 if not pitcher_db.empty:
@@ -418,23 +425,26 @@ if not pitcher_db.empty:
         p_name_raw = str(p_data['name']).title()
         p_name_clean = str(p_data['name']).lower().strip()
         p_team_code = str(p_data['team']).upper().strip()
+        
+        # FIXED: Core schedule filtration layout logic hook
+        # If the player isn't actively listed on today's schedule matrix, skip them entirely!
+        if p_name_clean != lookup_key and p_name_clean not in today_active_starters:
+            continue
+            
         p_base = float(p_data['base_avg'])
         p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data.index else "R"
         p_fatigue = int(p_data['rolling_pitches']) if 'rolling_pitches' in p_data.index else 90
         
-        # 1. Pull Live Sportsbook Line Vector
         current_book_line = live_market_lines.get(p_name_clean, sportsbook_line if p_name_clean == lookup_key else 5.5)
         
-        # 2. AUTOMATED SCHEDULE DISCOVERY Core Loop Hook
-        opp_team_target = live_schedule_grid.get(p_team_code, "NYM")
+        # Discover true active scheduled opponent or apply default
+        opp_team_target = live_schedule_grid.get(p_team_code, "NYM" if p_team_code != "NYM" else "PHI")
         
-        # Override to match sidebar context if analyzing your primary single target
         if p_name_clean == lookup_key:
             simulated_proj = live_avg
             current_book_line = sportsbook_line
             opp_team_target = opposing_team
         else:
-            # 3. BULK PRECISION SCANNERS: Process full 9-way matrices with live mapped opponents
             p_matchup_mult = 1.00
             if not b_db_bulk.empty and opp_team_target in b_db_bulk['team_clean'].values:
                 team_hitters = b_db_bulk[b_db_bulk['team_clean'] == opp_team_target]
@@ -455,7 +465,6 @@ if not pitcher_db.empty:
             p_park_mult, p_bullpen_mult = 1.00, 1.00
             stadium_home = p_team_code if venue_split == "Home" else opp_team_target
             if not ballpark_db.empty and stadium_home in ballpark_db['team_clean'].values:
-                # FIXED: Swapped raw .iloc property mapping for a secure .squeeze() Series conversion
                 p_row_park = ballpark_db[ballpark_db['team_clean'] == stadium_home].squeeze()
                 p_park_mult = float(p_row_park['k_scalar']) if 'k_scalar' in p_row_park.index else 1.00
                 p_bullpen_mult = float(p_row_park['bullpen_k_factor']) if 'bullpen_k_factor' in p_row_park.index else 1.00
@@ -488,12 +497,17 @@ if not pitcher_db.empty:
             "EDGE TIER STATUS": edge_tier
         })
 
-    master_slate_df = pd.DataFrame(global_tracker_rows)
-    styled_master_board = master_slate_df.style.set_properties(**{
-        'background-color': '#1A1423', 'color': '#E5D4ED', 'border-color': '#372549', 'text-align': 'center'
-    }).map(
-        lambda val: 'background-color: #FFB86C; color: #0E0B16; font-weight: bold; text-align: center;' if val == "🚀 S-Tier Edge Max"
-        else ('background-color: #BD93F9; color: #0E0B16; font-weight: bold; text-align: center;' if val == "📈 A-Tier Value" else 'text-align: center;'),
-        subset=["EDGE TIER STATUS"]
+    if global_tracker_rows:
+        master_slate_df = pd.DataFrame(global_tracker_rows)
+        styled_master_board = master_slate_df.style.set_properties(**{
+            'background-color': '#1A1423', 'color': '#E5D4ED', 'border-color': '#372549', 'text-align': 'center'
+        }).map(
+            lambda val: 'background-color: #FFB86C; color: #0E0B16; font-weight: bold; text-align: center;' if val == "🚀 S-Tier Edge Max"
+            else ('background-color: #BD93F9; color: #0E0B16; font-weight: bold; text-align: center;' if val == "📈 A-Tier Value" else 'text-align: center;'),
+            subset=["EDGE TIER STATUS"]
+        )
+        st.dataframe(styled_master_board, width="stretch", hide_index=True)
+    else:
+        st.info("✨ Full daily slate clear. Checking for tomorrow's early morning opener listings.")
     )
     st.dataframe(styled_master_board, width="stretch", hide_index=True)
