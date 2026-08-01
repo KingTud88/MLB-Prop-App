@@ -348,11 +348,13 @@ with col2:
         st.success(f"✨ No critical active batter injuries reported for {opposing_team} today.")
 
 # ==========================================
-# 🔮 GLOBAL DAILY MASTER SLATE TRACKER
+# 🔮 GLOBAL DAILY MASTER SLATE TRACKER (DYNAMIC SCHEDULE EDITION)
 # ==========================================
 st.markdown("<div class='section-header'>📊 Automated Global Slate Edge Tracker Matrix</div>", unsafe_allow_html=True)
+st.caption("Live Matchup Crawling Engine — Dynamically Maps Real-World Scheduled Opponents across the Full Slate Natively.")
 
 def fetch_live_slate_matchups():
+    """Crawls real-time schedule grids by parsing text nodes directly to avoid fragile class dependencies."""
     matchups_map = {}
     active_pitchers = set()
     try:
@@ -360,24 +362,39 @@ def fetch_live_slate_matchups():
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         res = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(res.text, "html.parser")
-        ROTOWIRE_CLEAN_MAP = {'SD': 'SDP', 'SDG': 'SDP', 'CWS': 'CHW', 'KC': 'KCR', 'SF': 'SFG', 'TB': 'TBR', 'WSH': 'WSN'}
-        for box in soup.select(".lineup__box"):
-            team_links = box.select(".lineup__team.is-visit a, .lineup__team.is-home a, .lineup__teams a")
-            if len(team_links) >= 2:
-                t1 = team_links[0].get_text(strip=True).upper()
-                t2 = team_links[1].get_text(strip=True).upper()
-                t1 = ROTOWIRE_CLEAN_MAP.get(t1, t1)
-                t2 = ROTOWIRE_CLEAN_MAP.get(t2, t2)
-                matchups_map[t1] = t2
-                matchups_map[t2] = t1
-            pitcher_links = box.select(".lineup__player-name a, .lineup__player a")
-            for p_link in pitcher_links:
-                p_name_text = p_link.get_text(strip=True).lower()
-                parent_text = p_link.get_parent().get_text().lower() if p_link.get_parent() else ""
-                if "pitcher" in parent_text or "p " in parent_text or "(p)" in parent_text: 
-                    active_pitchers.add(p_name_text)
+        
+        ROTOWIRE_CLEAN_MAP = {
+            'SD': 'SDP', 'SDG': 'SDP', 'CWS': 'CHW', 'KC': 'KCR', 'SF': 'SFG', 'TB': 'TBR', 'WSH': 'WSN'
+        }
+        
+        # Parse top-level lineup box nodes directly via universal element arrays
+        for box in soup.select(".lineup__box, [class*='lineup__box']"):
+            # Isolate the clean text header containing team abbreviations (e.g., "MIN @ TOR")
+            teams_header = box.select_one(".lineup__teams, .lineup__top, [class*='teams']")
+            if teams_header:
+                raw_header_text = teams_header.get_text(strip=True).upper()
+                # Clean up punctuation noise to extract raw team tokens safely
+                for char in ["@", "VS", "AT", "\n", "\r"]:
+                    raw_header_text = raw_header_text.replace(char, " ")
+                
+                tokens = [t.strip() for t in raw_header_text.split() if len(t.strip()) >= 2][:2]
+                if len(tokens) == 2:
+                    t1 = ROTOWIRE_CLEAN_MAP.get(tokens[0], tokens[0])
+                    t2 = ROTOWIRE_CLEAN_MAP.get(tokens[1], tokens[1])
+                    matchups_map[t1] = t2
+                    matchups_map[t2] = t1
+            
+            # Scrape listed scheduled pitchers off active game boards safely
+            p_anchors = box.select("a[href*='player']")
+            for p_a in p_anchors:
+                p_text = p_a.get_text(strip=True).lower()
+                parent_text = p_a.find_parent().get_text().lower() if p_a.find_parent() else ""
+                if any(k in parent_text for k in ["pitcher", "p:", "(p)", "starting"]):
+                    if len(p_text) > 3:
+                        active_pitchers.add(p_text)
+                        
         return matchups_map, active_pitchers
-    except: 
+    except:
         return matchups_map, active_pitchers
 
 def fetch_live_sportsbook_lines():
@@ -397,18 +414,19 @@ def fetch_live_sportsbook_lines():
                     props_map[clean_pname] = raw_line_val
                 except: continue
         return props_map
-    except: 
-        return props_map
+    except: return props_map
 
+# Run Background Live Data Harvesting Services
 live_schedule_grid, today_active_starters = fetch_live_slate_matchups()
 live_market_lines = fetch_live_sportsbook_lines()
 
 if not pitcher_db.empty:
     global_tracker_rows = []
+    
     try:
         b_db_bulk = pd.read_csv("batter_database.csv")
         b_db_bulk['team_clean'] = b_db_bulk['team'].str.upper().str.strip()
-    except: 
+    except:
         b_db_bulk = pd.DataFrame()
 
     for _, p_data in pitcher_db.iterrows():
@@ -416,16 +434,15 @@ if not pitcher_db.empty:
         p_name_clean = str(p_data['name']).lower().strip()
         p_team_code = str(p_data['team']).upper().strip()
         
-        # Discover true active scheduled opponent out of the crawling layer grid
+        # Discover true active scheduled opponent out of the crawling layer grid map
         opp_team_target = live_schedule_grid.get(p_team_code, None)
         
-        # AUTOMATED FILTER: If it's not your sidebar pitcher AND their team has no scheduled matchup today, skip them
-        if p_name_clean != lookup_key and not opp_team_target:
+        # ADVANCED OVERRIDE HOOK: Keeps your active sidebar search locked into the matrix seamlessly
+        if p_name_clean == lookup_key:
+            opp_team_target = opposing_team
+        elif not opp_team_target or (p_name_clean not in today_active_starters and today_active_starters):
+            # Skip pitchers who aren't officially scheduled to start on today's active live slate board
             continue
-            
-        # Fallback to keep manual testing active if needed
-        if not opp_team_target:
-            opp_team_target = opposing_team if p_name_clean == lookup_key else "NYM"
             
         p_base = float(p_data['base_avg'])
         p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data.index else "R"
@@ -435,7 +452,6 @@ if not pitcher_db.empty:
         if p_name_clean == lookup_key:
             simulated_proj = live_avg
             current_book_line = sportsbook_line
-            opp_team_target = opposing_team
         else:
             p_matchup_mult = 1.00
             if not b_db_bulk.empty and opp_team_target in b_db_bulk['team_clean'].values:
@@ -468,12 +484,9 @@ if not pitcher_db.empty:
         
         arbitrage_edge = round(simulated_proj - current_book_line, 2)
         edge_percentage = (abs(arbitrage_edge) / current_book_line) * 100 if current_book_line > 0 else 0
-        if edge_percentage >= 20.0: 
-            edge_tier = "🚀 S-Tier Edge Max"
-        elif edge_percentage >= 10.0: 
-            edge_tier = "📈 A-Tier Value"
-        else: 
-            edge_tier = "⚖️ Neutral Line"
+        if edge_percentage >= 20.0: edge_tier = "🚀 S-Tier Edge Max"
+        elif edge_percentage >= 10.0: edge_tier = "📈 A-Tier Value"
+        else: edge_tier = "⚖️ Neutral Line"
             
         global_tracker_rows.append({
             "PITCHER": p_name_raw, "TEAM": p_team_code, "OPPONENT": opp_team_target, "ARM": f"{p_arm_side}HP",
@@ -491,5 +504,5 @@ if global_tracker_rows:
         subset=["EDGE TIER STATUS"]
     )
     st.dataframe(styled_master_board, width="stretch", hide_index=True)
-else: 
+else:
     st.info("✨ Full daily slate clear. No starting pitchers listed for active matching on the boards.")
