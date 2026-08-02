@@ -461,7 +461,7 @@ for _, p_data in filtered_pitcher_db.iterrows():
     })
 
 if global_tracker_rows:
-     master_slate_df = pd.DataFrame(global_tracker_rows)
+    master_slate_df = pd.DataFrame(global_tracker_rows)
     styled_master_board = master_slate_df.style.format({
         "BASE": "{:.2f}", "LINE": "{:.1f}", "PROJ": "{:.2f}", "GAP": "{:+,.2f}"
      }).set_properties(**{
