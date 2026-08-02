@@ -35,6 +35,15 @@ def get_live_mlb_schedule():
 
 # Trigger the dynamic live tracking engine immediately
 todays_slate = get_live_mlb_schedule()
+# Trigger the dynamic live tracking engine immediately
+todays_slate = get_live_mlb_schedule()
+
+try:
+    batter_db = pd.read_csv("batter_database.csv")
+    batter_db['name_clean'] = batter_db['name'].str.lower().str.strip()
+    batter_db['team_clean'] = batter_db['team'].str.upper().str.strip()
+except Exception:
+    batter_db = pd.DataFrame()
 
 # ==========================================
 # 1. PAGE LAYOUT CONFIGURATION & NEON STYLING
