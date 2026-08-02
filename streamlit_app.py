@@ -430,14 +430,13 @@ with col1:
                     
             if k_list_calc: 
                 p_matchup_mult = (sum(k_list_calc) / len(k_list_calc)) / 22.5
-
-                p_park_mult, p_bullpen_mult = 1.00, 1.00
-                stadium_home = p_team_code if venue_split == "Home" else opp_team_target
+                
+            p_park_mult, p_bullpen_mult = 1.00, 1.00
+            stadium_home = p_team_code if venue_split == "Home" else opp_team_target
             if not ballpark_db.empty and stadium_home in ballpark_db['team_clean'].values:
                 p_row_park = ballpark_db[ballpark_db['team_clean'] == stadium_home].squeeze()
                 p_park_mult = float(p_row_park['k_scalar']) if 'k_scalar' in p_row_park.index else 1.00
                 p_bullpen_mult = float(p_row_park['bullpen_k_factor']) if 'bullpen_k_factor' in p_row_park.index else 1.00
-
                 p_venue_mult = 1.06 if venue_split == "Home" else 0.95
                 p_vegas_mult = 0.92 if vegas_spread >= 4.5 else (1.12 if vegas_spread <= 3.2 else 1.00)
                 p_wind_mult = 1.05 if wind_vector == "Blowing In (Ks Up)" else (0.94 if wind_vector == "Blowing Out (Ks Down)" else 1.00)
