@@ -429,8 +429,8 @@ with col1:
                         else: k_list_calc.append(raw_b_k * 0.92 * b_stab)
                     if k_list_calc: p_matchup_mult = (sum(k_list_calc) / len(k_list_calc)) / 22.5
 
-                p_park_mult, p_bullpen_mult = 1.00, 1.00
-                stadium_home = p_team_code if venue_split == "Home" else opp_team_target
+                    p_park_mult, p_bullpen_mult = 1.00, 1.00
+                    stadium_home = p_team_code if venue_split == "Home" else opp_team_target
                 if not ballpark_db.empty and stadium_home in ballpark_db['team_clean'].values:
                     p_row_park = ballpark_db[ballpark_db['team_clean'] == stadium_home].squeeze()
                     p_park_mult = float(p_row_park['k_scalar']) if 'k_scalar' in p_row_park.index else 1.00
