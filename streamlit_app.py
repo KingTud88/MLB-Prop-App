@@ -411,8 +411,8 @@ for _, p_data in filtered_pitcher_db.iterrows():
         current_book_line = sportsbook_line
     else:
         # Pull baseline batter projection context for the other pitchers on the slate
-        if not b_db_bulk.empty and opp_team_target in b_db_bulk['team_clean'].values:
-            team_hitters = b_db_bulk[b_db_bulk['team_clean'] == opp_team_target]
+        if not batter_db.empty and opp_team_target in batter_db['team_clean'].values:
+            team_hitters = batter_db[batter_db['name_clean'] == opp_team_target]
             k_list_calc = []
             
             for _, b_row in team_hitters.head(9).iterrows():
