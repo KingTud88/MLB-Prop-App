@@ -338,23 +338,23 @@ live_schedule_grid, today_active_starters = fetch_live_slate_matchups()
 live_market_lines = fetch_live_sportsbook_lines()
 
 # ==============================================================================
-    # # 5. WORKSPACE INTERFACE GENERATION CORE
-    # ==============================================================================
-    league_avg_k = 22.5
-    team_avg_k = lineup_df["K% USED"].mean()
-    matchup_multiplier = team_avg_k / league_avg_k
-    venue_multiplier = 1.06 if venue_split == "Home" else 0.95
-    vegas_multiplier = 0.92 if vegas_spread >= 4.5 else (1.12 if vegas_spread <= 3.2 else 1.00)
-    live_avg = round(pitcher_base_avg * matchup_multiplier * venue_multiplier * vegas_multiplier * park_multiplier * ump_multiplier * wind_multiplier * fatigue_multiplier * bullpen_multiplier * temp_multiplier, 2)
-    diff_val = round(live_avg - sportsbook_line, 2)
+# # 5. WORKSPACE INTERFACE GENERATION CORE
+ # ==============================================================================
+league_avg_k = 22.5
+team_avg_k = lineup_df["K% USED"].mean()
+matchup_multiplier = team_avg_k / league_avg_k
+venue_multiplier = 1.06 if venue_split == "Home" else 0.95
+vegas_multiplier = 0.92 if vegas_spread >= 4.5 else (1.12 if vegas_spread <= 3.2 else 1.00)
+live_avg = round(pitcher_base_avg * matchup_multiplier * venue_multiplier * vegas_multiplier * park_multiplier * ump_multiplier * wind_multiplier * fatigue_multiplier * bullpen_multiplier * temp_multiplier, 2)
+diff_val = round(live_avg - sportsbook_line, 2)
     
-    ch1, ch2 = st.columns(2)
-    with ch1:
-        st.header(f"🔥 {pitcher_input.title()}")
-        st.caption(f"🏟️ {opposing_team} | {venue_split} | {pitcher_throws}HP Intel Final")
-    with ch2:
-        high_prob = "84%" if live_avg < 6.0 else "66%"
-        st.markdown(f"<div class='metric-card' style='padding:5px;'><div class='metric-label'>HIGH K PROBABILITY</div><div class='metric-value' style='color:#FFB86C; font-size:32px;'>{high_prob}</div><div class='class-sub-text'>{top_pitch_text}</div></div>", unsafe_allow_html=True)
+ch1, ch2 = st.columns(2)
+with ch1:
+    st.header(f"🔥 {pitcher_input.title()}")
+    st.caption(f"🏟️ {opposing_team} | {venue_split} | {pitcher_throws}HP Intel Final")
+with ch2:
+    high_prob = "84%" if live_avg < 6.0 else "66%"
+    st.markdown(f"<div class='metric-card' style='padding:5px;'><div class='metric-label'>HIGH K PROBABILITY</div><div class='metric-value' style='color:#FFB86C; font-size:32px;'>{high_prob}</div><div class='class-sub-text'>{top_pitch_text}</div></div>", unsafe_allow_html=True)
         
     st.info(app_status)
     
