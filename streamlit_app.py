@@ -28,10 +28,9 @@ try:
             if "probablePitcher" in game["teams"]["home"]:
                 home_pitcher = game["teams"]["home"]["probablePitcher"]["fullName"].lower()
                 live_slate[home_pitcher] = {"team": home_team, "opponent": away_team}
-except Exception as e:
+    except Exception as e:
         st.sidebar.error(f"Schedule Sync Warning: {e}")
-     
-return live_slate
+    return live_slate
 
 # Trigger the dynamic live tracking engine immediately
 todays_slate = get_live_mlb_schedule()
