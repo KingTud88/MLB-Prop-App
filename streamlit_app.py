@@ -5,13 +5,14 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 import unicodedata
 from injury_scanner import check_active_team_injuries
+
 @st.cache_data(ttl=600)  # Keeps data cached for 10 minutes for fast refreshing
 def get_live_mlb_schedule():
-    """Automatically fetches the live active starting pitchers and matchups for the current date"""
+    """Automatically fetches the live active starting pitchers and matchups"""
     today_str = datetime.today().strftime('%Y-%m-%d')
     url = f"https://mlb.com{today_str}&hydrate=probablePitcher,team"
     live_slate = {}
-try:
+    try:
         response = requests.get(url).json()
         if "dates" in response and len(response["dates"]) > 0:
             for game in response["dates"]["games"]:
@@ -28,9 +29,9 @@ try:
                 if "probablePitcher" in game["teams"]["home"]:
                     home_pitcher = game["teams"]["home"]["probablePitcher"]["fullName"].lower()
                     live_slate[home_pitcher] = {"team": home_team, "opponent": away_team}
-except Exception as e:
-    st.sidebar.error(f"Schedule Sync Warning: {e}")
-return live_slate
+    except Exception as e:
+        st.sidebar.error(f"Schedule Sync Warning: {e}")
+    return live_slate
 
 # Trigger the dynamic live tracking engine immediately
 todays_slate = get_live_mlb_schedule()
