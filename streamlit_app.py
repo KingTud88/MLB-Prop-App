@@ -370,7 +370,7 @@ cm1, cm2, cm3, cm4 = st.columns(4)
 with cm1:
     grade = "A" if live_avg > 7.5 else ("B" if live_avg > 6.0 else ("C" if live_avg > 4.5 else "D"))
     st.markdown(f"<div class='metric-card'><div class='metric-label'>K GRADE</div><div class='metric-value'>{grade}</div></div>", unsafe_allow_html=True)
- with cm2:
+with cm2:
     st.markdown(f"<div class='metric-card'><div class='metric-label'>HIGH PROB K</div><div class='metric-value' style='color:#FFB86C;'>{int(live_avg + 3.0)}</div></div>", unsafe_allow_html=True)
 with cm3:
     st.markdown(f"<div class='metric-card'><div class='metric-label'>TOP PITCH</div><div class='metric-value' style='color:#BD93F9; font-size:14px; padding:4px;'>{top_pitch_text}</div></div>", unsafe_allow_html=True)
