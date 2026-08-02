@@ -471,7 +471,7 @@ if global_tracker_rows:
         else ('background-color: #BD93F9; color: #0E0B16; font-weight: bold; text-align: center;' if val == "⭐ A-Tier Value" else 'text-align: center;'),
         subset=["STATUS"]
     )
-    st.dataframe(styled_master_board, use_container_width="stretch", hide_index="stretch")
+    st.dataframe(styled_master_board, use_container_width=None, hide_index=True, hide_index=True)
 
     st.markdown("<div class='section-header'>Advanced Contextual Metrics Matrix</div>", unsafe_allow_html=True)
     am_c1, am_c2, am_c3 = st.columns(3)
