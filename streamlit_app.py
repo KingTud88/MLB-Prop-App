@@ -470,7 +470,7 @@ if global_tracker_rows:
         lambda val: 'background-color: #FFB86C; color: #0E0B16; font-weight: bold; text-align: center;' if val == "🔥 S-Tier Edge Max"
         else ('background-color: #BD93F9; color: #0E0B16; font-weight: bold; text-align: center;' if val == "⭐ A-Tier Value" else 'text-align: center;'),
         subset=["STATUS"]
-     )
+    )
     st.dataframe(styled_master_board, use_container_width=True, hide_index=True)
 
     st.markdown("<div class='section-header'>Advanced Contextual Metrics Matrix</div>", unsafe_allow_html=True)
