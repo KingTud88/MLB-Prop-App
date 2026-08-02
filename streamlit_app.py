@@ -10,7 +10,7 @@ from injury_scanner import check_active_team_injuries
 def get_live_mlb_schedule():
     """Automatically fetches the live active starting pitchers and matchups"""
     today_str = datetime.today().strftime('%Y-%m-%d')
-    url = f"https://mlb.com{today_str}&hydrate=probablePitcher,team"
+    url = f"https://statsapi.mlb.com/api/v1/schedule/?sportId=1&date={today_str}&hydrate=probablePitcher,team"
     live_slate = {}
     try:
         response = requests.get(url).json()
