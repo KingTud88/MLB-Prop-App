@@ -12,22 +12,22 @@ def get_live_mlb_schedule():
     url = f"https://mlb.com{today_str}&hydrate=probablePitcher,team"
     live_slate = {}
 try:
-    response = requests.get(url).json()
-       if "dates" in response and len(response["dates"]) > 0:
-        for game in response["dates"]["games"]:
-            # Grab standard three-letter team identifiers (e.g. 'CLE', 'NYY')
-            away_team = game["teams"]["away"]["team"]["teamCode"].upper()
-            home_team = game["teams"]["home"]["team"]["teamCode"].upper()
+        response = requests.get(url).json()
+        if "dates" in response and len(response["dates"]) > 0:
+            for game in response["dates"]["games"]:
+                # Grab standard three-letter team identifiers (e.g. 'CLE', 'NYY')
+                away_team = game["teams"]["away"]["team"]["teamCode"].upper()
+                home_team = game["teams"]["home"]["team"]["teamCode"].upper()
                 
-            # Automatically catch scheduled away rotation arm
-            if "probablePitcher" in game["teams"]["away"]:
-                away_pitcher = game["teams"]["away"]["probablePitcher"]["fullName"].lower()
-                 live_slate[away_pitcher] = {"team": away_team, "opponent": home_team}
+                # Automatically catch scheduled away rotation arm
+                if "probablePitcher" in game["teams"]["away"]:
+                    away_pitcher = game["teams"]["away"]["probablePitcher"]["fullName"].lower()
+                    live_slate[away_pitcher] = {"team": away_team, "opponent": home_team}
                     
-            # Automatically catch scheduled home rotation arm
-            if "probablePitcher" in game["teams"]["home"]:
-                home_pitcher = game["teams"]["home"]["probablePitcher"]["fullName"].lower()
-                live_slate[home_pitcher] = {"team": home_team, "opponent": away_team}
+                # Automatically catch scheduled home rotation arm
+                if "probablePitcher" in game["teams"]["home"]:
+                    home_pitcher = game["teams"]["home"]["probablePitcher"]["fullName"].lower()
+                    live_slate[home_pitcher] = {"team": home_team, "opponent": away_team}
     except Exception as e:
         st.sidebar.error(f"Schedule Sync Warning: {e}")
     return live_slate
