@@ -420,14 +420,14 @@ with col1:
         if not b_db_bulk.empty and opp_team_target in b_db_bulk['team_clean'].values:
                     team_hitters = b_db_bulk[b_db_bulk['team_clean'] == opp_team_target]
                     k_list_calc = []
-                    for _, b_row in team_hitters.head(9).iterrows():
-                        b_hand = str(b_row['hand']).upper().strip()
-                        raw_b_k = float(b_row['vs_lhp_k']) if p_arm_side == "L" else float(b_row['vs_rhp_k'])
-                        b_stab = float(b_row['k_stability']) if 'k_stability' in b_row.index else 1.00
-                        if (b_hand == "L" and p_arm_side == "R") or (b_hand == "R" and p_arm_side == "L") or b_hand == "S":
-                            k_list_calc.append(raw_b_k * 1.12 * b_stab)
-                        else: k_list_calc.append(raw_b_k * 0.92 * b_stab)
-                    if k_list_calc: p_matchup_mult = (sum(k_list_calc) / len(k_list_calc)) / 22.5
+                for _, b_row in team_hitters.head(9).iterrows():
+                    b_hand = str(b_row['hand']).upper().strip()
+                    raw_b_k = float(b_row['vs_lhp_k']) if p_arm_side == "L" else float(b_row['vs_rhp_k'])
+                    b_stab = float(b_row['k_stability']) if 'k_stability' in b_row.index else 1.00
+                if (b_hand == "L" and p_arm_side == "R") or (b_hand == "R" and p_arm_side == "L") or b_hand == "S":
+                    k_list_calc.append(raw_b_k * 1.12 * b_stab)
+                else: k_list_calc.append(raw_b_k * 0.92 * b_stab)
+                if k_list_calc: p_matchup_mult = (sum(k_list_calc) / len(k_list_calc)) / 22.5
 
                     p_park_mult, p_bullpen_mult = 1.00, 1.00
                     stadium_home = p_team_code if venue_split == "Home" else opp_team_target
