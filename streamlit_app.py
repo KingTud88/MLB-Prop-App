@@ -406,9 +406,9 @@ for _, p_data in filtered_pitcher_db.iterrows():
     p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data else "R"
     p_fatigue = int(p_data['rolling_pitches']) if 'rolling_pitches' in p_data else 0
     
-    # Extract live game parameters from your automatic schedule engine
+    Extract live game parameters from your automatic schedule engine
     opp_team_target = todays_slate[p_name_clean]["opponent"]
-    p_team_code = todays_slate[p_name_clean]["team"]
+    p_team_code = todays_slate[p_name_clean]["team"] # ⚡ FORCE THIS LINE TO OVERWRITE THE CSV SPREADSHEET ROW VALU
     
     # Establish calculation baselines for the slate row framework
     simulated_proj = float(p_base)
