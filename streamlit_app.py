@@ -378,7 +378,8 @@ with col1:
             updated_arsenal.append({"PITCH TYPE": row["PITCH"], "USAGE": row["USE"], "K% EXPECTED": f"K:{calc_k}%", "WHIFF RATE": row["WHIFF"], "PUTAWAY": f"{calc_put}%"})
         styled_arsenal = pd.DataFrame(updated_arsenal).style.set_properties(**{'text-align': 'center', 'background-color': '#1A1423', 'color': '#E5D4ED', 'border-color': '#372549'})
         st.dataframe(styled_arsenal, width="stretch", hide_index=True)
-     # ==============================================================================
+        
+# ==============================================================================
 # LINE 381: GLOBAL SLATE EDGE TRACKER MATRIX LOGIC BUILDER
 # ==============================================================================
 global_tracker_rows = []
@@ -411,7 +412,7 @@ for _, p_data in filtered_pitcher_db.iterrows():
         current_book_line = sportsbook_line
     else:
         # Pull baseline batter projection context for the other pitchers on the slate
-        if not batter_db.empty and opp_team_target in batter_db['team_clean'].values:
+        if not batter_db.empty and opp_team_target in batter_db['name_clean'].values:
             team_hitters = batter_db[batter_db['name_clean'] == opp_team_target]
             k_list_calc = []
             
