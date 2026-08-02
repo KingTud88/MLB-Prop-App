@@ -394,24 +394,23 @@ with col1:
             'LAA': 'OAK', 'OAK': 'LAA', 'MIA': 'SFG', 'SFG': 'MIA'
         }
 
-        for _, p_data in pitcher_db.iterrows():
+        for _, p_data in pitcher_db[pitcher_db['name'].isin([k.lower() for k in todays_slate.keys()])].iterrows():
             p_name_raw = str(p_data['name']).title()
             p_name_clean = str(p_data['name']).lower().strip()
             p_team_code = str(p_data['team']).upper().strip()
-            
+    
             p_base = float(p_data['base_avg'])
-            p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data.index else "R"
-            p_fatigue = int(p_data['rolling_pitches']) if 'rolling_pitches' in p_data.index else 90
-            opp_team_target = live_schedule_grid.get(p_team_code, ROTOWIRE_LIVE_MAP.get(p_team_code, "NYM"))
-            current_book_line = live_market_lines.get(p_name_clean, sportsbook_line if p_name_clean == lookup_key else 5.5)
+            p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data else "R"
+            p_fatigue = int(p_data['rolling_pitches']) if 'rolling_pitches' in p_data else 0
+    
+            # 🔥 FORCE YOUR MATCHUP TARGET TO LOCK INTO THE LIVE SCHEDULE ENGINE
+            opp_team_target = todays_slate[p_name_clean]["opponent"]
+            p_team_code = todays_slate[p_name_clean]["team"]  # Automatically fixes trades!
             
             if p_name_clean == lookup_key:
                 simulated_proj = live_avg
                 current_book_line = sportsbook_line
-                opp_team_target = opposing_team
             else:
-                if p_name_clean not in today_active_starters and today_active_starters: continue
-                
                 p_matchup_mult = 1.00
                 if not b_db_bulk.empty and opp_team_target in b_db_bulk['team_clean'].values:
                     team_hitters = b_db_bulk[b_db_bulk['team_clean'] == opp_team_target]
