@@ -15,7 +15,7 @@ def get_live_mlb_schedule():
     try:
         response = requests.get(url).json()
         if "dates" in response and len(response["dates"]) > 0:
-            for game in response["dates"]["games"]:
+            for game in response["dates"][0]["games"]:
                 # Grab standard three-letter team identifiers (e.g. 'CLE', 'NYY')
                 away_team = game["teams"]["away"]["team"]["teamCode"].upper()
                 home_team = game["teams"]["home"]["team"]["teamCode"].upper()
