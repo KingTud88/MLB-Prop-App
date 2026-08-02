@@ -11,40 +11,27 @@ def get_live_mlb_schedule():
     today_str = datetime.today().strftime('%Y-%m-%d')
     url = f"https://mlb.com{today_str}&hydrate=probablePitcher,team"
     live_slate = {}
-    try:
-        response = requests.get(url).json()
-        if "dates" in response and len(response["dates"]) > 0:
-            for game in response["dates"]["games"]:
-                # Grab standard three-letter team identifiers (e.g. 'CLE', 'NYY')
-                away_team = game["teams"]["away"]["team"]["teamCode"].upper()
-                home_team = game["teams"]["home"]["team"]["teamCode"].upper()
+try:
+    response = requests.get(url).json()
+       if "dates" in response and len(response["dates"]) > 0:
+        for game in response["dates"]["games"]:
+            # Grab standard three-letter team identifiers (e.g. 'CLE', 'NYY')
+            away_team = game["teams"]["away"]["team"]["teamCode"].upper()
+            home_team = game["teams"]["home"]["team"]["teamCode"].upper()
                 
-                # Automatically catch scheduled away rotation arm
-                if "probablePitcher" in game["teams"]["away"]:
-                    away_pitcher = game["teams"]["away"]["probablePitcher"]["fullName"].lower()
-                    live_slate[away_pitcher] = {"team": away_team, "opponent": home_team}
+            # Automatically catch scheduled away rotation arm
+            if "probablePitcher" in game["teams"]["away"]:
+                away_pitcher = game["teams"]["away"]["probablePitcher"]["fullName"].lower()
+                 live_slate[away_pitcher] = {"team": away_team, "opponent": home_team}
                     
-                # Automatically catch scheduled home rotation arm
-                if "probablePitcher" in game["teams"]["home"]:
-                    home_pitcher = game["teams"]["home"]["probablePitcher"]["fullName"].lower()
-                    live_slate[home_pitcher] = {"team": home_team, "opponent": away_team}
-    except Exception as e:
+            # Automatically catch scheduled home rotation arm
+            if "probablePitcher" in game["teams"]["home"]:
+                home_pitcher = game["teams"]["home"]["probablePitcher"]["fullName"].lower()
+                live_slate[home_pitcher] = {"team": home_team, "opponent": away_team}
+except Exception as e:
         st.sidebar.error(f"Schedule Sync Warning: {e}")
-          # 3. DYNAMIC PITCHER SELECTION LABELS
-    if todays_slate:
-        # Dropdown menu now only displays pitchers scheduled to throw TODAY
-        pitcher_input = st.selectbox("Select Active Pitcher:", options=sorted(list(todays_slate.keys())))
-        
-        if pitcher_input:
-            # Pull their real-time team and opponent data straight from the live schedule
-            pitcher_team = todays_slate[pitcher_input]["team"]
-            opposing_team = todays_slate[pitcher_input]["opponent"]
-    else:
-        st.warning("⚠️ No active starting pitchers officially announced yet for today's slate.")
-        pitcher_input = st.text_input("Enter Pitcher Name Manually:").strip().lower()
-        pitcher_team = "UNKNOWN"
-        opposing_team = "UNKNOWN"
-    return live_slate
+     
+return live_slate
 
 # Trigger the dynamic live tracking engine immediately
 todays_slate = get_live_mlb_schedule()
