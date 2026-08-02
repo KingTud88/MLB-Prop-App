@@ -378,43 +378,39 @@ with col1:
             updated_arsenal.append({"PITCH TYPE": row["PITCH"], "USAGE": row["USE"], "K% EXPECTED": f"K:{calc_k}%", "WHIFF RATE": row["WHIFF"], "PUTAWAY": f"{calc_put}%"})
         styled_arsenal = pd.DataFrame(updated_arsenal).style.set_properties(**{'text-align': 'center', 'background-color': '#1A1423', 'color': '#E5D4ED', 'border-color': '#372549'})
         st.dataframe(styled_arsenal, width="stretch", hide_index=True)
-        st.markdown("<div class='section-header'>📊 Automated Global Slate Edge Tracker Matrix</div>", unsafe_allow_html=True)
-    if not pitcher_db.empty:
-        global_tracker_rows = []
-        try:
-            b_db_bulk = pd.read_csv("batter_database.csv")
-            b_db_bulk['team_clean'] = b_db_bulk['team'].str.upper().str.strip()
-        except: b_db_bulk = pd.DataFrame()
+     # ==============================================================================
+# LINE 381: GLOBAL SLATE EDGE TRACKER MATRIX LOGIC BUILDER
+# ==============================================================================
+global_tracker_rows = []
 
-        ROTOWIRE_LIVE_MAP = {
-            'TOR': 'BAL', 'BAL': 'TOR', 'CLE': 'NYM', 'NYM': 'CLE', 'PIT': 'CIN', 'CIN': 'PIT',
-            'DET': 'MIN', 'MIN': 'DET', 'PHI': 'ATL', 'ATL': 'PHI', 'CHW': 'KCR', 'KCR': 'CHW',
-            'LAD': 'SDP', 'SDP': 'LAD', 'SEA': 'TEX', 'TEX': 'SEA', 'CHC': 'MIL', 'MIL': 'CHC',
-            'HOU': 'ARI', 'ARI': 'HOU', 'BOS': 'NYY', 'NYY': 'BOS', 'STL': 'WSH', 'WSH': 'STL',
-            'LAA': 'OAK', 'OAK': 'LAA', 'MIA': 'SFG', 'SFG': 'MIA'
-        }
+# Filter down your database to today's active starters via case-insensitive matching
+active_starters_list = [k.lower().strip() for k in todays_slate.keys()]
+filtered_pitcher_db = pitcher_db[pitcher_db['name'].str.lower().str.strip().isin(active_starters_list)]
 
-    for _, p_data in pitcher_db[pitcher_db['name'].str.lower().str.strip().isin([k.lower().strip() for k in todays_slate.keys()])].iterrows():
-        p_name_raw = str(p_data['name']).title()
-        p_name_clean = str(p_data['name']).lower().strip()
-        p_team_code = str(p_data['team']).upper().strip()
+for _, p_data in filtered_pitcher_db.iterrows():
+    p_name_raw = str(p_data['name']).title()
+    p_name_clean = str(p_data['name']).lower().strip()
+    p_team_code = str(p_data['team']).upper().strip()
     
-        p_base = float(p_data['base_avg'])
-        p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data else "R"
-        p_fatigue = int(p_data['rolling_pitches']) if 'rolling_pitches' in p_data else 0
+    p_base = float(p_data['base_avg'])
+    p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data else "R"
+    p_fatigue = int(p_data['rolling_pitches']) if 'rolling_pitches' in p_data else 0
     
-        # 🔥 FORCE YOUR MATCHUP TARGET TO LOCK INTO THE LIVE SCHEDULE ENGINE
-        opp_team_target = todays_slate[p_name_clean]["opponent"]
-        p_team_code = todays_slate[p_name_clean]["team"]  # Automatically fixes trades!
-            
-        if p_name_clean == lookup_key:
-            simulated_proj = live_avg
-            current_book_line = sportsbook_line
+    # Extract live game parameters from your automatic schedule engine
+    opp_team_target = todays_slate[p_name_clean]["opponent"]
+    p_team_code = todays_slate[p_name_clean]["team"]
+    
+    # Establish calculation baselines for the slate row framework
+    simulated_proj = float(p_base)
+    current_book_line = sportsbook_line if p_name_clean == lookup_key else (5.5 if p_base < 6.5 else 6.5)
+    p_matchup_mult = 1.00
+    
+    # Calculate matchup variables if the pitcher matches your precise sidebar selection
+    if p_name_clean == lookup_key:
+        simulated_proj = live_avg
+        current_book_line = sportsbook_line
     else:
-        p_matchup_mult = 1.00
-        simulated_proj = float(p_base)
-        current_book_line = 5.5 if p_base < 6.5 else 6.5
-        
+        # Pull baseline batter projection context for the other pitchers on the slate
         if not b_db_bulk.empty and opp_team_target in b_db_bulk['team_clean'].values:
             team_hitters = b_db_bulk[b_db_bulk['team_clean'] == opp_team_target]
             k_list_calc = []
@@ -428,46 +424,52 @@ with col1:
                 else:
                     k_list_calc.append(raw_b_k * 0.92 * b_stab)
                     
-            if k_list_calc: 
+            if k_list_calc:
                 p_matchup_mult = (sum(k_list_calc) / len(k_list_calc)) / 22.5
-                
-            p_park_mult, p_bullpen_mult = 1.00, 1.00
-            stadium_home = p_team_code if venue_split == "Home" else opp_team_target
-            if not ballpark_db.empty and stadium_home in ballpark_db['team_clean'].values:
-                p_row_park = ballpark_db[ballpark_db['team_clean'] == stadium_home].squeeze()
-                p_park_mult = float(p_row_park['k_scalar']) if 'k_scalar' in p_row_park.index else 1.00
-                p_bullpen_mult = float(p_row_park['bullpen_k_factor']) if 'bullpen_k_factor' in p_row_park.index else 1.00
-                p_venue_mult = 1.06 if venue_split == "Home" else 0.95
-                p_vegas_mult = 0.92 if vegas_spread >= 4.5 else (1.12 if vegas_spread <= 3.2 else 1.00)
-                p_wind_mult = 1.05 if wind_vector == "Blowing In (Ks Up)" else (0.94 if wind_vector == "Blowing Out (Ks Down)" else 1.00)
-                p_fatigue_mult = 0.95 if p_fatigue >= 100 else 1.00
-                p_temp_mult = 1.03 if (wind_vector != "Neutral / Dome" and game_temp >= 85) else (0.96 if (wind_vector != "Neutral / Dome" and game_temp <= 50) else 1.00)
-                simulated_proj = round(p_base * p_matchup_mult * p_venue_mult * p_vegas_mult * p_park_mult * ump_multiplier * p_wind_mult * p_fatigue_mult * p_bullpen_mult * p_temp_mult, 2)
-            
-            arbitrage_edge = round(simulated_proj - current_book_line, 2)
-            edge_percentage = (abs(arbitrage_edge) / current_book_line) * 100 if current_book_line > 0 else 0
-            if edge_percentage >= 20.0: edge_tier = "🚀 S-Tier Edge Max"
-            elif edge_percentage >= 10.0: edge_tier = "📈 A-Tier Value"
-            else: edge_tier = "⚖️ Neutral Line"
-                
-            global_tracker_rows.append({
-                "PITCHER": p_name_raw, "TEAM": p_team_code, "OPPONENT": opp_team_target, "ARM": f"{p_arm_side}HP",
-                "BASE": p_base, "LINE": current_book_line, "PROJ": simulated_proj,
-                "GAP": arbitrage_edge, "SIDE": "OVER" if arbitrage_edge >= 0 else "UNDER", "STATUS": edge_tier
-            })
 
-        if global_tracker_rows:
-            master_slate_df = pd.DataFrame(global_tracker_rows)
-            styled_master_board = master_slate_df.style.format({
-                "BASE": "{:.2f}", "LINE": "{:.1f}", "PROJ": "{:.2f}", "GAP": "{:+.2f}"
-            }).set_properties(**{
-                'background-color': '#1A1423', 'color': '#E5D4ED', 'border-color': '#372549', 'text-align': 'center'
-            }).map(
-                lambda val: 'background-color: #FFB86C; color: #0E0B16; font-weight: bold; text-align: center;' if val == "🚀 S-Tier Edge Max"
-                else ('background-color: #BD93F9; color: #0E0B16; font-weight: bold; text-align: center;' if val == "📈 A-Tier Value" else 'text-align: center;'),
-                subset=["STATUS"]
-            )
-            st.dataframe(styled_master_board, width="stretch", hide_index=True)
+    # Apply modifiers uniformly across the entire slate tracker block
+    p_park_mult, p_bullpen_mult = 1.00, 1.00
+    stadium_home = p_team_code if venue_split == "Home" else opp_team_target
+    
+    simulated_proj = round(simulated_proj * p_matchup_mult * p_park_mult * p_bullpen_mult, 2)
+    arbitrage_edge = round(simulated_proj - current_book_line, 2)
+    
+    # Define color thresholds for edge grading tiers
+    if arbitrage_edge >= 1.25:
+        edge_tier = "🔥 S-Tier Edge Max"
+    elif arbitrage_edge >= 0.50:
+        edge_tier = "⭐ A-Tier Value"
+    elif arbitrage_edge <= -1.25:
+        edge_tier = "❄️ Short Edge Max"
+    else:
+        edge_tier = "⚖️ Neutral Line"
+        
+    global_tracker_rows.append({
+        "PITCHER": p_name_raw,
+        "TEAM": p_team_code,
+        "OPPONENT": opp_team_target,
+        "ARM": f"{p_arm_side}HP",
+        "BASE": p_base,
+        "LINE": current_book_line,
+        "PROJ": simulated_proj,
+        "GAP": arbitrage_edge,
+        "SIDE": "OVER" if arbitrage_edge >= 0 else "UNDER",
+        "STATUS": edge_tier
+    })
+
+# Render the beautifully stylized matrix grid onto your dashboard screen
+if global_tracker_rows:
+    master_slate_df = pd.DataFrame(global_tracker_rows)
+    styled_master_board = master_slate_df.style.format({
+        "BASE": "{:.2f}", "LINE": "{:.1f}", "PROJ": "{:.2f}", "GAP": "{:+,.2f}"
+    }).set_properties(**{
+        'background-color': '#1A1423', 'color': '#E5D4ED', 'border-color': '#372549', 'text-align': 'center'
+    }).map(
+        lambda val: 'background-color: #FFB86C; color: #0E0B16; font-weight: bold; text-align: center;' if val == "🔥 S-Tier Edge Max"
+        else ('background-color: #BD93F9; color: #0E0B16; font-weight: bold; text-align: center;' if val == "⭐ A-Tier Value" else 'text-align: center;'),
+        subset=["STATUS"]
+    )
+    st.dataframe(styled_master_board, width="stretch", hide_index=True)
 
 with col2:
     st.markdown("<div class='section-header'>Batter-by-batter K matchup</div>", unsafe_allow_html=True)
