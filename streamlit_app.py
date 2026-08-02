@@ -412,7 +412,12 @@ with col1:
                 current_book_line = sportsbook_line
             else:
                 p_matchup_mult = 1.00
-                if not b_db_bulk.empty and opp_team_target in b_db_bulk['team_clean'].values:
+        
+                # 🔥 THE CRITICAL ENGINE FIX: Assign baseline values for all other pitchers on the slate
+                simulated_proj = float(p_base)
+                current_book_line = 5.5 if p_base < 6.5 else 6.5
+        
+        if not b_db_bulk.empty and opp_team_target in b_db_bulk['team_clean'].values:
                     team_hitters = b_db_bulk[b_db_bulk['team_clean'] == opp_team_target]
                     k_list_calc = []
                     for _, b_row in team_hitters.head(9).iterrows():
