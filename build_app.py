@@ -64,7 +64,7 @@ master_code = """
 # 1. PAGE LAYOUT CONFIGURATION & NEON STYLING CORE
 # ------------------------------------------------------------------------------
 st.set_page_config(page_title="MLB Strikeout Edge Predictor Master", layout="wide", initial_sidebar_state="expanded")
-st.markdown("""
+st.markdown(''
 <style>
     .reportview-container { background: #0E0B16; color: #E5D4ED; }
     .sidebar .sidebar-content { background: #1A1423; }
@@ -76,7 +76,7 @@ st.markdown("""
     .class-sub-text { font-size: 11px; color: #6272A4; }
     .section-header { background: linear-gradient(90deg, #372549 0%, #1A1423 100%); padding: 8px 15px; border-left: 5px solid #BD93F9; font-weight: bold; color: #E5D4ED; margin-top: 20px; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; }
 </style>
-\"\"\", unsafe_allow_html=True)
+'', unsafe_allow_html=True)
 
 st.title("🏹 MLB Strikeout Edge Predictor Engine")
 st.markdown("---")
@@ -273,7 +273,7 @@ if global_tracker_rows:
     master_slate_df = pd.DataFrame(global_tracker_rows)
     styled_master_board = master_slate_df.style.format({"BASE": "{:.2f}", "LINE": "{:.1f}", "PROJ": "{:.2f}", "GAP": "{:+,.2f}"}).set_properties(**{'background-color': '#1A1423', 'color': '#E5D4ED', 'border-color': '#372549', 'text-align': 'center'}).map(lambda val: 'background-color: #FFB86C; color: #0E0B16; font-weight: bold; text-align: center;' if val == "🔥 S-Tier Edge Max" else ('background-color: #BD93F9; color: #0E0B16; font-weight: bold; text-align: center;' if val == "⭐ A-Tier Value" else 'text-align: center;'), subset=["STATUS"])
     st.dataframe(styled_master_board, use_container_width=True, hide_index=True)
-
+'''
 # Force absolute direct file path access onto your main app container
 target_filepath = os.path.join(os.path.dirname(__file__), "streamlit_app.py")
 with open(target_filepath, "w", encoding="utf-8") as f:
