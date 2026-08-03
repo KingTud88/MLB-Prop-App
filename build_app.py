@@ -64,7 +64,7 @@ master_code = """
 # 1. PAGE LAYOUT CONFIGURATION & NEON STYLING CORE
 # ------------------------------------------------------------------------------
 st.set_page_config(page_title="MLB Strikeout Edge Predictor Master", layout="wide", initial_sidebar_state="expanded")
-st.markdown(\"\"\"
+st.markdown("""
 <style>
     .reportview-container { background: #0E0B16; color: #E5D4ED; }
     .sidebar .sidebar-content { background: #1A1423; }
