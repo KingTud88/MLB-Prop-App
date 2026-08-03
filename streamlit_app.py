@@ -16,31 +16,30 @@ def get_live_mlb_schedule():
     
     live_slate = {}
     try:
-        response = requests.get(url).json()
-        if "dates" in response and len(response["dates"]) > 0:
-            for game in response["dates"]["games"]:
-                # Grab standard three-letter team identifiers (e.g. 'CLE', 'NYY')
-                away_team = game["teams"]["away"]["team"]["teamCode"].upper().strip()
-                home_team = game["teams"]["home"]["team"]["teamCode"].upper().strip()
-                
-                # Normalize common mismatched API abbreviations to track dataset rows cleanly
-                map_teams = {"KCA": "KCR", "CHN": "CHC", "NYA": "NYY", "SDN": "SDP", "LAN": "LAD", "SFN": "SFG", "TBA": "TBR", "CHA": "CHW", "TEX": "TEX", "HOU": "HOU"}
-                away_team = map_teams.get(away_team, away_team)
-                home_team = map_teams.get(home_team, home_team)
-
-                # Automatically catch scheduled away rotation arm
-                if "probablePitcher" in game["teams"]["away"]:
-                    away_pitcher = game["teams"]["away"]["probablePitcher"]["fullName"].lower().strip()
-                    live_slate[away_pitcher] = {"team": away_team, "opponent": home_team, "venue": "Away"}
+        response = requests.get(url, timeout=5)
+        # If the API server is up, process the dynamic games cleanly
+        if response.status_code == 200:
+            data = response.json()
+            if "dates" in data and len(data["dates"]) > 0:
+                for game in data["dates"][0]["games"]:
+                    away_team = game["teams"]["away"]["team"]["teamCode"].upper().strip()
+                    home_team = game["teams"]["home"]["team"]["teamCode"].upper().strip()
                     
-                # Automatically catch scheduled home rotation arm
-                if "probablePitcher" in game["teams"]["home"]:
-                    home_pitcher = game["teams"]["home"]["probablePitcher"]["fullName"].lower().strip()
-                    live_slate[home_pitcher] = {"team": home_team, "opponent": away_team, "venue": "Home"}
-    except Exception as e:
-        st.sidebar.error(f"Schedule API Connection Warning: {e}")
-    return live_slate
+                    map_teams = {"KCA": "KCR", "CHN": "CHC", "NYA": "NYY", "SDN": "SDP", "LAN": "LAD", "SFN": "SFG", "TBA": "TBR", "CHA": "CHW"}
+                    away_team = map_teams.get(away_team, away_team)
+                    home_team = map_teams.get(home_team, home_team)
 
+                    if "probablePitcher" in game["teams"]["away"]:
+                        away_pitcher = game["teams"]["away"]["probablePitcher"]["fullName"].lower().strip()
+                        live_slate[away_pitcher] = {"team": away_team, "opponent": home_team, "venue": "Away"}
+                        
+                    if "probablePitcher" in game["teams"]["home"]:
+                        home_pitcher = game["teams"]["home"]["probablePitcher"]["fullName"].lower().strip()
+                        live_slate[home_pitcher] = {"team": home_team, "opponent": away_team, "venue": "Home"}
+    except Exception:
+        # Silently fails and passes an empty dictionary so your manual override sidebar wakes up cleanly
+        pass
+    return live_slate
 # Trigger dynamic live tracking variables instantly
 todays_slate = get_live_mlb_schedule()
 
@@ -219,7 +218,7 @@ if wind_speed > 12:
 # ==============================================================================
 # # 5. WORKSPACE INTERFACE GENERATION CORE (UN-NESTED FULL SCREEN SYSTEM)
 # ==============================================================================
-eague_avg_k = 22.5
+league_avg_k = 22.5
 team_avg_k = lineup_df["K% USED"].mean() if not lineup_df.empty else 22.5
 matchup_multiplier = team_avg_k / league_avg_k
 venue_multiplier = 1.06 if venue_split == "Home" else 0.95
