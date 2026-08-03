@@ -193,7 +193,7 @@ else:
     top_pitch_text = "Four-seam FB 45% use"
     pitch_df = pd.DataFrame([{"PITCH": "FOUR-SEAM FB", "USE": "45%", "WHIFF": "W:22%"}])
 
-app_status = f"✅ Live Database Framework Mapped: {pitcher_input.title()} locked vs {opposing_team} projection slates."python
+app_status = f"✅ Live Database Framework Mapped: {pitcher_input.title()} locked vs {opposing_team} projection slates."
 # ------------------------------------------------------------------------------
 # 4. STADIUM & WEATHER ENVIRONMENTAL SCALING MATRIX
 # ------------------------------------------------------------------------------
