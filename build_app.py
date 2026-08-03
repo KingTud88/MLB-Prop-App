@@ -117,7 +117,7 @@ with st.sidebar:
         wind_dir = st.selectbox("Wind Vector Direction", ["Inward", "Outward", "Crosswind"])
     else:
         game_temp, wind_speed, wind_dir = 72, 5, "Crosswind"
-master_code = """
+master_code = ""
 # ------------------------------------------------------------------------------
 # 3. INTERACTIVE INJURY SCANNER LOGIC DESK
 # ------------------------------------------------------------------------------
@@ -178,7 +178,7 @@ else:
     for i in range(1, 10):
         lineup_rows.append({"SLOT": i, "BATTER LINEUP CARD": f"Projected Lineup Hitter Slot {i}", "HAND": "R" if i % 2 == 0 else "L", "RAW K% SPLIT": "22.5%", "STABILITY INDEX": "1.0x", "DYNAMIC K% PROJECTION": f"{21.0 + (i * 0.4)}%"})
 st.dataframe(pd.DataFrame(lineup_rows), use_container_width=True, hide_index=True)
-master_code = """
+master_code = ""
 # ------------------------------------------------------------------------------
 # 7. MAIN INTERFACE GRID GENERATION BLOCK
 # ------------------------------------------------------------------------------
