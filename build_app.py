@@ -118,7 +118,8 @@ with st.sidebar:
         wind_dir = st.selectbox("Wind Vector Direction", ["Inward", "Outward", "Crosswind"])
     else:
         game_temp, wind_speed, wind_dir = 72, 5, "Crosswind"
-
+"""
+master_code += """
 # ------------------------------------------------------------------------------
 # 3. INTERACTIVE INJURY SCANNER LOGIC DESK
 # ------------------------------------------------------------------------------
@@ -144,7 +145,7 @@ wind_multiplier = 1.04 if (wind_speed > 10 and wind_dir == "Inward") else (0.96 
 lookup_key = pitcher_name_clean
 matched_pitcher = pitcher_db[pitcher_db['name_clean'] == lookup_key]
 if not matched_pitcher.empty:
-    p_data_row = matched_pitcher.iloc[0]
+    p_data_row = matched_pitcher.iloc
     pitcher_base_avg = float(p_data_row['base_avg'])
     pitcher_throws = str(p_data_row['throws']).upper().strip()
     strikeouts = int(p_data_row['strikeouts'])
@@ -161,8 +162,7 @@ else:
     pitcher_base_avg, pitcher_throws, strikeouts = 5.50, "R", 130
     top_pitch_text = "Four-seam FB 42% use"
     pitch_df = pd.DataFrame([{"PITCH": "FOUR-SEAM FB", "USE": "42%", "WHIFF": "W:25%"}])
-"""
-master_code += """
+
 # ------------------------------------------------------------------------------
 # 6. BATTER-BY-BATTER SPLITS SIMULATION GRID DISPLAY
 # ------------------------------------------------------------------------------
@@ -180,7 +180,8 @@ else:
     for i in range(1, 10):
         lineup_rows.append({"SLOT": i, "BATTER LINEUP CARD": f"Projected Lineup Hitter Slot {i}", "HAND": "R" if i % 2 == 0 else "L", "RAW K% SPLIT": "22.5%", "STABILITY INDEX": "1.0x", "DYNAMIC K% PROJECTION": f"{21.0 + (i * 0.4)}%"})
 st.dataframe(pd.DataFrame(lineup_rows), use_container_width=True, hide_index=True)
-
+"""
+master_code += """
 # ------------------------------------------------------------------------------
 # 7. MAIN INTERFACE GRID GENERATION BLOCK
 # ------------------------------------------------------------------------------
@@ -275,12 +276,14 @@ if global_tracker_rows:
     master_slate_df = pd.DataFrame(global_tracker_rows)
     styled_master_board = master_slate_df.style.format({"BASE": "{:.2f}", "LINE": "{:.1f}", "PROJ": "{:.2f}", "GAP": "{:+,.2f}"}).set_properties(**{'background-color': '#1A1423', 'color': '#E5D4ED', 'border-color': '#372549', 'text-align': 'center'}).map(lambda val: 'background-color: #FFB86C; color: #0E0B16; font-weight: bold; text-align: center;' if val == "🔥 S-Tier Edge Max" else ('background-color: #BD93F9; color: #0E0B16; font-weight: bold; text-align: center;' if val == "⭐ A-Tier Value" else 'text-align: center;'), subset=["STATUS"])
     st.dataframe(styled_master_board, use_container_width=True, hide_index=True)
-\"\"\"
+"""
 
-with open("streamlit_app.py", "w", encoding="utf-8") as f:
+# Force absolute direct file path access onto your main app container
+target_filepath = os.path.join(os.path.dirname(__file__), "streamlit_app.py")
+with open(target_filepath, "w", encoding="utf-8") as f:
     f.write(master_code)
-print("Master production app rewritten flawlessly!")
-\"\"\"
+print("The file system has completely overwritten streamlit_app.py flawlessly!")
+"""
 
 with open("build_app.py", "w", encoding="utf-8") as f:
     f.write(master_code)
