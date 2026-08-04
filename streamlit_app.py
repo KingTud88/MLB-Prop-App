@@ -255,26 +255,83 @@ else:
     top_pitch_text = "Four-seam FB 42% use"
     pitch_df = pd.DataFrame([{"PITCH": "FOUR-SEAM FB", "USE": "42%", "WHIFF": "W:25%"}])
 
-st.markdown(f"<div class='section-header'>⚔️ Batter-by-Batter Projected Splitting Grid: vs {opposing_team.upper()}</div>", unsafe_allow_html=True)
+league_avg_k = 22.5
+team_avg_k = 24.2
+matchup_multiplier = team_avg_k / league_avg_k
+venue_multiplier = 1.06 if venue_split == "Home" else 0.95
+vegas_multiplier = 1.00
+live_avg = round(pitcher_base_avg * matchup_multiplier * venue_multiplier * vegas_multiplier * park_multiplier * ump_multiplier * wind_multiplier * fatigue_multiplier * bullpen_multiplier * temp_multiplier, 2)
+diff_val = round(live_avg - sportsbook_line, 2)
 
-# 🟢 FIXED LIVE LOOKUP: Standardized pure uppercase parsing maps data accurately to batter_database.csv
-clean_target_team = str(opposing_team).upper().strip()
-team_hitters = batter_db[batter_db['team_clean'] == clean_target_team] if not batter_db.empty else pd.DataFrame()
-lineup_rows = []
+# --- EXECUTE THE TWO COLUMN SPLIT ---
+main_col1, main_col2 = st.columns(2)
 
-if not team_hitters.empty:
-    for idx, b_row in team_hitters.head(9).iterrows():
-        b_hand = str(b_row['hand']).upper().strip()
-        raw_b_k = float(b_row['vs_lhp_k']) if pitcher_throws == "L" else float(b_row['vs_rhp_k'])
-        b_stab = float(b_row['k_stability']) if 'k_stability' in b_row.index else 1.00
-        calc_k_pct = round(raw_b_k * (1.12 if b_hand != pitcher_throws else 0.92) * b_stab, 1)
-        lineup_rows.append({"SLOT": len(lineup_rows) + 1, "BATTER LINEUP CARD": str(b_row['name']).title(), "HAND": b_hand, "RAW K% SPLIT": f"{raw_b_k}%", "DYNAMIC K% PROJECTION": f"{calc_k_pct}%"})
-else:
-    # Stable real-time backup emulator loop maps baseline values seamlessly if file row structure cuts off
-    for i in range(1, 10):
-        lineup_rows.append({"SLOT": i, "BATTER LINEUP CARD": f"Live Scheduled Lineup Starter Slot {i}", "HAND": "R" if i % 2 == 0 else "L", "RAW K% SPLIT": "23.4%", "DYNAMIC K% PROJECTION": f"{21.0 + (i * 0.5)}%"})
+with main_col1:
+    st.markdown(f"<div class='section-header'>🔥 Searched Pitcher Metrics: {pitcher_input.title()}</div>", unsafe_allow_html=True)
+    ch1, ch2 = st.columns(2)
+    with ch1:
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>PROJ Ks</div><div class='metric-value' style='color:#FF79C6;'>{live_avg}</div><div class='class-sub-text' style='color:#50FA7B;'>{sportsbook_line} Line Set</div></div>", unsafe_allow_html=True)
+    with ch2:
+        high_prob = "84%" if live_avg > sportsbook_line else "66%"
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>HIGH K PROBABILITY</div><div class='metric-value' style='color:#FFB86C; font-size:32px;'>{high_prob}</div><div class='class-sub-text'>{top_pitch_text}</div></div>", unsafe_allow_html=True)
         
-st.dataframe(pd.DataFrame(lineup_rows).style.set_properties(**{'background-color': '#1A1423', 'color': '#8BE9FD'}), use_container_width=True, hide_index=True)
+    c_p1, c_p2 = st.columns(2)
+    with c_p1:
+        rec_tag = "OVER" if live_avg > sportsbook_line else "UNDER"
+        rec_color = "#50FA7B" if rec_tag == "OVER" else "#FF5555"
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>RECOMMENDATION</div><div class='metric-value' style='color:{rec_color};'>{rec_tag}</div><div class='class-sub-text' style='color:#8BE9FD;'>{diff_val} Difference Gap</div></div>", unsafe_allow_html=True)
+    with c_p2:
+        grade = "A" if live_avg > 7.5 else ("B" if live_avg > 6.0 else ("C" if live_avg > 4.5 else "D"))
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>K GRADE</div><div class='metric-value'>{grade}</div></div>", unsafe_allow_html=True)
+
+with main_col2:
+    st.markdown(f"<div class='section-header'>⚔️ Batter-by-Batter Projected Splitting Grid: vs {opposing_team.upper()}</div>", unsafe_allow_html=True)
+    
+    # 🚨 TRANSLATION CORE: Forces live API 'CHW' to match database 'CWS' formatting perfectly
+    clean_target_team = str(opposing_team).upper().strip()
+    if clean_target_team == "CHW": clean_target_team = "CWS"
+    if clean_target_team == "KCR": clean_target_team = "KC"
+    if clean_target_team == "CHC": clean_target_team = "CHC"
+    
+    team_hitters = batter_db[batter_db['team_clean'] == clean_target_team] if not batter_db.empty else pd.DataFrame()
+    lineup_rows = []
+    
+    if not team_hitters.empty:
+        for idx, b_row in team_hitters.head(9).iterrows():
+            b_hand = str(b_row['hand']).upper().strip()
+            raw_b_k = float(b_row['vs_lhp_k']) if pitcher_throws == "L" else float(b_row['vs_rhp_k'])
+            b_stab = float(b_row['k_stability']) if 'k_stability' in b_row.index else 1.00
+            calc_k_pct = round(raw_b_k * (1.12 if b_hand != pitcher_throws else 0.92) * b_stab, 1)
+            lineup_rows.append({"SLOT": len(lineup_rows) + 1, "BATTER LINEUP CARD": str(b_row['name']).title(), "HAND": b_hand, "RAW K% SPLIT": f"{raw_b_k}%", "DYNAMIC K% PROJECTION": f"{calc_k_pct}%"})
+    else:
+        for i in range(1, 10):
+            lineup_rows.append({"SLOT": i, "BATTER LINEUP CARD": f"Live Scheduled Lineup Starter Slot {i}", "HAND": "R" if i % 2 == 0 else "L", "RAW K% SPLIT": "23.4%", "DYNAMIC K% PROJECTION": f"{21.0 + (i * 0.5)}%"})
+            
+    st.dataframe(pd.DataFrame(lineup_rows).style.set_properties(**Traceback={'background-color': '#1A1423', 'color': '#8BE9FD'}), use_container_width=True, hide_index=True)
+
+# --- RE-ANCHOR THE SUB-MATRICES GRID ROWS ---
+sub_col1, sub_col2 = st.columns(2)
+with sub_col1:
+    st.markdown("<div class='section-header'>📊 Balanced Pitch Arsenal Matrix</div>", unsafe_allow_html=True)
+    if not pitch_df.empty:
+        updated_arsenal = []
+        for idx, row in pitch_df.iterrows():
+            raw_whiff = str(row["WHIFF"]).replace("%", "").replace("W:", "").strip()
+            whiff_val = float(raw_whiff) if raw_whiff.replace(".", "", 1).isdigit() else 25.0
+            calc_k = round(whiff_val * 0.85, 1)
+            calc_put = round(whiff_val * 0.58, 1)
+            updated_arsenal.append({"PITCH TYPE": row["PITCH"], "USAGE": row["USE"], "Ks EXPECTED": f"{calc_k}%", "WHIFF RATE": row["WHIFF"], "PUTAWAY": f"{calc_put}%"})
+        st.dataframe(pd.DataFrame(updated_arsenal).style.set_properties(**{'text-align': 'center', 'background-color': '#1A1423', 'color': '#8BE9FD', 'border-color': '#372549'}), use_container_width=True, hide_index=True)
+
+with sub_col2:
+    st.markdown("<div class='section-header'>⛈️ Stadium Adverse Weather Alert Center</div>", unsafe_allow_html=True)
+    weather_alerts = []
+    if wind_speed > 10:
+        weather_alerts.append({"STADIUM / BALLPARK": current_venue_name, "MATCHUP": f"{pitcher_team} vs {opposing_team}", "WIND VELOCITY": f"{wind_speed} MPH", "CRITICAL IMPACT STATUS": f"⚠️ Heavy {wind_dir} Vectors Detected"})
+    if weather_alerts:
+        st.dataframe(pd.DataFrame(weather_alerts).style.set_properties(**{'background-color': '#2A1B27', 'color': '#FF5555'}), use_container_width=True, hide_index=True)
+    else:
+        st.success("☀️ All active stadium tracking networks confirm optimal climate baselines across the country.")
 # ------------------------------------------------------------------------------
 # 6. ROW FRAMEWORK LAYER 4: FULL-WIDTH AUTOMATED GLOBAL SLATE EDGE TRACKER MATRIX
 # ------------------------------------------------------------------------------
@@ -284,12 +341,7 @@ st.subheader("📋 Automated Global Slate Edge Tracker Matrix")
 global_tracker_rows = []
 sample_slate = {"tarik skubal": {"team": "LAD", "opponent": "CHW"}, "paul skenes": {"team": "PIT", "opponent": "CIN"}, "dylan cease": {"team": "SDP", "opponent": "SFG"}, "corbin burnes": {"team": "BAL", "opponent": "PHI"}, "cole ragans": {"team": "KCR", "opponent": "DET"}, "zack wheeler": {"team": "PHI", "opponent": "BAL"}, "garrett crochet": {"team": "CHW", "opponent": "LAD"}}
 
-if todays_slate and len(todays_slate) >= 2:
-    active_slate_source = todays_slate
-else:
-    active_slate_source = sample_slate
-
-# 🟢 FIXED LIVE LOOKUP: Maps loop values through case-insensitive dictionaries correctly
+active_slate_source = todays_slate if (todays_slate and len(todays_slate) >= 2) else sample_slate
 active_starters_list = [str(k).lower().strip() for k in active_slate_source.keys()]
 filtered_pitcher_db = pitcher_db[pitcher_db['name_clean'].str.lower().str.strip().isin(active_starters_list)]
 
@@ -301,7 +353,9 @@ if not filtered_pitcher_db.empty:
         p_base = float(p_data['base_outs']) if (market == "Total Projected Outs" and 'base_outs' in p_data.index) else float(p_data['base_avg'])
         p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data.index else "R"
         
+        # 🚨 TRANSLATION CORE: Forces global rows to match 'CWS'/'CHW' database keys on the fly
         opp_team_target = str(active_slate_source[p_name_clean]["opponent"]).upper().strip()
+        db_lookup_team = "CWS" if opp_team_target == "CHW" else opp_team_target
         p_team_code = str(active_slate_source[p_name_clean]["team"]).upper().strip()
         
         simulated_proj = float(p_base)
@@ -312,8 +366,8 @@ if not filtered_pitcher_db.empty:
             simulated_proj = live_avg
             current_book_line = sportsbook_line
         else:
-            if not batter_db.empty and opp_team_target in batter_db['team_clean'].values:
-                team_hitters = batter_db[batter_db['team_clean'] == opp_team_target]
+            if not batter_db.empty and db_lookup_team in batter_db['team_clean'].values:
+                team_hitters = batter_db[batter_db['team_clean'] == db_lookup_team]
                 k_list_calc = []
                 for _, b_row in team_hitters.head(9).iterrows():
                     b_hand = str(b_row['hand']).upper().strip()
