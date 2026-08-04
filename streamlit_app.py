@@ -247,7 +247,11 @@ if not matched_pitcher.empty:
         p_use_col = f"p{p_num}_use"
         p_whiff_col = f"p{p_num}_whiff"
         if p_name_col in p_data_row.index and pd.notna(p_data_row[p_name_col]) and str(p_data_row[p_name_col]).strip() != "—":
-            pitch_records.append({"PITCH": str(p_data_row[p_name_col]).upper(), "USE": str(p_data_row[p_use_col]), "WHIFF": str(p_data_row[p_whiff_col])})
+            pitch_records.append({
+                "PITCH": str(p_data_row[p_name_col]).upper(),
+                "USE": str(p_data_row[p_use_col]),
+                "WHIFF": str(p_data_row[p_whiff_col])
+            })
     pitch_df = pd.DataFrame(pitch_records)
 else:
     pitcher_base_avg = 15.2 if market == "Total Projected Outs" else 5.50
@@ -257,23 +261,24 @@ else:
 
 league_avg_k = 22.5
 team_avg_k = 24.2
-matchup_multiplier = team_avg_k / league_avg_k
+matchup_multiplier = team_avg_k / league_avg_k if market == "Strikeouts (Ks)" else 1.02
 venue_multiplier = 1.06 if venue_split == "Home" else 0.95
 vegas_multiplier = 1.00
+
 live_avg = round(pitcher_base_avg * matchup_multiplier * venue_multiplier * vegas_multiplier * park_multiplier * ump_multiplier * wind_multiplier * fatigue_multiplier * bullpen_multiplier * temp_multiplier, 2)
 diff_val = round(live_avg - sportsbook_line, 2)
 
-# --- EXECUTE THE TWO COLUMN SPLIT ---
+# --- EXECUTE THE BALANCED TWO-COLUMN ROW SPLIT ---
 main_col1, main_col2 = st.columns(2)
 
 with main_col1:
     st.markdown(f"<div class='section-header'>🔥 Searched Pitcher Metrics: {pitcher_input.title()}</div>", unsafe_allow_html=True)
     ch1, ch2 = st.columns(2)
     with ch1:
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>PROJ Ks</div><div class='metric-value' style='color:#FF79C6;'>{live_avg}</div><div class='class-sub-text' style='color:#50FA7B;'>{sportsbook_line} Line Set</div></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>PROJ {market.upper()}</div><div class='metric-value' style='color:#FF79C6;'>{live_avg}</div><div class='class-sub-text' style='color:#50FA7B;'>{sportsbook_line} Line Set</div></div>", unsafe_allow_html=True)
     with ch2:
         high_prob = "84%" if live_avg > sportsbook_line else "66%"
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>HIGH K PROBABILITY</div><div class='metric-value' style='color:#FFB86C; font-size:32px;'>{high_prob}</div><div class='class-sub-text'>{top_pitch_text}</div></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>PROBABILITY SCORE</div><div class='metric-value' style='color:#FFB86C;'>{high_prob}</div><div class='class-sub-text'>{top_pitch_text}</div></div>", unsafe_allow_html=True)
         
     c_p1, c_p2 = st.columns(2)
     with c_p1:
@@ -281,17 +286,16 @@ with main_col1:
         rec_color = "#50FA7B" if rec_tag == "OVER" else "#FF5555"
         st.markdown(f"<div class='metric-card'><div class='metric-label'>RECOMMENDATION</div><div class='metric-value' style='color:{rec_color};'>{rec_tag}</div><div class='class-sub-text' style='color:#8BE9FD;'>{diff_val} Difference Gap</div></div>", unsafe_allow_html=True)
     with c_p2:
-        grade = "A" if live_avg > 7.5 else ("B" if live_avg > 6.0 else ("C" if live_avg > 4.5 else "D"))
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>K GRADE</div><div class='metric-value'>{grade}</div></div>", unsafe_allow_html=True)
+        grade = "A" if (live_avg > sportsbook_line * 1.15) else ("B" if live_avg > sportsbook_line else "C")
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>SIMULATION GRADE</div><div class='metric-value'>{grade}</div></div>", unsafe_allow_html=True)
 
 with main_col2:
     st.markdown(f"<div class='section-header'>⚔️ Batter-by-Batter Projected Splitting Grid: vs {opposing_team.upper()}</div>", unsafe_allow_html=True)
     
-    # 🚨 TRANSLATION CORE: Forces live API 'CHW' to match database 'CWS' formatting perfectly
+    # API TRANSLATOR BRIDGE: Resolves abbreviation mismatches dynamically
     clean_target_team = str(opposing_team).upper().strip()
     if clean_target_team == "CHW": clean_target_team = "CWS"
     if clean_target_team == "KCR": clean_target_team = "KC"
-    if clean_target_team == "CHC": clean_target_team = "CHC"
     
     team_hitters = batter_db[batter_db['team_clean'] == clean_target_team] if not batter_db.empty else pd.DataFrame()
     lineup_rows = []
@@ -300,17 +304,24 @@ with main_col2:
         for idx, b_row in team_hitters.head(9).iterrows():
             b_hand = str(b_row['hand']).upper().strip()
             raw_b_k = float(b_row['vs_lhp_k']) if pitcher_throws == "L" else float(b_row['vs_rhp_k'])
-            b_stab = float(b_row['k_stability']) if 'k_stability' in b_row.index else 1.00
+            b_stab = float(b_row['k_stability']) if 'k_stability' in b_row else 1.00
             calc_k_pct = round(raw_b_k * (1.12 if b_hand != pitcher_throws else 0.92) * b_stab, 1)
-            lineup_rows.append({"SLOT": len(lineup_rows) + 1, "BATTER LINEUP CARD": str(b_row['name']).title(), "HAND": b_hand, "RAW K% SPLIT": f"{raw_b_k}%", "DYNAMIC K% PROJECTION": f"{calc_k_pct}%"})
+            lineup_rows.append({
+                "SLOT": len(lineup_rows) + 1,
+                "BATTER LINEUP CARD": str(b_row['name']).title(),
+                "HAND": b_hand,
+                "RAW K% SPLIT": f"{raw_b_k}%",
+                "DYNAMIC K% PROJECTION": f"{calc_k_pct}%"
+            })
     else:
         for i in range(1, 10):
-            lineup_rows.append({"SLOT": i, "BATTER LINEUP CARD": f"Live Scheduled Lineup Starter Slot {i}", "HAND": "R" if i % 2 == 0 else "L", "RAW K% SPLIT": "23.4%", "DYNAMIC K% PROJECTION": f"{21.0 + (i * 0.5)}%"})
+            lineup_rows.append({"SLOT": i, "BATTER LINEUP CARD": f"Lineup Slot Active Hitter {i}", "HAND": "R" if i % 2 == 0 else "L", "RAW K% SPLIT": "23.4%", "DYNAMIC K% PROJECTION": f"{21.0 + (i * 0.5)}%"})
             
     st.dataframe(pd.DataFrame(lineup_rows).style.set_properties(**{'background-color': '#1A1423', 'color': '#8BE9FD'}), use_container_width=True, hide_index=True)
 
-# --- RE-ANCHOR THE SUB-MATRICES GRID ROWS ---
+# --- RE-ANCHOR THE SUB-MATRICES ROWS SIDE-BY-SIDE OUTSIDE THE LOOP ---
 sub_col1, sub_col2 = st.columns(2)
+
 with sub_col1:
     st.markdown("<div class='section-header'>📊 Balanced Pitch Arsenal Matrix</div>", unsafe_allow_html=True)
     if not pitch_df.empty:
@@ -353,7 +364,6 @@ if not filtered_pitcher_db.empty:
         p_base = float(p_data['base_outs']) if (market == "Total Projected Outs" and 'base_outs' in p_data.index) else float(p_data['base_avg'])
         p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data.index else "R"
         
-        # 🚨 TRANSLATION CORE: Forces global rows to match 'CWS'/'CHW' database keys on the fly
         opp_team_target = str(active_slate_source[p_name_clean]["opponent"]).upper().strip()
         db_lookup_team = "CWS" if opp_team_target == "CHW" else opp_team_target
         p_team_code = str(active_slate_source[p_name_clean]["team"]).upper().strip()
@@ -389,5 +399,11 @@ if not filtered_pitcher_db.empty:
 
 if global_tracker_rows:
     master_slate_df = pd.DataFrame(global_tracker_rows)
-    styled_master_board = master_slate_df.style.format({"BASE": "{:.2f}", "LINE": "{:.1f}", "PROJ": "{:.2f}", "GAP": "{:+,.2f}"}).set_properties(**{'background-color': '#1A1423', 'color': '#8BE9FD', 'border-color': '#372549', 'text-align': 'center'}).map(lambda val: 'background-color: #FFB86C; color: #0E0B16; font-weight: bold; text-align: center;' if val == "🔥 S-Tier Edge Max" else ('background-color: #BD93F9; color: #0E0B16; font-weight: bold; text-align: center;' if val == "⭐ A-Tier Value" else 'text-align: center;'), subset=["STATUS"])
+    styled_master_board = master_slate_df.style.format({"BASE": "{:.2f}", "LINE": "{:.1f}", "PROJ": "{:.2f}", "GAP": "{:+,.2f}"}).set_properties(**{
+        'background-color': '#1A1423', 'color': '#8BE9FD', 'border-color': '#372549', 'text-align': 'center'
+    }).map(
+        lambda val: 'background-color: #FFB86C; color: #0E0B16; font-weight: bold; text-align: center;' if val == "🔥 S-Tier Edge Max"
+        else ('background-color: #BD93F9; color: #0E0B16; font-weight: bold; text-align: center;' if val == "⭐ A-Tier Value" else 'text-align: center;'),
+        subset=["STATUS"]
+    )
     st.dataframe(styled_master_board, use_container_width=True, hide_index=True)
