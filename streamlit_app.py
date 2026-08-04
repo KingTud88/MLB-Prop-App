@@ -42,7 +42,7 @@ todays_slate = get_live_mlb_schedule()
 
 if "tarik skubal" in todays_slate: todays_slate["tarik skubal"]["team"] = "LAD"
 if "luis castillo" in todays_slate: todays_slate["luis castillo"]["team"] = "CHW"
-                        live_slate[p_name] = {"id": p_data["id"], "team": home_team, "opponent": away_team, "venue": "Home", "stadium": venue_name, "opp_id": away_id}
+live_slate[p_name] = {"id": p_data["id"], "team": home_team, "opponent": away_team, "venue": "Home", "stadium": venue_name, "opp_id": away_id}
     except Exception:
         pass
     return live_slate
