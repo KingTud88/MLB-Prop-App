@@ -23,7 +23,6 @@ def get_live_mlb_schedule():
                     home_code = str(game["teams"]["home"]["team"]["teamCode"]).upper().strip()
                     venue_name = str(game["venue"]["name"])
                     
-                    # Core team code normalization map
                     map_teams = {"KCA": "KCR", "CHN": "CHC", "NYA": "NYY", "SDN": "SDP", "LAN": "LAD", "SFN": "SFG", "TBA": "TBR", "CHA": "CHW"}
                     away_team = map_teams.get(away_code, away_code)
                     home_team = map_teams.get(home_code, home_code)
@@ -40,10 +39,8 @@ def get_live_mlb_schedule():
 
 todays_slate = get_live_mlb_schedule()
 
-# Post-Trade Deadline Roster Sync Core Overrides
 if "tarik skubal" in todays_slate: todays_slate["tarik skubal"]["team"] = "LAD"
 if "luis castillo" in todays_slate: todays_slate["luis castillo"]["team"] = "CHW"
-
 # ------------------------------------------------------------------------------
 # GLOBAL BACKEND DATASETS INTERFACE INITIALIZATION
 # ------------------------------------------------------------------------------
@@ -54,7 +51,6 @@ def load_global_databases():
         p_db['name_clean'] = p_db['name'].str.lower().str.strip()
     except Exception:
         p_db = pd.DataFrame(columns=['name', 'team', 'throws', 'base_avg', 'games', 'strikeouts', 'ip', 'era', 'name_clean', 'base_outs'])
-        
     try:
         b_db = pd.read_csv("batter_database.csv")
         b_db['name_clean'] = b_db['name'].str.lower().str.strip()
@@ -64,10 +60,7 @@ def load_global_databases():
     return p_db, b_db
 
 pitcher_db, batter_db = load_global_databases()
-
-# Ensure critical outs tracking schema parameters exist in fallback blocks
-if 'base_outs' not in pitcher_db.columns:
-    pitcher_db['base_outs'] = 17.5
+if 'base_outs' not in pitcher_db.columns: pitcher_db['base_outs'] = 17.5
 
 # ------------------------------------------------------------------------------
 # 1. PAGE LAYOUT CONFIGURATION & HIGH-CONTRAST POPPING BLUE STYLING CORE
@@ -96,8 +89,6 @@ st.markdown("---")
 with st.sidebar:
     st.header("⚙️ Simulation Settings")
     sport = st.selectbox("Select League", ["MLB"])
-    
-    # 🟢 TARGET IMPROVEMENT: Added Total Projected Outs to dropdown selection
     market = st.selectbox("Market Type", ["Strikeouts (Ks)", "Total Projected Outs"])
     st.subheader("🔍 Active Matchup Selection")
     
@@ -118,14 +109,11 @@ with st.sidebar:
 
     st.markdown("---")
     st.subheader("🎲 Sportsbook Line Calibration")
-    
-    # Calibrate default line boundaries automatically based on market choice
     default_book_line = 15.5 if market == "Total Projected Outs" else 6.5
     sportsbook_line = st.number_input("Current Line O/U", min_value=0.5, max_value=27.5, value=float(default_book_line), step=0.5)
     
     st.markdown("---")
     st.subheader("🏟️ Environmental Weather Analytics")
-    
     auto_temp = 78 if venue_split == "Home" else 71
     auto_wind = 14 if "Wind" in current_venue_name or venue_split == "Away" else 6
     auto_vector = "Outward" if auto_wind > 10 else "Crosswind"
@@ -138,6 +126,7 @@ with st.sidebar:
     else:
         game_temp, wind_speed, wind_dir = auto_temp, auto_wind, auto_vector
         st.caption(f"🤖 Automated Weather Synced: {game_temp}°F | {wind_speed} MPH {wind_dir}")
+
 # ------------------------------------------------------------------------------
 # 3. ROW FRAMEWORK LAYER 1: INTERACTIVE INJURY SCANNER LOGIC DESK (TOP ANCHOR)
 # ------------------------------------------------------------------------------
@@ -152,90 +141,15 @@ with inj_col2:
 
 park_multiplier, ump_multiplier, fatigue_multiplier, bullpen_multiplier = 1.00, 1.00, 1.00, 1.00
 temp_multiplier = 0.96 if game_temp > 85 else (1.05 if game_temp < 52 else 1.00)
-wind_multiplier = 1.04 if (wind_speed > 10 and wind_dir == "Inward") else (0.96 if (wind_speed > 10 and wind_dir == "Outward") else 1.00)
+wind_multiplier = 1.04 if (wind_speed > 10 and wind_dir == "Inward") else (0.96 if (wind_speed > 10 and wind_dir == "Outward") else 1.00
 # ------------------------------------------------------------------------------
-# 4. ROW FRAMEWORK LAYER 2: TWO-COLUMN MAIN ANALYSIS DESK
-# ------------------------------------------------------------------------------
-lookup_key = pitcher_name_clean
-matched_pitcher = pitcher_db[pitcher_db['name_clean'] == lookup_key]
-
-if not matched_pitcher.empty:
-    p_data_row = matched_pitcher.iloc[0]
-    pitcher_base_avg = float(p_data_row['base_outs']) if market == "Total Projected Outs" else float(p_data_row['base_avg'])
-    pitcher_throws = str(p_data_row['throws']).upper().strip()
-    strikeouts = int(p_data_row['strikeouts'])
-    top_pitch_text = str(p_data_row['top_pitch']) if 'top_pitch' in p_data_row else "Four-seam FB 42% use"
-    
-    pitch_records = []
-    for p_num in range(1, 6):
-        p_name_col = f"p{p_num}"
-        p_use_col = f"p{p_num}_use"
-        p_whiff_col = f"p{p_num}_whiff"
-        if p_name_col in p_data_row.index and pd.notna(p_data_row[p_name_col]) and str(p_data_row[p_name_col]).strip() != "—":
-            pitch_records.append({"PITCH": str(p_data_row[p_name_col]).upper(), "USE": str(p_data_row[p_use_col]), "WHIFF": str(p_data_row[p_whiff_col])})
-    pitch_df = pd.DataFrame(pitch_records)
-else:
-    pitcher_base_avg = 15.2 if market == "Total Projected Outs" else 5.50
-    pitcher_throws, strikeouts = "R", 130
-    top_pitch_text = "Four-seam FB 42% use"
-    pitch_df = pd.DataFrame([{"PITCH": "FOUR-SEAM FB", "USE": "42%", "WHIFF": "W:25%"}])
-
-league_avg_k = 22.5
-team_avg_k = 24.2
-matchup_multiplier = team_avg_k / league_avg_k if market == "Strikeouts (Ks)" else 1.02
-venue_multiplier = 1.06 if venue_split == "Home" else 0.95
-vegas_multiplier = 1.00
-
-live_avg = round(pitcher_base_avg * matchup_multiplier * venue_multiplier * vegas_multiplier * park_multiplier * ump_multiplier * wind_multiplier * fatigue_multiplier * bullpen_multiplier * temp_multiplier, 2)
-diff_val = round(live_avg - sportsbook_line, 2)
-
-main_col1, main_col2 = st.columns(2)
-
-with main_col1:
-    st.markdown(f"<div class='section-header'>🔥 Searched Pitcher Metrics: {pitcher_input.title()}</div>", unsafe_allow_html=True)
-    ch1, ch2 = st.columns(2)
-    with ch1:
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>PROJ {market.upper()}</div><div class='metric-value' style='color:#FF79C6;'>{live_avg}</div><div class='class-sub-text' style='color:#50FA7B;'>{sportsbook_line} Line Set</div></div>", unsafe_allow_html=True)
-    with ch2:
-        high_prob = "84%" if live_avg > sportsbook_line else "66%"
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>PROBABILITY SCORE</div><div class='metric-value' style='color:#FFB86C;'>{high_prob}</div><div class='class-sub-text'>{top_pitch_text}</div></div>", unsafe_allow_html=True)
-        
-    c_p1, c_p2 = st.columns(2)
-    with c_p1:
-        rec_tag = "OVER" if live_avg > sportsbook_line else "UNDER"
-        rec_color = "#50FA7B" if rec_tag == "OVER" else "#FF5555"
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>RECOMMENDATION</div><div class='metric-value' style='color:{rec_color};'>{rec_tag}</div><div class='class-sub-text' style='color:#8BE9FD;'>{diff_val} Difference Gap</div></div>", unsafe_allow_html=True)
-    with c_p2:
-        grade = "A" if (live_avg > sportsbook_line * 1.15) else ("B" if live_avg > sportsbook_line else "C")
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>SIMULATION GRADE</div><div class='metric-value'>{grade}</div></div>", unsafe_allow_html=True)
-
-with main_col2:
-    st.markdown(f"<div class='section-header'>⚔️ Batter-by-Batter Projected Splitting Grid: vs {opposing_team}</div>", unsafe_allow_html=True)
-    
-    # 🟢 TARGET IMPROVEMENT: Fixed live batter lookup using an optimized uppercase stripping loop to prevent drops
-    team_hitters = batter_db[batter_db['team_clean'] == opposing_team.upper().strip()] if not batter_db.empty else pd.DataFrame()
-    lineup_rows = []
-    
-    if not team_hitters.empty:
-        for idx, b_row in team_hitters.head(9).iterrows():
-            b_hand = str(b_row['hand']).upper().strip()
-            raw_b_k = float(b_row['vs_lhp_k']) if pitcher_throws == "L" else float(b_row['vs_rhp_k'])
-            b_stab = float(b_row['k_stability']) if 'k_stability' in b_row else 1.00
-            calc_k_pct = round(raw_b_k * (1.12 if b_hand != pitcher_throws else 0.92) * b_stab, 1)
-            lineup_rows.append({"SLOT": len(lineup_rows) + 1, "BATTER LINEUP CARD": str(b_row['name']).title(), "HAND": b_hand, "RAW K% SPLIT": f"{raw_b_k}%", "DYNAMIC K% PROJECTION": f"{calc_k_pct}%"})
-    else:
-        for i in range(1, 10):
-            lineup_rows.append({"SLOT": i, "BATTER LINEUP CARD": f"Lineup Slot Active Hitter {i}", "HAND": "R" if i % 2 == 0 else "L", "RAW K% SPLIT": "23.4%", "DYNAMIC K% PROJECTION": f"{21.0 + (i * 0.5)}%"})
-            
-    st.dataframe(pd.DataFrame(lineup_rows).style.set_properties(**{'background-color': '#1A1423', 'color': '#8BE9FD'}), use_container_width=True, hide_index=True)
-# ------------------------------------------------------------------------------
-# 5. DATA MATRICES FETCHING AND MATCHUP LOOKUPS
+# 4. DATA MATRICES FETCHING AND MATCHUP LOOKUPS
 # ------------------------------------------------------------------------------
 lookup_key = pitcher_name_clean.lower().strip()
 matched_pitcher = pitcher_db[pitcher_db['name_clean'] == lookup_key]
 
 if not matched_pitcher.empty:
-    p_data_row = matched_pitcher.iloc[0]
+    p_data_row = matched_pitcher.iloc
     pitcher_base_avg = float(p_data_row['base_outs']) if market == "Total Projected Outs" else float(p_data_row['base_avg'])
     pitcher_throws = str(p_data_row['throws']).upper().strip()
     strikeouts = int(p_data_row['strikeouts'])
@@ -292,7 +206,6 @@ with main_col1:
 with main_col2:
     st.markdown(f"<div class='section-header'>⚔️ Batter-by-Batter Projected Splitting Grid: vs {opposing_team.upper()}</div>", unsafe_allow_html=True)
     
-    # API TRANSLATOR BRIDGE: Resolves abbreviation mismatches dynamically
     clean_target_team = str(opposing_team).upper().strip()
     if clean_target_team == "CHW": clean_target_team = "CWS"
     if clean_target_team == "KCR": clean_target_team = "KC"
@@ -317,8 +230,7 @@ with main_col2:
         for i in range(1, 10):
             lineup_rows.append({"SLOT": i, "BATTER LINEUP CARD": f"Lineup Slot Active Hitter {i}", "HAND": "R" if i % 2 == 0 else "L", "RAW K% SPLIT": "23.4%", "DYNAMIC K% PROJECTION": f"{21.0 + (i * 0.5)}%"})
             
-    st.dataframe(pd.DataFrame(lineup_rows).style.set_properties(**{'background-color': '#1A1423', 'color': '#8BE9FD'}), use_container_width=True, hide_index=True)
-
+    st.dataframe(pd.DataFrame(lineup_rows).style.set_properties(**={'background-color': '#1A1423', 'color': '#8BE9FD'}), use_container_width=True, hide_index=True)
 # --- RE-ANCHOR THE SUB-MATRICES ROWS SIDE-BY-SIDE OUTSIDE THE LOOP ---
 sub_col1, sub_col2 = st.columns(2)
 
@@ -344,7 +256,7 @@ with sub_col2:
     else:
         st.success("☀️ All active stadium tracking networks confirm optimal climate baselines across the country.")
 # ------------------------------------------------------------------------------
-# 6. ROW FRAMEWORK LAYER 4: FULL-WIDTH AUTOMATED GLOBAL SLATE EDGE TRACKER MATRIX
+# 5. ROW FRAMEWORK LAYER 4: FULL-WIDTH AUTOMATED GLOBAL SLATE EDGE TRACKER MATRIX
 # ------------------------------------------------------------------------------
 st.markdown("---")
 st.subheader("📋 Automated Global Slate Edge Tracker Matrix")
