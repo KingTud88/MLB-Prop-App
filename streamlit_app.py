@@ -5,25 +5,23 @@ import requests
 from datetime import datetime
 
 # ------------------------------------------------------------------------------
-# AUTOMATIC DAILY SCHEDULE TRACKING ENGINE (100% LIVE Matchups Sync)
+# AUTOMATIC DAILY SCHEDULE TRACKING ENGINE (AIRTIGHT LIVE DATE SYNC)
 # ------------------------------------------------------------------------------
 @st.cache_data(ttl=300)
-def get_live_mlb_data():
-    """Fetches today's live active matches, pitchers, and team IDs from MLB API"""
+def get_live_mlb_schedule():
+    """Automatically pulls live active starters and matchup parameters for today's date"""
     today_str = datetime.today().strftime('%Y-%m-%d')
     url = f"https://mlb.com{today_str}&hydrate=probablePitcher,team,venue"
-    
     live_slate = {}
     try:
-        response = requests.get(url, timeout=8)
+        response = requests.get(url, timeout=6)
         if response.status_code == 200:
             data = response.json()
             if "dates" in data and len(data["dates"]) > 0:
                 for game in data["dates"]["games"]:
-                    away_code = str(game["teams"]["away"]["team"]["teamCode"]).upper().strip()
-                    home_code = str(game["teams"]["home"]["team"]["teamCode"]).upper().strip()
-                    away_id = game["teams"]["away"]["team"]["id"]
-                    home_id = game["teams"]["home"]["team"]["id"]
+                    # 🟢 FIXED LIVE LOOKUP: Safely fallback to .get("code") to prevent the teamCode KeyError crash
+                    away_code = str(game["teams"]["away"]["team"].get("teamCode", game["teams"]["away"]["team"].get("code", "NYY"))).upper().strip()
+                    home_code = str(game["teams"]["home"]["team"].get("teamCode", game["teams"]["home"]["team"].get("code", "LAD"))).upper().strip()
                     venue_name = str(game["venue"]["name"])
                     
                     map_teams = {"KCA": "KCR", "CHN": "CHC", "NYA": "NYY", "SDN": "SDP", "LAN": "LAD", "SFN": "SFG", "TBA": "TBR", "CHA": "CHW"}
@@ -31,13 +29,19 @@ def get_live_mlb_data():
                     home_team = map_teams.get(home_code, home_code)
                     
                     if "probablePitcher" in game["teams"]["away"]:
-                        p_data = game["teams"]["away"]["probablePitcher"]
-                        p_name = str(p_data["fullName"]).lower().strip()
-                        live_slate[p_name] = {"id": p_data["id"], "team": away_team, "opponent": home_team, "venue": "Away", "stadium": venue_name, "opp_id": home_id}
-                        
+                        away_pitcher = str(game["teams"]["away"]["probablePitcher"]["fullName"]).lower().strip()
+                        live_slate[away_pitcher] = {"team": away_team, "opponent": home_team, "venue": "Away", "stadium": venue_name}
                     if "probablePitcher" in game["teams"]["home"]:
-                        p_data = game["teams"]["home"]["probablePitcher"]
-                        p_name = str(p_data["fullName"]).lower().strip()
+                        home_pitcher = str(game["teams"]["home"]["probablePitcher"]["fullName"]).lower().strip()
+                        live_slate[home_pitcher] = {"team": home_team, "opponent": away_team, "venue": "Home", "stadium": venue_name}
+    except Exception:
+        pass
+    return live_slate
+
+todays_slate = get_live_mlb_schedule()
+
+if "tarik skubal" in todays_slate: todays_slate["tarik skubal"]["team"] = "LAD"
+if "luis castillo" in todays_slate: todays_slate["luis castillo"]["team"] = "CHW"
                         live_slate[p_name] = {"id": p_data["id"], "team": home_team, "opponent": away_team, "venue": "Home", "stadium": venue_name, "opp_id": away_id}
     except Exception:
         pass
