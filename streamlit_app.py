@@ -141,7 +141,7 @@ with inj_col2:
 
 park_multiplier, ump_multiplier, fatigue_multiplier, bullpen_multiplier = 1.00, 1.00, 1.00, 1.00
 temp_multiplier = 0.96 if game_temp > 85 else (1.05 if game_temp < 52 else 1.00)
-wind_multiplier = 1.04 if (wind_speed > 10 and wind_dir == "Inward") else (0.96 if (wind_speed > 10 and wind_dir == "Outward") else 1.00
+wind_multiplier = 1.04 if (wind_speed > 10 and wind_dir == "Inward") else (0.96 if (wind_speed > 10 and wind_dir == "Outward") else 1.00)
 # ------------------------------------------------------------------------------
 # 4. DATA MATRICES FETCHING AND MATCHUP LOOKUPS
 # ------------------------------------------------------------------------------
