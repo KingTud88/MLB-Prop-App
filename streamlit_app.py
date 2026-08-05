@@ -157,7 +157,7 @@ lookup_key = pitcher_name_clean.lower().strip()
 matched_pitcher = pitcher_db[pitcher_db['name_clean'] == lookup_key]
 
 if not matched_pitcher.empty:
-    p_data_row = matched_pitcher.iloc
+    p_data_row = matched_pitcher.iloc[0]
     pitcher_base_avg = float(p_data_row['base_outs']) if market == "Total Projected Outs" else float(p_data_row['base_avg'])
     pitcher_throws = str(p_data_row['throws']).upper().strip()
     strikeouts = int(p_data_row['strikeouts'])
