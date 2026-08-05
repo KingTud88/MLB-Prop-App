@@ -19,12 +19,12 @@ def get_live_mlb_schedule():
             data = response.json()
             if "dates" in data and len(data["dates"]) > 0:
                 for game in data["dates"]["games"]:
-                    # Pull standard three-letter abbreviations safely by testing fallback parameters
-                    away_code = str(game["teams"]["away"]["team"].get("teamCode", game["teams"]["away"]["team"].get("code", "NYY"))).upper().strip()
-                    home_code = str(game["teams"]["home"]["team"].get("teamCode", game["teams"]["home"]["team"].get("code", "LAD"))).upper().strip()
+                    # 🟢 FIXED LIVE LOOKUP: Re-mapped nested API keys to read the modern .get("code") structures flawlessly
+                    away_code = str(game["teams"]["away"]["team"].get("code", "NYY")).upper().strip()
+                    home_code = str(game["teams"]["home"]["team"].get("code", "LAD")).upper().strip()
                     venue_name = str(game["venue"]["name"])
                     
-                    map_teams = {"KCA": "KCR", "CHN": "CHC", "NYA": "NYY", "SDN": "SDP", "LAN": "LAD", "SFN": "SFG", "TBA": "TBR", "CHA": "CHW"}
+                    map_teams = {"KCA": "KC", "CHN": "CHC", "NYA": "NYY", "SDN": "SDP", "LAN": "LAD", "SFN": "SFG", "TBA": "TBR", "CHA": "CWS"}
                     away_team = map_teams.get(away_code, away_code)
                     home_team = map_teams.get(home_code, home_code)
                     
@@ -42,7 +42,7 @@ todays_slate = get_live_mlb_schedule()
 
 # Post-Trade Deadline Roster Sync Core Overrides
 if "tarik skubal" in todays_slate: todays_slate["tarik skubal"]["team"] = "LAD"
-if "luis castillo" in todays_slate: todays_slate["luis castillo"]["team"] = "CHW"
+if "luis castillo" in todays_slate: todays_slate["luis castillo"]["team"] = "CWS"
 # ------------------------------------------------------------------------------
 # GLOBAL BACKEND DATASETS INTERFACE INITIALIZATION
 # ------------------------------------------------------------------------------
