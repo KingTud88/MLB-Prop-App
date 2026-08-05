@@ -19,7 +19,7 @@ def get_live_mlb_schedule():
             data = response.json()
             if "dates" in data and len(data["dates"]) > 0:
                 for game in data["dates"]["games"]:
-                    # 🟢 FIXED LIVE LOOKUP: Safely fallback to .get("code") to prevent the teamCode KeyError crash
+                    # Pull standard three-letter abbreviations safely by testing fallback parameters
                     away_code = str(game["teams"]["away"]["team"].get("teamCode", game["teams"]["away"]["team"].get("code", "NYY"))).upper().strip()
                     home_code = str(game["teams"]["home"]["team"].get("teamCode", game["teams"]["home"]["team"].get("code", "LAD"))).upper().strip()
                     venue_name = str(game["venue"]["name"])
@@ -40,17 +40,11 @@ def get_live_mlb_schedule():
 
 todays_slate = get_live_mlb_schedule()
 
+# Post-Trade Deadline Roster Sync Core Overrides
 if "tarik skubal" in todays_slate: todays_slate["tarik skubal"]["team"] = "LAD"
 if "luis castillo" in todays_slate: todays_slate["luis castillo"]["team"] = "CHW"
-    live_slate[p_name] = {"id": p_data["id"], "team": home_team, "opponent": away_team, "venue": "Home", "stadium": venue_name, "opp_id": away_id}
-    except Exception:
-        pass
-    return live_slate
-
-todays_slate = get_live_mlb_data()
-
 # ------------------------------------------------------------------------------
-# LOCAL BACKEND REPOSITORY DATASETS INTERFACE INITIALIZATION
+# GLOBAL BACKEND DATASETS INTERFACE INITIALIZATION
 # ------------------------------------------------------------------------------
 @st.cache_data(ttl=3600)
 def load_global_databases():
@@ -70,50 +64,9 @@ def load_global_databases():
 pitcher_db, batter_db = load_global_databases()
 if 'base_outs' not in pitcher_db.columns: pitcher_db['base_outs'] = 17.5
 # ------------------------------------------------------------------------------
-# DEEP LIVE API SEASON STATS SYSTEM FETCH TRACKER
-# ------------------------------------------------------------------------------
-@st.cache_data(ttl=900)
-def fetch_live_pitcher_averages(player_id):
-    """Pulls current season live pitching summary statistics directly from MLB"""
-    url = f"https://mlb.com{player_id}?hydrate=stats(group=[pitching],type=[season])"
-    try:
-        res = requests.get(url, timeout=5).json()
-        if "people" in res and len(res["people"]) > 0:
-            person = res["people"][0]
-            throws = person.get("pitchHand", {}).get("code", "R")
-            if "stats" in person and len(person["stats"]) > 0:
-                splits = person["stats"][0]["splits"]
-                if len(splits) > 0:
-                    stats = splits[0]["stat"]
-                    games = stats.get("gamesPlayed", 12)
-                    strikeouts = stats.get("strikeouts", 65)
-                    ip = float(stats.get("inningsPitched", "60.0"))
-                    era = float(stats.get("era", "3.80"))
-                    base_avg = round(strikeouts / games, 2) if games > 0 else 5.20
-                    base_outs = round((ip * 3) / games, 1) if games > 0 else 16.5
-                    return {"throws": throws, "games": games, "strikeouts": strikeouts, "base_avg": base_avg, "base_outs": base_outs, "era": era}
-    except Exception:
-        pass
-    return {"throws": "R", "games": 15, "strikeouts": 75, "base_avg": 5.00, "base_outs": 16.5, "era": 3.75}
-
-@st.cache_data(ttl=900)
-def fetch_live_team_roster_names(team_id):
-    """Pulls current active roster hitters from MLB to map into our database platoon sheets"""
-    url = f"https://mlb.com{team_id}/roster/Active"
-    hitter_names = []
-    try:
-        res = requests.get(url, timeout=5).json()
-        if "roster" in res:
-            for player in res["roster"]:
-                if player["position"]["type"] != "Pitcher":
-                    hitter_names.append(str(player["person"]["fullName"]).lower().strip())
-    except Exception:
-        pass
-    return hitter_names
-# ------------------------------------------------------------------------------
 # 1. PAGE LAYOUT CONFIGURATION & HIGH-CONTRAST POPPING BLUE STYLING CORE
 # ------------------------------------------------------------------------------
-st.set_page_config(page_title="MLB Hybrid Edge Predictor Master", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="MLB Strikeout Edge Predictor Master", layout="wide", initial_sidebar_state="expanded")
 st.markdown("""
 <style>
     .reportview-container { background: #0E0B16; color: #8BE9FD; }
@@ -142,17 +95,19 @@ with st.sidebar:
     
     if todays_slate:
         pitcher_input = st.selectbox("Select Active Pitcher Today:", options=sorted(list(todays_slate.keys())))
-        p_meta = todays_slate[pitcher_input.lower().strip()]
-        pitcher_id = p_meta["id"]
-        pitcher_team = p_meta["team"]
-        opposing_team = p_meta["opponent"]
-        venue_split = p_meta["venue"]
-        current_venue_name = p_meta["stadium"]
-        opposing_team_id = p_meta["opp_id"]
+        pitcher_name_clean = pitcher_input.lower().strip()
+        pitcher_team = todays_slate[pitcher_name_clean]["team"]
+        opposing_team = todays_slate[pitcher_name_clean]["opponent"]
+        venue_split = todays_slate[pitcher_name_clean]["venue"]
+        current_venue_name = todays_slate[pitcher_name_clean]["stadium"]
     else:
-        st.warning("⚠️ Live MLB API Server Standby. Using overriding defaults.")
+        st.warning("⚠️ Schedule API Server Standby. Using manual override values.")
         pitcher_input = st.text_input("Enter Pitcher Name Manually:", "tarik skubal")
-        pitcher_id, pitcher_team, opposing_team, venue_split, current_venue_name, opposing_team_id = 669373, "LAD", "CHW", "Home", "Dodger Stadium", 145
+        pitcher_name_clean = pitcher_input.lower().strip()
+        pitcher_team = st.text_input("Pitcher Team Code:", "LAD").upper().strip()
+        opposing_team = st.text_input("Opposing Batter Team Code:", "CHW").upper().strip()
+        venue_split = st.selectbox("Pitcher Venue Assignment:", ["Home", "Away"])
+        current_venue_name = "Target Field"
 
     st.markdown("---")
     st.subheader("🎲 Sportsbook Line Calibration")
@@ -160,7 +115,7 @@ with st.sidebar:
     sportsbook_line = st.number_input("Current Line O/U", min_value=0.5, max_value=27.5, value=float(default_book_line), step=0.5)
     
     st.markdown("---")
-    st.subheader("🏟️ Environmental Weather Factor Overrides")
+    st.subheader("🏟️ Environmental Weather Analytics")
     auto_temp = 78 if venue_split == "Home" else 71
     auto_wind = 14 if "Wind" in current_venue_name or venue_split == "Away" else 6
     auto_vector = "Outward" if auto_wind > 10 else "Crosswind"
@@ -174,9 +129,6 @@ with st.sidebar:
         game_temp, wind_speed, wind_dir = auto_temp, auto_wind, auto_vector
         st.caption(f"🤖 Automated Weather Synced: {game_temp}°F | {wind_speed} MPH {wind_dir}")
 
-# ------------------------------------------------------------------------------
-# 3. ROW FRAMEWORK LAYER 1: INTERACTIVE INJURY SCANNER LOGIC DESK (TOP ANCHOR)
-# ------------------------------------------------------------------------------
 st.markdown("<div class='section-header'>🚨 Team Injury Status Desk</div>", unsafe_allow_html=True)
 inj_col1, inj_col2 = st.columns(2)
 with inj_col1:
@@ -190,32 +142,35 @@ park_multiplier, ump_multiplier, fatigue_multiplier, bullpen_multiplier = 1.00, 
 temp_multiplier = 0.96 if game_temp > 85 else (1.05 if game_temp < 52 else 1.00)
 wind_multiplier = 1.04 if (wind_speed > 10 and wind_dir == "Inward") else (0.96 if (wind_speed > 10 and wind_dir == "Outward") else 1.00)
 # ------------------------------------------------------------------------------
-# 4. ROW FRAMEWORK LAYER 2: HYBRID SELECTION TARGET MATRIX TRACKER
+# 5. DATA MATRICES FETCHING AND MATCHUP LOOKUPS
 # ------------------------------------------------------------------------------
-lookup_key = pitcher_input.lower().strip()
+lookup_key = pitcher_name_clean.lower().strip()
 matched_pitcher = pitcher_db[pitcher_db['name_clean'] == lookup_key]
-live_p_stats = fetch_live_pitcher_averages(pitcher_id)
 
-# BEST OF BOTH WORLDS: Use real-time season averages for the core calculator baseline
-pitcher_base_avg = float(live_p_stats['base_outs']) if market == "Total Projected Outs" else float(live_p_stats['base_avg'])
-pitcher_throws = live_p_stats['throws'].upper().strip()
-strikeouts = live_p_stats['strikeouts']
-top_pitch_text = f"Live season ERA: {live_p_stats['era']}"
-
-# BEST OF BOTH WORLDS: Preserve pitch types and advanced whiff variables from your custom file
 if not matched_pitcher.empty:
     p_data_row = matched_pitcher.iloc[0]
-    top_pitch_text = str(p_data_row['top_pitch']) if 'top_pitch' in p_data_row.index else top_pitch_text
+    pitcher_base_avg = float(p_data_row['base_outs']) if market == "Total Projected Outs" else float(p_data_row['base_avg'])
+    pitcher_throws = str(p_data_row['throws']).upper().strip()
+    strikeouts = int(p_data_row['strikeouts'])
+    top_pitch_text = str(p_data_row['top_pitch']) if 'top_pitch' in p_data_row.index else "Four-seam FB 42% use"
+    
     pitch_records = []
     for p_num in range(1, 6):
         p_name_col = f"p{p_num}"
         p_use_col = f"p{p_num}_use"
         p_whiff_col = f"p{p_num}_whiff"
         if p_name_col in p_data_row.index and pd.notna(p_data_row[p_name_col]) and str(p_data_row[p_name_col]).strip() != "—":
-            pitch_records.append({"PITCH": str(p_data_row[p_name_col]).upper(), "USE": str(p_data_row[p_use_col]), "WHIFF": str(p_data_row[p_whiff_col])})
+            pitch_records.append({
+                "PITCH": str(p_data_row[p_name_col]).upper(),
+                "USE": str(p_data_row[p_use_col]),
+                "WHIFF": str(p_data_row[p_whiff_col])
+            })
     pitch_df = pd.DataFrame(pitch_records)
 else:
-    pitch_df = pd.DataFrame([{"PITCH": "FOUR-SEAM FB", "USE": "42%", "WHIFF": "W:25%"}, {"PITCH": "SLIDER", "USE": "28%", "WHIFF": "W:33%"}])
+    pitcher_base_avg = 15.2 if market == "Total Projected Outs" else 5.50
+    pitcher_throws, strikeouts = "R", 130
+    top_pitch_text = "Four-seam FB 42% use"
+    pitch_df = pd.DataFrame([{"PITCH": "FOUR-SEAM FB", "USE": "42%", "WHIFF": "W:25%"}])
 
 league_avg_k = 22.5
 team_avg_k = 24.2
@@ -226,14 +181,18 @@ vegas_multiplier = 1.00
 live_avg = round(pitcher_base_avg * matchup_multiplier * venue_multiplier * vegas_multiplier * park_multiplier * ump_multiplier * wind_multiplier * fatigue_multiplier * bullpen_multiplier * temp_multiplier, 2)
 diff_val = round(live_avg - sportsbook_line, 2)
 
+# --- EXECUTE THE BALANCED TWO-COLUMN ROW SPLIT ---
 main_col1, main_col2 = st.columns(2)
+
 with main_col1:
-    st.markdown(f"<div class='section-header'>🔥 Live Pitcher Metrics: {pitcher_input.title()}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='section-header'>🔥 Searched Pitcher Metrics: {pitcher_input.title()}</div>", unsafe_allow_html=True)
     ch1, ch2 = st.columns(2)
-    with ch1: st.markdown(f"<div class='metric-card'><div class='metric-label'>PROJ {market.upper()}</div><div class='metric-value' style='color:#FF79C6;'>{live_avg}</div><div class='class-sub-text' style='color:#50FA7B;'>{sportsbook_line} Line Set</div></div>", unsafe_allow_html=True)
+    with ch1:
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>PROJ {market.upper()}</div><div class='metric-value' style='color:#FF79C6;'>{live_avg}</div><div class='class-sub-text' style='color:#50FA7B;'>{sportsbook_line} Line Set</div></div>", unsafe_allow_html=True)
     with ch2:
         high_prob = "84%" if live_avg > sportsbook_line else "66%"
         st.markdown(f"<div class='metric-card'><div class='metric-label'>PROBABILITY SCORE</div><div class='metric-value' style='color:#FFB86C;'>{high_prob}</div><div class='class-sub-text'>{top_pitch_text}</div></div>", unsafe_allow_html=True)
+        
     c_p1, c_p2 = st.columns(2)
     with c_p1:
         rec_tag = "OVER" if live_avg > sportsbook_line else "UNDER"
@@ -244,35 +203,36 @@ with main_col1:
         st.markdown(f"<div class='metric-card'><div class='metric-label'>SIMULATION GRADE</div><div class='metric-value'>{grade}</div></div>", unsafe_allow_html=True)
 
 with main_col2:
-    st.markdown(f"<div class='section-header'>⚔️ Hybrid Platoon Splitting Grid: vs {opposing_team.upper()}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='section-header'>⚔️ Batter-by-Batter Projected Splitting Grid: vs {opposing_team.upper()}</div>", unsafe_allow_html=True)
     
-    # BEST OF BOTH WORLDS: Load today's real lineup roster names directly from the live API
-    live_roster_names = fetch_live_team_roster_names(opposing_team_id)
+    clean_target_team = str(opposing_team).upper().strip()
+    if clean_target_team == "CHW": clean_target_team = "CWS"
+    if clean_target_team == "KCR": clean_target_team = "KC"
+    
+    team_hitters = batter_db[batter_db['team_clean'] == clean_target_team] if not batter_db.empty else pd.DataFrame()
     lineup_rows = []
     
-    clean_target_team = "CWS" if opposing_team.upper().strip() == "CHW" else ("KC" if opposing_team.upper().strip() == "KCR" else opposing_team.upper().strip())
-    team_hitters_db = batter_db[batter_db['team_clean'] == clean_target_team] if not batter_db.empty else pd.DataFrame()
-    
-    if live_roster_names and not team_hitters_db.empty:
-        for p_name in live_roster_names[:9]:
-            match_hitter = team_hitters_db[team_hitters_db['name_clean'] == p_name]
-            if not match_hitter.empty:
-                b_row = match_hitter.iloc[0]
-                b_hand = str(b_row['hand']).upper().strip()
-                raw_b_k = float(b_row['vs_lhp_k']) if pitcher_throws == "L" else float(b_row['vs_rhp_k'])
-                b_stab = float(b_row['k_stability']) if 'k_stability' in b_row.index else 1.00
-            else:
-                b_hand, raw_b_k, b_stab = "R", 22.4, 1.00
-                
+    if not team_hitters.empty:
+        for idx, b_row in team_hitters.head(9).iterrows():
+            b_hand = str(b_row['hand']).upper().strip()
+            raw_b_k = float(b_row['vs_lhp_k']) if pitcher_throws == "L" else float(b_row['vs_rhp_k'])
+            b_stab = float(b_row['k_stability']) if 'k_stability' in b_row else 1.00
             calc_k_pct = round(raw_b_k * (1.12 if b_hand != pitcher_throws else 0.92) * b_stab, 1)
-            lineup_rows.append({"SLOT": len(lineup_rows) + 1, "BATTER LINEUP CARD": p_name.title(), "HAND": b_hand, "RAW K% SPLIT": f"{raw_b_k}%", "DYNAMIC K% PROJECTION": f"{calc_k_pct}%"})
+            lineup_rows.append({
+                "SLOT": len(lineup_rows) + 1,
+                "BATTER LINEUP CARD": str(b_row['name']).title(),
+                "HAND": b_hand,
+                "RAW K% SPLIT": f"{raw_b_k}%",
+                "DYNAMIC K% PROJECTION": f"{calc_k_pct}%"
+            })
+    else:
+        for i in range(1, 10):
+            lineup_rows.append({"SLOT": i, "BATTER LINEUP CARD": f"Lineup Slot Active Hitter {i}", "HAND": "R", "RAW K% SPLIT": "23.4%", "DYNAMIC K% PROJECTION": f"{21.0 + (i * 0.5)}%"})
             
-    if not lineup_rows:
-        for i in range(1, 10): lineup_rows.append({"SLOT": i, "BATTER LINEUP CARD": f"Live Lineup Slot Starter {i}", "HAND": "R", "RAW K% SPLIT": "22.5%", "DYNAMIC K% PROJECTION": "21.4%"})
-        
     st.dataframe(pd.DataFrame(lineup_rows).style.set_properties(**{'background-color': '#1A1423', 'color': '#8BE9FD'}), use_container_width=True, hide_index=True)
-# --- RE-ANCHOR ADVANCED ARSENAL & WEATHER ALERTS MATRIX ROWS ---
+# --- RE-ANCHOR THE SUB-MATRICES ROWS SIDE-BY-SIDE OUTSIDE THE LOOP ---
 sub_col1, sub_col2 = st.columns(2)
+
 with sub_col1:
     st.markdown("<div class='section-header'>📊 Balanced Pitch Arsenal Matrix</div>", unsafe_allow_html=True)
     if not pitch_df.empty:
@@ -288,52 +248,66 @@ with sub_col1:
 with sub_col2:
     st.markdown("<div class='section-header'>⛈️ Stadium Adverse Weather Alert Center</div>", unsafe_allow_html=True)
     weather_alerts = []
-    if wind_speed > 10: weather_alerts.append({"STADIUM / BALLPARK": current_venue_name, "MATCHUP": f"{pitcher_team} vs {opposing_team}", "WIND VELOCITY": f"{wind_speed} MPH", "CRITICAL IMPACT STATUS": f"⚠️ Heavy {wind_dir} Vectors Detected"})
-    if weather_alerts: st.dataframe(pd.DataFrame(weather_alerts).style.set_properties(**{'background-color': '#2A1B27', 'color': '#FF5555'}), use_container_width=True, hide_index=True)
-    else: st.success("☀️ All active stadium tracking networks confirm optimal climate baselines across the country.")
+    if wind_speed > 10:
+        weather_alerts.append({"STADIUM / BALLPARK": current_venue_name, "MATCHUP": f"{pitcher_team} vs {opposing_team}", "WIND VELOCITY": f"{wind_speed} MPH", "CRITICAL IMPACT STATUS": f"⚠️ Heavy {wind_dir} Vectors Detected"})
+    if weather_alerts:
+        st.dataframe(pd.DataFrame(weather_alerts).style.set_properties(**{'background-color': '#2A1B27', 'color': '#FF5555'}), use_container_width=True, hide_index=True)
+    else:
+        st.success("☀️ All active stadium tracking networks confirm optimal climate baselines across the country.")
 
 # ------------------------------------------------------------------------------
-# 5. FULL-WIDTH AUTOMATED GLOBAL SLATE EDGE TRACKER MATRIX (HYBRID INTEL SYSTEM)
+# 6. ROW FRAMEWORK LAYER 4: FULL-WIDTH AUTOMATED GLOBAL SLATE EDGE TRACKER MATRIX
 # ------------------------------------------------------------------------------
 st.markdown("---")
 st.subheader("📋 Automated Global Slate Edge Tracker Matrix")
 
 global_tracker_rows = []
-sample_slate = {"tarik skubal": {"id": 669373, "team": "LAD", "opponent": "CHW", "venue": "Home", "stadium": "Dodger Stadium", "opp_id": 145}}
+sample_slate = {"tarik skubal": {"team": "LAD", "opponent": "CHW"}, "paul skenes": {"team": "PIT", "opponent": "CIN"}, "dylan cease": {"team": "SDP", "opponent": "SFG"}, "corbin burnes": {"team": "BAL", "opponent": "PHI"}, "cole ragans": {"team": "KCR", "opponent": "DET"}, "zack wheeler": {"team": "PHI", "opponent": "BAL"}, "garrett crochet": {"team": "CHW", "opponent": "LAD"}}
+
 active_slate_source = todays_slate if (todays_slate and len(todays_slate) >= 2) else sample_slate
+active_starters_list = [str(k).lower().strip() for k in active_slate_source.keys()]
+filtered_pitcher_db = pitcher_db[pitcher_db['name_clean'].str.lower().str.strip().isin(active_starters_list)]
 
-for p_name, p_meta in active_slate_source.items():
-    p_id = p_meta["id"]
-    opp_team_target = p_meta["opponent"]
-    p_team_code = p_meta["team"]
-    
-    # Query live stats for every daily player row dynamically
-    row_stats = fetch_live_pitcher_averages(p_id)
-    p_base = float(row_stats['base_outs']) if market == "Total Projected Outs" else float(row_stats['base_avg'])
-    p_arm_side = row_stats['throws'].upper().strip()
-    
-    simulated_proj = float(p_base)
-    current_book_line = sportsbook_line if p_name == lookup_key else (15.5 if market == "Total Projected Outs" else 5.5)
-    
-    p_matchup_mult = 1.00
-    db_lookup_team = "CWS" if opp_team_target == "CHW" else opp_team_target
-    if not batter_db.empty and db_lookup_team in batter_db['team_clean'].values:
-        team_hitters = batter_db[batter_db['team_clean'] == db_lookup_team]
-        k_list_calc = []
-        for _, b_row in team_hitters.head(9).iterrows():
-            b_hand = str(b_row['hand']).upper().strip()
-            raw_b_k = float(b_row['vs_lhp_k']) if p_arm_side == "L" else float(b_row['vs_rhp_k'])
-            b_stab = float(b_row['k_stability']) if 'k_stability' in b_row.index else 1.00
-            if (b_hand == "L" and p_arm_side == "R") or (b_hand == "R" and p_arm_side == "L") or b_hand == "S": k_list_calc.append(raw_b_k * 1.12 * b_stab)
-            else: k_list_calc.append(raw_b_k * 0.92 * b_stab)
-        if k_list_calc and market == "Strikeouts (Ks)": p_matchup_mult = (sum(k_list_calc) / len(k_list_calc)) / 22.5
+if not filtered_pitcher_db.empty:
+    for _, p_data in filtered_pitcher_db.iterrows():
+        p_name_raw = str(p_data['name']).title()
+        p_name_clean = str(p_data['name']).lower().strip()
+        
+        p_base = float(p_data['base_outs']) if (market == "Total Projected Outs" and 'base_outs' in p_data.index) else float(p_data['base_avg'])
+        p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data.index else "R"
+        
+        opp_team_target = str(active_slate_source[p_name_clean]["opponent"]).upper().strip()
+        db_lookup_team = "CWS" if opp_team_target == "CHW" else opp_team_target
+        p_team_code = str(active_slate_source[p_name_clean]["team"]).upper().strip()
+        
+        simulated_proj = float(p_base)
+        current_book_line = sportsbook_line if p_name_clean == lookup_key else (15.5 if market == "Total Projected Outs" else 5.5)
+        p_matchup_mult = 1.00
+        
+        if p_name_clean == lookup_key:
+            simulated_proj = live_avg
+            current_book_line = sportsbook_line
+        else:
+            if not batter_db.empty and db_lookup_team in batter_db['team_clean'].values:
+                team_hitters = batter_db[batter_db['team_clean'] == db_lookup_team]
+                k_list_calc = []
+                for _, b_row in team_hitters.head(9).iterrows():
+                    b_hand = str(b_row['hand']).upper().strip()
+                    raw_b_k = float(b_row['vs_lhp_k']) if p_arm_side == "L" else float(b_row['vs_rhp_k'])
+                    b_stab = float(b_row['k_stability']) if 'k_stability' in b_row.index else 1.00
+                    if (b_hand == "L" and p_arm_side == "R") or (b_hand == "R" and p_arm_side == "L") or b_hand == "S":
+                        k_list_calc.append(raw_b_k * 1.12 * b_stab)
+                    else:
+                        k_list_calc.append(raw_b_k * 0.92 * b_stab)
+                if k_list_calc and market == "Strikeouts (Ks)": 
+                    p_matchup_mult = (sum(k_list_calc) / len(k_list_calc)) / 22.5
 
-    p_park_mult, p_bullpen_mult = 1.00, 1.00
-    simulated_proj = round(simulated_proj * p_matchup_mult * p_park_mult * p_bullpen_mult, 2)
-    arbitrage_edge = round(simulated_proj - current_book_line, 2)
-    
-    edge_tier = "🔥 S-Tier Edge Max" if arbitrage_edge >= 1.25 else ("⭐ A-Tier Value" if arbitrage_edge >= 0.50 else ("❄️ Short Edge Max" if arbitrage_edge <= -1.25 else "⚖️ Neutral Line"))
-    global_tracker_rows.append({"PITCHER": p_name.title(), "TEAM": p_team_code, "OPPONENT": opp_team_target, "ARM": f"{p_arm_side}HP", "BASE": p_base, "LINE": current_book_line, "PROJ": simulated_proj, "GAP": arbitrage_edge, "SIDE": "OVER" if arbitrage_edge >= 0 else "UNDER", "STATUS": edge_tier})
+        p_park_mult, p_bullpen_mult = 1.00, 1.00
+        simulated_proj = round(simulated_proj * p_matchup_mult * p_park_mult * p_bullpen_mult, 2)
+        arbitrage_edge = round(simulated_proj - current_book_line, 2)
+        
+        edge_tier = "🔥 S-Tier Edge Max" if arbitrage_edge >= 1.25 else ("⭐ A-Tier Value" if arbitrage_edge >= 0.50 else ("❄️ Short Edge Max" if arbitrage_edge <= -1.25 else "⚖️ Neutral Line"))
+        global_tracker_rows.append({"PITCHER": p_name_raw, "TEAM": p_team_code, "OPPONENT": opp_team_target, "ARM": f"{p_arm_side}HP", "BASE": p_base, "LINE": current_book_line, "PROJ": simulated_proj, "GAP": arbitrage_edge, "SIDE": "OVER" if arbitrage_edge >= 0 else "UNDER", "STATUS": edge_tier})
 
 if global_tracker_rows:
     master_slate_df = pd.DataFrame(global_tracker_rows)
@@ -345,4 +319,3 @@ if global_tracker_rows:
         subset=["STATUS"]
     )
     st.dataframe(styled_master_board, use_container_width=True, hide_index=True)
-  
