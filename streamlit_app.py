@@ -1,21 +1,3 @@
-import sys
-
-# ------------------------------------------------------------------------------
-# ADVANCED SERVER MIDDLEWARE HOOK (FORCES COMPATIBILITY WITH NEWEST STARLETTE BUILDS)
-# ------------------------------------------------------------------------------
-try:
-    import starlette.middleware.gzip as starlette_gzip
-    if hasattr(starlette_gzip, "GZipResponder") and not hasattr(starlette_gzip.GZipResponder, "__init___patched"):
-        original_init = starlette_gzip.GZipResponder.__init__
-        def patched_init(self, app, minimum_size=500, **kwargs):
-            # Map old parameters to the newest required keyword-only argument structure dynamically
-            kwargs.pop("thread_minimum_size", None)
-            original_init(self, app, minimum_size=minimum_size, **kwargs)
-        starlette_gzip.GZipResponder.__init__ = patched_init
-        starlette_gzip.GZipResponder.__init___patched = True
-except Exception:
-    pass
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -32,6 +14,7 @@ def get_live_mlb_schedule():
     url = f"https://mlb.com{today_str}&hydrate=probablePitcher,team,venue"
     live_slate = {}
     
+    # Official MLB Live Numeric ID to 3-Letter CSV Abbreviation Translation Matrix
     mlb_id_map = {
         109: "ARI", 144: "ATL", 110: "BAL", 111: "BOS", 112: "CHC", 145: "CHW", 113: "CIN", 114: "CLE", 
         115: "COL", 116: "DET", 117: "HOU", 118: "KCR", 138: "LAA", 119: "LAD", 139: "MIA", 158: "MIL", 
@@ -119,10 +102,8 @@ with st.sidebar:
     if todays_slate and len(todays_slate) > 0:
         display_options = sorted([name.title() for name in todays_slate.keys()])
         pitcher_display_choice = st.selectbox("Select Active Pitcher Today:", options=display_options)
-        
         pitcher_input = pitcher_display_choice.lower().strip()
         pitcher_name_clean = pitcher_input
-        
         pitcher_team = todays_slate[pitcher_name_clean]["team"]
         opposing_team = todays_slate[pitcher_name_clean]["opponent"]
         venue_split = todays_slate[pitcher_name_clean]["venue"]
@@ -176,7 +157,7 @@ lookup_key = pitcher_name_clean.lower().strip()
 matched_pitcher = pitcher_db[pitcher_db['name_clean'] == lookup_key]
 
 if not matched_pitcher.empty:
-    p_data_row = matched_pitcher.iloc[0]
+    p_data_row = matched_pitcher.iloc
     pitcher_base_avg = float(p_data_row['base_outs']) if market == "Total Projected Outs" else float(p_data_row['base_avg'])
     pitcher_throws = str(p_data_row['throws']).upper().strip()
     strikeouts = int(p_data_row['strikeouts'])
@@ -209,20 +190,16 @@ vegas_multiplier = 1.00
 live_avg = round(pitcher_base_avg * matchup_multiplier * venue_multiplier * vegas_multiplier * park_multiplier * ump_multiplier * wind_multiplier * fatigue_multiplier * bullpen_multiplier * temp_multiplier, 2)
 diff_val = round(live_avg - sportsbook_line, 2)
 
-# 🎲 PRO UPGRADE CORE: Simulates 10,000 games instantly using the mathematical Poisson distribution
 simulated_games = np.random.poisson(live_avg, 10000)
 over_prob_pct = round(np.mean(simulated_games > sportsbook_line) * 100, 1)
 
-# --- EXECUTE THE BALANCED TWO-COLUMN ROW SPLIT ---
 main_col1, main_col2 = st.columns(2)
-
 with main_col1:
     st.markdown(f"<div class='section-header'>🔥 Searched Pitcher Metrics: {pitcher_input.title()}</div>", unsafe_allow_html=True)
     ch1, ch2 = st.columns(2)
     with ch1:
         st.markdown(f"<div class='metric-card'><div class='metric-label'>PROJ {market.upper()}</div><div class='metric-value' style='color:#FF79C6;'>{live_avg}</div><div class='class-sub-text' style='color:#50FA7B;'>{sportsbook_line} Line Set</div></div>", unsafe_allow_html=True)
     with ch2:
-        # Displays the real calculated math probability instead of the old hardcoded text
         st.markdown(f"<div class='metric-card'><div class='metric-label'>OVER PROBABILITY</div><div class='metric-value' style='color:#FFB86C;'>{over_prob_pct}%</div><div class='class-sub-text'>Based on 10,000 Sims</div></div>", unsafe_allow_html=True)
         
     c_p1, c_p2 = st.columns(2)
@@ -236,7 +213,6 @@ with main_col1:
 
 with main_col2:
     st.markdown(f"<div class='section-header'>⚔️ Batter-by-Batter Projected Splitting Grid: vs {opposing_team.upper()}</div>", unsafe_allow_html=True)
-    
     clean_target_team = str(opposing_team).upper().strip()
     if clean_target_team == "CHW": clean_target_team = "CWS"
     if clean_target_team == "KCR": clean_target_team = "KC"
