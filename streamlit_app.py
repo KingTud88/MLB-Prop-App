@@ -89,7 +89,7 @@ st.markdown("""
 st.title("🏹 MLB Strikeout Edge Predictor Engine")
 st.markdown("---")
 # ------------------------------------------------------------------------------
-# 2. INTERACTIVE SIDEBAR CONFIGURATION DESK (WITH WEATHER AUTOMATION)
+# 2. INTERACTIVE SIDEBAR CONFIGURATION DESK (WITH AIRTIGHT WARNING VALIDATION)
 # ------------------------------------------------------------------------------
 with st.sidebar:
     st.header("⚙️ Simulation Settings")
@@ -97,19 +97,28 @@ with st.sidebar:
     market = st.selectbox("Market Type", ["Strikeouts (Ks)", "Total Projected Outs"])
     st.subheader("🔍 Active Matchup Selection")
     
-    if todays_slate:
-        pitcher_input = st.selectbox("Select Active Pitcher Today:", options=sorted(list(todays_slate.keys())))
-        pitcher_name_clean = pitcher_input.lower().strip()
+    # Core Validation Upgrade: Ensure slate dictionary contains active length parameters
+    if todays_slate and len(todays_slate) > 0:
+        # 🟢 CORRECTION: Display choices cleanly in Title Case while keeping matching lookup keys behind the scenes
+        display_options = sorted([name.title() for name in todays_slate.keys()])
+        pitcher_display_choice = st.selectbox("Select Active Pitcher Today:", options=display_options)
+        
+        # Standardize matching key strings natively to eliminate fake standby flags instantly
+        pitcher_input = pitcher_display_choice.lower().strip()
+        pitcher_name_clean = pitcher_input
+        
         pitcher_team = todays_slate[pitcher_name_clean]["team"]
         opposing_team = todays_slate[pitcher_name_clean]["opponent"]
         venue_split = todays_slate[pitcher_name_clean]["venue"]
         current_venue_name = todays_slate[pitcher_name_clean]["stadium"]
     else:
+        # Seamlessly handle standby fallbacks when data arrays are empty
         st.warning("⚠️ Schedule API Server Standby. Using manual override values.")
-        pitcher_input = st.text_input("Enter Pitcher Name Manually:", "tarik skubal")
-        pitcher_name_clean = pitcher_input.lower().strip()
+        pitcher_display_choice = st.text_input("Enter Pitcher Name Manually:", "Tarik Skubal")
+        pitcher_name_clean = pitcher_display_choice.lower().strip()
+        pitcher_input = pitcher_name_clean
         pitcher_team = st.text_input("Pitcher Team Code:", "LAD").upper().strip()
-        opposing_team = st.text_input("Opposing Batter Team Code:", "CWS").upper().strip()
+        opposing_team = st.text_input("Opposing Batter Team Code:", "CHW").upper().strip()
         venue_split = st.selectbox("Pitcher Venue Assignment:", ["Home", "Away"])
         current_venue_name = "Target Field"
 
