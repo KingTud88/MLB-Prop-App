@@ -170,7 +170,7 @@ park_multiplier, ump_multiplier, fatigue_multiplier, bullpen_multiplier = 1.00, 
 temp_multiplier = 0.96 if game_temp > 85 else (1.05 if game_temp < 52 else 1.00)
 wind_multiplier = 1.04 if (wind_speed > 10 and wind_dir == "Inward") else (0.96 if (wind_speed > 10 and wind_dir == "Outward") else 1.00)
 # ------------------------------------------------------------------------------
-# 5. DATA MATRICES FETCHING AND MATCHUP LOOKUPS
+# 5. DATA MATRICES FETCHING AND MATCHUP LOOKUPS (WITH 10,000-GAME PRO SIMULATION)
 # ------------------------------------------------------------------------------
 lookup_key = pitcher_name_clean.lower().strip()
 matched_pitcher = pitcher_db[pitcher_db['name_clean'] == lookup_key]
@@ -209,6 +209,10 @@ vegas_multiplier = 1.00
 live_avg = round(pitcher_base_avg * matchup_multiplier * venue_multiplier * vegas_multiplier * park_multiplier * ump_multiplier * wind_multiplier * fatigue_multiplier * bullpen_multiplier * temp_multiplier, 2)
 diff_val = round(live_avg - sportsbook_line, 2)
 
+# 🎲 PRO UPGRADE CORE: Simulates 10,000 games instantly using the mathematical Poisson distribution
+simulated_games = np.random.poisson(live_avg, 10000)
+over_prob_pct = round(np.mean(simulated_games > sportsbook_line) * 100, 1)
+
 # --- EXECUTE THE BALANCED TWO-COLUMN ROW SPLIT ---
 main_col1, main_col2 = st.columns(2)
 
@@ -218,8 +222,8 @@ with main_col1:
     with ch1:
         st.markdown(f"<div class='metric-card'><div class='metric-label'>PROJ {market.upper()}</div><div class='metric-value' style='color:#FF79C6;'>{live_avg}</div><div class='class-sub-text' style='color:#50FA7B;'>{sportsbook_line} Line Set</div></div>", unsafe_allow_html=True)
     with ch2:
-        high_prob = "84%" if live_avg > sportsbook_line else "66%"
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>PROBABILITY SCORE</div><div class='metric-value' style='color:#FFB86C;'>{high_prob}</div><div class='class-sub-text'>{top_pitch_text}</div></div>", unsafe_allow_html=True)
+        # Displays the real calculated math probability instead of the old hardcoded text
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>OVER PROBABILITY</div><div class='metric-value' style='color:#FFB86C;'>{over_prob_pct}%</div><div class='class-sub-text'>Based on 10,000 Sims</div></div>", unsafe_allow_html=True)
         
     c_p1, c_p2 = st.columns(2)
     with c_p1:
@@ -227,7 +231,7 @@ with main_col1:
         rec_color = "#50FA7B" if rec_tag == "OVER" else "#FF5555"
         st.markdown(f"<div class='metric-card'><div class='metric-label'>RECOMMENDATION</div><div class='metric-value' style='color:{rec_color};'>{rec_tag}</div><div class='class-sub-text' style='color:#8BE9FD;'>{diff_val} Difference Gap</div></div>", unsafe_allow_html=True)
     with c_p2:
-        grade = "A" if (live_avg > sportsbook_line * 1.15) else ("B" if live_avg > sportsbook_line else "C")
+        grade = "A" if (over_prob_pct > 65 or over_prob_pct < 35) else ("B" if (over_prob_pct > 55 or over_prob_pct < 45) else "C")
         st.markdown(f"<div class='metric-card'><div class='metric-label'>SIMULATION GRADE</div><div class='metric-value'>{grade}</div></div>", unsafe_allow_html=True)
 
 with main_col2:
