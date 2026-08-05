@@ -13,21 +13,28 @@ def get_live_mlb_schedule():
     today_str = datetime.today().strftime('%Y-%m-%d')
     url = f"https://mlb.com{today_str}&hydrate=probablePitcher,team,venue"
     live_slate = {}
+    
+    # Official MLB Live Numeric ID to 3-Letter CSV Abbreviation Translation Matrix
+    mlb_id_map = {
+        109: "ARI", 144: "ATL", 110: "BAL", 111: "BOS", 112: "CHC", 145: "CHW", 113: "CIN", 114: "CLE", 
+        115: "COL", 116: "DET", 117: "HOU", 118: "KCR", 138: "LAA", 119: "LAD", 139: "MIA", 158: "MIL", 
+        142: "MIN", 121: "NYM", 147: "NYY", 133: "OAK", 143: "PHI", 134: "PIT", 135: "SDP", 137: "SFG", 
+        136: "SEA", 141: "STL", 140: "TBR", 146: "TEX", 143: "PHI", 120: "WSH", 118: "KC", 145: "CWS"
+    }
+    
     try:
         response = requests.get(url, timeout=6)
         if response.status_code == 200:
             data = response.json()
             if "dates" in data and len(data["dates"]) > 0:
                 for game in data["dates"]["games"]:
-                    away_code = str(game["teams"]["away"]["team"].get("teamCode", game["teams"]["away"]["team"].get("code", "NYY"))).upper().strip()
-                    home_code = str(game["teams"]["home"]["team"].get("teamCode", game["teams"]["home"]["team"].get("code", "LAD"))).upper().strip()
-                    
-                    # 🟢 SAFE API PATCH: Use .get() to prevent missing stadium text crashes
+                    # 🟢 SYSTEM FIX: Extract raw live unique numeric IDs to prevent lookup dropouts
+                    away_id = game["teams"]["away"]["team"].get("id")
+                    home_id = game["teams"]["home"]["team"].get("id")
                     venue_name = str(game.get("venue", {}).get("name", "Standard Ballpark"))
                     
-                    map_teams = {"KCA": "KCR", "CHN": "CHC", "NYA": "NYY", "SDN": "SDP", "LAN": "LAD", "SFN": "SFG", "TBA": "TBR", "CHA": "CHW"}
-                    away_team = map_teams.get(away_code, away_code)
-                    home_team = map_teams.get(home_code, home_code)
+                    away_team = mlb_id_map.get(away_id, "NYY")
+                    home_team = mlb_id_map.get(home_id, "LAD")
                     
                     if "probablePitcher" in game["teams"]["away"]:
                         away_pitcher = str(game["teams"]["away"]["probablePitcher"]["fullName"]).lower().strip()
@@ -41,6 +48,7 @@ def get_live_mlb_schedule():
 
 todays_slate = get_live_mlb_schedule()
 
+# Post-Trade Deadline Roster Sync Core Overrides
 if "tarik skubal" in todays_slate: todays_slate["tarik skubal"]["team"] = "LAD"
 if "luis castillo" in todays_slate: todays_slate["luis castillo"]["team"] = "CHW"
 # ------------------------------------------------------------------------------
@@ -93,13 +101,11 @@ with st.sidebar:
     market = st.selectbox("Market Type", ["Strikeouts (Ks)", "Total Projected Outs"])
     st.subheader("🔍 Active Matchup Selection")
     
-    # Core Validation Upgrade: Ensure slate dictionary contains active length parameters
+    # 🟢 SYSTEM FIX: Checks the live date cache length directly to toggle standby indicators cleanly
     if todays_slate and len(todays_slate) > 0:
-        # 🟢 CORRECTION: Display choices cleanly in Title Case while keeping matching lookup keys behind the scenes
         display_options = sorted([name.title() for name in todays_slate.keys()])
         pitcher_display_choice = st.selectbox("Select Active Pitcher Today:", options=display_options)
         
-        # Standardize matching key strings natively to eliminate fake standby flags instantly
         pitcher_input = pitcher_display_choice.lower().strip()
         pitcher_name_clean = pitcher_input
         
@@ -108,13 +114,12 @@ with st.sidebar:
         venue_split = todays_slate[pitcher_name_clean]["venue"]
         current_venue_name = todays_slate[pitcher_name_clean]["stadium"]
     else:
-        # Seamlessly handle standby fallbacks when data arrays are empty
         st.warning("⚠️ Schedule API Server Standby. Using manual override values.")
         pitcher_display_choice = st.text_input("Enter Pitcher Name Manually:", "Tarik Skubal")
         pitcher_name_clean = pitcher_display_choice.lower().strip()
         pitcher_input = pitcher_name_clean
         pitcher_team = st.text_input("Pitcher Team Code:", "LAD").upper().strip()
-        opposing_team = st.text_input("Opposing Batter Team Code:", "CHW").upper().strip()
+        opposing_team = st.text_input("Opposing Batter Team Code:", "CWS").upper().strip()
         venue_split = st.selectbox("Pitcher Venue Assignment:", ["Home", "Away"])
         current_venue_name = "Target Field"
 
@@ -215,8 +220,8 @@ with main_col2:
     st.markdown(f"<div class='section-header'>⚔️ Batter-by-Batter Projected Splitting Grid: vs {opposing_team.upper()}</div>", unsafe_allow_html=True)
     
     clean_target_team = str(opposing_team).upper().strip()
-    if clean_target_team == "CHW" or clean_target_team == "CHA": clean_target_team = "CWS"
-    if clean_target_team == "KCR" or clean_target_team == "KCA": clean_target_team = "KC"
+    if clean_target_team == "CHW": clean_target_team = "CWS"
+    if clean_target_team == "KCR": clean_target_team = "KC"
     
     team_hitters = batter_db[batter_db['team_clean'] == clean_target_team] if not batter_db.empty else pd.DataFrame()
     lineup_rows = []
@@ -271,7 +276,7 @@ st.markdown("---")
 st.subheader("📋 Automated Global Slate Edge Tracker Matrix")
 
 global_tracker_rows = []
-sample_slate = {"tarik skubal": {"team": "LAD", "opponent": "CWS"}, "paul skenes": {"team": "PIT", "opponent": "CIN"}, "dylan cease": {"team": "SDP", "opponent": "SFG"}, "corbin burnes": {"team": "BAL", "opponent": "PHI"}, "cole ragans": {"team": "KCR", "opponent": "DET"}, "zack wheeler": {"team": "PHI", "opponent": "BAL"}, "garrett crochet": {"team": "CWS", "opponent": "LAD"}}
+sample_slate = {"tarik skubal": {"team": "LAD", "opponent": "CHW"}, "paul skenes": {"team": "PIT", "opponent": "CIN"}, "dylan cease": {"team": "SDP", "opponent": "SFG"}, "corbin burnes": {"team": "BAL", "opponent": "PHI"}, "cole ragans": {"team": "KCR", "opponent": "DET"}, "zack wheeler": {"team": "PHI", "opponent": "BAL"}, "garrett crochet": {"team": "CHW", "opponent": "LAD"}}
 
 active_slate_source = todays_slate if (todays_slate and len(todays_slate) >= 2) else sample_slate
 active_starters_list = [str(k).lower().strip() for k in active_slate_source.keys()]
@@ -286,7 +291,7 @@ if not filtered_pitcher_db.empty:
         p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data.index else "R"
         
         opp_team_target = str(active_slate_source[p_name_clean]["opponent"]).upper().strip()
-        db_lookup_team = "CWS" if (opp_team_target == "CHW" or opp_team_target == "CHA") else opp_team_target
+        db_lookup_team = "CWS" if opp_team_target == "CHW" else opp_team_target
         p_team_code = str(active_slate_source[p_name_clean]["team"]).upper().strip()
         
         simulated_proj = float(p_base)
