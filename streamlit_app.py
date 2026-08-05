@@ -1,4 +1,4 @@
-import streamlit as st
+import streamlit st
 import pandas as pd
 import numpy as np
 import requests
@@ -11,24 +11,21 @@ from datetime import datetime
 def get_live_mlb_schedule():
     """Automatically pulls live active starters and matchup parameters for today's date"""
     today_str = datetime.today().strftime('%Y-%m-%d')
-    # Optimized direct query endpoint structure ensures rapid response times
     url = f"https://mlb.com{today_str}&hydrate=probablePitcher,team,venue"
     live_slate = {}
     try:
-        response = requests.get(url, timeout=8)
+        response = requests.get(url, timeout=6)
         if response.status_code == 200:
             data = response.json()
             if "dates" in data and len(data["dates"]) > 0:
                 for game in data["dates"]["games"]:
-                    away_obj = game["teams"]["away"]["team"]
-                    home_obj = game["teams"]["home"]["team"]
+                    away_code = str(game["teams"]["away"]["team"].get("teamCode", game["teams"]["away"]["team"].get("code", "NYY"))).upper().strip()
+                    home_code = str(game["teams"]["home"]["team"].get("teamCode", game["teams"]["home"]["team"].get("code", "LAD"))).upper().strip()
                     
-                    # Fallback architecture guarantees team code extraction
-                    away_code = str(away_obj.get("code", away_obj.get("teamCode", "NYY"))).upper().strip()
-                    home_code = str(home_obj.get("code", home_obj.get("teamCode", "LAD"))).upper().strip()
-                    venue_name = str(game["venue"]["name"])
+                    # 🟢 SAFE API PATCH: Use .get() to prevent missing stadium text crashes
+                    venue_name = str(game.get("venue", {}).get("name", "Standard Ballpark"))
                     
-                    map_teams = {"KCA": "KC", "CHN": "CHC", "NYA": "NYY", "SDN": "SDP", "LAN": "LAD", "SFN": "SFG", "TBA": "TBR", "CHW": "CWS", "CHA": "CWS"}
+                    map_teams = {"KCA": "KCR", "CHN": "CHC", "NYA": "NYY", "SDN": "SDP", "LAN": "LAD", "SFN": "SFG", "TBA": "TBR", "CHA": "CHW"}
                     away_team = map_teams.get(away_code, away_code)
                     home_team = map_teams.get(home_code, home_code)
                     
@@ -44,9 +41,8 @@ def get_live_mlb_schedule():
 
 todays_slate = get_live_mlb_schedule()
 
-# Post-Trade Deadline Roster Sync Core Overrides
 if "tarik skubal" in todays_slate: todays_slate["tarik skubal"]["team"] = "LAD"
-if "luis castillo" in todays_slate: todays_slate["luis castillo"]["team"] = "CWS"
+if "luis castillo" in todays_slate: todays_slate["luis castillo"]["team"] = "CHW"
 # ------------------------------------------------------------------------------
 # GLOBAL BACKEND DATASETS INTERFACE INITIALIZATION
 # ------------------------------------------------------------------------------
