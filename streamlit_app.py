@@ -1,12 +1,18 @@
 import sys
 
 # ------------------------------------------------------------------------------
-# AUTOMATED STARLETTE PATCH (FIRES AUTOMATICALLY TO FIX PYTHON 3.14 INCOMPATIBILITY)
+# ADVANCED SERVER MIDDLEWARE HOOK (FORCES COMPATIBILITY WITH NEWEST STARLETTE BUILDS)
 # ------------------------------------------------------------------------------
 try:
     import starlette.middleware.gzip as starlette_gzip
-    if not hasattr(starlette_gzip, "GZipResponder"):
-        from starlette.middleware.gzip import GZipResponder
+    if hasattr(starlette_gzip, "GZipResponder") and not hasattr(starlette_gzip.GZipResponder, "__init___patched"):
+        original_init = starlette_gzip.GZipResponder.__init__
+        def patched_init(self, app, minimum_size=500, **kwargs):
+            # Map old parameters to the newest required keyword-only argument structure dynamically
+            kwargs.pop("thread_minimum_size", None)
+            original_init(self, app, minimum_size=minimum_size, **kwargs)
+        starlette_gzip.GZipResponder.__init__ = patched_init
+        starlette_gzip.GZipResponder.__init___patched = True
 except Exception:
     pass
 
@@ -26,7 +32,6 @@ def get_live_mlb_schedule():
     url = f"https://mlb.com{today_str}&hydrate=probablePitcher,team,venue"
     live_slate = {}
     
-    # Official MLB Live Numeric ID to 3-Letter CSV Abbreviation Translation Matrix
     mlb_id_map = {
         109: "ARI", 144: "ATL", 110: "BAL", 111: "BOS", 112: "CHC", 145: "CHW", 113: "CIN", 114: "CLE", 
         115: "COL", 116: "DET", 117: "HOU", 118: "KCR", 138: "LAA", 119: "LAD", 139: "MIA", 158: "MIL", 
@@ -253,3 +258,92 @@ with main_col2:
             lineup_rows.append({"SLOT": i, "BATTER LINEUP CARD": f"Lineup Slot Active Hitter {i}", "HAND": "R", "RAW K% SPLIT": "23.4%", "DYNAMIC K% PROJECTION": f"{21.0 + (i * 0.5)}%"})
             
     st.dataframe(pd.DataFrame(lineup_rows).style.set_properties(**{'background-color': '#1A1423', 'color': '#8BE9FD'}), use_container_width=True, hide_index=True)
+# --- RE-ANCHOR THE SUB-MATRICES ROWS SIDE-BY-SIDE OUTSIDE THE LOOP ---
+sub_col1, sub_col2 = st.columns(2)
+
+with sub_col1:
+    st.markdown("<div class='section-header'>📊 Balanced Pitch Arsenal Matrix</div>", unsafe_allow_html=True)
+    if not pitch_df.empty:
+        updated_arsenal = []
+        for idx, row in pitch_df.iterrows():
+            raw_whiff = str(row["WHIFF"]).replace("%", "").replace("W:", "").strip()
+            whiff_val = float(raw_whiff) if raw_whiff.replace(".", "", 1).isdigit() else 25.0
+            calc_k = round(whiff_val * 0.85, 1)
+            calc_put = round(whiff_val * 0.58, 1)
+            updated_arsenal.append({"PITCH TYPE": row["PITCH"], "USAGE": row["USE"], "Ks EXPECTED": f"{calc_k}%", "WHIFF RATE": row["WHIFF"], "PUTAWAY": f"{calc_put}%"})
+        st.dataframe(pd.DataFrame(updated_arsenal).style.set_properties(**{'text-align': 'center', 'background-color': '#1A1423', 'color': '#8BE9FD', 'border-color': '#372549'}), use_container_width=True, hide_index=True)
+
+with sub_col2:
+    st.markdown("<div class='section-header'>⛈️ Stadium Adverse Weather Alert Center</div>", unsafe_allow_html=True)
+    weather_alerts = []
+    if wind_speed > 10:
+        weather_alerts.append({"STADIUM / BALLPARK": current_venue_name, "MATCHUP": f"{pitcher_team} vs {opposing_team}", "WIND VELOCITY": f"{wind_speed} MPH", "CRITICAL IMPACT STATUS": f"⚠️ Heavy {wind_dir} Vectors Detected"})
+    if weather_alerts:
+        st.dataframe(pd.DataFrame(weather_alerts).style.set_properties(**{'background-color': '#2A1B27', 'color': '#FF5555'}), use_container_width=True, hide_index=True)
+    else:
+        st.success("☀️ All active stadium tracking networks confirm optimal climate baselines across the country.")
+
+# ------------------------------------------------------------------------------
+# 6. ROW FRAMEWORK LAYER 4: FULL-WIDTH AUTOMATED GLOBAL SLATE EDGE TRACKER MATRIX
+# ------------------------------------------------------------------------------
+st.markdown("---")
+st.subheader("📋 Automated Global Slate Edge Tracker Matrix")
+
+global_tracker_rows = []
+sample_slate = {"tarik skubal": {"team": "LAD", "opponent": "CHW"}, "paul skenes": {"team": "PIT", "opponent": "CIN"}, "dylan cease": {"team": "SDP", "opponent": "SFG"}, "corbin burnes": {"team": "BAL", "opponent": "PHI"}, "cole ragans": {"team": "KCR", "opponent": "DET"}, "zack wheeler": {"team": "PHI", "opponent": "BAL"}, "garrett crochet": {"team": "CHW", "opponent": "LAD"}}
+
+active_slate_source = todays_slate if (todays_slate and len(todays_slate) >= 2) else sample_slate
+active_starters_list = [str(k).lower().strip() for k in active_slate_source.keys()]
+filtered_pitcher_db = pitcher_db[pitcher_db['name_clean'].str.lower().str.strip().isin(active_starters_list)]
+
+if not filtered_pitcher_db.empty:
+    for _, p_data in filtered_pitcher_db.iterrows():
+        p_name_raw = str(p_data['name']).title()
+        p_name_clean = str(p_data['name']).lower().strip()
+        
+        p_base = float(p_data['base_outs']) if (market == "Total Projected Outs" and 'base_outs' in p_data.index) else float(p_data['base_avg'])
+        p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data.index else "R"
+        
+        opp_team_target = str(active_slate_source[p_name_clean]["opponent"]).upper().strip()
+        db_lookup_team = "CWS" if opp_team_target == "CHW" else opp_team_target
+        p_team_code = str(active_slate_source[p_name_clean]["team"]).upper().strip()
+        
+        simulated_proj = float(p_base)
+        current_book_line = sportsbook_line if p_name_clean == lookup_key else (15.5 if market == "Total Projected Outs" else 5.5)
+        p_matchup_mult = 1.00
+        
+        if p_name_clean == lookup_key:
+            simulated_proj = live_avg
+            current_book_line = sportsbook_line
+        else:
+            if not batter_db.empty and db_lookup_team in batter_db['team_clean'].values:
+                team_hitters = batter_db[batter_db['team_clean'] == db_lookup_team]
+                k_list_calc = []
+                for _, b_row in team_hitters.head(9).iterrows():
+                    b_hand = str(b_row['hand']).upper().strip()
+                    raw_b_k = float(b_row['vs_lhp_k']) if p_arm_side == "L" else float(b_row['vs_rhp_k'])
+                    b_stab = float(b_row['k_stability']) if 'k_stability' in b_row.index else 1.00
+                    if (b_hand == "L" and p_arm_side == "R") or (b_hand == "R" and p_arm_side == "L") or b_hand == "S":
+                        k_list_calc.append(raw_b_k * 1.12 * b_stab)
+                    else:
+                        k_list_calc.append(raw_b_k * 0.92 * b_stab)
+                if k_list_calc and market == "Strikeouts (Ks)": 
+                    p_matchup_mult = (sum(k_list_calc) / len(k_list_calc)) / 22.5
+
+        p_park_mult, p_bullpen_mult = 1.00, 1.00
+        simulated_proj = round(simulated_proj * p_matchup_mult * p_park_mult * p_bullpen_mult, 2)
+        arbitrage_edge = round(simulated_proj - current_book_line, 2)
+        
+        edge_tier = "🔥 S-Tier Edge Max" if arbitrage_edge >= 1.25 else ("⭐ A-Tier Value" if arbitrage_edge >= 0.50 else ("❄️ Short Edge Max" if arbitrage_edge <= -1.25 else "⚖️ Neutral Line"))
+        global_tracker_rows.append({"PITCHER": p_name_raw, "TEAM": p_team_code, "OPPONENT": opp_team_target, "ARM": f"{p_arm_side}HP", "BASE": p_base, "LINE": current_book_line, "PROJ": simulated_proj, "GAP": arbitrage_edge, "SIDE": "OVER" if arbitrage_edge >= 0 else "UNDER", "STATUS": edge_tier})
+
+if global_tracker_rows:
+    master_slate_df = pd.DataFrame(global_tracker_rows)
+    styled_master_board = master_slate_df.style.format({"BASE": "{:.2f}", "LINE": "{:.1f}", "PROJ": "{:.2f}", "GAP": "{:+,.2f}"}).set_properties(**{
+        'background-color': '#1A1423', 'color': '#8BE9FD', 'border-color': '#372549', 'text-align': 'center'
+    }).map(
+        lambda val: 'background-color: #FFB86C; color: #0E0B16; font-weight: bold; text-align: center;' if val == "🔥 S-Tier Edge Max"
+        else ('background-color: #BD93F9; color: #0E0B16; font-weight: bold; text-align: center;' if val == "⭐ A-Tier Value" else 'text-align: center;'),
+        subset=["STATUS"]
+    )
+    st.dataframe(styled_master_board, use_container_width=True, hide_index=True)
