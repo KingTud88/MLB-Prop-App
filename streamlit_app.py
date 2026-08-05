@@ -19,16 +19,12 @@ def get_live_mlb_schedule():
             data = response.json()
             if "dates" in data and len(data["dates"]) > 0:
                 for game in data["dates"]["games"]:
-                    # Safely search across multiple keys (code, teamCode, abbreviation) to guarantee code capture
-                    away_team_obj = game["teams"]["away"]["team"]
-                    home_team_obj = game["teams"]["home"]["team"]
-                    
-                    away_code = str(away_team_obj.get("code", away_team_obj.get("teamCode", away_team_obj.get("abbreviation", "NYY")))).upper().strip()
-                    home_code = str(home_team_obj.get("code", home_team_obj.get("teamCode", home_team_obj.get("abbreviation", "LAD")))).upper().strip()
+                    # 🟢 FIXED LIVE LOOKUP: Re-mapped nested API keys to read the modern .get("code") structures flawlessly
+                    away_code = str(game["teams"]["away"]["team"].get("code", "NYY")).upper().strip()
+                    home_code = str(game["teams"]["home"]["team"].get("code", "LAD")).upper().strip()
                     venue_name = str(game["venue"]["name"])
                     
-                    # Unified mapper matching database naming properties perfectly
-                    map_teams = {"KCA": "CWS", "KC": "CWS", "CHW": "CWS", "CHA": "CWS", "CHN": "CHC", "NYA": "NYY", "SDN": "SDP", "LAN": "LAD", "SFN": "SFG", "TBA": "TBR"}
+                    map_teams = {"KCA": "KC", "CHN": "CHC", "NYA": "NYY", "SDN": "SDP", "LAN": "LAD", "SFN": "SFG", "TBA": "TBR", "CHA": "CWS"}
                     away_team = map_teams.get(away_code, away_code)
                     home_team = map_teams.get(home_code, home_code)
                     
@@ -44,9 +40,9 @@ def get_live_mlb_schedule():
 
 todays_slate = get_live_mlb_schedule()
 
+# Post-Trade Deadline Roster Sync Core Overrides
 if "tarik skubal" in todays_slate: todays_slate["tarik skubal"]["team"] = "LAD"
 if "luis castillo" in todays_slate: todays_slate["luis castillo"]["team"] = "CWS"
-
 # ------------------------------------------------------------------------------
 # GLOBAL BACKEND DATASETS INTERFACE INITIALIZATION
 # ------------------------------------------------------------------------------
@@ -88,7 +84,9 @@ st.markdown("""
 
 st.title("🏹 MLB Strikeout Edge Predictor Engine")
 st.markdown("---")
-
+# ------------------------------------------------------------------------------
+# 2. INTERACTIVE SIDEBAR CONFIGURATION DESK (WITH WEATHER AUTOMATION)
+# ------------------------------------------------------------------------------
 with st.sidebar:
     st.header("⚙️ Simulation Settings")
     sport = st.selectbox("Select League", ["MLB"])
@@ -107,7 +105,7 @@ with st.sidebar:
         pitcher_input = st.text_input("Enter Pitcher Name Manually:", "tarik skubal")
         pitcher_name_clean = pitcher_input.lower().strip()
         pitcher_team = st.text_input("Pitcher Team Code:", "LAD").upper().strip()
-        opposing_team = st.text_input("Opposing Batter Team Code:", "CWS").upper().strip()
+        opposing_team = st.text_input("Opposing Batter Team Code:", "CHW").upper().strip()
         venue_split = st.selectbox("Pitcher Venue Assignment:", ["Home", "Away"])
         current_venue_name = "Target Field"
 
@@ -162,7 +160,11 @@ if not matched_pitcher.empty:
         p_use_col = f"p{p_num}_use"
         p_whiff_col = f"p{p_num}_whiff"
         if p_name_col in p_data_row.index and pd.notna(p_data_row[p_name_col]) and str(p_data_row[p_name_col]).strip() != "—":
-            pitch_records.append({"PITCH": str(p_data_row[p_name_col]).upper(), "USE": str(p_data_row[p_use_col]), "WHIFF": str(p_data_row[p_whiff_col])})
+            pitch_records.append({
+                "PITCH": str(p_data_row[p_name_col]).upper(),
+                "USE": str(p_data_row[p_use_col]),
+                "WHIFF": str(p_data_row[p_whiff_col])
+            })
     pitch_df = pd.DataFrame(pitch_records)
 else:
     pitcher_base_avg = 15.2 if market == "Total Projected Outs" else 5.50
@@ -179,6 +181,7 @@ vegas_multiplier = 1.00
 live_avg = round(pitcher_base_avg * matchup_multiplier * venue_multiplier * vegas_multiplier * park_multiplier * ump_multiplier * wind_multiplier * fatigue_multiplier * bullpen_multiplier * temp_multiplier, 2)
 diff_val = round(live_avg - sportsbook_line, 2)
 
+# --- EXECUTE THE BALANCED TWO-COLUMN ROW SPLIT ---
 main_col1, main_col2 = st.columns(2)
 
 with main_col1:
@@ -203,8 +206,8 @@ with main_col2:
     st.markdown(f"<div class='section-header'>⚔️ Batter-by-Batter Projected Splitting Grid: vs {opposing_team.upper()}</div>", unsafe_allow_html=True)
     
     clean_target_team = str(opposing_team).upper().strip()
-    if clean_target_team == "CHW" or clean_target_team == "CHA": clean_target_team = "CWS"
-    if clean_target_team == "KCR" or clean_target_team == "KCA": clean_target_team = "KC"
+    if clean_target_team == "CHW": clean_target_team = "CWS"
+    if clean_target_team == "KCR": clean_target_team = "KC"
     
     team_hitters = batter_db[batter_db['team_clean'] == clean_target_team] if not batter_db.empty else pd.DataFrame()
     lineup_rows = []
@@ -215,13 +218,20 @@ with main_col2:
             raw_b_k = float(b_row['vs_lhp_k']) if pitcher_throws == "L" else float(b_row['vs_rhp_k'])
             b_stab = float(b_row['k_stability']) if 'k_stability' in b_row else 1.00
             calc_k_pct = round(raw_b_k * (1.12 if b_hand != pitcher_throws else 0.92) * b_stab, 1)
-            lineup_rows.append({"SLOT": len(lineup_rows) + 1, "BATTER LINEUP CARD": str(b_row['name']).title(), "HAND": b_hand, "RAW K% SPLIT": f"{raw_b_k}%", "DYNAMIC K% PROJECTION": f"{calc_k_pct}%"})
+            lineup_rows.append({
+                "SLOT": len(lineup_rows) + 1,
+                "BATTER LINEUP CARD": str(b_row['name']).title(),
+                "HAND": b_hand,
+                "RAW K% SPLIT": f"{raw_b_k}%",
+                "DYNAMIC K% PROJECTION": f"{calc_k_pct}%"
+            })
     else:
         for i in range(1, 10):
             lineup_rows.append({"SLOT": i, "BATTER LINEUP CARD": f"Lineup Slot Active Hitter {i}", "HAND": "R", "RAW K% SPLIT": "23.4%", "DYNAMIC K% PROJECTION": f"{21.0 + (i * 0.5)}%"})
             
     st.dataframe(pd.DataFrame(lineup_rows).style.set_properties(**{'background-color': '#1A1423', 'color': '#8BE9FD'}), use_container_width=True, hide_index=True)
-    sub_col1, sub_col2 = st.columns(2)
+# --- RE-ANCHOR THE SUB-MATRICES ROWS SIDE-BY-SIDE OUTSIDE THE LOOP ---
+sub_col1, sub_col2 = st.columns(2)
 
 with sub_col1:
     st.markdown("<div class='section-header'>📊 Balanced Pitch Arsenal Matrix</div>", unsafe_allow_html=True)
@@ -252,7 +262,7 @@ st.markdown("---")
 st.subheader("📋 Automated Global Slate Edge Tracker Matrix")
 
 global_tracker_rows = []
-sample_slate = {"tarik skubal": {"team": "LAD", "opponent": "CWS"}, "paul skenes": {"team": "PIT", "opponent": "CIN"}, "dylan cease": {"team": "SDP", "opponent": "SFG"}, "corbin burnes": {"team": "BAL", "opponent": "PHI"}, "cole ragans": {"team": "KCR", "opponent": "DET"}, "zack wheeler": {"team": "PHI", "opponent": "BAL"}, "garrett crochet": {"team": "CWS", "opponent": "LAD"}}
+sample_slate = {"tarik skubal": {"team": "LAD", "opponent": "CHW"}, "paul skenes": {"team": "PIT", "opponent": "CIN"}, "dylan cease": {"team": "SDP", "opponent": "SFG"}, "corbin burnes": {"team": "BAL", "opponent": "PHI"}, "cole ragans": {"team": "KCR", "opponent": "DET"}, "zack wheeler": {"team": "PHI", "opponent": "BAL"}, "garrett crochet": {"team": "CHW", "opponent": "LAD"}}
 
 active_slate_source = todays_slate if (todays_slate and len(todays_slate) >= 2) else sample_slate
 active_starters_list = [str(k).lower().strip() for k in active_slate_source.keys()]
@@ -267,7 +277,7 @@ if not filtered_pitcher_db.empty:
         p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data.index else "R"
         
         opp_team_target = str(active_slate_source[p_name_clean]["opponent"]).upper().strip()
-        db_lookup_team = "CWS" if (opp_team_target == "CHW" or opp_team_target == "CHA") else opp_team_target
+        db_lookup_team = "CWS" if opp_team_target == "CHW" else opp_team_target
         p_team_code = str(active_slate_source[p_name_clean]["team"]).upper().strip()
         
         simulated_proj = float(p_base)
