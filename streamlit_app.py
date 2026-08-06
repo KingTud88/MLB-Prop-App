@@ -6,16 +6,16 @@ from datetime import datetime
 import datetime as dt
 
 # ------------------------------------------------------------------------------
-# AUTOMATIC DAILY SCHEDULE TRACKING ENGINE (AIRTIGHT LOCAL TIME ZONE SYNC)
+# AUTOMATIC DAILY SCHEDULE TRACKING ENGINE (AIRTIGHT LIVE DATE SYNC)
 # ------------------------------------------------------------------------------
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=120)
 def get_live_mlb_schedule():
     """Automatically pulls live active starters and matchup parameters for today's date"""
-    # 🟢 CORE CORRECTION: Calculate current Eastern Time to prevent UTC midnight date-skips
     utc_now = datetime.utcnow()
-    est_now = utc_now - dt.timedelta(hours=4)  # Force synchronization to local US game day calendar tracks
-    today_str = est_now.strftime('%Y-%m-%d')
+    est_now = utc_now - dt.timedelta(hours=4)  # Local US game day synchronization matrix
     
+    # 🟢 CRITICAL API CORRECTION: Reformatted date structure to prevent empty payload drops
+    today_str = est_now.strftime('%m/%d/%Y')
     url = f"https://mlb.com{today_str}"
     live_slate = {}
     
@@ -273,9 +273,7 @@ with main_col2:
     with c_o2:
         grade_outs = "A" if (over_prob_pct_outs > 65 or over_prob_pct_outs < 35) else ("B" if (over_prob_pct_outs > 55 or over_prob_pct_outs < 45) else "C")
         st.markdown(f"<div class='metric-card'><div class='metric-label'>OUTS SIM GRADE</div><div class='metric-value'>{grade_outs}</div></div>", unsafe_allow_html=True)
-# ------------------------------------------------------------------------------
-# 6. ROW FRAMEWORK LAYER 4: RE-ANCHORED UNIVERSAL AUTOMATED GLOBAL SLATE MATRIX
-# ------------------------------------------------------------------------------
+# --- SPLIT THE ACCELERATED SUB-CARDS GRIDS ---
 st.markdown("---")
 sub_col1, sub_col2 = st.columns(2)
 
@@ -323,13 +321,11 @@ st.subheader("📋 Automated Global Slate Edge Tracker Matrix")
 
 global_tracker_rows = []
 
-# 🟢 AIRTIGHT LIVE SYNC ACTION: Build directly from live API pairs without hardcoded sample block drops
 if todays_slate and len(todays_slate) > 0:
     for live_name, meta in todays_slate.items():
         p_name_raw = live_name.title()
         p_name_clean = live_name.lower().strip()
         
-        # Pull matching statistical properties from your file smoothly using clean lowercase targets
         db_match = pitcher_db[pitcher_db['name_clean'] == p_name_clean]
         
         if not db_match.empty:
@@ -337,7 +333,7 @@ if todays_slate and len(todays_slate) > 0:
             p_base_k = float(p_data['base_avg'])
             p_base_outs = float(p_data['base_outs']) if 'base_outs' in p_data.index else 17.50
             p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data.index else "R"
-            p_team_code = str(p_data.get('team', meta["team"])).upper().strip() # 🟢 PRESERVES DATABASE TEAM CODE (like TOR for Dylan Cease)
+            p_team_code = str(p_data.get('team', meta["team"])).upper().strip()
         else:
             p_base_k, p_base_outs, p_arm_side = 5.50, 15.2, "R"
             p_team_code = str(meta["team"]).upper().strip()
@@ -377,12 +373,8 @@ if global_tracker_rows:
         'background-color': '#1A1423', 'color': '#8BE9FD', 'border-color': '#372549', 'text-align': 'center'
     }), use_container_width=True, hide_index=True)
 else:
-    # Safe user warning fallback if API completely cuts network availability strings
     st.info("💡 Live board matching layer empty. Awaiting confirmed active pitcher announcements from league data systems.")
 
-# ------------------------------------------------------------------------------
-# MASTER REQ SEARCH HISTORY SHEET DESK MATRIX
-# ------------------------------------------------------------------------------
 st.markdown("---")
 st.markdown("<div class='section-header' style='background: linear-gradient(90deg, #FF79C6 0%, #1A1423 100%); border-left: 5px solid #FF79C6;'>📋 Stored Search History & Dual-Market Live Ledger Sheets</div>", unsafe_allow_html=True)
 
