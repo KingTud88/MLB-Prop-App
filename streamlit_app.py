@@ -10,7 +10,8 @@ from datetime import datetime
 @st.cache_data(ttl=300)
 def get_live_mlb_schedule():
     """Automatically pulls live active starters and matchup parameters for today's date"""
-    today_str = datetime.today().strftime('%Y-%m-%d')
+    # 🟢 LIVE DATE AXIS FIX: Force engine to pull the exact live calendar date dynamically
+    today_str = datetime.now().strftime('%Y-%m-%d')
     url = f"https://mlb.com{today_str}&hydrate=probablePitcher,team,venue"
     live_slate = {}
     
