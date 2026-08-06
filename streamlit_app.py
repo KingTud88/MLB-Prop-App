@@ -169,19 +169,19 @@ park_multiplier, ump_multiplier, fatigue_multiplier, bullpen_multiplier = 1.00, 
 temp_multiplier = 0.96 if game_temp > 85 else (1.05 if game_temp < 52 else 1.00)
 wind_multiplier = 1.04 if (wind_speed > 10 and wind_dir == "Inward") else (0.96 if (wind_speed > 10 and wind_dir == "Outward") else 1.00)
 # ------------------------------------------------------------------------------
-# 5. DATA MATRICES FETCHING AND MATCHUP LOOKUPS (GRID-SAFE MINIMAL DISCOVERY)
+# 5. DATA MATRICES FETCHING AND MATCHUP LOOKUPS (AIRTIGHT 21-COLUMN DISCOVERY)
 # ------------------------------------------------------------------------------
 lookup_key = pitcher_name_clean.lower().strip()
 matched_pitcher = pitcher_db[pitcher_db['name_clean'] == lookup_key]
 
-# 🟢 GRID-SAFE PATTERN: Generates a tight, variable-length line that adapts perfectly to your file parameters
+# 🟢 AIRTIGHT GRID-SAFE PATTERN: Generates exactly 21 columns to perfectly match your database header row
 if matched_pitcher.empty and lookup_key != "" and "projected starter" not in lookup_key:
     st.markdown("<div class='section-header' style='background: linear-gradient(90deg, #FF5555 0%, #1A1423 100%); border-left: 5px solid #FF5555;'>🚨 Searched Pitcher Missing From Database</div>", unsafe_allow_html=True)
-    st.warning(f"**{pitcher_input.title()}** was not found in your pitcher_database.csv file! Copy the row below, paste it at the bottom, and your database grid will save perfectly:")
+    st.warning(f"**{pitcher_input.title()}** was not found in your pitcher_database.csv file! Copy the full row below, paste it at the bottom, and your database grid will save perfectly:")
     
-    # 🌟 FIXED: Stripped out the forced trailing em-dashes to prevent file column misalignment crashes
-    grid_safe_database_row = f"{pitcher_input.title()},{pitcher_team},R,5.20,12,62,65.0,3.85,Four-seam FB,42% use,25%,W:25%,6.0,Slider,28% use,20%,W:20%,5.5"
-    st.code(grid_safe_database_row, language="csv")
+    # 🌟 FIXED: Formatted with exactly 20 commas (21 total cells) to perfectly align with your master data grid sheet
+    perfect_21_col_row = f"{pitcher_input.title()},{pitcher_team},R,5.20,12,62,65.0,3.85,Four-seam FB,38%,21%,23,Four-seam FB,38%,21%,Slider,28%,20%,Changeup,14%,18%"
+    st.code(perfect_21_col_row, language="csv")
     st.markdown("---")
 
 if not matched_pitcher.empty:
@@ -192,7 +192,7 @@ if not matched_pitcher.empty:
     top_pitch_text = str(p_data_row['top_pitch']) if 'top_pitch' in p_data_row.index else "Four-seam FB 42% use"
     
     pitch_records = []
-    for p_num in range(1, 6):
+    for p_num in range(1, 4):  # Matches up to 3 pitches based on your 21-column layout header row
         p_name_col = f"p{p_num}"
         p_use_col = f"p{p_num}_use"
         p_whiff_col = f"p{p_num}_whiff"
