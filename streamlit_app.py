@@ -169,14 +169,23 @@ park_multiplier, ump_multiplier, fatigue_multiplier, bullpen_multiplier = 1.00, 
 temp_multiplier = 0.96 if game_temp > 85 else (1.05 if game_temp < 52 else 1.00)
 wind_multiplier = 1.04 if (wind_speed > 10 and wind_dir == "Inward") else (0.96 if (wind_speed > 10 and wind_dir == "Outward") else 1.00)
 # ------------------------------------------------------------------------------
-# 5. DATA MATRICES FETCHING AND MATCHUP LOOKUPS (WITH 10,000-GAME PRO SIMULATION)
+# 5. DATA MATRICES FETCHING AND MATCHUP LOOKUPS (WITH AUTOMATED SEARCH SCANNER)
 # ------------------------------------------------------------------------------
 lookup_key = pitcher_name_clean.lower().strip()
 matched_pitcher = pitcher_db[pitcher_db['name_clean'] == lookup_key]
 
+# 🟢 SEARCH DETECTIVE: If you search a name that isn't in your file, generate their row instantly
+if matched_pitcher.empty and lookup_key != "" and "projected starter" not in lookup_key:
+    st.markdown("<div class='section-header' style='background: linear-gradient(90deg, #FF5555 0%, #1A1423 100%); border-left: 5px solid #FF5555;'>🚨 Searched Pitcher Missing From Database</div>", unsafe_allow_html=True)
+    st.warning(f"**{pitcher_input.title()}** was not found in your pitcher_database.csv file! Copy the line below, go to GitHub, and paste it at the bottom of your file to add them permanently:")
+    
+    # Creates a perfectly formatted 8-column line ready to copy
+    st.code(f"{pitcher_input.title()},{pitcher_team},R,5.20,12,62,65.0,3.85", language="csv")
+    st.markdown("---")
+
 if not matched_pitcher.empty:
     p_data_row = matched_pitcher.iloc[0]
-    pitcher_base_avg = float(p_data_row['base_outs']) if market == "Total Projected Outs" else float(p_data_row['base_avg'])
+    pitcher_base_avg = float(p_data_row['base_outs']) if (market == "Total Projected Outs" and 'base_outs' in p_data_row.index) else float(p_data_row['base_avg'])
     pitcher_throws = str(p_data_row['throws']).upper().strip()
     strikeouts = int(p_data_row['strikeouts'])
     top_pitch_text = str(p_data_row['top_pitch']) if 'top_pitch' in p_data_row.index else "Four-seam FB 42% use"
@@ -255,7 +264,7 @@ with main_col2:
         for i in range(1, 10):
             lineup_rows.append({"SLOT": i, "BATTER LINEUP CARD": f"Lineup Slot Active Hitter {i}", "HAND": "R", "RAW K% SPLIT": "23.4%", "DYNAMIC K% PROJECTION": f"{21.0 + (i * 0.5)}%"})
             
-    st.dataframe(pd.DataFrame(lineup_rows).style.set_properties(**{'background-color': '#1A1423', 'color': '#8BE9FD'}), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(lineup_rows).style.set_properties(**Traceback={'background-color': '#1A1423', 'color': '#8BE9FD'}), use_container_width=True, hide_index=True)
 # --- RE-ANCHOR THE SUB-MATRICES ROWS SIDE-BY-SIDE OUTSIDE THE LOOP ---
 sub_col1, sub_col2 = st.columns(2)
 
