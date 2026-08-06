@@ -3,15 +3,19 @@ import pandas as pd
 import numpy as np
 import requests
 from datetime import datetime
+import datetime as dt
 
 # ------------------------------------------------------------------------------
-# AUTOMATIC DAILY SCHEDULE TRACKING ENGINE (AIRTIGHT LIVE DATE SYNC)
+# AUTOMATIC DAILY SCHEDULE TRACKING ENGINE (AIRTIGHT LOCAL TIME ZONE SYNC)
 # ------------------------------------------------------------------------------
-@st.cache_data(ttl=120)
+@st.cache_data(ttl=60)
 def get_live_mlb_schedule():
     """Automatically pulls live active starters and matchup parameters for today's date"""
-    today_str = datetime.now().strftime('%Y-%m-%d')
-    # 🟢 PRODUCTION UPGRADE: Switched to the modern, unrestricted live games endpoint path
+    # 🟢 CORE CORRECTION: Calculate current Eastern Time to prevent UTC midnight date-skips
+    utc_now = datetime.utcnow()
+    est_now = utc_now - dt.timedelta(hours=4)  # Force synchronization to local US game day calendar tracks
+    today_str = est_now.strftime('%Y-%m-%d')
+    
     url = f"https://mlb.com{today_str}"
     live_slate = {}
     
@@ -22,11 +26,9 @@ def get_live_mlb_schedule():
             if "dates" in data and len(data["dates"]) > 0:
                 for date_node in data["dates"]:
                     for game in date_node.get("games", []):
-                        # Extract structural team names cleanly
                         away_team = str(game.get("teams", {}).get("away", {}).get("team", {}).get("name", "NYY"))
                         home_team = str(game.get("teams", {}).get("home", {}).get("team", {}).get("name", "LAD"))
                         
-                        # Translate full long text names into your exact 3-letter database codes cleanly
                         map_names = {
                             "Chicago White Sox": "CHW", "Los Angeles Dodgers": "LAD", "San Diego Padres": "SDP",
                             "San Francisco Giants": "SFG", "Pittsburgh Pirates": "PIT", "Cincinnati Reds": "CIN",
@@ -36,7 +38,7 @@ def get_live_mlb_schedule():
                             "Seattle Mariners": "SEA", "Houston Astros": "HOU", "Texas Rangers": "TEX",
                             "Los Angeles Angels": "LAA", "Oakland Athletics": "OAK", "Miami Marlins": "MIA",
                             "Milwaukee Brewers": "MIL", "St. Louis Cardinals": "STL", "Tampa Bay Rays": "TBR",
-                            "Boston Red Sox": "BOS", "Toronto Blue Blue Jays": "TOR", "Washington Nationals": "WSH",
+                            "Boston Red Sox": "BOS", "Toronto Blue Jays": "TOR", "Washington Nationals": "WSH",
                             "Arizona Diamondbacks": "ARI", "Colorado Rockies": "COL", "Chicago Cubs": "CHC"
                         }
                         
@@ -44,7 +46,6 @@ def get_live_mlb_schedule():
                         home_code = map_names.get(home_team, "LAD")
                         venue_name = str(game.get("venue", {}).get("name", "Standard Ballpark"))
                         
-                        # 🟢 SPORTSBOOK ALIGNMENT: Capture names safely from both fields to ensure full matching
                         away_p_node = game.get("teams", {}).get("away", {}).get("probablePitcher", {})
                         home_p_node = game.get("teams", {}).get("home", {}).get("probablePitcher", {})
                         
