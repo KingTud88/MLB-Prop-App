@@ -26,8 +26,20 @@ def get_live_mlb_schedule():
         if response.status_code == 200:
             data = response.json()
             if "dates" in data and len(data["dates"]) > 0:
-                for date_node in data["dates"]:
-                    for game in date_node.get("games", []):
+                date_records = data["dates"]
+                all_games = []
+                
+                if isinstance(date_records, list):
+                    for node in date_records:
+                        if isinstance(node, dict):
+                            all_games.extend(node.get("games", []))
+                elif isinstance(date_records, dict):
+                    all_games.extend(date_records.get("games", []))
+                else:
+                    all_games.extend(data["dates"].get("games", []))
+                
+                for game in all_games:
+                    if isinstance(game, dict) and "teams" in game:
                         away_team_node = game.get("teams", {}).get("away", {}).get("team", {})
                         home_team_node = game.get("teams", {}).get("home", {}).get("team", {})
                         
@@ -41,8 +53,8 @@ def get_live_mlb_schedule():
                         away_p_node = game.get("teams", {}).get("away", {}).get("probablePitcher", {})
                         home_p_node = game.get("teams", {}).get("home", {}).get("probablePitcher", {})
                         
-                        away_pitcher = str(away_p_node.get("fullName", f"projected starter ({away_team})")).lower().strip()
-                        home_pitcher = str(home_p_node.get("fullName", f"projected starter ({home_team})")).lower().strip()
+                        away_pitcher = str(away_p_node.get("fullName", f"Projected Starter ({away_team})")).lower().strip()
+                        home_pitcher = str(home_p_node.get("fullName", f"Projected Starter ({home_team})")).lower().strip()
                         
                         live_slate[away_pitcher] = {"team": away_team, "opponent": home_team, "venue": "Away", "stadium": venue_name}
                         live_slate[home_pitcher] = {"team": home_team, "opponent": away_team, "venue": "Home", "stadium": venue_name}
@@ -90,7 +102,7 @@ st.markdown("""
     div.stButton > button:hover { background-color: #BD93F9; color: #0E0B16; }
     .metric-card { background-color: #1A1423; border: 2px solid #372549; border-radius: 10px; padding: 15px; text-align: center; margin-bottom: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); }
     .metric-label { font-size: 11px; text-transform: uppercase; color: #BD93F9; letter-spacing: 1.5px; font-weight: 600; }
-    .metric-value { font-size: 40px; font-weight: bold; color: #50FA7B; margin: 5px 0; font-family: 'Courier New', monospace; }
+    .metric-value { font-size: 38px; font-weight: bold; color: #50FA7B; margin: 5px 0; font-family: 'Courier New', monospace; }
     .class-sub-text { font-size: 11px; color: #6272A4; }
     .section-header { background: linear-gradient(90deg, #372549 0%, #1A1423 100%); padding: 8px 15px; border-left: 5px solid #BD93F9; font-weight: bold; color: #8BE9FD; margin-top: 20px; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; }
 </style>
@@ -99,15 +111,13 @@ st.markdown("""
 st.title("🏹 MLB Strikeout Edge Predictor Engine")
 st.markdown("---")
 # ------------------------------------------------------------------------------
-# 2. INTERACTIVE SIDEBAR CONFIGURATION DESK (WITH ACTION REFRESH SUBMIT FORM)
+# 2. INTERACTIVE SIDEBAR CONFIGURATION DESK (WITH DUAL-MARKET INPUT LINES)
 # ------------------------------------------------------------------------------
 with st.sidebar:
     st.header("⚙️ Simulation Settings")
     sport = st.selectbox("Select League", ["MLB"])
-    market = st.selectbox("Market Type", ["Strikeouts (Ks)", "Total Projected Outs"])
     st.subheader("🔍 Active Matchup Selection")
     
-    # 🟢 MODERNAIZATION CORE: Wrap controls inside an isolation form block to stop instant logging
     with st.form(key="matchup_simulation_form"):
         if todays_slate and len(todays_slate) > 0:
             display_options = sorted([name.title() for name in todays_slate.keys()])
@@ -130,8 +140,9 @@ with st.sidebar:
 
         st.markdown("---")
         st.subheader("🎲 Sportsbook Line Calibration")
-        default_book_line = 15.5 if market == "Total Projected Outs" else 6.5
-        sportsbook_line = st.number_input("Current Line O/U", min_value=0.5, max_value=27.5, value=float(default_book_line), step=0.5)
+        # 🟢 SIMULTANEOUS IMPROVEMENT: Provide separate calibration entry slots for both markets at once
+        sportsbook_line_k = st.number_input("Sportsbook Strikeout Line (Ks)", min_value=0.5, max_value=15.5, value=6.5, step=0.5)
+        sportsbook_line_outs = st.number_input("Sportsbook Total Outs Line", min_value=0.5, max_value=27.5, value=15.5, step=0.5)
         
         st.markdown("---")
         st.subheader("🏟️ Environmental Weather Analytics")
@@ -148,8 +159,7 @@ with st.sidebar:
             game_temp, wind_speed, wind_dir = auto_temp, auto_wind, auto_vector
             st.caption(f"🤖 Automated Weather Synced: {game_temp}°F | {wind_speed} MPH {wind_dir}")
             
-        # 🟢 THE MANUAL SEARCH TRIGGER BUTTON: Halts app recalculations until explicitly clicked
-        submit_button = st.form_submit_button(label="🚀 Run Pro Simulation Matchup")
+        submit_button = st.form_submit_button(label="🚀 Run Pro Dual-Market Simulation")
 
 st.markdown("<div class='section-header'>🚨 Team Injury Status Desk</div>", unsafe_allow_html=True)
 inj_col1, inj_col2 = st.columns(2)
@@ -164,7 +174,7 @@ park_multiplier, ump_multiplier, fatigue_multiplier, bullpen_multiplier = 1.00, 
 temp_multiplier = 0.96 if game_temp > 85 else (1.05 if game_temp < 52 else 1.00)
 wind_multiplier = 1.04 if (wind_speed > 10 and wind_dir == "Inward") else (0.96 if (wind_speed > 10 and wind_dir == "Outward") else 1.00)
 # ------------------------------------------------------------------------------
-# 5. DATA MATRICES FETCHING AND MATCHUP LOOKUPS (AIRTIGHT 27-COLUMN DISCOVERY)
+# 5. DATA MATRICES FETCHING AND MATCHUP LOOKUPS (DUAL PARALLEL SIMULATIONS)
 # ------------------------------------------------------------------------------
 lookup_key = pitcher_name_clean.lower().strip()
 matched_pitcher = pitcher_db[pitcher_db['name_clean'] == lookup_key]
@@ -178,7 +188,8 @@ if matched_pitcher.empty and lookup_key != "" and "projected starter" not in loo
 
 if not matched_pitcher.empty:
     p_data_row = matched_pitcher.iloc[0]
-    pitcher_base_avg = float(p_data_row['base_outs']) if (market == "Total Projected Outs" and 'base_outs' in p_data_row.index) else float(p_data_row['base_avg'])
+    pitcher_base_avg_k = float(p_data_row['base_avg'])
+    pitcher_base_avg_outs = float(p_data_row['base_outs']) if 'base_outs' in p_data_row.index else 17.5
     pitcher_throws = str(p_data_row['throws']).upper().strip()
     strikeouts = int(p_data_row['strikeouts'])
     top_pitch_text = str(p_data_row['top_pitch']) if 'top_pitch' in p_data_row.index else "Four-seam FB 42% use"
@@ -196,59 +207,88 @@ if not matched_pitcher.empty:
             })
     pitch_df = pd.DataFrame(pitch_records)
 else:
-    pitcher_base_avg = 15.2 if market == "Total Projected Outs" else 5.50
+    pitcher_base_avg_k, pitcher_base_avg_outs = 5.50, 15.2
     pitcher_throws, strikeouts = "R", 130
     top_pitch_text = "Four-seam FB 42% use"
     pitch_df = pd.DataFrame([{"PITCH": "FOUR-SEAM FB", "USE": "42%", "WHIFF": "W:25%"}])
 
 league_avg_k = 22.5
 team_avg_k = 24.2
-matchup_multiplier = team_avg_k / league_avg_k if market == "Strikeouts (Ks)" else 1.02
+matchup_multiplier_k = team_avg_k / league_avg_k
+matchup_multiplier_outs = 1.02
 venue_multiplier = 1.06 if venue_split == "Home" else 0.95
-vegas_multiplier = 1.00
 
-live_avg = round(pitcher_base_avg * matchup_multiplier * venue_multiplier * vegas_multiplier * park_multiplier * ump_multiplier * wind_multiplier * fatigue_multiplier * bullpen_multiplier * temp_multiplier, 2)
-diff_val = round(live_avg - sportsbook_line, 2)
+# 🟢 SIMULTANEOUS MATRIX CALCULATIONS: Process both streams completely in parallel fields
+live_avg_k = round(pitcher_base_avg_k * matchup_multiplier_k * venue_multiplier * park_multiplier * ump_multiplier * wind_multiplier * fatigue_multiplier * bullpen_multiplier * temp_multiplier, 2)
+live_avg_outs = round(pitcher_base_avg_outs * matchup_multiplier_outs * venue_multiplier * park_multiplier * ump_multiplier * wind_multiplier * fatigue_multiplier * bullpen_multiplier * temp_multiplier, 2)
 
-simulated_games = np.random.poisson(live_avg, 10000)
-over_prob_pct = round(np.mean(simulated_games > sportsbook_line) * 100, 1)
+diff_val_k = round(live_avg_k - sportsbook_line_k, 2)
+diff_val_outs = round(live_avg_outs - sportsbook_line_outs, 2)
 
-# 🟢 CONDITIONAL ACTION INTERCEPTOR: Only appends to the session queue if the form button was pushed
+# 🟢 DUAL PRO SIMULATIONS: Run separate 10,000 game Poisson matrices back-to-back instantly
+sim_games_k = np.random.poisson(live_avg_k, 10000)
+sim_games_outs = np.random.poisson(live_avg_outs, 10000)
+
+over_prob_pct_k = round(np.mean(sim_games_k > sportsbook_line_k) * 100, 1)
+over_prob_pct_outs = round(np.mean(sim_games_outs > sportsbook_line_outs) * 100, 1)
+
+# 🟢 DUAL DATA SNAPSHOT APPENDING CORE: Logs both metrics cleanly to your history queue
 if submit_button and pitcher_input != "" and "projected starter" not in pitcher_input:
     new_snapshot_record = {
         "PITCHER": pitcher_input.title(),
         "TEAM": pitcher_team,
         "OPPONENT": opposing_team,
-        "MARKET TYPE": market,
-        "BOOK LINE": sportsbook_line,
-        "PROJECTED Ks": live_avg if market == "Strikeouts (Ks)" else "—",
-        "PROJECTED OUTS": live_avg if market == "Total Projected Outs" else "—",  # 🟢 ADDED: Custom Outs Field
-        "GAP VALUE": f"{diff_val:+,.2f}",
-        "OVER PROBABILITY": f"{over_prob_pct}%"
+        "STRIKEOUT LINE": sportsbook_line_k,
+        "PROJECTED Ks": live_avg_k,
+        "K OVER PROBABILITY": f"{over_prob_pct_k}%",
+        "OUTS LINE": sportsbook_line_outs,
+        "PROJECTED OUTS": live_avg_outs,
+        "OUTS OVER PROBABILITY": f"{over_prob_pct_outs}%"
     }
-    if not any(d['PITCHER'] == new_snapshot_record['PITCHER'] and d['MARKET TYPE'] == new_snapshot_record['MARKET TYPE'] and d['BOOK LINE'] == new_snapshot_record['BOOK LINE'] for d in st.session_state["search_history_queue"]):
-        st.session_state["search_history_queue"].append(new_snapshot_record)
+    st.session_state["search_history_queue"].append(new_snapshot_record)
 
+# --- EXECUTE THE BALANCED TWO-COLUMN ROW SPLIT FOR MATRICES DESKS ---
 main_col1, main_col2 = st.columns(2)
+
 with main_col1:
-    st.markdown(f"<div class='section-header'>🔥 Searched Pitcher Metrics: {pitcher_input.title()}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='section-header'>🔥 STRIKEOUT SIMULATION DESK: {pitcher_input.title()}</div>", unsafe_allow_html=True)
     ch1, ch2 = st.columns(2)
     with ch1:
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>PROJ {market.upper()}</div><div class='metric-value' style='color:#FF79C6;'>{live_avg}</div><div class='class-sub-text' style='color:#50FA7B;'>{sportsbook_line} Line Set</div></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>PROJ STRIKEOUTS</div><div class='metric-value' style='color:#FF79C6;'>{live_avg_k}</div><div class='class-sub-text' style='color:#50FA7B;'>{sportsbook_line_k} Line Set</div></div>", unsafe_allow_html=True)
     with ch2:
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>OVER PROBABILITY</div><div class='metric-value' style='color:#FFB86C;'>{over_prob_pct}%</div><div class='class-sub-text'>Based on 10,000 Sims</div></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>K OVER PROBABILITY</div><div class='metric-value' style='color:#FFB86C;'>{over_prob_pct_k}%</div><div class='class-sub-text'>Based on 10,000 Sims</div></div>", unsafe_allow_html=True)
         
     c_p1, c_p2 = st.columns(2)
     with c_p1:
-        rec_tag = "OVER" if live_avg > sportsbook_line else "UNDER"
-        rec_color = "#50FA7B" if rec_tag == "OVER" else "#FF5555"
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>RECOMMENDATION</div><div class='metric-value' style='color:{rec_color};'>{rec_tag}</div><div class='class-sub-text' style='color:#8BE9FD;'>{diff_val} Difference Gap</div></div>", unsafe_allow_html=True)
+        rec_tag_k = "OVER" if live_avg_k > sportsbook_line_k else "UNDER"
+        rec_color_k = "#50FA7B" if rec_tag_k == "OVER" else "#FF5555"
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>K RECOMMENDATION</div><div class='metric-value' style='color:{rec_color_k};'>{rec_tag_k}</div><div class='class-sub-text' style='color:#8BE9FD;'>{diff_val_k:+,.2f} K Difference Gap</div></div>", unsafe_allow_html=True)
     with c_p2:
-        grade = "A" if (over_prob_pct > 65 or over_prob_pct < 35) else ("B" if (over_prob_pct > 55 or over_prob_pct < 45) else "C")
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>SIMULATION GRADE</div><div class='metric-value'>{grade}</div></div>", unsafe_allow_html=True)
+        grade_k = "A" if (over_prob_pct_k > 65 or over_prob_pct_k < 35) else ("B" if (over_prob_pct_k > 55 or over_prob_pct_k < 45) else "C")
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>K SIMULATION GRADE</div><div class='metric-value'>{grade_k}</div></div>", unsafe_allow_html=True)
 
 with main_col2:
-    st.markdown(f"<div class='section-header'>⚔️ Batter-by-Batter Projected Splitting Grid: vs {opposing_team.upper()}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='section-header'>🏟️ TOTAL OUTS SIMULATION DESK: {pitcher_input.title()}</div>", unsafe_allow_html=True)
+    co1, co2 = st.columns(2)
+    with co1:
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>PROJ TOTAL OUTS</div><div class='metric-value' style='color:#FF79C6;'>{live_avg_outs}</div><div class='class-sub-text' style='color:#50FA7B;'>{sportsbook_line_outs} Line Set</div></div>", unsafe_allow_html=True)
+    with co2:
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>OUTS PROBABILITY</div><div class='metric-value' style='color:#FFB86C;'>{over_prob_pct_outs}%</div><div class='class-sub-text'>Based on 10,000 Sims</div></div>", unsafe_allow_html=True)
+        
+    c_o1, c_o2 = st.columns(2)
+    with c_o1:
+        rec_tag_outs = "OVER" if live_avg_outs > sportsbook_line_outs else "UNDER"
+        rec_color_outs = "#50FA7B" if rec_tag_outs == "OVER" else "#FF5555"
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>OUTS RECOMMENDATION</div><div class='metric-value' style='color:{rec_color_outs};'>{rec_tag_outs}</div><div class='class-sub-text' style='color:#8BE9FD;'>{diff_val_outs:+,.2f} Outs Gap</div></div>", unsafe_allow_html=True)
+    with c_o2:
+        grade_outs = "A" if (over_prob_pct_outs > 65 or over_prob_pct < 35) else ("B" if (over_prob_pct_outs > 55 or over_prob_pct < 45) else "C")
+        st.markdown(f"<div class='metric-card'><div class='metric-label'>OUTS SIM GRADE</div><div class='metric-value'>{grade_outs}</div></div>", unsafe_allow_html=True)
+# --- SPLIT THE ACCELERATED SUB-CARDS GRIDS ---
+st.markdown("---")
+sub_col1, sub_col2 = st.columns(2)
+
+with sub_col1:
+    st.markdown(f"<div class='section-header'>⚔️ Batter-by-Batter Splitting Grid: vs {opposing_team.upper()}</div>", unsafe_allow_html=True)
     clean_target_team = str(opposing_team).upper().strip()
     if clean_target_team == "CHW": clean_target_team = "CWS"
     if clean_target_team == "KCR": clean_target_team = "KC"
@@ -272,12 +312,9 @@ with main_col2:
     else:
         for i in range(1, 10):
             lineup_rows.append({"SLOT": i, "BATTER LINEUP CARD": f"Lineup Slot Active Hitter {i}", "HAND": "R", "RAW K% SPLIT": "23.4%", "DYNAMIC K% PROJECTION": f"{21.0 + (i * 0.5)}%"})
-            
-    st.dataframe(pd.DataFrame(lineup_rows).style.set_properties(**{'background-color': '#1A1423', 'color': '#8BE9FD'}), use_container_width=True, hide_index=True)
-# --- RE-ANCHOR THE SUB-MATRICES ROWS SIDE-BY-SIDE OUTSIDE THE LOOP ---
-sub_col1, sub_col2 = st.columns(2)
+    st.dataframe(pd.DataFrame(lineup_rows).style.set_properties(**{ 'background-color': '#1A1423', 'color': '#8BE9FD'}), use_container_width=True, hide_index=True)
 
-with sub_col1:
+with sub_col2:
     st.markdown("<div class='section-header'>📊 Balanced Pitch Arsenal Matrix</div>", unsafe_allow_html=True)
     if not pitch_df.empty:
         updated_arsenal = []
@@ -288,16 +325,6 @@ with sub_col1:
             calc_put = round(whiff_val * 0.58, 1)
             updated_arsenal.append({"PITCH TYPE": row["PITCH"], "USAGE": row["USE"], "Ks EXPECTED": f"{calc_k}%", "WHIFF RATE": row["WHIFF"], "PUTAWAY": f"{calc_put}%"})
         st.dataframe(pd.DataFrame(updated_arsenal).style.set_properties(**{'text-align': 'center', 'background-color': '#1A1423', 'color': '#8BE9FD', 'border-color': '#372549'}), use_container_width=True, hide_index=True)
-
-with sub_col2:
-    st.markdown("<div class='section-header'>⛈️ Stadium Adverse Weather Alert Center</div>", unsafe_allow_html=True)
-    weather_alerts = []
-    if wind_speed > 10:
-        weather_alerts.append({"STADIUM / BALLPARK": current_venue_name, "MATCHUP": f"{pitcher_team} vs {opposing_team}", "WIND VELOCITY": f"{wind_speed} MPH", "CRITICAL IMPACT STATUS": f"⚠️ Heavy {wind_dir} Vectors Detected"})
-    if weather_alerts:
-        st.dataframe(pd.DataFrame(weather_alerts).style.set_properties(**{'background-color': '#2A1B27', 'color': '#FF5555'}), use_container_width=True, hide_index=True)
-    else:
-        st.success("☀️ All active stadium tracking networks confirm optimal climate baselines across the country.")
 
 st.markdown("---")
 st.subheader("📋 Automated Global Slate Edge Tracker Matrix")
@@ -318,20 +345,21 @@ if not filtered_pitcher_db.empty:
         p_name_raw = str(p_data['name']).title()
         p_name_clean = str(p_data['name']).lower().strip()
         
-        p_base = float(p_data['base_outs']) if (market == "Total Projected Outs" and 'base_outs' in p_data.index) else float(p_data['base_avg'])
+        p_base_k = float(p_data['base_avg'])
+        p_base_outs = float(p_data['base_outs']) if 'base_outs' in p_data.index else 17.50
         p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data.index else "R"
         
         opp_team_target = str(active_slate_source.get(p_name_clean, {"opponent": "CHW"})["opponent"]).upper().strip()
         db_lookup_team = "CWS" if opp_team_target == "CHW" else opp_team_target
         p_team_code = str(active_slate_source.get(p_name_clean, {"team": "LAD"})["team"]).upper().strip()
         
-        simulated_proj = float(p_base)
-        current_book_line = sportsbook_line if p_name_clean == lookup_key else (15.5 if market == "Total Projected Outs" else 5.5)
-        p_matchup_mult = 1.00
+        current_book_line_k = sportsbook_line_k if p_name_clean == lookup_key else 5.5
+        p_matchup_mult_k = 1.00
         
         if p_name_clean == lookup_key:
-            simulated_proj = live_avg
-            current_book_line = sportsbook_line
+            sim_proj_k = live_avg_k
+            sim_proj_outs = live_avg_outs
+            current_book_line_k = sportsbook_line_k
         else:
             if not batter_db.empty and db_lookup_team in batter_db['team_clean'].values:
                 team_hitters = batter_db[batter_db['team_clean'] == db_lookup_team]
@@ -344,40 +372,27 @@ if not filtered_pitcher_db.empty:
                         k_list_calc.append(raw_b_k * 1.12 * b_stab)
                     else:
                         k_list_calc.append(raw_b_k * 0.92 * b_stab)
-                if k_list_calc and market == "Strikeouts (Ks)": 
-                    p_matchup_mult = (sum(k_list_calc) / len(k_list_calc)) / 22.5
+                if k_list_calc: 
+                    p_matchup_mult_k = (sum(k_list_calc) / len(k_list_calc)) / 22.5
 
-        p_park_mult, p_bullpen_mult = 1.00, 1.00
-        simulated_proj = round(simulated_proj * p_matchup_mult * p_park_mult * p_bullpen_mult, 2)
-        arbitrage_edge = round(simulated_proj - current_book_line, 2)
-        
-        edge_tier = "🔥 S-Tier Edge Max" if arbitrage_edge >= 1.25 else ("⭐ A-Tier Value" if arbitrage_edge >= 0.50 else ("❄️ Short Edge Max" if arbitrage_edge <= -1.25 else "⚖️ Neutral Line"))
-        global_tracker_rows.append({"PITCHER": p_name_raw, "TEAM": p_team_code, "OPPONENT": opp_team_target, "ARM": f"{p_arm_side}HP", "BASE": p_base, "LINE": current_book_line, "PROJ": simulated_proj, "GAP": arbitrage_edge, "SIDE": "OVER" if arbitrage_edge >= 0 else "UNDER", "STATUS": edge_tier})
+            sim_proj_k = round(p_base_k * p_matchup_mult_k, 2)
+            sim_proj_outs = round(p_base_outs * 1.01, 2)
+
+        global_tracker_rows.append({"PITCHER": p_name_raw, "TEAM": p_team_code, "OPPONENT": opp_team_target, "ARM": f"{p_arm_side}HP", "PROJ Ks": sim_proj_k, "PROJ OUTS": sim_proj_outs, "STATUS": "⚖️ Live Board Monitoring"})
 
 if global_tracker_rows:
-    master_slate_df = pd.DataFrame(global_tracker_rows)
-    styled_master_board = master_slate_df.style.format({"BASE": "{:.2f}", "LINE": "{:.1f}", "PROJ": "{:.2f}", "GAP": "{:+,.2f}"}).set_properties(**{
+    st.dataframe(pd.DataFrame(global_tracker_rows).style.set_properties(**{
         'background-color': '#1A1423', 'color': '#8BE9FD', 'border-color': '#372549', 'text-align': 'center'
-    }).map(
-        lambda val: 'background-color: #FFB86C; color: #0E0B16; font-weight: bold; text-align: center;' if val == "🔥 S-Tier Edge Max"
-        else ('background-color: #BD93F9; color: #0E0B16; font-weight: bold; text-align: center;' if val == "⭐ A-Tier Value" else 'text-align: center;'),
-        subset=["STATUS"]
-    )
-    st.dataframe(styled_master_board, use_container_width=True, hide_index=True)
+    }), use_container_width=True, hide_index=True)
 
 # ------------------------------------------------------------------------------
-# 🟢 LIVE HISTORY SHEET: MASTER LEDGER TABLE (WITH DETAILED TOTAL OUTS COLUMNS)
+# 🟢 STOD MASTER TRACKER LEDGER ROW ENGINE
 # ------------------------------------------------------------------------------
 st.markdown("---")
-st.markdown("<div class='section-header' style='background: linear-gradient(90deg, #FF79C6 0%, #1A1423 100%); border-left: 5px solid #FF79C6;'>📋 Stored Search History & Live Projections Ledger</div>", unsafe_allow_html=True)
+st.markdown("<div class='section-header' style='background: linear-gradient(90deg, #FF79C6 0%, #1A1423 100%); border-left: 5px solid #FF79C6;'>📋 Stored Search History & Dual-Market Live Ledger Sheets</div>", unsafe_allow_html=True)
 
 if st.session_state["search_history_queue"]:
     history_df = pd.DataFrame(st.session_state["search_history_queue"])
-    
-    # Force layout sorting columns order for perfect widescreen readability
-    display_cols = ["PITCHER", "TEAM", "OPPONENT", "MARKET TYPE", "BOOK LINE", "PROJECTED Ks", "PROJECTED OUTS", "GAP VALUE", "OVER PROBABILITY"]
-    history_df = history_df.reindex(columns=display_cols)
-    
     st.dataframe(history_df.style.set_properties(**{
         'background-color': '#1A1423', 'color': '#50FA7B', 'border-color': '#372549', 'text-align': 'center'
     }), use_container_width=True, hide_index=True)
@@ -386,4 +401,4 @@ if st.session_state["search_history_queue"]:
         st.session_state["search_history_queue"] = []
         st.rerun()
 else:
-    st.info("💡 Adjust your calibration parameters in the sidebar panel above and click 'Run Pro Simulation Matchup' to append records onto this worksheet.")
+    st.info("💡 Calibrate both lines in your form panel above and click 'Run Pro Dual-Market Simulation' to track both projections at once here.")
