@@ -264,7 +264,7 @@ with main_col2:
         for i in range(1, 10):
             lineup_rows.append({"SLOT": i, "BATTER LINEUP CARD": f"Lineup Slot Active Hitter {i}", "HAND": "R", "RAW K% SPLIT": "23.4%", "DYNAMIC K% PROJECTION": f"{21.0 + (i * 0.5)}%"})
             
-    st.dataframe(pd.DataFrame(lineup_rows).style.set_properties(**Traceback={'background-color': '#1A1423', 'color': '#8BE9FD'}), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(lineup_rows).style.set_properties(**{'background-color': '#1A1423', 'color': '#8BE9FD'}), use_container_width=True, hide_index=True)
 # --- RE-ANCHOR THE SUB-MATRICES ROWS SIDE-BY-SIDE OUTSIDE THE LOOP ---
 sub_col1, sub_col2 = st.columns(2)
 
