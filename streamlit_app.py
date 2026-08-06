@@ -6,16 +6,16 @@ from datetime import datetime
 import datetime as dt
 
 # ------------------------------------------------------------------------------
-# AUTOMATIC DAILY SCHEDULE TRACKING ENGINE (AIRTIGHT LIVE DATE SYNC)
+# AUTOMATIC DAILY SCHEDULE TRACKING ENGINE (AIRTIGHT ZONE-AWARE TIME SYNC)
 # ------------------------------------------------------------------------------
 @st.cache_data(ttl=120)
 def get_live_mlb_schedule():
     """Automatically pulls live active starters and matchup parameters for today's date"""
-    utc_now = datetime.utcnow()
+    # 🟢 DEPRECATION FIXED: Replaced legacy utcnow() with zone-aware datetime object to fix line 14 terminal warning
+    utc_now = datetime.now(dt.timezone.utc)
     est_now = utc_now - dt.timedelta(hours=4)  # Local US game day synchronization matrix
     today_str = est_now.strftime('%Y-%m-%d')
     
-    # Air-tight fallback array matching endpoint paths
     url = f"https://mlb.com{today_str}&hydrate=probablePitcher,team,venue"
     live_slate = {}
     
@@ -165,7 +165,6 @@ with st.sidebar:
         else:
             game_temp, wind_speed, wind_dir = auto_temp, auto_wind, auto_vector
             
-        # 🟢 WEATHER BOX CORRECTION: Fixed display elements and re-anchored climate metrics tracking cards
         st.markdown(f"**Stadium Vector Config:** {game_temp}°F | {wind_speed} MPH {wind_dir}")
         st.caption("🤖 Weather variables map calculation adjustments dynamically.")
             
@@ -288,7 +287,7 @@ with main_col2:
     with c_o2:
         grade_outs = "A" if (over_prob_pct_outs > 65 or over_prob_pct_outs < 35) else ("B" if (over_prob_pct_outs > 55 or over_prob_pct_outs < 45) else "C")
         st.markdown(f"<div class='metric-card'><div class='metric-label'>OUTS SIM GRADE</div><div class='metric-value'>{grade_outs}</div></div>", unsafe_allow_html=True)
-# --- SPLIT THE ACCELERATED SUB-CARDS GRIDS (CLEAN WIDTH UPDATES DESIGNATED) ---
+# --- SPLIT THE ACCELERATED SUB-CARDS GRIDS ---
 st.markdown("---")
 sub_col1, sub_col2 = st.columns(2)
 
@@ -317,7 +316,6 @@ with sub_col1:
     else:
         for i in range(1, 10):
             lineup_rows.append({"SLOT": i, "BATTER LINEUP CARD": f"Lineup Slot Active Hitter {i}", "HAND": "R", "RAW K% SPLIT": "23.4%", "DYNAMIC K% PROJECTION": f"{21.0 + (i * 0.5)}%"})
-    # 🟢 SYNTAX UPGRADE: Applied width="stretch" framework updates to remove deprecation log notices natively
     st.dataframe(pd.DataFrame(lineup_rows).style.set_properties(**{ 'background-color': '#1A1423', 'color': '#8BE9FD'}), width="stretch", hide_index=True)
 
 with sub_col2:
@@ -336,6 +334,7 @@ st.markdown("---")
 st.subheader("📋 Automated Global Slate Edge Tracker Matrix")
 
 global_tracker_rows = []
+sample_slate = {"tarik skubal": {"team": "LAD", "opponent": "CHW"}, "paul skenes": {"team": "PIT", "opponent": "CIN"}, "dylan cease": {"team": "SDP", "opponent": "SFG"}, "corbin burnes": {"team": "BAL", "opponent": "PHI"}, "cole ragans": {"team": "KCR", "opponent": "DET"}, "zack wheeler": {"team": "PHI", "opponent": "BAL"}, "garrett crochet": {"team": "CHW", "opponent": "LAD"}}
 
 if todays_slate and len(todays_slate) > 0:
     for live_name, meta in todays_slate.items():
@@ -345,7 +344,7 @@ if todays_slate and len(todays_slate) > 0:
         db_match = pitcher_db[pitcher_db['name_clean'] == p_name_clean]
         
         if not db_match.empty:
-            p_data = db_match.iloc[0]
+            p_data = db_match.iloc
             p_base_k = float(p_data['base_avg'])
             p_base_outs = float(p_data['base_outs']) if 'base_outs' in p_data.index else 17.50
             p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data.index else "R"
