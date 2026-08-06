@@ -169,18 +169,19 @@ park_multiplier, ump_multiplier, fatigue_multiplier, bullpen_multiplier = 1.00, 
 temp_multiplier = 0.96 if game_temp > 85 else (1.05 if game_temp < 52 else 1.00)
 wind_multiplier = 1.04 if (wind_speed > 10 and wind_dir == "Inward") else (0.96 if (wind_speed > 10 and wind_dir == "Outward") else 1.00)
 # ------------------------------------------------------------------------------
-# 5. DATA MATRICES FETCHING AND MATCHUP LOOKUPS (WITH AUTOMATED SEARCH SCANNER)
+# 5. DATA MATRICES FETCHING AND MATCHUP LOOKUPS (WITH PERFECTLY PADDED ROW DISCOVERY)
 # ------------------------------------------------------------------------------
 lookup_key = pitcher_name_clean.lower().strip()
 matched_pitcher = pitcher_db[pitcher_db['name_clean'] == lookup_key]
 
-# 🟢 SEARCH DETECTIVE: If you search a name that isn't in your file, generate their row instantly
+# 🟢 DATA EXTRACTION ALIGNMENT: Generates the exact multi-variable pitch array matching your file format
 if matched_pitcher.empty and lookup_key != "" and "projected starter" not in lookup_key:
     st.markdown("<div class='section-header' style='background: linear-gradient(90deg, #FF5555 0%, #1A1423 100%); border-left: 5px solid #FF5555;'>🚨 Searched Pitcher Missing From Database</div>", unsafe_allow_html=True)
-    st.warning(f"**{pitcher_input.title()}** was not found in your pitcher_database.csv file! Copy the line below, go to GitHub, and paste it at the bottom of your file to add them permanently:")
+    st.warning(f"**{pitcher_input.title()}** was not found in your pitcher_database.csv file! Copy the full line below and paste it at the bottom of your file to safely preserve your database shape:")
     
-    # Creates a perfectly formatted 8-column line ready to copy
-    st.code(f"{pitcher_input.title()},{pitcher_team},R,5.20,12,62,65.0,3.85", language="csv")
+    # Builds the exact row structure seen on your screen: Core stats + 5 perfectly padded pitch placeholder metrics
+    perfect_database_row = f"{pitcher_input.title()},{pitcher_team},R,5.20,12,62,65.0,3.85,FOUR-SEAM,40% use,25%,22.0%,6.5,SLIDER,30%,20%,W:28%,24.5%,CHANGEUP,20%,15%,W:22%,20.0%,—,—,—,—,—"
+    st.code(perfect_database_row, language="csv")
     st.markdown("---")
 
 if not matched_pitcher.empty:
