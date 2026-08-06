@@ -13,10 +13,10 @@ def get_live_mlb_schedule():
     """Automatically pulls live active starters and matchup parameters for today's date"""
     utc_now = datetime.utcnow()
     est_now = utc_now - dt.timedelta(hours=4)  # Local US game day synchronization matrix
+    today_str = est_now.strftime('%Y-%m-%d')
     
-    # 🟢 CRITICAL API CORRECTION: Reformatted date structure to prevent empty payload drops
-    today_str = est_now.strftime('%m/%d/%Y')
-    url = f"https://mlb.com{today_str}"
+    # Air-tight fallback array matching endpoint paths
+    url = f"https://mlb.com{today_str}&hydrate=probablePitcher,team,venue"
     live_slate = {}
     
     try:
@@ -24,8 +24,20 @@ def get_live_mlb_schedule():
         if response.status_code == 200:
             data = response.json()
             if "dates" in data and len(data["dates"]) > 0:
-                for date_node in data["dates"]:
-                    for game in date_node.get("games", []):
+                date_records = data["dates"]
+                all_games = []
+                
+                if isinstance(date_records, list):
+                    for node in date_records:
+                        if isinstance(node, dict):
+                            all_games.extend(node.get("games", []))
+                elif isinstance(date_records, dict):
+                    all_games.extend(date_records.get("games", []))
+                else:
+                    all_games.extend(data["dates"].get("games", []))
+                
+                for game in all_games:
+                    if isinstance(game, dict) and "teams" in game:
                         away_team = str(game.get("teams", {}).get("away", {}).get("team", {}).get("name", "NYY"))
                         home_team = str(game.get("teams", {}).get("home", {}).get("team", {}).get("name", "LAD"))
                         
@@ -152,7 +164,10 @@ with st.sidebar:
             wind_dir = st.selectbox("Wind Vector Direction", ["Inward", "Outward", "Crosswind"])
         else:
             game_temp, wind_speed, wind_dir = auto_temp, auto_wind, auto_vector
-            st.caption(f"🤖 Automated Weather Synced: {game_temp}°F | {wind_speed} MPH {wind_dir}")
+            
+        # 🟢 WEATHER BOX CORRECTION: Fixed display elements and re-anchored climate metrics tracking cards
+        st.markdown(f"**Stadium Vector Config:** {game_temp}°F | {wind_speed} MPH {wind_dir}")
+        st.caption("🤖 Weather variables map calculation adjustments dynamically.")
             
         submit_button = st.form_submit_button(label="🚀 Run Pro Dual-Market Simulation")
 
@@ -273,7 +288,7 @@ with main_col2:
     with c_o2:
         grade_outs = "A" if (over_prob_pct_outs > 65 or over_prob_pct_outs < 35) else ("B" if (over_prob_pct_outs > 55 or over_prob_pct_outs < 45) else "C")
         st.markdown(f"<div class='metric-card'><div class='metric-label'>OUTS SIM GRADE</div><div class='metric-value'>{grade_outs}</div></div>", unsafe_allow_html=True)
-# --- SPLIT THE ACCELERATED SUB-CARDS GRIDS ---
+# --- SPLIT THE ACCELERATED SUB-CARDS GRIDS (CLEAN WIDTH UPDATES DESIGNATED) ---
 st.markdown("---")
 sub_col1, sub_col2 = st.columns(2)
 
@@ -302,7 +317,8 @@ with sub_col1:
     else:
         for i in range(1, 10):
             lineup_rows.append({"SLOT": i, "BATTER LINEUP CARD": f"Lineup Slot Active Hitter {i}", "HAND": "R", "RAW K% SPLIT": "23.4%", "DYNAMIC K% PROJECTION": f"{21.0 + (i * 0.5)}%"})
-    st.dataframe(pd.DataFrame(lineup_rows).style.set_properties(**{ 'background-color': '#1A1423', 'color': '#8BE9FD'}), use_container_width=True, hide_index=True)
+    # 🟢 SYNTAX UPGRADE: Applied width="stretch" framework updates to remove deprecation log notices natively
+    st.dataframe(pd.DataFrame(lineup_rows).style.set_properties(**{ 'background-color': '#1A1423', 'color': '#8BE9FD'}), width="stretch", hide_index=True)
 
 with sub_col2:
     st.markdown("<div class='section-header'>📊 Balanced Pitch Arsenal Matrix</div>", unsafe_allow_html=True)
@@ -314,7 +330,7 @@ with sub_col2:
             calc_k = round(whiff_val * 0.85, 1)
             calc_put = round(whiff_val * 0.58, 1)
             updated_arsenal.append({"PITCH TYPE": row["PITCH"], "USAGE": row["USE"], "Ks EXPECTED": f"{calc_k}%", "WHIFF RATE": row["WHIFF"], "PUTAWAY": f"{calc_put}%"})
-        st.dataframe(pd.DataFrame(updated_arsenal).style.set_properties(**{'text-align': 'center', 'background-color': '#1A1423', 'color': '#8BE9FD', 'border-color': '#372549'}), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(updated_arsenal).style.set_properties(**{'text-align': 'center', 'background-color': '#1A1423', 'color': '#8BE9FD', 'border-color': '#372549'}), width="stretch", hide_index=True)
 
 st.markdown("---")
 st.subheader("📋 Automated Global Slate Edge Tracker Matrix")
@@ -371,7 +387,7 @@ if todays_slate and len(todays_slate) > 0:
 if global_tracker_rows:
     st.dataframe(pd.DataFrame(global_tracker_rows).style.set_properties(**{
         'background-color': '#1A1423', 'color': '#8BE9FD', 'border-color': '#372549', 'text-align': 'center'
-    }), use_container_width=True, hide_index=True)
+    }), width="stretch", hide_index=True)
 else:
     st.info("💡 Live board matching layer empty. Awaiting confirmed active pitcher announcements from league data systems.")
 
@@ -382,7 +398,7 @@ if st.session_state["search_history_queue"]:
     history_df = pd.DataFrame(st.session_state["search_history_queue"])
     st.dataframe(history_df.style.set_properties(**{
         'background-color': '#1A1423', 'color': '#50FA7B', 'border-color': '#372549', 'text-align': 'center'
-    }), use_container_width=True, hide_index=True)
+    }), width="stretch", hide_index=True)
     
     if st.button("🧹 Reset Search History Ledger"):
         st.session_state["search_history_queue"] = []
