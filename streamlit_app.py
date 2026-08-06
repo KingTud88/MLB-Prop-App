@@ -273,7 +273,9 @@ with main_col2:
     with c_o2:
         grade_outs = "A" if (over_prob_pct_outs > 65 or over_prob_pct_outs < 35) else ("B" if (over_prob_pct_outs > 55 or over_prob_pct_outs < 45) else "C")
         st.markdown(f"<div class='metric-card'><div class='metric-label'>OUTS SIM GRADE</div><div class='metric-value'>{grade_outs}</div></div>", unsafe_allow_html=True)
-# --- SPLIT THE ACCELERATED SUB-CARDS GRIDS ---
+# ------------------------------------------------------------------------------
+# 6. ROW FRAMEWORK LAYER 4: RE-ANCHORED UNIVERSAL AUTOMATED GLOBAL SLATE MATRIX
+# ------------------------------------------------------------------------------
 st.markdown("---")
 sub_col1, sub_col2 = st.columns(2)
 
@@ -320,28 +322,28 @@ st.markdown("---")
 st.subheader("📋 Automated Global Slate Edge Tracker Matrix")
 
 global_tracker_rows = []
-sample_slate = {"tarik skubal": {"team": "LAD", "opponent": "CHW"}, "paul skenes": {"team": "PIT", "opponent": "CIN"}, "dylan cease": {"team": "SDP", "opponent": "SFG"}, "corbin burnes": {"team": "BAL", "opponent": "PHI"}, "cole ragans": {"team": "KCR", "opponent": "DET"}, "zack wheeler": {"team": "PHI", "opponent": "BAL"}, "garrett crochet": {"team": "CHW", "opponent": "LAD"}}
 
-if todays_slate and len(todays_slate) >= 2:
-    active_slate_source = todays_slate
-    active_starters_list = [str(k).lower().strip() for k in active_slate_source.keys()]
-    filtered_pitcher_db = pitcher_db[pitcher_db['name_clean'].str.lower().str.strip().isin(active_starters_list)]
-else:
-    active_slate_source = sample_slate
-    filtered_pitcher_db = pitcher_db.head(8) if not pitcher_db.empty else pd.DataFrame()
+# 🟢 AIRTIGHT LIVE SYNC ACTION: Build directly from live API pairs without hardcoded sample block drops
+if todays_slate and len(todays_slate) > 0:
+    for live_name, meta in todays_slate.items():
+        p_name_raw = live_name.title()
+        p_name_clean = live_name.lower().strip()
+        
+        # Pull matching statistical properties from your file smoothly using clean lowercase targets
+        db_match = pitcher_db[pitcher_db['name_clean'] == p_name_clean]
+        
+        if not db_match.empty:
+            p_data = db_match.iloc[0]
+            p_base_k = float(p_data['base_avg'])
+            p_base_outs = float(p_data['base_outs']) if 'base_outs' in p_data.index else 17.50
+            p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data.index else "R"
+            p_team_code = str(p_data.get('team', meta["team"])).upper().strip() # 🟢 PRESERVES DATABASE TEAM CODE (like TOR for Dylan Cease)
+        else:
+            p_base_k, p_base_outs, p_arm_side = 5.50, 15.2, "R"
+            p_team_code = str(meta["team"]).upper().strip()
 
-if not filtered_pitcher_db.empty:
-    for _, p_data in filtered_pitcher_db.iterrows():
-        p_name_raw = str(p_data['name']).title()
-        p_name_clean = str(p_data['name']).lower().strip()
-        
-        p_base_k = float(p_data['base_avg'])
-        p_base_outs = float(p_data['base_outs']) if 'base_outs' in p_data.index else 17.50
-        p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data.index else "R"
-        
-        opp_team_target = str(active_slate_source.get(p_name_clean, {"opponent": "CHW"})["opponent"]).upper().strip()
+        opp_team_target = str(meta["opponent"]).upper().strip()
         db_lookup_team = "CWS" if opp_team_target == "CHW" else opp_team_target
-        p_team_code = str(active_slate_source.get(p_name_clean, {"team": "LAD"})["team"]).upper().strip()
         
         if p_name_clean == lookup_key:
             sim_proj_k = live_avg_k
@@ -365,13 +367,22 @@ if not filtered_pitcher_db.empty:
             sim_proj_k = round(p_base_k * p_matchup_mult_k, 2)
             sim_proj_outs = round(p_base_outs * 1.01, 2)
 
-        global_tracker_rows.append({"PITCHER": p_name_raw, "TEAM": p_team_code, "OPPONENT": opp_team_target, "ARM": f"{p_arm_side}HP", "PROJ Ks": sim_proj_k, "PROJ OUTS": sim_proj_outs, "STATUS": "🟢 Live API Stream Online"})
+        global_tracker_rows.append({
+            "PITCHER": p_name_raw, "TEAM": p_team_code, "OPPONENT": opp_team_target, 
+            "ARM": f"{p_arm_side}HP", "PROJ Ks": sim_proj_k, "PROJ OUTS": sim_proj_outs, "STATUS": "🟢 Live API Stream Online"
+        })
 
 if global_tracker_rows:
     st.dataframe(pd.DataFrame(global_tracker_rows).style.set_properties(**{
         'background-color': '#1A1423', 'color': '#8BE9FD', 'border-color': '#372549', 'text-align': 'center'
     }), use_container_width=True, hide_index=True)
+else:
+    # Safe user warning fallback if API completely cuts network availability strings
+    st.info("💡 Live board matching layer empty. Awaiting confirmed active pitcher announcements from league data systems.")
 
+# ------------------------------------------------------------------------------
+# MASTER REQ SEARCH HISTORY SHEET DESK MATRIX
+# ------------------------------------------------------------------------------
 st.markdown("---")
 st.markdown("<div class='section-header' style='background: linear-gradient(90deg, #FF79C6 0%, #1A1423 100%); border-left: 5px solid #FF79C6;'>📋 Stored Search History & Dual-Market Live Ledger Sheets</div>", unsafe_allow_html=True)
 
