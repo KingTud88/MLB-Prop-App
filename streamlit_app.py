@@ -175,7 +175,7 @@ if matched_pitcher.empty and lookup_key != "" and "projected starter" not in loo
     st.markdown("---")
 
 if not matched_pitcher.empty:
-    p_data_row = matched_pitcher.iloc
+    p_data_row = matched_pitcher.iloc[0]
     pitcher_base_avg = float(p_data_row['base_outs']) if (market == "Total Projected Outs" and 'base_outs' in p_data_row.index) else float(p_data_row['base_avg'])
     pitcher_throws = str(p_data_row['throws']).upper().strip()
     strikeouts = int(p_data_row['strikeouts'])
