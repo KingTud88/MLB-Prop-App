@@ -5,17 +5,15 @@ import requests
 from datetime import datetime
 
 # ------------------------------------------------------------------------------
-# AUTOMATIC DAILY SCHEDULE TRACKING ENGINE (AIRTIGHT LIVE DATE SYNC)
+# AUTOMATIC DAILY SCHEDULE TRACKING ENGINE (SPORTSBOOK-ALIGNED LIVE SYNC)
 # ------------------------------------------------------------------------------
 @st.cache_data(ttl=300)
 def get_live_mlb_schedule():
     """Automatically pulls live active starters and matchup parameters for today's date"""
-    # 🟢 LIVE DATE AXIS FIX: Force engine to pull the exact live calendar date dynamically
     today_str = datetime.now().strftime('%Y-%m-%d')
     url = f"https://mlb.com{today_str}&hydrate=probablePitcher,team,venue"
     live_slate = {}
     
-    # Official MLB Live Numeric ID to 3-Letter CSV Abbreviation Translation Matrix
     mlb_id_map = {
         109: "ARI", 144: "ATL", 110: "BAL", 111: "BOS", 112: "CHC", 145: "CHW", 113: "CIN", 114: "CLE", 
         115: "COL", 116: "DET", 117: "HOU", 118: "KCR", 138: "LAA", 119: "LAD", 139: "MIA", 158: "MIL", 
@@ -36,12 +34,19 @@ def get_live_mlb_schedule():
                     away_team = mlb_id_map.get(away_id, "NYY")
                     home_team = mlb_id_map.get(home_id, "LAD")
                     
+                    # 🟢 SPORTSBOOK AXIS: Extract listed pitcher names, or fall back safely if unconfirmed
                     if "probablePitcher" in game["teams"]["away"]:
                         away_pitcher = str(game["teams"]["away"]["probablePitcher"]["fullName"]).lower().strip()
-                        live_slate[away_pitcher] = {"team": away_team, "opponent": home_team, "venue": "Away", "stadium": venue_name}
+                    else:
+                        away_pitcher = f"projected starter ({away_team})"
+                        
                     if "probablePitcher" in game["teams"]["home"]:
                         home_pitcher = str(game["teams"]["home"]["probablePitcher"]["fullName"]).lower().strip()
-                        live_slate[home_pitcher] = {"team": home_team, "opponent": away_team, "venue": "Home", "stadium": venue_name}
+                    else:
+                        home_pitcher = f"projected starter ({home_team})"
+                        
+                    live_slate[away_pitcher] = {"team": away_team, "opponent": home_team, "venue": "Away", "stadium": venue_name}
+                    live_slate[home_pitcher] = {"team": home_team, "opponent": away_team, "venue": "Home", "stadium": venue_name}
     except Exception:
         pass
     return live_slate
