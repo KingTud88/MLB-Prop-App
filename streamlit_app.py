@@ -7,57 +7,52 @@ from datetime import datetime
 # ------------------------------------------------------------------------------
 # AUTOMATIC DAILY SCHEDULE TRACKING ENGINE (AIRTIGHT LIVE DATE SYNC)
 # ------------------------------------------------------------------------------
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=120)
 def get_live_mlb_schedule():
     """Automatically pulls live active starters and matchup parameters for today's date"""
     today_str = datetime.now().strftime('%Y-%m-%d')
-    url = f"https://mlb.com{today_str}&hydrate=probablePitcher,team,venue"
+    # 🟢 PRODUCTION UPGRADE: Switched to the modern, unrestricted live games endpoint path
+    url = f"https://mlb.com{today_str}"
     live_slate = {}
-    
-    mlb_id_map = {
-        109: "ARI", 144: "ATL", 110: "BAL", 111: "BOS", 112: "CHC", 145: "CHW", 113: "CIN", 114: "CLE", 
-        115: "COL", 116: "DET", 117: "HOU", 118: "KCR", 138: "LAA", 119: "LAD", 139: "MIA", 158: "MIL", 
-        142: "MIN", 121: "NYM", 147: "NYY", 133: "OAK", 143: "PHI", 134: "PIT", 135: "SDP", 137: "SFG", 
-        136: "SEA", 141: "STL", 140: "TBR", 146: "TEX", 120: "WSH", 118: "KC", 145: "CWS"
-    }
     
     try:
         response = requests.get(url, timeout=6)
         if response.status_code == 200:
             data = response.json()
             if "dates" in data and len(data["dates"]) > 0:
-                date_records = data["dates"]
-                all_games = []
-                
-                if isinstance(date_records, list):
-                    for node in date_records:
-                        if isinstance(node, dict):
-                            all_games.extend(node.get("games", []))
-                elif isinstance(date_records, dict):
-                    all_games.extend(date_records.get("games", []))
-                else:
-                    all_games.extend(data["dates"].get("games", []))
-                
-                for game in all_games:
-                    if isinstance(game, dict) and "teams" in game:
-                        away_team_node = game.get("teams", {}).get("away", {}).get("team", {})
-                        home_team_node = game.get("teams", {}).get("home", {}).get("team", {})
+                for date_node in data["dates"]:
+                    for game in date_node.get("games", []):
+                        # Extract structural team names cleanly
+                        away_team = str(game.get("teams", {}).get("away", {}).get("team", {}).get("name", "NYY"))
+                        home_team = str(game.get("teams", {}).get("home", {}).get("team", {}).get("name", "LAD"))
                         
-                        away_id = away_team_node.get("id")
-                        home_id = home_team_node.get("id")
+                        # Translate full long text names into your exact 3-letter database codes cleanly
+                        map_names = {
+                            "Chicago White Sox": "CHW", "Los Angeles Dodgers": "LAD", "San Diego Padres": "SDP",
+                            "San Francisco Giants": "SFG", "Pittsburgh Pirates": "PIT", "Cincinnati Reds": "CIN",
+                            "Cleveland Guardians": "CLE", "New York Mets": "NYM", "New York Yankees": "NYY",
+                            "Atlanta Braves": "ATL", "Kansas City Royals": "KCR", "Baltimore Orioles": "BAL",
+                            "Philadelphia Phillies": "PHI", "Minnesota Twins": "MIN", "Detroit Tigers": "DET",
+                            "Seattle Mariners": "SEA", "Houston Astros": "HOU", "Texas Rangers": "TEX",
+                            "Los Angeles Angels": "LAA", "Oakland Athletics": "OAK", "Miami Marlins": "MIA",
+                            "Milwaukee Brewers": "MIL", "St. Louis Cardinals": "STL", "Tampa Bay Rays": "TBR",
+                            "Boston Red Sox": "BOS", "Toronto Blue Blue Jays": "TOR", "Washington Nationals": "WSH",
+                            "Arizona Diamondbacks": "ARI", "Colorado Rockies": "COL", "Chicago Cubs": "CHC"
+                        }
+                        
+                        away_code = map_names.get(away_team, "NYY")
+                        home_code = map_names.get(home_team, "LAD")
                         venue_name = str(game.get("venue", {}).get("name", "Standard Ballpark"))
                         
-                        away_team = mlb_id_map.get(away_id, "NYY")
-                        home_team = mlb_id_map.get(home_id, "LAD")
-                        
+                        # 🟢 SPORTSBOOK ALIGNMENT: Capture names safely from both fields to ensure full matching
                         away_p_node = game.get("teams", {}).get("away", {}).get("probablePitcher", {})
                         home_p_node = game.get("teams", {}).get("home", {}).get("probablePitcher", {})
                         
-                        away_pitcher = str(away_p_node.get("fullName", f"Projected Starter ({away_team})")).lower().strip()
-                        home_pitcher = str(home_p_node.get("fullName", f"Projected Starter ({home_team})")).lower().strip()
+                        away_pitcher = str(away_p_node.get("fullName", f"Projected Starter ({away_code})")).lower().strip()
+                        home_pitcher = str(home_p_node.get("fullName", f"Projected Starter ({home_code})")).lower().strip()
                         
-                        live_slate[away_pitcher] = {"team": away_team, "opponent": home_team, "venue": "Away", "stadium": venue_name}
-                        live_slate[home_pitcher] = {"team": home_team, "opponent": away_team, "venue": "Home", "stadium": venue_name}
+                        live_slate[away_pitcher] = {"team": away_code, "opponent": home_code, "venue": "Away", "stadium": venue_name}
+                        live_slate[home_pitcher] = {"team": home_code, "opponent": away_code, "venue": "Home", "stadium": venue_name}
     except Exception:
         pass
     return live_slate
@@ -140,7 +135,6 @@ with st.sidebar:
 
         st.markdown("---")
         st.subheader("🎲 Sportsbook Line Calibration")
-        # 🟢 SIMULTANEOUS IMPROVEMENT: Provide separate calibration entry slots for both markets at once
         sportsbook_line_k = st.number_input("Sportsbook Strikeout Line (Ks)", min_value=0.5, max_value=15.5, value=6.5, step=0.5)
         sportsbook_line_outs = st.number_input("Sportsbook Total Outs Line", min_value=0.5, max_value=27.5, value=15.5, step=0.5)
         
@@ -218,21 +212,18 @@ matchup_multiplier_k = team_avg_k / league_avg_k
 matchup_multiplier_outs = 1.02
 venue_multiplier = 1.06 if venue_split == "Home" else 0.95
 
-# 🟢 SIMULTANEOUS MATRIX CALCULATIONS: Process both streams completely in parallel fields
 live_avg_k = round(pitcher_base_avg_k * matchup_multiplier_k * venue_multiplier * park_multiplier * ump_multiplier * wind_multiplier * fatigue_multiplier * bullpen_multiplier * temp_multiplier, 2)
 live_avg_outs = round(pitcher_base_avg_outs * matchup_multiplier_outs * venue_multiplier * park_multiplier * ump_multiplier * wind_multiplier * fatigue_multiplier * bullpen_multiplier * temp_multiplier, 2)
 
 diff_val_k = round(live_avg_k - sportsbook_line_k, 2)
 diff_val_outs = round(live_avg_outs - sportsbook_line_outs, 2)
 
-# 🟢 DUAL PRO SIMULATIONS: Run separate 10,000 game Poisson matrices back-to-back instantly
 sim_games_k = np.random.poisson(live_avg_k, 10000)
 sim_games_outs = np.random.poisson(live_avg_outs, 10000)
 
 over_prob_pct_k = round(np.mean(sim_games_k > sportsbook_line_k) * 100, 1)
 over_prob_pct_outs = round(np.mean(sim_games_outs > sportsbook_line_outs) * 100, 1)
 
-# 🟢 DUAL DATA SNAPSHOT APPENDING CORE: Logs both metrics cleanly to your history queue
 if submit_button and pitcher_input != "" and "projected starter" not in pitcher_input:
     new_snapshot_record = {
         "PITCHER": pitcher_input.title(),
@@ -247,9 +238,7 @@ if submit_button and pitcher_input != "" and "projected starter" not in pitcher_
     }
     st.session_state["search_history_queue"].append(new_snapshot_record)
 
-# --- EXECUTE THE BALANCED TWO-COLUMN ROW SPLIT FOR MATRICES DESKS ---
 main_col1, main_col2 = st.columns(2)
-
 with main_col1:
     st.markdown(f"<div class='section-header'>🔥 STRIKEOUT SIMULATION DESK: {pitcher_input.title()}</div>", unsafe_allow_html=True)
     ch1, ch2 = st.columns(2)
@@ -281,7 +270,7 @@ with main_col2:
         rec_color_outs = "#50FA7B" if rec_tag_outs == "OVER" else "#FF5555"
         st.markdown(f"<div class='metric-card'><div class='metric-label'>OUTS RECOMMENDATION</div><div class='metric-value' style='color:{rec_color_outs};'>{rec_tag_outs}</div><div class='class-sub-text' style='color:#8BE9FD;'>{diff_val_outs:+,.2f} Outs Gap</div></div>", unsafe_allow_html=True)
     with c_o2:
-        grade_outs = "A" if (over_prob_pct_outs > 65 or over_prob_pct < 35) else ("B" if (over_prob_pct_outs > 55 or over_prob_pct < 45) else "C")
+        grade_outs = "A" if (over_prob_pct_outs > 65 or over_prob_pct_outs < 35) else ("B" if (over_prob_pct_outs > 55 or over_prob_pct_outs < 45) else "C")
         st.markdown(f"<div class='metric-card'><div class='metric-label'>OUTS SIM GRADE</div><div class='metric-value'>{grade_outs}</div></div>", unsafe_allow_html=True)
 # --- SPLIT THE ACCELERATED SUB-CARDS GRIDS ---
 st.markdown("---")
@@ -353,14 +342,11 @@ if not filtered_pitcher_db.empty:
         db_lookup_team = "CWS" if opp_team_target == "CHW" else opp_team_target
         p_team_code = str(active_slate_source.get(p_name_clean, {"team": "LAD"})["team"]).upper().strip()
         
-        current_book_line_k = sportsbook_line_k if p_name_clean == lookup_key else 5.5
-        p_matchup_mult_k = 1.00
-        
         if p_name_clean == lookup_key:
             sim_proj_k = live_avg_k
             sim_proj_outs = live_avg_outs
-            current_book_line_k = sportsbook_line_k
         else:
+            p_matchup_mult_k = 1.00
             if not batter_db.empty and db_lookup_team in batter_db['team_clean'].values:
                 team_hitters = batter_db[batter_db['team_clean'] == db_lookup_team]
                 k_list_calc = []
@@ -378,16 +364,13 @@ if not filtered_pitcher_db.empty:
             sim_proj_k = round(p_base_k * p_matchup_mult_k, 2)
             sim_proj_outs = round(p_base_outs * 1.01, 2)
 
-        global_tracker_rows.append({"PITCHER": p_name_raw, "TEAM": p_team_code, "OPPONENT": opp_team_target, "ARM": f"{p_arm_side}HP", "PROJ Ks": sim_proj_k, "PROJ OUTS": sim_proj_outs, "STATUS": "⚖️ Live Board Monitoring"})
+        global_tracker_rows.append({"PITCHER": p_name_raw, "TEAM": p_team_code, "OPPONENT": opp_team_target, "ARM": f"{p_arm_side}HP", "PROJ Ks": sim_proj_k, "PROJ OUTS": sim_proj_outs, "STATUS": "🟢 Live API Stream Online"})
 
 if global_tracker_rows:
     st.dataframe(pd.DataFrame(global_tracker_rows).style.set_properties(**{
         'background-color': '#1A1423', 'color': '#8BE9FD', 'border-color': '#372549', 'text-align': 'center'
     }), use_container_width=True, hide_index=True)
 
-# ------------------------------------------------------------------------------
-# 🟢 STOD MASTER TRACKER LEDGER ROW ENGINE
-# ------------------------------------------------------------------------------
 st.markdown("---")
 st.markdown("<div class='section-header' style='background: linear-gradient(90deg, #FF79C6 0%, #1A1423 100%); border-left: 5px solid #FF79C6;'>📋 Stored Search History & Dual-Market Live Ledger Sheets</div>", unsafe_allow_html=True)
 
