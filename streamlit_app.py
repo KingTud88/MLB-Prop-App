@@ -26,37 +26,26 @@ def get_live_mlb_schedule():
         if response.status_code == 200:
             data = response.json()
             if "dates" in data and len(data["dates"]) > 0:
-                # 🟢 SYSTEM FIX: Universal router parses list loops and raw index sheets cleanly
-                date_records = data["dates"]
-                all_games = []
-                
-                if isinstance(date_records, list):
-                    for node in date_records:
-                        all_games.extend(node.get("games", []))
-                elif isinstance(date_records, dict):
-                    all_games.extend(date_records.get("games", []))
-                else:
-                    all_games.extend(data["dates"][0].get("games", []))
-                
-                for game in all_games:
-                    away_team_node = game.get("teams", {}).get("away", {}).get("team", {})
-                    home_team_node = game.get("teams", {}).get("home", {}).get("team", {})
-                    
-                    away_id = away_team_node.get("id")
-                    home_id = home_team_node.get("id")
-                    venue_name = str(game.get("venue", {}).get("name", "Standard Ballpark"))
-                    
-                    away_team = mlb_id_map.get(away_id, "NYY")
-                    home_team = mlb_id_map.get(home_id, "LAD")
-                    
-                    away_p_node = game.get("teams", {}).get("away", {}).get("probablePitcher", {})
-                    home_p_node = game.get("teams", {}).get("home", {}).get("probablePitcher", {})
-                    
-                    away_pitcher = str(away_p_node.get("fullName", f"Projected Starter ({away_team})")).lower().strip()
-                    home_pitcher = str(home_p_node.get("fullName", f"Projected Starter ({home_team})")).lower().strip()
-                    
-                    live_slate[away_pitcher] = {"team": away_team, "opponent": home_team, "venue": "Away", "stadium": venue_name}
-                    live_slate[home_pitcher] = {"team": home_team, "opponent": away_team, "venue": "Home", "stadium": venue_name}
+                for date_node in data["dates"]:
+                    for game in date_node.get("games", []):
+                        away_team_node = game.get("teams", {}).get("away", {}).get("team", {})
+                        home_team_node = game.get("teams", {}).get("home", {}).get("team", {})
+                        
+                        away_id = away_team_node.get("id")
+                        home_id = home_team_node.get("id")
+                        venue_name = str(game.get("venue", {}).get("name", "Standard Ballpark"))
+                        
+                        away_team = mlb_id_map.get(away_id, "NYY")
+                        home_team = mlb_id_map.get(home_id, "LAD")
+                        
+                        away_p_node = game.get("teams", {}).get("away", {}).get("probablePitcher", {})
+                        home_p_node = game.get("teams", {}).get("home", {}).get("probablePitcher", {})
+                        
+                        away_pitcher = str(away_p_node.get("fullName", f"projected starter ({away_team})")).lower().strip()
+                        home_pitcher = str(home_p_node.get("fullName", f"projected starter ({home_team})")).lower().strip()
+                        
+                        live_slate[away_pitcher] = {"team": away_team, "opponent": home_team, "venue": "Away", "stadium": venue_name}
+                        live_slate[home_pitcher] = {"team": home_team, "opponent": away_team, "venue": "Home", "stadium": venue_name}
     except Exception:
         pass
     return live_slate
@@ -85,6 +74,10 @@ def load_global_databases():
 
 pitcher_db, batter_db = load_global_databases()
 if 'base_outs' not in pitcher_db.columns: pitcher_db['base_outs'] = 17.5
+
+# 🟢 USER PREFERENCE CORE: Creates a working memory queue to store all your searched pitchers and projections
+if "search_history_queue" not in st.session_state:
+    st.session_state["search_history_queue"] = []
 # ------------------------------------------------------------------------------
 # 1. PAGE LAYOUT CONFIGURATION & HIGH-CONTRAST POPPING BLUE STYLING CORE
 # ------------------------------------------------------------------------------
@@ -174,25 +167,22 @@ wind_multiplier = 1.04 if (wind_speed > 10 and wind_dir == "Inward") else (0.96 
 lookup_key = pitcher_name_clean.lower().strip()
 matched_pitcher = pitcher_db[pitcher_db['name_clean'] == lookup_key]
 
-# 🟢 AIRTIGHT GRID-SAFE PATTERN: Generates exactly 27 columns to match your database headers perfectly
 if matched_pitcher.empty and lookup_key != "" and "projected starter" not in lookup_key:
     st.markdown("<div class='section-header' style='background: linear-gradient(90deg, #FF5555 0%, #1A1423 100%); border-left: 5px solid #FF5555;'>🚨 Searched Pitcher Missing From Database</div>", unsafe_allow_html=True)
     st.warning(f"**{pitcher_input.title()}** was not found in your pitcher_database.csv file! Copy the full row below, paste it at the bottom, and your database grid will save perfectly:")
-    
-    # 🌟 CORRECTION: Formatted with exactly 26 commas (27 total cells) to align with p1 through p5 header tracks perfectly
     perfect_27_col_row = f"{pitcher_input.title()},{pitcher_team},R,5.20,12,62,65.0,3.85,Four-seam FB,38%,21%,23,Four-seam FB,38%,21%,Slider,28%,20%,Changeup,14%,18%,Cutter,12%,15%,Curveball,8%,12%"
     st.code(perfect_27_col_row, language="csv")
     st.markdown("---")
 
 if not matched_pitcher.empty:
-    p_data_row = matched_pitcher.iloc[0]
+    p_data_row = matched_pitcher.iloc
     pitcher_base_avg = float(p_data_row['base_outs']) if (market == "Total Projected Outs" and 'base_outs' in p_data_row.index) else float(p_data_row['base_avg'])
     pitcher_throws = str(p_data_row['throws']).upper().strip()
     strikeouts = int(p_data_row['strikeouts'])
     top_pitch_text = str(p_data_row['top_pitch']) if 'top_pitch' in p_data_row.index else "Four-seam FB 42% use"
     
     pitch_records = []
-    for p_num in range(1, 6):  # Fixed: Maps all 5 pitch type column slots perfectly
+    for p_num in range(1, 6):
         p_name_col = f"p{p_num}"
         p_use_col = f"p{p_num}_use"
         p_whiff_col = f"p{p_num}_whiff"
@@ -220,6 +210,22 @@ diff_val = round(live_avg - sportsbook_line, 2)
 
 simulated_games = np.random.poisson(live_avg, 10000)
 over_prob_pct = round(np.mean(simulated_games > sportsbook_line) * 100, 1)
+
+# 🟢 USER PREFERENCE SYSTEM AUTO LOGGING: Captures the active projection value and appends it to memory
+if pitcher_input != "" and "projected starter" not in pitcher_input:
+    new_snapshot_record = {
+        "PITCHER": pitcher_input.title(),
+        "TEAM": pitcher_team,
+        "OPPONENT": opposing_team,
+        "MARKET": market,
+        "LINE": sportsbook_line,
+        "PROJECTION": live_avg,
+        "GAP VALUE": f"{diff_val:+,.2f}",
+        "OVER PROBABILITY": f"{over_prob_pct}%"
+    }
+    # Check for duplicates to prevent recording the same exact click back-to-back
+    if not any(d['PITCHER'] == new_snapshot_record['PITCHER'] and d['MARKET'] == new_snapshot_record['MARKET'] and d['LINE'] == new_snapshot_record['LINE'] for d in st.session_state["search_history_queue"]):
+        st.session_state["search_history_queue"].append(new_snapshot_record)
 
 main_col1, main_col2 = st.columns(2)
 with main_col1:
@@ -291,40 +297,20 @@ with sub_col2:
     else:
         st.success("☀️ All active stadium tracking networks confirm optimal climate baselines across the country.")
 
-# ------------------------------------------------------------------------------
-# 6. ROW FRAMEWORK LAYER 4: DETECTIVE MATRIX & GLOBAL TRACKER CORE
-# ------------------------------------------------------------------------------
 st.markdown("---")
-
-# 🔍 THE AUTOMATED PITCHER DETECTIVE ENGINE
-global_tracker_rows = []
-missing_pitcher_rows = []
-sample_slate = {"tarik skubal": {"team": "LAD", "opponent": "CHW"}, "paul skenes": {"team": "PIT", "opponent": "CIN"}, "dylan cease": {"team": "SDP", "opponent": "SFG"}, "corbin burnes": {"team": "BAL", "opponent": "PHI"}, "cole ragans": {"team": "KCR", "opponent": "DET"}, "zack wheeler": {"team": "PHI", "opponent": "BAL"}, "garrett crochet": {"team": "CHW", "opponent": "LAD"}}
-
-active_slate_source = todays_slate if (todays_slate and len(todays_slate) >= 2) else sample_slate
-active_starters_list = [str(k).lower().strip() for k in active_slate_source.keys()]
-filtered_pitcher_db = pitcher_db[pitcher_db['name_clean'].str.lower().str.strip().isin(active_starters_list)]
-
-# Automatically detect which live slate pitchers are completely missing from your database file
-existing_names_clean = pitcher_db['name_clean'].str.lower().str.strip().tolist() if not pitcher_db.empty else []
-
-for live_name, meta in active_slate_source.items():
-    if live_name not in existing_names_clean and "projected starter" not in live_name:
-        # Format the name perfectly into your exact 8-column layout structure with safety defaults
-        missing_pitcher_rows.append(f"{live_name.title()},{meta['team']},R,5.20,12,62,65.0,3.85")
-
-# 🚨 DISPLAY ALERT WINDOW IF MISSING PITCHERS ARE DETECTED
-if missing_pitcher_rows:
-    st.markdown("<div class='section-header' style='background: linear-gradient(90deg, #FF5555 0%, #1A1423 100%); border-left: 5px solid #FF5555;'>🚨 Missing Pitcher Database Alert Desk</div>", unsafe_allow_html=True)
-    st.warning("The live schedule has starting pitchers that do not exist inside your pitcher_database.csv file! Copy the rows below and paste them into your file:")
-    
-    # Pack rows into a clean, easy-to-copy code block area natively on your monitor
-    formatted_missing_text = "\\n".join(missing_pitcher_rows)
-    st.code(formatted_missing_text, language="csv")
-
 st.subheader("📋 Automated Global Slate Edge Tracker Matrix")
 
-# --- CONSTRUCT THE GLOBAL LEDGER BOARD SHEETS ---
+global_tracker_rows = []
+sample_slate = {"tarik skubal": {"team": "LAD", "opponent": "CHW"}, "paul skenes": {"team": "PIT", "opponent": "CIN"}, "dylan cease": {"team": "SDP", "opponent": "SFG"}, "corbin burnes": {"team": "BAL", "opponent": "PHI"}, "cole ragans": {"team": "KCR", "opponent": "DET"}, "zack wheeler": {"team": "PHI", "opponent": "BAL"}, "garrett crochet": {"team": "CHW", "opponent": "LAD"}}
+
+if todays_slate and len(todays_slate) >= 2:
+    active_slate_source = todays_slate
+    active_starters_list = [str(k).lower().strip() for k in active_slate_source.keys()]
+    filtered_pitcher_db = pitcher_db[pitcher_db['name_clean'].str.lower().str.strip().isin(active_starters_list)]
+else:
+    active_slate_source = sample_slate
+    filtered_pitcher_db = pitcher_db.head(8) if not pitcher_db.empty else pd.DataFrame()
+
 if not filtered_pitcher_db.empty:
     for _, p_data in filtered_pitcher_db.iterrows():
         p_name_raw = str(p_data['name']).title()
@@ -376,3 +362,24 @@ if global_tracker_rows:
         subset=["STATUS"]
     )
     st.dataframe(styled_master_board, use_container_width=True, hide_index=True)
+
+# ------------------------------------------------------------------------------
+# 🟢 LIVE REQ TRACKER: THE ACCUMULATING SEARCH LOG MATRIX (SITS AT THE ABSOLUTE BOTTOM)
+# ------------------------------------------------------------------------------
+st.markdown("---")
+st.markdown("<div class='section-header' style='background: linear-gradient(90deg, #FF79C6 0%, #1A1423 100%); border-left: 5px solid #FF79C6;'>📋 Stored Search History & Live Projections Ledger</div>", unsafe_allow_html=True)
+
+if st.session_state["search_history_queue"]:
+    history_df = pd.DataFrame(st.session_state["search_history_queue"])
+    
+    # Render the saved searches in a high-contrast matrix spreadsheet view
+    st.dataframe(history_df.style.set_properties(**{
+        'background-color': '#1A1423', 'color': '#50FA7B', 'border-color': '#372549', 'text-align': 'center'
+    }), use_container_width=True, hide_index=True)
+    
+    # Clear memory option widget
+    if st.button("🧹 Reset Search History Ledger"):
+        st.session_state["search_history_queue"] = []
+        st.rerun()
+else:
+    st.info("💡 Search for pitchers or toggle lines in your sidebar menu above to append entries onto this permanent ledger sheet.")
