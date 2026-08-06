@@ -75,7 +75,6 @@ def load_global_databases():
 pitcher_db, batter_db = load_global_databases()
 if 'base_outs' not in pitcher_db.columns: pitcher_db['base_outs'] = 17.5
 
-# 🟢 USER PREFERENCE CORE: Creates a working memory queue to store all your searched pitchers and projections
 if "search_history_queue" not in st.session_state:
     st.session_state["search_history_queue"] = []
 # ------------------------------------------------------------------------------
@@ -87,7 +86,7 @@ st.markdown("""
     .reportview-container { background: #0E0B16; color: #8BE9FD; }
     .sidebar .sidebar-content { background: #1A1423; }
     h1, h2, h3, h4, h5, h6, p, span, label { color: #8BE9FD !important; }
-    div.stButton > button:first-child { background-color: #FF79C6; color: #0E0B16; font-weight: bold; border-radius: 6px; }
+    div.stButton > button:first-child { background-color: #FF79C6; color: #0E0B16; font-weight: bold; border-radius: 6px; width: 100%; margin-top: 10px; }
     div.stButton > button:hover { background-color: #BD93F9; color: #0E0B16; }
     .metric-card { background-color: #1A1423; border: 2px solid #372549; border-radius: 10px; padding: 15px; text-align: center; margin-bottom: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); }
     .metric-label { font-size: 11px; text-transform: uppercase; color: #BD93F9; letter-spacing: 1.5px; font-weight: 600; }
@@ -100,7 +99,7 @@ st.markdown("""
 st.title("🏹 MLB Strikeout Edge Predictor Engine")
 st.markdown("---")
 # ------------------------------------------------------------------------------
-# 2. INTERACTIVE SIDEBAR CONFIGURATION DESK (WITH AIRTIGHT WARNING VALIDATION)
+# 2. INTERACTIVE SIDEBAR CONFIGURATION DESK (WITH ACTION REFRESH SUBMIT FORM)
 # ------------------------------------------------------------------------------
 with st.sidebar:
     st.header("⚙️ Simulation Settings")
@@ -108,46 +107,49 @@ with st.sidebar:
     market = st.selectbox("Market Type", ["Strikeouts (Ks)", "Total Projected Outs"])
     st.subheader("🔍 Active Matchup Selection")
     
-    if todays_slate and len(todays_slate) > 0:
-        display_options = sorted([name.title() for name in todays_slate.keys()])
-        pitcher_display_choice = st.selectbox("Select Active Pitcher Today:", options=display_options)
-        
-        pitcher_input = pitcher_display_choice.lower().strip()
-        pitcher_name_clean = pitcher_input
-        
-        pitcher_team = todays_slate[pitcher_name_clean]["team"]
-        opposing_team = todays_slate[pitcher_name_clean]["opponent"]
-        venue_split = todays_slate[pitcher_name_clean]["venue"]
-        current_venue_name = todays_slate[pitcher_name_clean]["stadium"]
-    else:
-        st.warning("⚠️ Schedule API Server Standby. Using manual override values.")
-        pitcher_display_choice = st.text_input("Enter Pitcher Name Manually:", "Tarik Skubal")
-        pitcher_name_clean = pitcher_display_choice.lower().strip()
-        pitcher_input = pitcher_name_clean
-        pitcher_team = st.text_input("Pitcher Team Code:", "LAD").upper().strip()
-        opposing_team = st.text_input("Opposing Batter Team Code:", "CWS").upper().strip()
-        venue_split = st.selectbox("Pitcher Venue Assignment:", ["Home", "Away"])
-        current_venue_name = "Target Field"
+    # 🟢 MODERNAIZATION CORE: Wrap controls inside an isolation form block to stop instant logging
+    with st.form(key="matchup_simulation_form"):
+        if todays_slate and len(todays_slate) > 0:
+            display_options = sorted([name.title() for name in todays_slate.keys()])
+            pitcher_display_choice = st.selectbox("Select Active Pitcher Today:", options=display_options)
+            pitcher_input = pitcher_display_choice.lower().strip()
+            pitcher_name_clean = pitcher_input
+            pitcher_team = todays_slate[pitcher_name_clean]["team"]
+            opposing_team = todays_slate[pitcher_name_clean]["opponent"]
+            venue_split = todays_slate[pitcher_name_clean]["venue"]
+            current_venue_name = todays_slate[pitcher_name_clean]["stadium"]
+        else:
+            st.warning("⚠️ Schedule API Server Standby. Using manual override values.")
+            pitcher_display_choice = st.text_input("Enter Pitcher Name Manually:", "Tarik Skubal")
+            pitcher_name_clean = pitcher_display_choice.lower().strip()
+            pitcher_input = pitcher_name_clean
+            pitcher_team = st.text_input("Pitcher Team Code:", "LAD").upper().strip()
+            opposing_team = st.text_input("Opposing Batter Team Code:", "CWS").upper().strip()
+            venue_split = st.selectbox("Pitcher Venue Assignment:", ["Home", "Away"])
+            current_venue_name = "Target Field"
 
-    st.markdown("---")
-    st.subheader("🎲 Sportsbook Line Calibration")
-    default_book_line = 15.5 if market == "Total Projected Outs" else 6.5
-    sportsbook_line = st.number_input("Current Line O/U", min_value=0.5, max_value=27.5, value=float(default_book_line), step=0.5)
-    
-    st.markdown("---")
-    st.subheader("🏟️ Environmental Weather Analytics")
-    auto_temp = 78 if venue_split == "Home" else 71
-    auto_wind = 14 if "Wind" in current_venue_name or venue_split == "Away" else 6
-    auto_vector = "Outward" if auto_wind > 10 else "Crosswind"
-    
-    override_weather = st.checkbox("Manual Condition Adjustments", value=False)
-    if override_weather:
-        game_temp = st.slider("Game Temperature (°F)", 30, 105, int(auto_temp))
-        wind_speed = st.slider("Wind Velocity (MPH)", 0, 30, int(auto_wind))
-        wind_dir = st.selectbox("Wind Vector Direction", ["Inward", "Outward", "Crosswind"])
-    else:
-        game_temp, wind_speed, wind_dir = auto_temp, auto_wind, auto_vector
-        st.caption(f"🤖 Automated Weather Synced: {game_temp}°F | {wind_speed} MPH {wind_dir}")
+        st.markdown("---")
+        st.subheader("🎲 Sportsbook Line Calibration")
+        default_book_line = 15.5 if market == "Total Projected Outs" else 6.5
+        sportsbook_line = st.number_input("Current Line O/U", min_value=0.5, max_value=27.5, value=float(default_book_line), step=0.5)
+        
+        st.markdown("---")
+        st.subheader("🏟️ Environmental Weather Analytics")
+        auto_temp = 78 if venue_split == "Home" else 71
+        auto_wind = 14 if "Wind" in current_venue_name or venue_split == "Away" else 6
+        auto_vector = "Outward" if auto_wind > 10 else "Crosswind"
+        
+        override_weather = st.checkbox("Manual Condition Adjustments", value=False)
+        if override_weather:
+            game_temp = st.slider("Game Temperature (°F)", 30, 105, int(auto_temp))
+            wind_speed = st.slider("Wind Velocity (MPH)", 0, 30, int(auto_wind))
+            wind_dir = st.selectbox("Wind Vector Direction", ["Inward", "Outward", "Crosswind"])
+        else:
+            game_temp, wind_speed, wind_dir = auto_temp, auto_wind, auto_vector
+            st.caption(f"🤖 Automated Weather Synced: {game_temp}°F | {wind_speed} MPH {wind_dir}")
+            
+        # 🟢 THE MANUAL SEARCH TRIGGER BUTTON: Halts app recalculations until explicitly clicked
+        submit_button = st.form_submit_button(label="🚀 Run Pro Simulation Matchup")
 
 st.markdown("<div class='section-header'>🚨 Team Injury Status Desk</div>", unsafe_allow_html=True)
 inj_col1, inj_col2 = st.columns(2)
@@ -211,20 +213,20 @@ diff_val = round(live_avg - sportsbook_line, 2)
 simulated_games = np.random.poisson(live_avg, 10000)
 over_prob_pct = round(np.mean(simulated_games > sportsbook_line) * 100, 1)
 
-# 🟢 USER PREFERENCE SYSTEM AUTO LOGGING: Captures the active projection value and appends it to memory
-if pitcher_input != "" and "projected starter" not in pitcher_input:
+# 🟢 CONDITIONAL ACTION INTERCEPTOR: Only appends to the session queue if the form button was pushed
+if submit_button and pitcher_input != "" and "projected starter" not in pitcher_input:
     new_snapshot_record = {
         "PITCHER": pitcher_input.title(),
         "TEAM": pitcher_team,
         "OPPONENT": opposing_team,
-        "MARKET": market,
-        "LINE": sportsbook_line,
-        "PROJECTION": live_avg,
+        "MARKET TYPE": market,
+        "BOOK LINE": sportsbook_line,
+        "PROJECTED Ks": live_avg if market == "Strikeouts (Ks)" else "—",
+        "PROJECTED OUTS": live_avg if market == "Total Projected Outs" else "—",  # 🟢 ADDED: Custom Outs Field
         "GAP VALUE": f"{diff_val:+,.2f}",
         "OVER PROBABILITY": f"{over_prob_pct}%"
     }
-    # Check for duplicates to prevent recording the same exact click back-to-back
-    if not any(d['PITCHER'] == new_snapshot_record['PITCHER'] and d['MARKET'] == new_snapshot_record['MARKET'] and d['LINE'] == new_snapshot_record['LINE'] for d in st.session_state["search_history_queue"]):
+    if not any(d['PITCHER'] == new_snapshot_record['PITCHER'] and d['MARKET TYPE'] == new_snapshot_record['MARKET TYPE'] and d['BOOK LINE'] == new_snapshot_record['BOOK LINE'] for d in st.session_state["search_history_queue"]):
         st.session_state["search_history_queue"].append(new_snapshot_record)
 
 main_col1, main_col2 = st.columns(2)
@@ -364,7 +366,7 @@ if global_tracker_rows:
     st.dataframe(styled_master_board, use_container_width=True, hide_index=True)
 
 # ------------------------------------------------------------------------------
-# 🟢 LIVE REQ TRACKER: THE ACCUMULATING SEARCH LOG MATRIX (SITS AT THE ABSOLUTE BOTTOM)
+# 🟢 LIVE HISTORY SHEET: MASTER LEDGER TABLE (WITH DETAILED TOTAL OUTS COLUMNS)
 # ------------------------------------------------------------------------------
 st.markdown("---")
 st.markdown("<div class='section-header' style='background: linear-gradient(90deg, #FF79C6 0%, #1A1423 100%); border-left: 5px solid #FF79C6;'>📋 Stored Search History & Live Projections Ledger</div>", unsafe_allow_html=True)
@@ -372,14 +374,16 @@ st.markdown("<div class='section-header' style='background: linear-gradient(90de
 if st.session_state["search_history_queue"]:
     history_df = pd.DataFrame(st.session_state["search_history_queue"])
     
-    # Render the saved searches in a high-contrast matrix spreadsheet view
+    # Force layout sorting columns order for perfect widescreen readability
+    display_cols = ["PITCHER", "TEAM", "OPPONENT", "MARKET TYPE", "BOOK LINE", "PROJECTED Ks", "PROJECTED OUTS", "GAP VALUE", "OVER PROBABILITY"]
+    history_df = history_df.reindex(columns=display_cols)
+    
     st.dataframe(history_df.style.set_properties(**{
         'background-color': '#1A1423', 'color': '#50FA7B', 'border-color': '#372549', 'text-align': 'center'
     }), use_container_width=True, hide_index=True)
     
-    # Clear memory option widget
     if st.button("🧹 Reset Search History Ledger"):
         st.session_state["search_history_queue"] = []
         st.rerun()
 else:
-    st.info("💡 Search for pitchers or toggle lines in your sidebar menu above to append entries onto this permanent ledger sheet.")
+    st.info("💡 Adjust your calibration parameters in the sidebar panel above and click 'Run Pro Simulation Matchup' to append records onto this worksheet.")
