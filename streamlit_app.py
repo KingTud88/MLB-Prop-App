@@ -10,12 +10,10 @@ from datetime import datetime
 @st.cache_data(ttl=300)
 def get_live_mlb_schedule():
     """Automatically pulls live active starters and matchup parameters for today's date"""
-    # Forces the script to target today's date dynamically
     today_str = datetime.now().strftime('%Y-%m-%d')
     url = f"https://mlb.com{today_str}&hydrate=probablePitcher,team,venue"
     live_slate = {}
     
-    # Official MLB Live Numeric ID to 3-Letter CSV Abbreviation Translation Matrix
     mlb_id_map = {
         109: "ARI", 144: "ATL", 110: "BAL", 111: "BOS", 112: "CHC", 145: "CHW", 113: "CIN", 114: "CLE", 
         115: "COL", 116: "DET", 117: "HOU", 118: "KCR", 138: "LAA", 119: "LAD", 139: "MIA", 158: "MIL", 
@@ -28,35 +26,43 @@ def get_live_mlb_schedule():
         if response.status_code == 200:
             data = response.json()
             if "dates" in data and len(data["dates"]) > 0:
-                for date_node in data["dates"]:
-                    for game in date_node.get("games", []):
-                        # 🟢 CORE CORRECTION: Deep tree mapping to safely extract structural values
-                        away_team_node = game.get("teams", {}).get("away", {}).get("team", {})
-                        home_team_node = game.get("teams", {}).get("home", {}).get("team", {})
-                        
-                        away_id = away_team_node.get("id")
-                        home_id = home_team_node.get("id")
-                        venue_name = str(game.get("venue", {}).get("name", "Standard Ballpark"))
-                        
-                        away_team = mlb_id_map.get(away_id, "NYY")
-                        home_team = mlb_id_map.get(home_id, "LAD")
-                        
-                        # Extract listed pitcher names safely
-                        away_p_node = game.get("teams", {}).get("away", {}).get("probablePitcher", {})
-                        home_p_node = game.get("teams", {}).get("home", {}).get("probablePitcher", {})
-                        
-                        away_pitcher = str(away_p_node.get("fullName", f"projected starter ({away_team})")).lower().strip()
-                        home_pitcher = str(home_p_node.get("fullName", f"projected starter ({home_team})")).lower().strip()
-                        
-                        live_slate[away_pitcher] = {"team": away_team, "opponent": home_team, "venue": "Away", "stadium": venue_name}
-                        live_slate[home_pitcher] = {"team": home_team, "opponent": away_team, "venue": "Home", "stadium": venue_name}
+                # 🟢 SYSTEM FIX: Universal router parses list loops and raw index sheets cleanly
+                date_records = data["dates"]
+                all_games = []
+                
+                if isinstance(date_records, list):
+                    for node in date_records:
+                        all_games.extend(node.get("games", []))
+                elif isinstance(date_records, dict):
+                    all_games.extend(date_records.get("games", []))
+                else:
+                    all_games.extend(data["dates"][0].get("games", []))
+                
+                for game in all_games:
+                    away_team_node = game.get("teams", {}).get("away", {}).get("team", {})
+                    home_team_node = game.get("teams", {}).get("home", {}).get("team", {})
+                    
+                    away_id = away_team_node.get("id")
+                    home_id = home_team_node.get("id")
+                    venue_name = str(game.get("venue", {}).get("name", "Standard Ballpark"))
+                    
+                    away_team = mlb_id_map.get(away_id, "NYY")
+                    home_team = mlb_id_map.get(home_id, "LAD")
+                    
+                    away_p_node = game.get("teams", {}).get("away", {}).get("probablePitcher", {})
+                    home_p_node = game.get("teams", {}).get("home", {}).get("probablePitcher", {})
+                    
+                    away_pitcher = str(away_p_node.get("fullName", f"Projected Starter ({away_team})")).lower().strip()
+                    home_pitcher = str(home_p_node.get("fullName", f"Projected Starter ({home_team})")).lower().strip()
+                    
+                    live_slate[away_pitcher] = {"team": away_team, "opponent": home_team, "venue": "Away", "stadium": venue_name}
+                    live_slate[home_pitcher] = {"team": home_team, "opponent": away_team, "venue": "Home", "stadium": venue_name}
     except Exception:
         pass
     return live_slate
 
 todays_slate = get_live_mlb_schedule()
 
-# Post-Trade Deadline Roster Sync Core Overrides
 if "tarik skubal" in todays_slate: todays_slate["tarik skubal"]["team"] = "LAD"
 if "luis castillo" in todays_slate: todays_slate["luis castillo"]["team"] = "CHW"
 # ------------------------------------------------------------------------------
@@ -284,7 +290,6 @@ st.subheader("📋 Automated Global Slate Edge Tracker Matrix")
 global_tracker_rows = []
 sample_slate = {"tarik skubal": {"team": "LAD", "opponent": "CHW"}, "paul skenes": {"team": "PIT", "opponent": "CIN"}, "dylan cease": {"team": "SDP", "opponent": "SFG"}, "corbin burnes": {"team": "BAL", "opponent": "PHI"}, "cole ragans": {"team": "KCR", "opponent": "DET"}, "zack wheeler": {"team": "PHI", "opponent": "BAL"}, "garrett crochet": {"team": "CHW", "opponent": "LAD"}}
 
-# Dynamic fallback router forces database starters to load seamlessly if API nodes stay dry
 if todays_slate and len(todays_slate) >= 2:
     active_slate_source = todays_slate
     active_starters_list = [str(k).lower().strip() for k in active_slate_source.keys()]
@@ -301,10 +306,9 @@ if not filtered_pitcher_db.empty:
         p_base = float(p_data['base_outs']) if (market == "Total Projected Outs" and 'base_outs' in p_data.index) else float(p_data['base_avg'])
         p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data.index else "R"
         
-        slate_meta = active_slate_source.get(p_name_clean, {"opponent": "CHW", "team": str(p_data.get("team", "LAD"))})
-        opp_team_target = str(slate_meta["opponent"]).upper().strip()
+        opp_team_target = str(active_slate_source.get(p_name_clean, {"opponent": "CHW"})["opponent"]).upper().strip()
         db_lookup_team = "CWS" if opp_team_target == "CHW" else opp_team_target
-        p_team_code = str(slate_meta["team"]).upper().strip()
+        p_team_code = str(active_slate_source.get(p_name_clean, {"team": "LAD"})["team"]).upper().strip()
         
         simulated_proj = float(p_base)
         current_book_line = sportsbook_line if p_name_clean == lookup_key else (15.5 if market == "Total Projected Outs" else 5.5)
