@@ -1,6 +1,6 @@
 name,team,throws,base_avg,games,strikeouts,ip,era,top_pitch,pitch_k_pct,whiff_pct,skill_score,p1,p1_use,p1_whiff,p2,p2_use,p2_whiff,p3,p3_use,p3_whiff,p4,p4_use,p4_whiff,p5,p5_use,p5_whiff
-dylan cease,SDP,R,7.95,23,183,133.1,3.48,Slider 42% use,34.2%,35.4%,9.1,Slider,42%,W:47%,Four-seam FB,38%,W:25%,Knuckle Curve,11%,W:38%,Sinker,6%,W:14%,Changeup,3%,W:31%
-tarik skubal,LAA,L,7.65,24,184,154.2,2.45,Four-seam 39% use,32.5%,31.1%,9.5,Four-seam FB,39%,W:29%,Changeup,31%,W:44%,Slider,20%,W:38%,Knuckle Curve,10%,W:31%,—,0%,—
+dylan cease,TOR,R,7.95,23,183,133.1,3.48,Slider 42% use,34.2%,35.4%,9.1,Slider,42%,W:47%,Four-seam FB,38%,W:25%,Knuckle Curve,11%,W:38%,Sinker,6%,W:14%,Changeup,3%,W:31%
+tarik skubal,LAD,L,7.65,24,184,154.2,2.45,Four-seam 39% use,32.5%,31.1%,9.5,Four-seam FB,39%,W:29%,Changeup,31%,W:44%,Slider,20%,W:38%,Knuckle Curve,10%,W:31%,—,0%,—
 paul skenes,PIT,R,8.15,21,171,131.0,2.15,Four-seam 42% use,35.2%,31.8%,9.7,Four-seam FB,42%,W:31%,Splinker,28%,W:29%,Slider,15%,W:42%,Curveball,10%,W:29%,Changeup,5%,W:22%
 tanner bibee,CLE,R,5.95,22,131,121.0,3.65,Four-seam 45% use,26.4%,24.2%,6.5,Four-seam FB,45%,W:21%,Slider,25%,W:34%,Changeup,18%,W:26%,Cutter,12%,W:14%,—,0%,—
 corbin burnes,BAL,R,6.25,24,150,149.2,3.12,Cutter 48% use,24.7%,25.9%,7.9,Cutter,48%,W:24%,Slider,22%,W:36%,Changeup,13%,W:31%,Sinker,11%,W:12%,Curveball,6%,W:28%
