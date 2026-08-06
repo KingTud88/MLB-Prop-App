@@ -282,22 +282,39 @@ with sub_col2:
         st.success("☀️ All active stadium tracking networks confirm optimal climate baselines across the country.")
 
 # ------------------------------------------------------------------------------
-# 6. ROW FRAMEWORK LAYER 4: FULL-WIDTH AUTOMATED GLOBAL SLATE EDGE TRACKER MATRIX
+# 6. ROW FRAMEWORK LAYER 4: DETECTIVE MATRIX & GLOBAL TRACKER CORE
 # ------------------------------------------------------------------------------
 st.markdown("---")
-st.subheader("📋 Automated Global Slate Edge Tracker Matrix")
 
+# 🔍 THE AUTOMATED PITCHER DETECTIVE ENGINE
 global_tracker_rows = []
+missing_pitcher_rows = []
 sample_slate = {"tarik skubal": {"team": "LAD", "opponent": "CHW"}, "paul skenes": {"team": "PIT", "opponent": "CIN"}, "dylan cease": {"team": "SDP", "opponent": "SFG"}, "corbin burnes": {"team": "BAL", "opponent": "PHI"}, "cole ragans": {"team": "KCR", "opponent": "DET"}, "zack wheeler": {"team": "PHI", "opponent": "BAL"}, "garrett crochet": {"team": "CHW", "opponent": "LAD"}}
 
-if todays_slate and len(todays_slate) >= 2:
-    active_slate_source = todays_slate
-    active_starters_list = [str(k).lower().strip() for k in active_slate_source.keys()]
-    filtered_pitcher_db = pitcher_db[pitcher_db['name_clean'].str.lower().str.strip().isin(active_starters_list)]
-else:
-    active_slate_source = sample_slate
-    filtered_pitcher_db = pitcher_db.head(8) if not pitcher_db.empty else pd.DataFrame()
+active_slate_source = todays_slate if (todays_slate and len(todays_slate) >= 2) else sample_slate
+active_starters_list = [str(k).lower().strip() for k in active_slate_source.keys()]
+filtered_pitcher_db = pitcher_db[pitcher_db['name_clean'].str.lower().str.strip().isin(active_starters_list)]
 
+# Automatically detect which live slate pitchers are completely missing from your database file
+existing_names_clean = pitcher_db['name_clean'].str.lower().str.strip().tolist() if not pitcher_db.empty else []
+
+for live_name, meta in active_slate_source.items():
+    if live_name not in existing_names_clean and "projected starter" not in live_name:
+        # Format the name perfectly into your exact 8-column layout structure with safety defaults
+        missing_pitcher_rows.append(f"{live_name.title()},{meta['team']},R,5.20,12,62,65.0,3.85")
+
+# 🚨 DISPLAY ALERT WINDOW IF MISSING PITCHERS ARE DETECTED
+if missing_pitcher_rows:
+    st.markdown("<div class='section-header' style='background: linear-gradient(90deg, #FF5555 0%, #1A1423 100%); border-left: 5px solid #FF5555;'>🚨 Missing Pitcher Database Alert Desk</div>", unsafe_allow_html=True)
+    st.warning("The live schedule has starting pitchers that do not exist inside your pitcher_database.csv file! Copy the rows below and paste them into your file:")
+    
+    # Pack rows into a clean, easy-to-copy code block area natively on your monitor
+    formatted_missing_text = "\\n".join(missing_pitcher_rows)
+    st.code(formatted_missing_text, language="csv")
+
+st.subheader("📋 Automated Global Slate Edge Tracker Matrix")
+
+# --- CONSTRUCT THE GLOBAL LEDGER BOARD SHEETS ---
 if not filtered_pitcher_db.empty:
     for _, p_data in filtered_pitcher_db.iterrows():
         p_name_raw = str(p_data['name']).title()
