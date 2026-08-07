@@ -1,406 +1,416 @@
-import streamlit as st
-import pandas as pd
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+import os
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+from pathlib import Path
+from typing import Any
+from zoneinfo import ZoneInfo
+
 import numpy as np
+import pandas as pd
 import requests
-from datetime import datetime
-import datetime as dt
+import streamlit as st
 
-# ------------------------------------------------------------------------------
-# AUTOMATIC DAILY SCHEDULE TRACKING ENGINE (AIRTIGHT ZONE-AWARE TIME SYNC)
-# ------------------------------------------------------------------------------
-@st.cache_data(ttl=120)
-def get_live_mlb_schedule():
-    """Automatically pulls live active starters and matchup parameters for today's date"""
-    # 🟢 DEPRECATION FIXED: Replaced legacy utcnow() with zone-aware datetime object to fix line 14 terminal warning
-    utc_now = datetime.now(dt.timezone.utc)
-    est_now = utc_now - dt.timedelta(hours=4)  # Local US game day synchronization matrix
-    today_str = est_now.strftime('%Y-%m-%d')
-    
-    url = f"https://mlb.com{today_str}&hydrate=probablePitcher,team,venue"
-    live_slate = {}
-    
-    try:
-        response = requests.get(url, timeout=6)
-        if response.status_code == 200:
-            data = response.json()
-            if "dates" in data and len(data["dates"]) > 0:
-                date_records = data["dates"]
-                all_games = []
-                
-                if isinstance(date_records, list):
-                    for node in date_records:
-                        if isinstance(node, dict):
-                            all_games.extend(node.get("games", []))
-                elif isinstance(date_records, dict):
-                    all_games.extend(date_records.get("games", []))
-                else:
-                    all_games.extend(data["dates"].get("games", []))
-                
-                for game in all_games:
-                    if isinstance(game, dict) and "teams" in game:
-                        away_team = str(game.get("teams", {}).get("away", {}).get("team", {}).get("name", "NYY"))
-                        home_team = str(game.get("teams", {}).get("home", {}).get("team", {}).get("name", "LAD"))
-                        
-                        map_names = {
-                            "Chicago White Sox": "CHW", "Los Angeles Dodgers": "LAD", "San Diego Padres": "SDP",
-                            "San Francisco Giants": "SFG", "Pittsburgh Pirates": "PIT", "Cincinnati Reds": "CIN",
-                            "Cleveland Guardians": "CLE", "New York Mets": "NYM", "New York Yankees": "NYY",
-                            "Atlanta Braves": "ATL", "Kansas City Royals": "KCR", "Baltimore Orioles": "BAL",
-                            "Philadelphia Phillies": "PHI", "Minnesota Twins": "MIN", "Detroit Tigers": "DET",
-                            "Seattle Mariners": "SEA", "Houston Astros": "HOU", "Texas Rangers": "TEX",
-                            "Los Angeles Angels": "LAA", "Oakland Athletics": "OAK", "Miami Marlins": "MIA",
-                            "Milwaukee Brewers": "MIL", "St. Louis Cardinals": "STL", "Tampa Bay Rays": "TBR",
-                            "Boston Red Sox": "BOS", "Toronto Blue Jays": "TOR", "Washington Nationals": "WSH",
-                            "Arizona Diamondbacks": "ARI", "Colorado Rockies": "COL", "Chicago Cubs": "CHC"
-                        }
-                        
-                        away_code = map_names.get(away_team, "NYY")
-                        home_code = map_names.get(home_team, "LAD")
-                        venue_name = str(game.get("venue", {}).get("name", "Standard Ballpark"))
-                        
-                        away_p_node = game.get("teams", {}).get("away", {}).get("probablePitcher", {})
-                        home_p_node = game.get("teams", {}).get("home", {}).get("probablePitcher", {})
-                        
-                        away_pitcher = str(away_p_node.get("fullName", f"Projected Starter ({away_code})")).lower().strip()
-                        home_pitcher = str(home_p_node.get("fullName", f"Projected Starter ({home_code})")).lower().strip()
-                        
-                        live_slate[away_pitcher] = {"team": away_code, "opponent": home_code, "venue": "Away", "stadium": venue_name}
-                        live_slate[home_pitcher] = {"team": home_code, "opponent": away_code, "venue": "Home", "stadium": venue_name}
-    except Exception:
-        pass
-    return live_slate
+APP_VERSION = "2.0.0"
+EASTERN = ZoneInfo("America/New_York")
+MLB_API = "https://statsapi.mlb.com/api/v1"
+APP_DIR = Path(__file__).resolve().parent
+DATA_DIR = APP_DIR / "data"
+MODEL_DIR = APP_DIR / "models"
 
-todays_slate = get_live_mlb_schedule()
+TEAM_ABBR = {
+    108:"LAA",109:"ARI",110:"BAL",111:"BOS",112:"CHC",113:"CIN",114:"CLE",115:"COL",
+    116:"DET",117:"HOU",118:"KCR",119:"LAD",120:"WSH",121:"NYM",133:"ATH",134:"PIT",
+    135:"SDP",136:"SEA",137:"SFG",138:"STL",139:"TBR",140:"TEX",141:"TOR",142:"MIN",
+    143:"PHI",144:"ATL",145:"CHW",146:"MIA",147:"NYY",158:"MIL"
+}
 
-if "tarik skubal" in todays_slate: todays_slate["tarik skubal"]["team"] = "LAD"
-if "luis castillo" in todays_slate: todays_slate["luis castillo"]["team"] = "CHW"
-# ------------------------------------------------------------------------------
-# GLOBAL BACKEND DATASETS INTERFACE INITIALIZATION
-# ------------------------------------------------------------------------------
-@st.cache_data(ttl=3600)
-def load_global_databases():
-    try:
-        p_db = pd.read_csv("pitcher_database.csv")
-        p_db['name_clean'] = p_db['name'].str.lower().str.strip()
-    except Exception:
-        p_db = pd.DataFrame(columns=['name', 'team', 'throws', 'base_avg', 'games', 'strikeouts', 'ip', 'era', 'name_clean', 'base_outs'])
-    try:
-        b_db = pd.read_csv("batter_database.csv")
-        b_db['name_clean'] = b_db['name'].str.lower().str.strip()
-        b_db['team_clean'] = b_db['team'].str.upper().str.strip()
-    except Exception:
-        b_db = pd.DataFrame(columns=['name', 'team', 'hand', 'vs_lhp_k', 'vs_rhp_k', 'team_clean', 'name_clean'])
-    return p_db, b_db
+PARK_K_FACTOR = {
+    "Coors Field":0.94,"T-Mobile Park":1.05,"Petco Park":1.03,"Oracle Park":1.02,
+    "Dodger Stadium":1.01,"Yankee Stadium":0.99,"Fenway Park":0.98,"Wrigley Field":1.00
+}
 
-pitcher_db, batter_db = load_global_databases()
-if 'base_outs' not in pitcher_db.columns: pitcher_db['base_outs'] = 17.5
+st.set_page_config(page_title="PitchLab Pro", page_icon="⚾", layout="wide", initial_sidebar_state="expanded")
 
-if "search_history_queue" not in st.session_state:
-    st.session_state["search_history_queue"] = []
-# ------------------------------------------------------------------------------
-# 1. PAGE LAYOUT CONFIGURATION & HIGH-CONTRAST POPPING BLUE STYLING CORE
-# ------------------------------------------------------------------------------
-st.set_page_config(page_title="MLB Strikeout Edge Predictor Master", layout="wide", initial_sidebar_state="expanded")
 st.markdown("""
 <style>
-    .reportview-container { background: #0E0B16; color: #8BE9FD; }
-    .sidebar .sidebar-content { background: #1A1423; }
-    h1, h2, h3, h4, h5, h6, p, span, label { color: #8BE9FD !important; }
-    div.stButton > button:first-child { background-color: #FF79C6; color: #0E0B16; font-weight: bold; border-radius: 6px; width: 100%; margin-top: 10px; }
-    div.stButton > button:hover { background-color: #BD93F9; color: #0E0B16; }
-    .metric-card { background-color: #1A1423; border: 2px solid #372549; border-radius: 10px; padding: 15px; text-align: center; margin-bottom: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); }
-    .metric-label { font-size: 11px; text-transform: uppercase; color: #BD93F9; letter-spacing: 1.5px; font-weight: 600; }
-    .metric-value { font-size: 38px; font-weight: bold; color: #50FA7B; margin: 5px 0; font-family: 'Courier New', monospace; }
-    .class-sub-text { font-size: 11px; color: #6272A4; }
-    .section-header { background: linear-gradient(90deg, #372549 0%, #1A1423 100%); padding: 8px 15px; border-left: 5px solid #BD93F9; font-weight: bold; color: #8BE9FD; margin-top: 20px; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; }
+:root { --bg:#071019; --panel:#0d1b2a; --ink:#e8f1f8; --muted:#89a1b3; --cyan:#31d7ff; --green:#31e6a1; --red:#ff5d73; }
+.stApp { background:linear-gradient(145deg,#06101a,#0b1723); color:var(--ink); }
+[data-testid="stSidebar"] { background:#07131f; border-right:1px solid #173149; }
+.block-container { padding-top:1.5rem; max-width:1500px; }
+h1,h2,h3 { letter-spacing:-.02em; }
+div[data-testid="stMetric"] { background:#0d1b2a; border:1px solid #1b3851; padding:16px; border-radius:14px; }
+.status-live {display:inline-block;background:#123c32;color:#65f0bd;padding:5px 10px;border-radius:999px;font-weight:700}
+.status-warn {display:inline-block;background:#442c17;color:#ffc766;padding:5px 10px;border-radius:999px;font-weight:700}
+.small-muted {color:#89a1b3;font-size:.85rem}
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🏹 MLB Strikeout Edge Predictor Engine")
-st.markdown("---")
-# ------------------------------------------------------------------------------
-# 2. INTERACTIVE SIDEBAR CONFIGURATION DESK (WITH DUAL-MARKET INPUT LINES)
-# ------------------------------------------------------------------------------
-with st.sidebar:
-    st.header("⚙️ Simulation Settings")
-    sport = st.selectbox("Select League", ["MLB"])
-    st.subheader("🔍 Active Matchup Selection")
-    
-    with st.form(key="matchup_simulation_form"):
-        if todays_slate and len(todays_slate) > 0:
-            display_options = sorted([name.title() for name in todays_slate.keys()])
-            pitcher_display_choice = st.selectbox("Select Active Pitcher Today:", options=display_options)
-            pitcher_input = pitcher_display_choice.lower().strip()
-            pitcher_name_clean = pitcher_input
-            pitcher_team = todays_slate[pitcher_name_clean]["team"]
-            opposing_team = todays_slate[pitcher_name_clean]["opponent"]
-            venue_split = todays_slate[pitcher_name_clean]["venue"]
-            current_venue_name = todays_slate[pitcher_name_clean]["stadium"]
-        else:
-            st.warning("⚠️ Schedule API Server Standby. Using manual override values.")
-            pitcher_display_choice = st.text_input("Enter Pitcher Name Manually:", "Tarik Skubal")
-            pitcher_name_clean = pitcher_display_choice.lower().strip()
-            pitcher_input = pitcher_name_clean
-            pitcher_team = st.text_input("Pitcher Team Code:", "LAD").upper().strip()
-            opposing_team = st.text_input("Opposing Batter Team Code:", "CWS").upper().strip()
-            venue_split = st.selectbox("Pitcher Venue Assignment:", ["Home", "Away"])
-            current_venue_name = "Target Field"
+@dataclass(frozen=True)
+class GamePitcher:
+    key: str
+    pitcher_id: int
+    pitcher_name: str
+    team: str
+    opponent: str
+    side: str
+    venue: str
+    game_pk: int
+    game_time: str
+    status: str
 
-        st.markdown("---")
-        st.subheader("🎲 Sportsbook Line Calibration")
-        sportsbook_line_k = st.number_input("Sportsbook Strikeout Line (Ks)", min_value=0.5, max_value=15.5, value=6.5, step=0.5)
-        sportsbook_line_outs = st.number_input("Sportsbook Total Outs Line", min_value=0.5, max_value=27.5, value=15.5, step=0.5)
-        
-        st.markdown("---")
-        st.subheader("🏟️ Environmental Weather Analytics")
-        auto_temp = 78 if venue_split == "Home" else 71
-        auto_wind = 14 if "Wind" in current_venue_name or venue_split == "Away" else 6
-        auto_vector = "Outward" if auto_wind > 10 else "Crosswind"
-        
-        override_weather = st.checkbox("Manual Condition Adjustments", value=False)
-        if override_weather:
-            game_temp = st.slider("Game Temperature (°F)", 30, 105, int(auto_temp))
-            wind_speed = st.slider("Wind Velocity (MPH)", 0, 30, int(auto_wind))
-            wind_dir = st.selectbox("Wind Vector Direction", ["Inward", "Outward", "Crosswind"])
-        else:
-            game_temp, wind_speed, wind_dir = auto_temp, auto_wind, auto_vector
-            
-        st.markdown(f"**Stadium Vector Config:** {game_temp}°F | {wind_speed} MPH {wind_dir}")
-        st.caption("🤖 Weather variables map calculation adjustments dynamically.")
-            
-        submit_button = st.form_submit_button(label="🚀 Run Pro Dual-Market Simulation")
+@dataclass(frozen=True)
+class Projection:
+    mean_k: float
+    mean_outs: float
+    k_sd: float
+    outs_sd: float
+    k_probs: np.ndarray
+    outs_probs: np.ndarray
+    k_samples: np.ndarray
+    outs_samples: np.ndarray
+    confidence: str
+    data_quality: int
+    factors: list[tuple[str, float]]
 
-st.markdown("<div class='section-header'>🚨 Team Injury Status Desk</div>", unsafe_allow_html=True)
-inj_col1, inj_col2 = st.columns(2)
-with inj_col1:
-    st.markdown(f"**{pitcher_team} Rotation Depth Status:**")
-    st.success("🟢 No fresh starting rotation constraints recorded inside the last 24 hours.")
-with inj_col2:
-    st.markdown(f"**{opposing_team} Lineup Depth Status:**")
-    st.info("ℹ️ Lineup card stabilization verified. Cross-referencing current active bench slots.")
+class MLBClient:
+    def __init__(self) -> None:
+        self.session = requests.Session()
+        self.session.headers.update({"Accept":"application/json","User-Agent":f"PitchLabPro/{APP_VERSION}"})
 
-park_multiplier, ump_multiplier, fatigue_multiplier, bullpen_multiplier = 1.00, 1.00, 1.00, 1.00
-temp_multiplier = 0.96 if game_temp > 85 else (1.05 if game_temp < 52 else 1.00)
-wind_multiplier = 1.04 if (wind_speed > 10 and wind_dir == "Inward") else (0.96 if (wind_speed > 10 and wind_dir == "Outward") else 1.00)
-# ------------------------------------------------------------------------------
-# 5. DATA MATRICES FETCHING AND MATCHUP LOOKUPS (DUAL PARALLEL SIMULATIONS)
-# ------------------------------------------------------------------------------
-lookup_key = pitcher_name_clean.lower().strip()
-matched_pitcher = pitcher_db[pitcher_db['name_clean'] == lookup_key]
+    def get(self, endpoint: str, params: dict[str, Any]) -> dict[str, Any]:
+        response = self.session.get(f"{MLB_API}/{endpoint}", params=params, timeout=20)
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError("Unexpected MLB response format")
+        return payload
 
-if matched_pitcher.empty and lookup_key != "" and "projected starter" not in lookup_key:
-    st.markdown("<div class='section-header' style='background: linear-gradient(90deg, #FF5555 0%, #1A1423 100%); border-left: 5px solid #FF5555;'>🚨 Searched Pitcher Missing From Database</div>", unsafe_allow_html=True)
-    st.warning(f"**{pitcher_input.title()}** was not found in your pitcher_database.csv file! Copy the full row below, paste it at the bottom, and your database grid will save perfectly:")
-    perfect_27_col_row = f"{pitcher_input.title()},{pitcher_team},R,5.20,12,62,65.0,3.85,Four-seam FB,38%,21%,23,Four-seam FB,38%,21%,Slider,28%,20%,Changeup,14%,18%,Cutter,12%,15%,Curveball,8%,12%"
-    st.code(perfect_27_col_row, language="csv")
-    st.markdown("---")
-
-if not matched_pitcher.empty:
-    p_data_row = matched_pitcher.iloc[0]
-    pitcher_base_avg_k = float(p_data_row['base_avg'])
-    pitcher_base_avg_outs = float(p_data_row['base_outs']) if 'base_outs' in p_data_row.index else 17.5
-    pitcher_throws = str(p_data_row['throws']).upper().strip()
-    strikeouts = int(p_data_row['strikeouts'])
-    top_pitch_text = str(p_data_row['top_pitch']) if 'top_pitch' in p_data_row.index else "Four-seam FB 42% use"
-    
-    pitch_records = []
-    for p_num in range(1, 6):
-        p_name_col = f"p{p_num}"
-        p_use_col = f"p{p_num}_use"
-        p_whiff_col = f"p{p_num}_whiff"
-        if p_name_col in p_data_row.index and pd.notna(p_data_row[p_name_col]) and str(p_data_row[p_name_col]).strip() != "—":
-            pitch_records.append({
-                "PITCH": str(p_data_row[p_name_col]).upper(),
-                "USE": str(p_data_row[p_use_col]),
-                "WHIFF": str(p_data_row[p_whiff_col])
-            })
-    pitch_df = pd.DataFrame(pitch_records)
-else:
-    pitcher_base_avg_k, pitcher_base_avg_outs = 5.50, 15.2
-    pitcher_throws, strikeouts = "R", 130
-    top_pitch_text = "Four-seam FB 42% use"
-    pitch_df = pd.DataFrame([{"PITCH": "FOUR-SEAM FB", "USE": "42%", "WHIFF": "W:25%"}])
-
-league_avg_k = 22.5
-team_avg_k = 24.2
-matchup_multiplier_k = team_avg_k / league_avg_k
-matchup_multiplier_outs = 1.02
-venue_multiplier = 1.06 if venue_split == "Home" else 0.95
-
-live_avg_k = round(pitcher_base_avg_k * matchup_multiplier_k * venue_multiplier * park_multiplier * ump_multiplier * wind_multiplier * fatigue_multiplier * bullpen_multiplier * temp_multiplier, 2)
-live_avg_outs = round(pitcher_base_avg_outs * matchup_multiplier_outs * venue_multiplier * park_multiplier * ump_multiplier * wind_multiplier * fatigue_multiplier * bullpen_multiplier * temp_multiplier, 2)
-
-diff_val_k = round(live_avg_k - sportsbook_line_k, 2)
-diff_val_outs = round(live_avg_outs - sportsbook_line_outs, 2)
-
-sim_games_k = np.random.poisson(live_avg_k, 10000)
-sim_games_outs = np.random.poisson(live_avg_outs, 10000)
-
-over_prob_pct_k = round(np.mean(sim_games_k > sportsbook_line_k) * 100, 1)
-over_prob_pct_outs = round(np.mean(sim_games_outs > sportsbook_line_outs) * 100, 1)
-
-if submit_button and pitcher_input != "" and "projected starter" not in pitcher_input:
-    new_snapshot_record = {
-        "PITCHER": pitcher_input.title(),
-        "TEAM": pitcher_team,
-        "OPPONENT": opposing_team,
-        "STRIKEOUT LINE": sportsbook_line_k,
-        "PROJECTED Ks": live_avg_k,
-        "K OVER PROBABILITY": f"{over_prob_pct_k}%",
-        "OUTS LINE": sportsbook_line_outs,
-        "PROJECTED OUTS": live_avg_outs,
-        "OUTS OVER PROBABILITY": f"{over_prob_pct_outs}%"
-    }
-    st.session_state["search_history_queue"].append(new_snapshot_record)
-
-main_col1, main_col2 = st.columns(2)
-with main_col1:
-    st.markdown(f"<div class='section-header'>🔥 STRIKEOUT SIMULATION DESK: {pitcher_input.title()}</div>", unsafe_allow_html=True)
-    ch1, ch2 = st.columns(2)
-    with ch1:
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>PROJ STRIKEOUTS</div><div class='metric-value' style='color:#FF79C6;'>{live_avg_k}</div><div class='class-sub-text' style='color:#50FA7B;'>{sportsbook_line_k} Line Set</div></div>", unsafe_allow_html=True)
-    with ch2:
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>K OVER PROBABILITY</div><div class='metric-value' style='color:#FFB86C;'>{over_prob_pct_k}%</div><div class='class-sub-text'>Based on 10,000 Sims</div></div>", unsafe_allow_html=True)
-        
-    c_p1, c_p2 = st.columns(2)
-    with c_p1:
-        rec_tag_k = "OVER" if live_avg_k > sportsbook_line_k else "UNDER"
-        rec_color_k = "#50FA7B" if rec_tag_k == "OVER" else "#FF5555"
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>K RECOMMENDATION</div><div class='metric-value' style='color:{rec_color_k};'>{rec_tag_k}</div><div class='class-sub-text' style='color:#8BE9FD;'>{diff_val_k:+,.2f} K Difference Gap</div></div>", unsafe_allow_html=True)
-    with c_p2:
-        grade_k = "A" if (over_prob_pct_k > 65 or over_prob_pct_k < 35) else ("B" if (over_prob_pct_k > 55 or over_prob_pct_k < 45) else "C")
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>K SIMULATION GRADE</div><div class='metric-value'>{grade_k}</div></div>", unsafe_allow_html=True)
-
-with main_col2:
-    st.markdown(f"<div class='section-header'>🏟️ TOTAL OUTS SIMULATION DESK: {pitcher_input.title()}</div>", unsafe_allow_html=True)
-    co1, co2 = st.columns(2)
-    with co1:
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>PROJ TOTAL OUTS</div><div class='metric-value' style='color:#FF79C6;'>{live_avg_outs}</div><div class='class-sub-text' style='color:#50FA7B;'>{sportsbook_line_outs} Line Set</div></div>", unsafe_allow_html=True)
-    with co2:
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>OUTS PROBABILITY</div><div class='metric-value' style='color:#FFB86C;'>{over_prob_pct_outs}%</div><div class='class-sub-text'>Based on 10,000 Sims</div></div>", unsafe_allow_html=True)
-        
-    c_o1, c_o2 = st.columns(2)
-    with c_o1:
-        rec_tag_outs = "OVER" if live_avg_outs > sportsbook_line_outs else "UNDER"
-        rec_color_outs = "#50FA7B" if rec_tag_outs == "OVER" else "#FF5555"
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>OUTS RECOMMENDATION</div><div class='metric-value' style='color:{rec_color_outs};'>{rec_tag_outs}</div><div class='class-sub-text' style='color:#8BE9FD;'>{diff_val_outs:+,.2f} Outs Gap</div></div>", unsafe_allow_html=True)
-    with c_o2:
-        grade_outs = "A" if (over_prob_pct_outs > 65 or over_prob_pct_outs < 35) else ("B" if (over_prob_pct_outs > 55 or over_prob_pct_outs < 45) else "C")
-        st.markdown(f"<div class='metric-card'><div class='metric-label'>OUTS SIM GRADE</div><div class='metric-value'>{grade_outs}</div></div>", unsafe_allow_html=True)
-# --- SPLIT THE ACCELERATED SUB-CARDS GRIDS ---
-st.markdown("---")
-sub_col1, sub_col2 = st.columns(2)
-
-with sub_col1:
-    st.markdown(f"<div class='section-header'>⚔️ Batter-by-Batter Splitting Grid: vs {opposing_team.upper()}</div>", unsafe_allow_html=True)
-    clean_target_team = str(opposing_team).upper().strip()
-    if clean_target_team == "CHW": clean_target_team = "CWS"
-    if clean_target_team == "KCR": clean_target_team = "KC"
-    
-    team_hitters = batter_db[batter_db['team_clean'] == clean_target_team] if not batter_db.empty else pd.DataFrame()
-    lineup_rows = []
-    
-    if not team_hitters.empty:
-        for idx, b_row in team_hitters.head(9).iterrows():
-            b_hand = str(b_row['hand']).upper().strip()
-            raw_b_k = float(b_row['vs_lhp_k']) if pitcher_throws == "L" else float(b_row['vs_rhp_k'])
-            b_stab = float(b_row['k_stability']) if 'k_stability' in b_row else 1.00
-            calc_k_pct = round(raw_b_k * (1.12 if b_hand != pitcher_throws else 0.92) * b_stab, 1)
-            lineup_rows.append({
-                "SLOT": len(lineup_rows) + 1,
-                "BATTER LINEUP CARD": str(b_row['name']).title(),
-                "HAND": b_hand,
-                "RAW K% SPLIT": f"{raw_b_k}%",
-                "DYNAMIC K% PROJECTION": f"{calc_k_pct}%"
-            })
-    else:
-        for i in range(1, 10):
-            lineup_rows.append({"SLOT": i, "BATTER LINEUP CARD": f"Lineup Slot Active Hitter {i}", "HAND": "R", "RAW K% SPLIT": "23.4%", "DYNAMIC K% PROJECTION": f"{21.0 + (i * 0.5)}%"})
-    st.dataframe(pd.DataFrame(lineup_rows).style.set_properties(**{ 'background-color': '#1A1423', 'color': '#8BE9FD'}), width="stretch", hide_index=True)
-
-with sub_col2:
-    st.markdown("<div class='section-header'>📊 Balanced Pitch Arsenal Matrix</div>", unsafe_allow_html=True)
-    if not pitch_df.empty:
-        updated_arsenal = []
-        for idx, row in pitch_df.iterrows():
-            raw_whiff = str(row["WHIFF"]).replace("%", "").replace("W:", "").strip()
-            whiff_val = float(raw_whiff) if raw_whiff.replace(".", "", 1).isdigit() else 25.0
-            calc_k = round(whiff_val * 0.85, 1)
-            calc_put = round(whiff_val * 0.58, 1)
-            updated_arsenal.append({"PITCH TYPE": row["PITCH"], "USAGE": row["USE"], "Ks EXPECTED": f"{calc_k}%", "WHIFF RATE": row["WHIFF"], "PUTAWAY": f"{calc_put}%"})
-        st.dataframe(pd.DataFrame(updated_arsenal).style.set_properties(**{'text-align': 'center', 'background-color': '#1A1423', 'color': '#8BE9FD', 'border-color': '#372549'}), width="stretch", hide_index=True)
-
-st.markdown("---")
-st.subheader("📋 Automated Global Slate Edge Tracker Matrix")
-
-global_tracker_rows = []
-sample_slate = {"tarik skubal": {"team": "LAD", "opponent": "CHW"}, "paul skenes": {"team": "PIT", "opponent": "CIN"}, "dylan cease": {"team": "SDP", "opponent": "SFG"}, "corbin burnes": {"team": "BAL", "opponent": "PHI"}, "cole ragans": {"team": "KCR", "opponent": "DET"}, "zack wheeler": {"team": "PHI", "opponent": "BAL"}, "garrett crochet": {"team": "CHW", "opponent": "LAD"}}
-
-if todays_slate and len(todays_slate) > 0:
-    for live_name, meta in todays_slate.items():
-        p_name_raw = live_name.title()
-        p_name_clean = live_name.lower().strip()
-        
-        db_match = pitcher_db[pitcher_db['name_clean'] == p_name_clean]
-        
-        if not db_match.empty:
-            p_data = db_match.iloc
-            p_base_k = float(p_data['base_avg'])
-            p_base_outs = float(p_data['base_outs']) if 'base_outs' in p_data.index else 17.50
-            p_arm_side = str(p_data['throws']).upper().strip() if 'throws' in p_data.index else "R"
-            p_team_code = str(p_data.get('team', meta["team"])).upper().strip()
-        else:
-            p_base_k, p_base_outs, p_arm_side = 5.50, 15.2, "R"
-            p_team_code = str(meta["team"]).upper().strip()
-
-        opp_team_target = str(meta["opponent"]).upper().strip()
-        db_lookup_team = "CWS" if opp_team_target == "CHW" else opp_team_target
-        
-        if p_name_clean == lookup_key:
-            sim_proj_k = live_avg_k
-            sim_proj_outs = live_avg_outs
-        else:
-            p_matchup_mult_k = 1.00
-            if not batter_db.empty and db_lookup_team in batter_db['team_clean'].values:
-                team_hitters = batter_db[batter_db['team_clean'] == db_lookup_team]
-                k_list_calc = []
-                for _, b_row in team_hitters.head(9).iterrows():
-                    b_hand = str(b_row['hand']).upper().strip()
-                    raw_b_k = float(b_row['vs_lhp_k']) if p_arm_side == "L" else float(b_row['vs_rhp_k'])
-                    b_stab = float(b_row['k_stability']) if 'k_stability' in b_row.index else 1.00
-                    if (b_hand == "L" and p_arm_side == "R") or (b_hand == "R" and p_arm_side == "L") or b_hand == "S":
-                        k_list_calc.append(raw_b_k * 1.12 * b_stab)
-                    else:
-                        k_list_calc.append(raw_b_k * 0.92 * b_stab)
-                if k_list_calc: 
-                    p_matchup_mult_k = (sum(k_list_calc) / len(k_list_calc)) / 22.5
-
-            sim_proj_k = round(p_base_k * p_matchup_mult_k, 2)
-            sim_proj_outs = round(p_base_outs * 1.01, 2)
-
-        global_tracker_rows.append({
-            "PITCHER": p_name_raw, "TEAM": p_team_code, "OPPONENT": opp_team_target, 
-            "ARM": f"{p_arm_side}HP", "PROJ Ks": sim_proj_k, "PROJ OUTS": sim_proj_outs, "STATUS": "🟢 Live API Stream Online"
+@st.cache_data(ttl=120, show_spinner=False)
+def get_schedule(day: str) -> tuple[list[GamePitcher], str | None]:
+    try:
+        payload = MLBClient().get("schedule", {
+            "sportId":1,"date":day,
+            "hydrate":"probablePitcher,team,venue,linescore"
         })
+    except (requests.RequestException, ValueError) as exc:
+        return [], f"Schedule unavailable: {exc}"
 
-if global_tracker_rows:
-    st.dataframe(pd.DataFrame(global_tracker_rows).style.set_properties(**{
-        'background-color': '#1A1423', 'color': '#8BE9FD', 'border-color': '#372549', 'text-align': 'center'
-    }), width="stretch", hide_index=True)
-else:
-    st.info("💡 Live board matching layer empty. Awaiting confirmed active pitcher announcements from league data systems.")
+    rows: list[GamePitcher] = []
+    for block in payload.get("dates", []):
+        for game in block.get("games", []):
+            teams = game.get("teams", {})
+            game_pk = int(game.get("gamePk", 0))
+            venue = game.get("venue", {}).get("name", "Unknown venue")
+            game_time = game.get("gameDate", "")
+            status = game.get("status", {}).get("detailedState", "Unknown")
+            for side, opponent_side in (("away","home"),("home","away")):
+                node = teams.get(side, {})
+                opponent = teams.get(opponent_side, {})
+                pitcher = node.get("probablePitcher") or {}
+                if not pitcher.get("id") or not pitcher.get("fullName"):
+                    continue
+                team_node = node.get("team", {})
+                opp_node = opponent.get("team", {})
+                team = TEAM_ABBR.get(team_node.get("id"), team_node.get("abbreviation", "UNK"))
+                opp = TEAM_ABBR.get(opp_node.get("id"), opp_node.get("abbreviation", "UNK"))
+                key = f"{game_pk}:{pitcher['id']}"
+                rows.append(GamePitcher(key, int(pitcher["id"]), pitcher["fullName"], team, opp,
+                                        side.title(), venue, game_pk, game_time, status))
+    return rows, None
 
-st.markdown("---")
-st.markdown("<div class='section-header' style='background: linear-gradient(90deg, #FF79C6 0%, #1A1423 100%); border-left: 5px solid #FF79C6;'>📋 Stored Search History & Dual-Market Live Ledger Sheets</div>", unsafe_allow_html=True)
+@st.cache_data(ttl=1800, show_spinner=False)
+def get_pitcher_game_log(pitcher_id: int, season: int) -> tuple[pd.DataFrame, str | None]:
+    try:
+        payload = MLBClient().get(f"people/{pitcher_id}/stats", {
+            "stats":"gameLog","group":"pitching","season":season,"gameType":"R"
+        })
+    except (requests.RequestException, ValueError) as exc:
+        return pd.DataFrame(), f"Pitcher history unavailable: {exc}"
 
-if st.session_state["search_history_queue"]:
-    history_df = pd.DataFrame(st.session_state["search_history_queue"])
-    st.dataframe(history_df.style.set_properties(**{
-        'background-color': '#1A1423', 'color': '#50FA7B', 'border-color': '#372549', 'text-align': 'center'
-    }), width="stretch", hide_index=True)
-    
-    if st.button("🧹 Reset Search History Ledger"):
-        st.session_state["search_history_queue"] = []
-        st.rerun()
-else:
-    st.info("💡 Calibrate both lines in your form panel above and click 'Run Pro Dual-Market Simulation' to track both projections at once here.")
+    splits = []
+    for stat_block in payload.get("stats", []):
+        splits.extend(stat_block.get("splits", []))
+    records = []
+    for split in splits:
+        stat = split.get("stat", {})
+        ip = parse_ip(stat.get("inningsPitched", "0.0"))
+        records.append({
+            "date":pd.to_datetime(split.get("date"), errors="coerce"),
+            "opponent":split.get("opponent", {}).get("name", ""),
+            "games_started":float(stat.get("gamesStarted", 0) or 0),
+            "batters_faced":float(stat.get("battersFaced", 0) or 0),
+            "strikeouts":float(stat.get("strikeOuts", 0) or 0),
+            "walks":float(stat.get("baseOnBalls", 0) or 0),
+            "hits":float(stat.get("hits", 0) or 0),
+            "runs":float(stat.get("runs", 0) or 0),
+            "pitches":float(stat.get("numberOfPitches", 0) or 0),
+            "outs":ip * 3.0,
+        })
+    df = pd.DataFrame(records)
+    if df.empty:
+        return df, "No regular-season game log returned."
+    return df.sort_values("date"), None
+
+def parse_ip(value: Any) -> float:
+    try:
+        whole, frac = str(value).split(".")
+        return int(whole) + int(frac) / 3
+    except (ValueError, AttributeError):
+        return 0.0
+
+def weighted_mean(values: pd.Series, half_life: float, fallback: float) -> float:
+    clean = pd.to_numeric(values, errors="coerce").dropna().to_numpy(dtype=float)
+    if clean.size == 0:
+        return fallback
+    ages = np.arange(clean.size - 1, -1, -1)
+    weights = np.power(0.5, ages / half_life)
+    return float(np.average(clean, weights=weights))
+
+def shrink(rate: float, opportunities: float, prior: float, prior_weight: float) -> float:
+    return float((rate * opportunities + prior * prior_weight) / max(opportunities + prior_weight, 1.0))
+
+def negbin_pmf(mean: float, dispersion: float, maximum: int) -> np.ndarray:
+    mean = max(mean, 0.05)
+    dispersion = max(dispersion, 0.05)
+    r = 1.0 / dispersion
+    p = r / (r + mean)
+    probs = np.array([
+        math.exp(math.lgamma(k + r) - math.lgamma(r) - math.lgamma(k + 1) + r * math.log(p) + k * math.log(1-p))
+        for k in range(maximum + 1)
+    ])
+    probs[-1] += max(0.0, 1.0 - probs.sum())
+    return probs / probs.sum()
+
+def discrete_normal_probs(mean: float, sd: float, maximum: int = 27) -> np.ndarray:
+    xs = np.arange(maximum + 1)
+    z_hi = (xs + .5 - mean) / (sd * math.sqrt(2))
+    z_lo = (xs - .5 - mean) / (sd * math.sqrt(2))
+    erf = np.vectorize(math.erf)
+    probs = .5 * (erf(z_hi) - erf(z_lo))
+    probs[0] += .5 * (1 + math.erf((-0.5 - mean)/(sd*math.sqrt(2))))
+    probs[-1] += .5 * (1 - math.erf((maximum+.5-mean)/(sd*math.sqrt(2))))
+    probs = np.clip(probs, 0, None)
+    return probs / probs.sum()
+
+def calculate_projection(log: pd.DataFrame, game: GamePitcher, manual: dict[str, float], simulations: int) -> Projection:
+    starts = log[log["games_started"] > 0].copy().tail(35)
+    if starts.empty:
+        starts = log.tail(20).copy()
+
+    bf = weighted_mean(starts["batters_faced"], 5.0, 22.0)
+    outs = weighted_mean(starts["outs"], 5.0, 16.0)
+    pitches = weighted_mean(starts["pitches"], 5.0, 88.0)
+    total_bf = float(starts["batters_faced"].sum())
+    raw_k_rate = float(starts["strikeouts"].sum() / max(total_bf, 1))
+    k_rate = shrink(raw_k_rate, total_bf, 0.224, 120.0)
+
+    opponent_factor = manual["opponent_k_pct"] / 22.4
+    park_factor = PARK_K_FACTOR.get(game.venue, 1.0)
+    ump_factor = manual["umpire_k_factor"]
+    weather_factor = manual["weather_factor"]
+    rest_factor = manual["rest_factor"]
+    pitch_limit_factor = manual["pitch_limit"] / max(pitches, 75.0)
+    pitch_limit_factor = float(np.clip(pitch_limit_factor, .78, 1.12))
+
+    projected_bf = bf * pitch_limit_factor * rest_factor
+    projected_outs = outs * pitch_limit_factor * rest_factor
+    projected_k = projected_bf * k_rate * opponent_factor * park_factor * ump_factor * weather_factor
+
+    # Conservative empirical shrinkage prevents manual inputs from creating absurd tails.
+    projected_k = float(np.clip(0.78 * projected_k + 0.22 * weighted_mean(starts["strikeouts"], 5, 5.0), 0.5, 13.5))
+    projected_outs = float(np.clip(projected_outs, 3.0, 24.0))
+
+    k_variance = float(starts["strikeouts"].var(ddof=1)) if len(starts) > 2 else projected_k * 1.25
+    dispersion = max((k_variance - projected_k) / max(projected_k**2, .1), .08)
+    k_probs = negbin_pmf(projected_k, dispersion, 18)
+
+    outs_sd = float(starts["outs"].std(ddof=1)) if len(starts) > 2 else 4.0
+    outs_sd = float(np.clip(outs_sd, 2.5, 6.5))
+    outs_probs = discrete_normal_probs(projected_outs, outs_sd, 27)
+
+    seed_text = f"{game.key}|{date.today()}|{APP_VERSION}"
+    seed = int(hashlib.sha256(seed_text.encode()).hexdigest()[:8], 16)
+    rng = np.random.default_rng(seed)
+    k_samples = rng.choice(np.arange(len(k_probs)), size=simulations, p=k_probs)
+    outs_samples = rng.choice(np.arange(len(outs_probs)), size=simulations, p=outs_probs)
+
+    quality = min(100, 35 + len(starts) * 2 + (15 if total_bf >= 250 else 0) + (10 if game.pitcher_id else 0))
+    confidence = "High" if quality >= 85 else "Medium" if quality >= 65 else "Low"
+    factors = [
+        ("Opponent strikeout profile", opponent_factor - 1),
+        ("Recent workload / pitch limit", pitch_limit_factor - 1),
+        ("Park", park_factor - 1),
+        ("Umpire", ump_factor - 1),
+        ("Weather", weather_factor - 1),
+        ("Rest", rest_factor - 1),
+    ]
+    return Projection(projected_k, projected_outs, math.sqrt(k_variance), outs_sd,
+                      k_probs, outs_probs, k_samples, outs_samples, confidence, quality, factors)
+
+def over_probability(samples: np.ndarray, line: float) -> float:
+    return float(np.mean(samples > line))
+
+def fair_american(probability: float) -> str:
+    p = float(np.clip(probability, .001, .999))
+    odds = -100*p/(1-p) if p >= .5 else 100*(1-p)/p
+    return f"{odds:+.0f}"
+
+def interval(samples: np.ndarray, low: float=.10, high: float=.90) -> tuple[int,int]:
+    return int(np.quantile(samples, low)), int(np.quantile(samples, high))
+
+def load_local_csv(filename: str) -> pd.DataFrame:
+    candidates = [DATA_DIR / filename, APP_DIR / filename]
+    for path in candidates:
+        if path.exists():
+            return pd.read_csv(path)
+    return pd.DataFrame()
+
+now = datetime.now(EASTERN)
+query_day = now.date()
+
+with st.sidebar:
+    st.markdown("## PitchLab Pro")
+    st.caption(f"Distributional MLB starter projections · v{APP_VERSION}")
+    selected_date = st.date_input("Slate date", value=query_day)
+    st.markdown("### Model controls")
+    simulations = st.select_slider("Simulation draws", [5000,10000,25000,50000], value=25000)
+    opponent_k_pct = st.slider("Projected lineup K%", 15.0, 32.0, 22.4, .1)
+    pitch_limit = st.slider("Expected pitch limit", 60, 115, 92)
+    umpire_k_factor = st.slider("Umpire K factor", .94, 1.06, 1.00, .01)
+    weather_factor = st.slider("Weather K factor", .96, 1.04, 1.00, .01)
+    rest_days = st.slider("Days rest", 3, 10, 5)
+    rest_factor = 0.96 if rest_days <= 3 else 1.0 if rest_days <= 6 else 1.01
+    st.caption("Market lines affect edge display only, never the baseball forecast.")
+
+schedule, schedule_error = get_schedule(selected_date.isoformat())
+
+st.title("⚾ PitchLab Pro")
+st.markdown("Pregame strikeout and starter-outs distributions with transparent assumptions and uncertainty.")
+
+if schedule_error:
+    st.error(schedule_error)
+
+if not schedule:
+    st.warning("No announced probable pitchers are available for this date. Choose another date or wait for teams to announce starters.")
+    st.stop()
+
+options = {g.key:g for g in schedule}
+selected_key = st.selectbox("Pitcher", list(options), format_func=lambda key: f"{options[key].pitcher_name} · {options[key].team} vs {options[key].opponent}")
+game = options[selected_key]
+
+season = selected_date.year
+log, history_error = get_pitcher_game_log(game.pitcher_id, season)
+if log.empty and season > 2000:
+    previous_log, previous_error = get_pitcher_game_log(game.pitcher_id, season - 1)
+    if not previous_log.empty:
+        log, history_error = previous_log, None
+    elif history_error is None:
+        history_error = previous_error
+
+if history_error:
+    st.warning(history_error)
+if log.empty:
+    st.error("A projection cannot be issued without a pitcher game history. This is safer than silently using fake default statistics.")
+    st.stop()
+
+manual = {
+    "opponent_k_pct":opponent_k_pct,
+    "pitch_limit":float(pitch_limit),
+    "umpire_k_factor":umpire_k_factor,
+    "weather_factor":weather_factor,
+    "rest_factor":rest_factor,
+}
+projection = calculate_projection(log, game, manual, simulations)
+
+st.markdown(f"<span class='status-live'>LIVE SCHEDULE</span> &nbsp; <span class='small-muted'>{game.status} · {game.side} · {game.venue} · Updated {now:%I:%M %p ET}</span>", unsafe_allow_html=True)
+
+line_col1, line_col2, line_col3 = st.columns([1,1,2])
+with line_col1:
+    k_line = st.number_input("Strikeout line", .5, 15.5, 5.5, .5)
+with line_col2:
+    outs_line = st.number_input("Outs line", .5, 26.5, 15.5, .5)
+with line_col3:
+    st.markdown("#### Data status")
+    st.progress(projection.data_quality / 100, text=f"{projection.confidence} confidence · data quality {projection.data_quality}/100")
+
+k_over = over_probability(projection.k_samples, k_line)
+outs_over = over_probability(projection.outs_samples, outs_line)
+k_lo, k_hi = interval(projection.k_samples)
+o_lo, o_hi = interval(projection.outs_samples)
+
+m1,m2,m3,m4 = st.columns(4)
+m1.metric("Projected strikeouts", f"{projection.mean_k:.2f}", f"80% range {k_lo}-{k_hi}")
+m2.metric(f"Over {k_line:g}", f"{k_over:.1%}", f"Fair {fair_american(k_over)}")
+m3.metric("Projected outs", f"{projection.mean_outs:.2f}", f"80% range {o_lo}-{o_hi}")
+m4.metric(f"Over {outs_line:g}", f"{outs_over:.1%}", f"Fair {fair_american(outs_over)}")
+
+tab1,tab2,tab3,tab4 = st.tabs(["Projection","Distribution","Form & workload","Model card"])
+
+with tab1:
+    left,right = st.columns([1.4,1])
+    with left:
+        st.subheader("Decision table")
+        decision = pd.DataFrame([
+            {"Market":f"K over {k_line:g}","Probability":k_over,"Fair odds":fair_american(k_over),"Projection":projection.mean_k},
+            {"Market":f"K under {k_line:g}","Probability":1-k_over,"Fair odds":fair_american(1-k_over),"Projection":projection.mean_k},
+            {"Market":f"Outs over {outs_line:g}","Probability":outs_over,"Fair odds":fair_american(outs_over),"Projection":projection.mean_outs},
+            {"Market":f"Outs under {outs_line:g}","Probability":1-outs_over,"Fair odds":fair_american(1-outs_over),"Projection":projection.mean_outs},
+        ])
+        st.dataframe(decision.style.format({"Probability":"{:.1%}","Projection":"{:.2f}"}), hide_index=True, use_container_width=True)
+        st.caption("Probabilities are model estimates, not guarantees. Compare fair odds with a price only after accounting for vig and uncertainty.")
+    with right:
+        st.subheader("Projection drivers")
+        factor_df = pd.DataFrame(projection.factors, columns=["Factor","Impact"])
+        factor_df["Direction"] = np.where(factor_df["Impact"] >= 0, "Raises", "Lowers")
+        factor_df["Impact"] = factor_df["Impact"].map(lambda x: f"{x:+.1%}")
+        st.dataframe(factor_df, hide_index=True, use_container_width=True)
+
+with tab2:
+    k_chart = pd.DataFrame({"Strikeouts":np.arange(len(projection.k_probs)),"Probability":projection.k_probs}).set_index("Strikeouts")
+    outs_chart = pd.DataFrame({"Outs":np.arange(len(projection.outs_probs)),"Probability":projection.outs_probs}).set_index("Outs")
+    c1,c2 = st.columns(2)
+    with c1:
+        st.subheader("Strikeout distribution")
+        st.bar_chart(k_chart, color="#31d7ff")
+    with c2:
+        st.subheader("Outs distribution")
+        st.bar_chart(outs_chart, color="#31e6a1")
+
+with tab3:
+    display = log.tail(15).copy()
+    display["K/BF"] = display["strikeouts"] / display["batters_faced"].replace(0,np.nan)
+    display["Pitches/BF"] = display["pitches"] / display["batters_faced"].replace(0,np.nan)
+    st.line_chart(display.set_index("date")[["strikeouts","outs"]])
+    st.dataframe(display[["date","opponent","strikeouts","outs","batters_faced","pitches","K/BF","Pitches/BF"]].sort_values("date",ascending=False).style.format({"K/BF":"{:.1%}","Pitches/BF":"{:.2f}"}), hide_index=True, use_container_width=True)
+
+with tab4:
+    st.subheader("What this version does")
+    st.markdown("""
+- Separates expected workload from strikeout skill instead of multiplying arbitrary static values.
+- Uses exponentially weighted form with empirical-Bayes shrinkage toward league average.
+- Produces full Negative Binomial strikeout and bounded outs distributions.
+- Keeps sportsbook inputs outside the forecast to avoid market leakage.
+- Refuses to publish a projection when required player history is unavailable.
+- Exposes every manual assumption and reports an uncertainty range.
+    """)
+    st.subheader("Current limitations")
+    st.markdown("""
+- Projected lineup K%, umpire, weather, and pitch limit are manual until dedicated feeds are connected.
+- This is an inference dashboard, not yet a trained walk-forward gradient-boosted production model.
+- Calibration must be measured on archived pregame snapshots before probabilities can be considered production-grade.
+    """)
+    manifest = {
+        "app_version":APP_VERSION,
+        "prediction_timestamp_et":now.isoformat(),
+        "game_pk":game.game_pk,
+        "pitcher_id":game.pitcher_id,
+        "inputs":manual,
+        "simulation_draws":simulations,
+        "confidence":projection.confidence,
+    }
+    st.download_button("Download prediction manifest", json.dumps(manifest,indent=2), file_name=f"projection_{game.game_pk}_{game.pitcher_id}.json", mime="application/json")
