@@ -23,29 +23,29 @@ def get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:
 
 def previous_pitcher_games(pitcher_id: int, before: str, limit: int = 10) -> list[dict[str, Any]]:
     data = get_json(f"people/{pitcher_id}/stats", {"stats": "gameLog", "group": "pitching", "season": before[:4]})
-    splits = data.get("stats", [{}])[0].get("splits", [])
+    stats = data.get("stats") or []
+    splits = stats[0].get("splits", []) if stats else []
     rows = [s for s in splits if s.get("date", "") < before]
     rows.sort(key=lambda x: x.get("date", ""), reverse=True)
     return rows[:limit]
 
 
+def person_info(player_id: int) -> dict[str, Any]:
+    data = get_json(f"people/{player_id}", {})
+    people = data.get("people") or []
+    return people[0] if people else {}
+
+
 def player_hand(player_id: int) -> str:
-    data = get_json(f"people/{player_id}", {})
-    people = data.get("people", [])
-    return str(people[0].get("pitchHand", {}).get("code", "")) if people else ""
-
-
-def batter_hand(player_id: int) -> str:
-    data = get_json(f"people/{player_id}", {})
-    people = data.get("people", [])
-    return str(people[0].get("batSide", {}).get("code", "")) if people else ""
+    return str(person_info(player_id).get("pitchHand", {}).get("code", ""))
 
 
 def historical_batter_k_rate(player_id: int, before: str) -> float:
-    data = get_json(f"people/{player_id}/stats", {
-        "stats": "gameLog", "group": "hitting", "season": before[:4]
-    })
-    splits = data.get("stats", [{}])[0].get("splits", [])
+    data = get_json(f"people/{player_id}/stats", {"stats": "gameLog", "group": "hitting", "season": before[:4]})
+    stats = data.get("stats") or []
+    if not stats:
+        return 0.0
+    splits = stats[0].get("splits", [])
     rows = [s for s in splits if s.get("date", "") < before][-10:]
     ks = sum(float(x.get("stat", {}).get("strikeOuts", 0)) for x in rows)
     ab = sum(float(x.get("stat", {}).get("atBats", 0)) for x in rows)
@@ -68,7 +68,8 @@ def build_features(pitcher_id: int, opponent_team_id: int, game_date: str, oppon
         if not pid:
             continue
         try:
-            bat_hand = batter_hand(int(pid))
+            info = person_info(int(pid))
+            bat_hand = str(info.get("batSide", {}).get("code", ""))
             k_rate = historical_batter_k_rate(int(pid), game_date)
         except requests.RequestException:
             continue
@@ -131,7 +132,7 @@ def game_snapshots(game_date: str) -> list[Any]:
                     pitcher_name=probable.get("fullName", "Unknown"),
                     opponent_team=opponent_team.get("abbreviation", ""),
                     features=features,
-                    source_versions={"mlb_stats_api": "v1", "reconstruction": "2.2.0"},
+                    source_versions={"mlb_stats_api": "v1", "reconstruction": "2.2.1"},
                     actual_strikeouts=int(ks),
                     actual_batters_faced=int(bf) if bf is not None else None,
                 ))
