@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -38,14 +38,49 @@ def player_hand(pitcher_id: int) -> str:
     return str(people[0].get("pitchHand", {}).get("code", "")) if people else ""
 
 
-def build_features(pitcher_id: int, game_date: str) -> dict[str, float]:
+def team_hitting_log(team_id: int, before: str) -> list[dict[str, Any]]:
+    data = get_json(f"teams/{team_id}/stats", {
+        "stats": "gameLog",
+        "group": "hitting",
+        "season": before[:4],
+    })
+    splits = data.get("stats", [{}])[0].get("splits", [])
+    rows = [s for s in splits if s.get("date", "") < before]
+    rows.sort(key=lambda x: x.get("date", ""), reverse=True)
+    return rows[-10:]
+
+
+def opponent_features(team_id: int, before: str) -> tuple[float, float]:
+    logs = team_hitting_log(team_id, before)
+    if not logs:
+        return 0.0, 0.0
+    total_k = sum(float(x.get("stat", {}).get("strikeOuts", 0)) for x in logs)
+    total_ab = sum(float(x.get("stat", {}).get("atBats", 0)) for x in logs)
+    return (total_k / total_ab if total_ab else 0.0), float(len(logs))
+
+
+def build_features(pitcher_id: int, opponent_team_id: int, game_date: str) -> dict[str, float]:
     logs = previous_pitcher_games(pitcher_id, game_date)
     hand = player_hand(pitcher_id)
-    return build_baseball_features(
+    opponent_k_rate, opponent_games = opponent_features(opponent_team_id, game_date)
+
+    rest = 5.0
+    if logs:
+        last_date = logs[0].get("date")
+        if last_date:
+            try:
+                rest = max(0.0, (date.fromisoformat(game_date) - date.fromisoformat(last_date)).days)
+            except ValueError:
+                pass
+
+    features = build_baseball_features(
         pitcher_logs=[x.get("stat", {}) for x in logs],
         pitcher_hand=hand,
-        recent_days_rest=5.0,
+        recent_days_rest=rest,
     )
+    features["opponent_k_rate"] = opponent_k_rate
+    features["opponent_prior_games"] = opponent_games
+    return features
 
 
 def game_snapshots(game_date: str) -> list[Any]:
@@ -62,7 +97,12 @@ def game_snapshots(game_date: str) -> list[Any]:
                 pid = probable.get("id")
                 if not pid:
                     continue
-                opponent = game.get("teams", {}).get("home" if side == "away" else "away", {}).get("team", {}).get("abbreviation", "")
+                opponent_side = "home" if side == "away" else "away"
+                opponent = game.get("teams", {}).get(opponent_side, {})
+                opponent_team = opponent.get("team", {})
+                opponent_id = opponent_team.get("id")
+                if not opponent_id:
+                    continue
                 try:
                     boxscore = get_json(f"game/{game_id}/boxscore", {})
                     players = boxscore.get("teams", {}).get(side, {}).get("players", {})
@@ -74,15 +114,16 @@ def game_snapshots(game_date: str) -> list[Any]:
                         continue
                 except requests.RequestException:
                     continue
-                features = build_features(int(pid), game_date)
+
+                features = build_features(int(pid), int(opponent_id), game_date)
                 snapshots.append(make_snapshot(
                     game_id=game_id,
                     game_date=game_date,
                     pitcher_id=str(pid),
                     pitcher_name=probable.get("fullName", "Unknown"),
-                    opponent_team=opponent,
+                    opponent_team=opponent_team.get("abbreviation", ""),
                     features=features,
-                    source_versions={"mlb_stats_api": "v1", "reconstruction": "2.0.0"},
+                    source_versions={"mlb_stats_api": "v1", "reconstruction": "2.1.0"},
                     actual_strikeouts=int(ks),
                     actual_batters_faced=int(bf) if bf is not None else None,
                 ))
