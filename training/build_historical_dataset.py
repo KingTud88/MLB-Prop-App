@@ -10,6 +10,7 @@ import requests
 
 from .baseball_features import build_baseball_features
 from .matchup_features import build_matchup_features
+from .pitch_mix_matchup import build_pitch_mix_matchup_features
 from .snapshot_schema import make_snapshot, snapshots_to_frame
 
 BASE = "https://statsapi.mlb.com/api/v1"
@@ -59,6 +60,25 @@ def historical_batter_k_rate(player_id: int, before: str) -> float:
     return ks / ab if ab else 0.0
 
 
+def historical_pitch_mix(pitcher_id: int, before: str) -> list[dict[str, Any]]:
+    """Return pitch-mix aggregates from games before the target date when available."""
+    data = get_json(f"people/{pitcher_id}/stats", {
+        "stats": "gameLog", "group": "pitching", "season": before[:4]
+    })
+    stats = data.get("stats") or []
+    if not stats:
+        return []
+    rows = [s for s in stats[0].get("splits", []) if s.get("date", "") < before][-10:]
+    # MLB gameLog does not expose pitch-type metrics consistently. Keep this
+    # neutral unless a richer historical pitch source is present in the row.
+    mix: list[dict[str, Any]] = []
+    for row in rows:
+        stat = row.get("stat", {})
+        for item in stat.get("pitchMix", []) if isinstance(stat.get("pitchMix"), list) else []:
+            mix.append(item)
+    return mix
+
+
 def build_features(pitcher_id: int, opponent_team_id: int, game_date: str, opponent_players: list[dict[str, Any]]) -> dict[str, float]:
     logs = previous_pitcher_games(pitcher_id, game_date)
     hand = player_hand(pitcher_id)
@@ -87,12 +107,15 @@ def build_features(pitcher_id: int, opponent_team_id: int, game_date: str, oppon
             "strikeout_rate_opposite_hand": k_rate if bat_hand != hand else 0.0,
         })
 
+    arsenal = historical_pitch_mix(pitcher_id, game_date)
     features = build_baseball_features(
         pitcher_logs=[x.get("stat", {}) for x in logs],
         pitcher_hand=hand,
         recent_days_rest=rest,
+        arsenal=arsenal,
     )
     features.update(build_matchup_features(hand, batters))
+    features.update(build_pitch_mix_matchup_features(hand, arsenal, batters))
     features["opponent_team_id"] = float(opponent_team_id)
     return features
 
@@ -139,7 +162,7 @@ def game_snapshots(game_date: str) -> list[Any]:
                     pitcher_name=probable.get("fullName", "Unknown"),
                     opponent_team=opponent_team.get("abbreviation", ""),
                     features=features,
-                    source_versions={"mlb_stats_api": "v1", "reconstruction": "2.2.2"},
+                    source_versions={"mlb_stats_api": "v1", "reconstruction": "2.3.0"},
                     actual_strikeouts=int(ks),
                     actual_batters_faced=int(bf) if bf is not None else None,
                 ))
