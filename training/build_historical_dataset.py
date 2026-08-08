@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
 import requests
 
 from .baseball_features import build_baseball_features
+from .matchup_features import build_matchup_features
 from .snapshot_schema import make_snapshot, snapshots_to_frame
 
 BASE = "https://statsapi.mlb.com/api/v1"
@@ -21,65 +22,70 @@ def get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:
 
 
 def previous_pitcher_games(pitcher_id: int, before: str, limit: int = 10) -> list[dict[str, Any]]:
-    data = get_json(f"people/{pitcher_id}/stats", {
-        "stats": "gameLog",
-        "group": "pitching",
-        "season": before[:4],
-    })
+    data = get_json(f"people/{pitcher_id}/stats", {"stats": "gameLog", "group": "pitching", "season": before[:4]})
     splits = data.get("stats", [{}])[0].get("splits", [])
     rows = [s for s in splits if s.get("date", "") < before]
     rows.sort(key=lambda x: x.get("date", ""), reverse=True)
     return rows[:limit]
 
 
-def player_hand(pitcher_id: int) -> str:
-    data = get_json(f"people/{pitcher_id}", {})
+def player_hand(player_id: int) -> str:
+    data = get_json(f"people/{player_id}", {})
     people = data.get("people", [])
     return str(people[0].get("pitchHand", {}).get("code", "")) if people else ""
 
 
-def team_hitting_log(team_id: int, before: str) -> list[dict[str, Any]]:
-    data = get_json(f"teams/{team_id}/stats", {
-        "stats": "gameLog",
-        "group": "hitting",
-        "season": before[:4],
+def batter_hand(player_id: int) -> str:
+    data = get_json(f"people/{player_id}", {})
+    people = data.get("people", [])
+    return str(people[0].get("batSide", {}).get("code", "")) if people else ""
+
+
+def historical_batter_k_rate(player_id: int, before: str) -> float:
+    data = get_json(f"people/{player_id}/stats", {
+        "stats": "gameLog", "group": "hitting", "season": before[:4]
     })
     splits = data.get("stats", [{}])[0].get("splits", [])
-    rows = [s for s in splits if s.get("date", "") < before]
-    rows.sort(key=lambda x: x.get("date", ""), reverse=True)
-    return rows[-10:]
+    rows = [s for s in splits if s.get("date", "") < before][-10:]
+    ks = sum(float(x.get("stat", {}).get("strikeOuts", 0)) for x in rows)
+    ab = sum(float(x.get("stat", {}).get("atBats", 0)) for x in rows)
+    return ks / ab if ab else 0.0
 
 
-def opponent_features(team_id: int, before: str) -> tuple[float, float]:
-    logs = team_hitting_log(team_id, before)
-    if not logs:
-        return 0.0, 0.0
-    total_k = sum(float(x.get("stat", {}).get("strikeOuts", 0)) for x in logs)
-    total_ab = sum(float(x.get("stat", {}).get("atBats", 0)) for x in logs)
-    return (total_k / total_ab if total_ab else 0.0), float(len(logs))
-
-
-def build_features(pitcher_id: int, opponent_team_id: int, game_date: str) -> dict[str, float]:
+def build_features(pitcher_id: int, opponent_team_id: int, game_date: str, opponent_players: list[dict[str, Any]]) -> dict[str, float]:
     logs = previous_pitcher_games(pitcher_id, game_date)
     hand = player_hand(pitcher_id)
-    opponent_k_rate, opponent_games = opponent_features(opponent_team_id, game_date)
-
     rest = 5.0
-    if logs:
-        last_date = logs[0].get("date")
-        if last_date:
-            try:
-                rest = max(0.0, (date.fromisoformat(game_date) - date.fromisoformat(last_date)).days)
-            except ValueError:
-                pass
+    if logs and logs[0].get("date"):
+        try:
+            rest = max(0.0, (date.fromisoformat(game_date) - date.fromisoformat(logs[0]["date"])).days)
+        except ValueError:
+            pass
+
+    batters: list[dict[str, Any]] = []
+    for player in opponent_players:
+        pid = player.get("person", {}).get("id")
+        if not pid:
+            continue
+        try:
+            bat_hand = batter_hand(int(pid))
+            k_rate = historical_batter_k_rate(int(pid), game_date)
+        except requests.RequestException:
+            continue
+        batters.append({
+            "hand": bat_hand,
+            "strikeout_rate": k_rate,
+            "strikeout_rate_same_hand": k_rate if bat_hand == hand else 0.0,
+            "strikeout_rate_opposite_hand": k_rate if bat_hand != hand else 0.0,
+        })
 
     features = build_baseball_features(
         pitcher_logs=[x.get("stat", {}) for x in logs],
         pitcher_hand=hand,
         recent_days_rest=rest,
     )
-    features["opponent_k_rate"] = opponent_k_rate
-    features["opponent_prior_games"] = opponent_games
+    features.update(build_matchup_features(hand, batters))
+    features["opponent_team_id"] = float(opponent_team_id)
     return features
 
 
@@ -105,8 +111,10 @@ def game_snapshots(game_date: str) -> list[Any]:
                     continue
                 try:
                     boxscore = get_json(f"game/{game_id}/boxscore", {})
-                    players = boxscore.get("teams", {}).get(side, {}).get("players", {})
-                    player = players.get(f"ID{pid}", {})
+                    players = boxscore.get("teams", {}).get(opponent_side, {}).get("players", {})
+                    opponent_players = list(players.values())
+                    pitcher_players = boxscore.get("teams", {}).get(side, {}).get("players", {})
+                    player = pitcher_players.get(f"ID{pid}", {})
                     pitching = player.get("stats", {}).get("pitching", {})
                     ks = pitching.get("strikeOuts")
                     bf = pitching.get("battersFaced")
@@ -115,7 +123,7 @@ def game_snapshots(game_date: str) -> list[Any]:
                 except requests.RequestException:
                     continue
 
-                features = build_features(int(pid), int(opponent_id), game_date)
+                features = build_features(int(pid), int(opponent_id), game_date, opponent_players)
                 snapshots.append(make_snapshot(
                     game_id=game_id,
                     game_date=game_date,
@@ -123,7 +131,7 @@ def game_snapshots(game_date: str) -> list[Any]:
                     pitcher_name=probable.get("fullName", "Unknown"),
                     opponent_team=opponent_team.get("abbreviation", ""),
                     features=features,
-                    source_versions={"mlb_stats_api": "v1", "reconstruction": "2.1.0"},
+                    source_versions={"mlb_stats_api": "v1", "reconstruction": "2.2.0"},
                     actual_strikeouts=int(ks),
                     actual_batters_faced=int(bf) if bf is not None else None,
                 ))
@@ -132,8 +140,8 @@ def game_snapshots(game_date: str) -> list[Any]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build frozen pregame MLB pitcher snapshots.")
-    parser.add_argument("--start", required=True, help="YYYY-MM-DD")
-    parser.add_argument("--end", required=True, help="YYYY-MM-DD")
+    parser.add_argument("--start", required=True)
+    parser.add_argument("--end", required=True)
     parser.add_argument("--output", type=Path, default=Path("data/historical_snapshots.csv"))
     args = parser.parse_args()
 
