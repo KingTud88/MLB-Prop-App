@@ -10,17 +10,21 @@ from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 from .dataset_builder import load_snapshot_dataset
-from engine.walk_forward import brier_score, calibration_table, log_loss
-
 
 TARGET = "actual_strikeouts"
 
 
 def _feature_frame(frame: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
-    payload = pd.json_normalize(frame["feature_payload"].apply(json.loads) if frame["feature_payload"].dtype == object else frame["feature_payload"])
-    numeric = payload.select_dtypes(include=[np.number]).copy()
-    numeric = numeric.replace([np.inf, -np.inf], np.nan).fillna(numeric.median(numeric_only=True)).fillna(0.0)
-    return numeric, list(numeric.columns)
+    """Use the flattened feature_payload.* columns produced by snapshots_to_frame."""
+    prefix = "feature_payload."
+    columns = [c for c in frame.columns if c.startswith(prefix)]
+    if not columns:
+        raise ValueError("No flattened feature_payload.* columns found in snapshot dataset")
+
+    numeric = frame[columns].apply(pd.to_numeric, errors="coerce")
+    numeric = numeric.replace([np.inf, -np.inf], np.nan)
+    numeric = numeric.fillna(numeric.median(numeric_only=True)).fillna(0.0)
+    return numeric, columns
 
 
 def walk_forward_backtest(frame: pd.DataFrame, min_train: int = 500, test_size: int = 100) -> pd.DataFrame:
