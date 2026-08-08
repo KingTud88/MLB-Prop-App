@@ -93,13 +93,9 @@ class MLBClient:
 @st.cache_data(ttl=120, show_spinner=False)
 def get_schedule(day: str) -> tuple[list[GamePitcher], str | None]:
     try:
-        payload = MLBClient().get("schedule", {
-            "sportId":1,"date":day,
-            "hydrate":"probablePitcher,team,venue,linescore"
-        })
+        payload = MLBClient().get("schedule", {"sportId":1,"date":day,"hydrate":"probablePitcher,team,venue,linescore"})
     except (requests.RequestException, ValueError) as exc:
         return [], f"Schedule unavailable: {exc}"
-
     rows: list[GamePitcher] = []
     for block in payload.get("dates", []):
         for game in block.get("games", []):
@@ -109,29 +105,22 @@ def get_schedule(day: str) -> tuple[list[GamePitcher], str | None]:
             game_time = game.get("gameDate", "")
             status = game.get("status", {}).get("detailedState", "Unknown")
             for side, opponent_side in (("away","home"),("home","away")):
-                node = teams.get(side, {})
-                opponent = teams.get(opponent_side, {})
+                node, opponent = teams.get(side, {}), teams.get(opponent_side, {})
                 pitcher = node.get("probablePitcher") or {}
                 if not pitcher.get("id") or not pitcher.get("fullName"):
                     continue
-                team_node = node.get("team", {})
-                opp_node = opponent.get("team", {})
+                team_node, opp_node = node.get("team", {}), opponent.get("team", {})
                 team = TEAM_ABBR.get(team_node.get("id"), team_node.get("abbreviation", "UNK"))
                 opp = TEAM_ABBR.get(opp_node.get("id"), opp_node.get("abbreviation", "UNK"))
-                key = f"{game_pk}:{pitcher['id']}"
-                rows.append(GamePitcher(key, int(pitcher["id"]), pitcher["fullName"], team, opp,
-                                        side.title(), venue, game_pk, game_time, status))
+                rows.append(GamePitcher(f"{game_pk}:{pitcher['id']}", int(pitcher["id"]), pitcher["fullName"], team, opp, side.title(), venue, game_pk, game_time, status))
     return rows, None
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def get_pitcher_game_log(pitcher_id: int, season: int) -> tuple[pd.DataFrame, str | None]:
     try:
-        payload = MLBClient().get(f"people/{pitcher_id}/stats", {
-            "stats":"gameLog","group":"pitching","season":season,"gameType":"R"
-        })
+        payload = MLBClient().get(f"people/{pitcher_id}/stats", {"stats":"gameLog","group":"pitching","season":season,"gameType":"R"})
     except (requests.RequestException, ValueError) as exc:
         return pd.DataFrame(), f"Pitcher history unavailable: {exc}"
-
     splits = []
     for stat_block in payload.get("stats", []):
         splits.extend(stat_block.get("splits", []))
@@ -139,18 +128,7 @@ def get_pitcher_game_log(pitcher_id: int, season: int) -> tuple[pd.DataFrame, st
     for split in splits:
         stat = split.get("stat", {})
         ip = parse_ip(stat.get("inningsPitched", "0.0"))
-        records.append({
-            "date":pd.to_datetime(split.get("date"), errors="coerce"),
-            "opponent":split.get("opponent", {}).get("name", ""),
-            "games_started":float(stat.get("gamesStarted", 0) or 0),
-            "batters_faced":float(stat.get("battersFaced", 0) or 0),
-            "strikeouts":float(stat.get("strikeOuts", 0) or 0),
-            "walks":float(stat.get("baseOnBalls", 0) or 0),
-            "hits":float(stat.get("hits", 0) or 0),
-            "runs":float(stat.get("runs", 0) or 0),
-            "pitches":float(stat.get("numberOfPitches", 0) or 0),
-            "outs":ip * 3.0,
-        })
+        records.append({"date":pd.to_datetime(split.get("date"), errors="coerce"),"opponent":split.get("opponent", {}).get("name", ""),"games_started":float(stat.get("gamesStarted", 0) or 0),"batters_faced":float(stat.get("battersFaced", 0) or 0),"strikeouts":float(stat.get("strikeOuts", 0) or 0),"walks":float(stat.get("baseOnBalls", 0) or 0),"hits":float(stat.get("hits", 0) or 0),"runs":float(stat.get("runs", 0) or 0),"pitches":float(stat.get("numberOfPitches", 0) or 0),"outs":ip * 3.0})
     df = pd.DataFrame(records)
     if df.empty:
         return df, "No regular-season game log returned."
@@ -179,10 +157,7 @@ def negbin_pmf(mean: float, dispersion: float, maximum: int) -> np.ndarray:
     dispersion = max(dispersion, 0.05)
     r = 1.0 / dispersion
     p = r / (r + mean)
-    probs = np.array([
-        math.exp(math.lgamma(k + r) - math.lgamma(r) - math.lgamma(k + 1) + r * math.log(p) + k * math.log(1-p))
-        for k in range(maximum + 1)
-    ])
+    probs = np.array([math.exp(math.lgamma(k + r) - math.lgamma(r) - math.lgamma(k + 1) + r * math.log(p) + k * math.log(1-p)) for k in range(maximum + 1)])
     probs[-1] += max(0.0, 1.0 - probs.sum())
     return probs / probs.sum()
 
@@ -201,56 +176,38 @@ def calculate_projection(log: pd.DataFrame, game: GamePitcher, manual: dict[str,
     starts = log[log["games_started"] > 0].copy().tail(35)
     if starts.empty:
         starts = log.tail(20).copy()
-
     bf = weighted_mean(starts["batters_faced"], 5.0, 22.0)
     outs = weighted_mean(starts["outs"], 5.0, 16.0)
     pitches = weighted_mean(starts["pitches"], 5.0, 88.0)
     total_bf = float(starts["batters_faced"].sum())
     raw_k_rate = float(starts["strikeouts"].sum() / max(total_bf, 1))
     k_rate = shrink(raw_k_rate, total_bf, 0.224, 120.0)
-
     opponent_factor = manual["opponent_k_pct"] / 22.4
     park_factor = PARK_K_FACTOR.get(game.venue, 1.0)
     ump_factor = manual["umpire_k_factor"]
     weather_factor = manual["weather_factor"]
     rest_factor = manual["rest_factor"]
-    pitch_limit_factor = manual["pitch_limit"] / max(pitches, 75.0)
-    pitch_limit_factor = float(np.clip(pitch_limit_factor, .78, 1.12))
-
+    pitch_limit_factor = float(np.clip(manual["pitch_limit"] / max(pitches, 75.0), .78, 1.12))
     projected_bf = bf * pitch_limit_factor * rest_factor
     projected_outs = outs * pitch_limit_factor * rest_factor
     projected_k = projected_bf * k_rate * opponent_factor * park_factor * ump_factor * weather_factor
-
-    # Conservative empirical shrinkage prevents manual inputs from creating absurd tails.
     projected_k = float(np.clip(0.78 * projected_k + 0.22 * weighted_mean(starts["strikeouts"], 5, 5.0), 0.5, 13.5))
     projected_outs = float(np.clip(projected_outs, 3.0, 24.0))
-
     k_variance = float(starts["strikeouts"].var(ddof=1)) if len(starts) > 2 else projected_k * 1.25
     dispersion = max((k_variance - projected_k) / max(projected_k**2, .1), .08)
     k_probs = negbin_pmf(projected_k, dispersion, 18)
-
     outs_sd = float(starts["outs"].std(ddof=1)) if len(starts) > 2 else 4.0
     outs_sd = float(np.clip(outs_sd, 2.5, 6.5))
     outs_probs = discrete_normal_probs(projected_outs, outs_sd, 27)
-
     seed_text = f"{game.key}|{date.today()}|{APP_VERSION}"
     seed = int(hashlib.sha256(seed_text.encode()).hexdigest()[:8], 16)
     rng = np.random.default_rng(seed)
     k_samples = rng.choice(np.arange(len(k_probs)), size=simulations, p=k_probs)
     outs_samples = rng.choice(np.arange(len(outs_probs)), size=simulations, p=outs_probs)
-
     quality = min(100, 35 + len(starts) * 2 + (15 if total_bf >= 250 else 0) + (10 if game.pitcher_id else 0))
     confidence = "High" if quality >= 85 else "Medium" if quality >= 65 else "Low"
-    factors = [
-        ("Opponent strikeout profile", opponent_factor - 1),
-        ("Recent workload / pitch limit", pitch_limit_factor - 1),
-        ("Park", park_factor - 1),
-        ("Umpire", ump_factor - 1),
-        ("Weather", weather_factor - 1),
-        ("Rest", rest_factor - 1),
-    ]
-    return Projection(projected_k, projected_outs, math.sqrt(k_variance), outs_sd,
-                      k_probs, outs_probs, k_samples, outs_samples, confidence, quality, factors)
+    factors = [("Opponent strikeout profile", opponent_factor - 1),("Recent workload / pitch limit", pitch_limit_factor - 1),("Park", park_factor - 1),("Umpire", ump_factor - 1),("Weather", weather_factor - 1),("Rest", rest_factor - 1)]
+    return Projection(projected_k, projected_outs, math.sqrt(k_variance), outs_sd, k_probs, outs_probs, k_samples, outs_samples, confidence, quality, factors)
 
 def over_probability(samples: np.ndarray, line: float) -> float:
     return float(np.mean(samples > line))
@@ -272,7 +229,6 @@ def load_local_csv(filename: str) -> pd.DataFrame:
 
 now = datetime.now(EASTERN)
 query_day = now.date()
-
 with st.sidebar:
     st.markdown("## PitchLab Pro")
     st.caption(f"Distributional MLB starter projections · v{APP_VERSION}")
@@ -288,21 +244,16 @@ with st.sidebar:
     st.caption("Market lines affect edge display only, never the baseball forecast.")
 
 schedule, schedule_error = get_schedule(selected_date.isoformat())
-
 st.title("⚾ PitchLab Pro")
 st.markdown("Pregame strikeout and starter-outs distributions with transparent assumptions and uncertainty.")
-
 if schedule_error:
     st.error(schedule_error)
-
 if not schedule:
     st.warning("No announced probable pitchers are available for this date. Choose another date or wait for teams to announce starters.")
     st.stop()
-
 options = {g.key:g for g in schedule}
 selected_key = st.selectbox("Pitcher", list(options), format_func=lambda key: f"{options[key].pitcher_name} · {options[key].team} vs {options[key].opponent}")
 game = options[selected_key]
-
 season = selected_date.year
 log, history_error = get_pitcher_game_log(game.pitcher_id, season)
 if log.empty and season > 2000:
@@ -311,24 +262,14 @@ if log.empty and season > 2000:
         log, history_error = previous_log, None
     elif history_error is None:
         history_error = previous_error
-
 if history_error:
     st.warning(history_error)
 if log.empty:
     st.error("A projection cannot be issued without a pitcher game history. This is safer than silently using fake default statistics.")
     st.stop()
-
-manual = {
-    "opponent_k_pct":opponent_k_pct,
-    "pitch_limit":float(pitch_limit),
-    "umpire_k_factor":umpire_k_factor,
-    "weather_factor":weather_factor,
-    "rest_factor":rest_factor,
-}
+manual = {"opponent_k_pct":opponent_k_pct,"pitch_limit":float(pitch_limit),"umpire_k_factor":umpire_k_factor,"weather_factor":weather_factor,"rest_factor":rest_factor}
 projection = calculate_projection(log, game, manual, simulations)
-
 st.markdown(f"<span class='status-live'>LIVE SCHEDULE</span> &nbsp; <span class='small-muted'>{game.status} · {game.side} · {game.venue} · Updated {now:%I:%M %p ET}</span>", unsafe_allow_html=True)
-
 line_col1, line_col2, line_col3 = st.columns([1,1,2])
 with line_col1:
     k_line = st.number_input("Strikeout line", .5, 15.5, 5.5, .5)
@@ -337,12 +278,10 @@ with line_col2:
 with line_col3:
     st.markdown("#### Data status")
     st.progress(projection.data_quality / 100, text=f"{projection.confidence} confidence · data quality {projection.data_quality}/100")
-
 k_over = over_probability(projection.k_samples, k_line)
 outs_over = over_probability(projection.outs_samples, outs_line)
 k_lo, k_hi = interval(projection.k_samples)
 o_lo, o_hi = interval(projection.outs_samples)
-
 m1,m2,m3,m4 = st.columns(4)
 m1.metric("Projected strikeouts", f"{projection.mean_k:.2f}", f"80% range {k_lo}-{k_hi}")
 m2.metric(f"Over {k_line:g}", f"{k_over:.1%}", f"Fair {fair_american(k_over)}")
@@ -350,17 +289,11 @@ m3.metric("Projected outs", f"{projection.mean_outs:.2f}", f"80% range {o_lo}-{o
 m4.metric(f"Over {outs_line:g}", f"{outs_over:.1%}", f"Fair {fair_american(outs_over)}")
 
 tab1,tab2,tab3,tab4 = st.tabs(["Projection","Distribution","Form & workload","Model card"])
-
 with tab1:
     left,right = st.columns([1.4,1])
     with left:
         st.subheader("Decision table")
-        decision = pd.DataFrame([
-            {"Market":f"K over {k_line:g}","Probability":k_over,"Fair odds":fair_american(k_over),"Projection":projection.mean_k},
-            {"Market":f"K under {k_line:g}","Probability":1-k_over,"Fair odds":fair_american(1-k_over),"Projection":projection.mean_k},
-            {"Market":f"Outs over {outs_line:g}","Probability":outs_over,"Fair odds":fair_american(outs_over),"Projection":projection.mean_outs},
-            {"Market":f"Outs under {outs_line:g}","Probability":1-outs_over,"Fair odds":fair_american(1-outs_over),"Projection":projection.mean_outs},
-        ])
+        decision = pd.DataFrame([{ "Market":f"K over {k_line:g}","Probability":k_over,"Fair odds":fair_american(k_over),"Projection":projection.mean_k},{"Market":f"K under {k_line:g}","Probability":1-k_over,"Fair odds":fair_american(1-k_over),"Projection":projection.mean_k},{"Market":f"Outs over {outs_line:g}","Probability":outs_over,"Fair odds":fair_american(outs_over),"Projection":projection.mean_outs},{"Market":f"Outs under {outs_line:g}","Probability":1-outs_over,"Fair odds":fair_american(1-outs_over),"Projection":projection.mean_outs}])
         st.dataframe(decision.style.format({"Probability":"{:.1%}","Projection":"{:.2f}"}), hide_index=True, use_container_width=True)
         st.caption("Probabilities are model estimates, not guarantees. Compare fair odds with a price only after accounting for vig and uncertainty.")
     with right:
@@ -369,7 +302,6 @@ with tab1:
         factor_df["Direction"] = np.where(factor_df["Impact"] >= 0, "Raises", "Lowers")
         factor_df["Impact"] = factor_df["Impact"].map(lambda x: f"{x:+.1%}")
         st.dataframe(factor_df, hide_index=True, use_container_width=True)
-
 with tab2:
     k_chart = pd.DataFrame({"Strikeouts":np.arange(len(projection.k_probs)),"Probability":projection.k_probs}).set_index("Strikeouts")
     outs_chart = pd.DataFrame({"Outs":np.arange(len(projection.outs_probs)),"Probability":projection.outs_probs}).set_index("Outs")
@@ -380,14 +312,12 @@ with tab2:
     with c2:
         st.subheader("Outs distribution")
         st.bar_chart(outs_chart, color="#31e6a1")
-
 with tab3:
     display = log.tail(15).copy()
     display["K/BF"] = display["strikeouts"] / display["batters_faced"].replace(0,np.nan)
     display["Pitches/BF"] = display["pitches"] / display["batters_faced"].replace(0,np.nan)
     st.line_chart(display.set_index("date")[["strikeouts","outs"]])
     st.dataframe(display[["date","opponent","strikeouts","outs","batters_faced","pitches","K/BF","Pitches/BF"]].sort_values("date",ascending=False).style.format({"K/BF":"{:.1%}","Pitches/BF":"{:.2f}"}), hide_index=True, use_container_width=True)
-
 with tab4:
     st.subheader("What this version does")
     st.markdown("""
@@ -404,13 +334,44 @@ with tab4:
 - This is an inference dashboard, not yet a trained walk-forward gradient-boosted production model.
 - Calibration must be measured on archived pregame snapshots before probabilities can be considered production-grade.
     """)
-    manifest = {
-        "app_version":APP_VERSION,
-        "prediction_timestamp_et":now.isoformat(),
-        "game_pk":game.game_pk,
-        "pitcher_id":game.pitcher_id,
-        "inputs":manual,
-        "simulation_draws":simulations,
-        "confidence":projection.confidence,
-    }
+    manifest = {"app_version":APP_VERSION,"prediction_timestamp_et":now.isoformat(),"game_pk":game.game_pk,"pitcher_id":game.pitcher_id,"inputs":manual,"simulation_draws":simulations,"confidence":projection.confidence}
     st.download_button("Download prediction manifest", json.dumps(manifest,indent=2), file_name=f"projection_{game.game_pk}_{game.pitcher_id}.json", mime="application/json")
+
+# Manual sportsbook line + tracking layer. This does not change the baseball forecast.
+from training.manual_lines import ManualLine, analyze_manual_line, append_bet_log
+
+st.divider()
+st.subheader("Manual sportsbook line")
+st.caption("Enter the line and price you see at your sportsbook. No sportsbook API or paid credits required.")
+manual_col1, manual_col2, manual_col3, manual_col4 = st.columns([1.2, 1, 1, 1])
+with manual_col1:
+    manual_side = st.selectbox("Side", ["Over", "Under"], key="manual_side")
+with manual_col2:
+    manual_line = st.number_input("K line", 0.5, 15.5, float(k_line), 0.5, key="manual_line")
+with manual_col3:
+    manual_odds = st.number_input("American odds", -500, 500, -110, 5, key="manual_odds")
+with manual_col4:
+    st.write("")
+    analyze_button = st.button("Analyze line", type="primary", use_container_width=True)
+
+if analyze_button:
+    manual_over = over_probability(projection.k_samples, manual_line)
+    analysis = analyze_manual_line(projection.mean_k, manual_over, manual_line, manual_side, int(manual_odds))
+    confidence = __import__("training.manual_lines", fromlist=["confidence_tier"]).confidence_tier(analysis["model_probability"], analysis["edge"])
+    a1,a2,a3,a4 = st.columns(4)
+    a1.metric("Model probability", f"{analysis['model_probability']:.1%}")
+    a2.metric("Sportsbook implied", f"{analysis['implied_probability']:.1%}")
+    a3.metric("Model edge", f"{analysis['edge']:+.1%}")
+    a4.metric("Provisional confidence", confidence)
+    st.info("Confidence is provisional until historical sportsbook lines are available for calibration.")
+    if st.button("Save to bet tracker", key="save_bet"):
+        record = ManualLine(game.pitcher_name, selected_date.isoformat(), manual_line, manual_side, int(manual_odds))
+        append_bet_log(APP_DIR / "data" / "bet_log.csv", record, analysis)
+        st.success("Bet saved to the local tracker.")
+
+tracker_path = DATA_DIR / "bet_log.csv"
+if tracker_path.exists():
+    with st.expander("Bet tracker"):
+        tracker = pd.read_csv(tracker_path)
+        st.dataframe(tracker.sort_values("entered_at_utc", ascending=False), hide_index=True, use_container_width=True)
+        st.download_button("Download bet tracker CSV", tracker.to_csv(index=False), file_name="bet_tracker.csv", mime="text/csv")
