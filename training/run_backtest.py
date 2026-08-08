@@ -13,11 +13,11 @@ from .dataset_builder import load_snapshot_dataset
 from .simulation_blend import mathematical_projection, simulate_strikeouts, simulation_distribution
 
 TARGET = "actual_strikeouts"
+PREFIX = "feature_payload."
 
 
 def _feature_frame(frame: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
-    prefix = "feature_payload."
-    columns = [c for c in frame.columns if c.startswith(prefix)]
+    columns = [c for c in frame.columns if c.startswith(PREFIX)]
     if not columns:
         raise ValueError("No flattened feature_payload.* columns found in snapshot dataset")
     numeric = frame[columns].apply(pd.to_numeric, errors="coerce")
@@ -26,8 +26,9 @@ def _feature_frame(frame: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     return numeric, columns
 
 
-def _math_projection(row: dict[str, object]) -> float:
-    return float(mathematical_projection(row))
+def _unprefix_features(row: dict[str, object]) -> dict[str, object]:
+    """Restore feature names expected by the standalone projection engine."""
+    return {k[len(PREFIX):] if k.startswith(PREFIX) else k: v for k, v in row.items()}
 
 
 def walk_forward_backtest(frame: pd.DataFrame, min_train: int = 500, test_size: int = 100) -> pd.DataFrame:
@@ -51,14 +52,17 @@ def walk_forward_backtest(frame: pd.DataFrame, min_train: int = 500, test_size: 
         math_preds: list[float] = []
         sim_preds: list[float] = []
         blend_preds: list[float] = []
+        sim_std: list[float] = []
         for offset, (_, row) in enumerate(frame.iloc[start:stop].iterrows()):
-            math_pred = max(0.0, _math_projection(row.to_dict()))
+            clean = _unprefix_features(row.to_dict())
+            math_pred = max(0.0, float(mathematical_projection(clean)))
             samples = simulate_strikeouts(math_pred, simulations=10000, seed=42 + start + offset)
             dist = simulation_distribution(samples)
             sim_pred = dist["sim_mean_ks"]
             math_preds.append(math_pred)
             sim_preds.append(sim_pred)
             blend_preds.append(0.5 * math_pred + 0.5 * sim_pred)
+            sim_std.append(dist["sim_std_ks"])
 
         math_preds = np.asarray(math_preds)
         sim_preds = np.asarray(sim_preds)
@@ -79,6 +83,7 @@ def walk_forward_backtest(frame: pd.DataFrame, min_train: int = 500, test_size: 
             "math_mae": math_mae, "math_rmse": math_rmse,
             "simulation_mae": sim_mae, "simulation_rmse": sim_rmse,
             "blend_mae": blend_mae, "blend_rmse": blend_rmse,
+            "simulation_std_mean": float(np.mean(sim_std)) if sim_std else 0.0,
         })
     return pd.DataFrame(rows)
 
@@ -111,6 +116,7 @@ def main() -> None:
         "blend_rmse_mean": float(results["blend_rmse"].mean()),
         "simulation_count_per_snapshot": 10000,
         "blend_weight": 0.5,
+        "simulation_role": "distributional uncertainty; Poisson simulation mean is centered on the mathematical expectation and is not an independent point-estimate signal",
         "calibration_available": False,
         "calibration_note": "Line-level probabilities require a defined sportsbook line per frozen pregame snapshot.",
     }
