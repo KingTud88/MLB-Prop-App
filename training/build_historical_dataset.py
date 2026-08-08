@@ -8,6 +8,7 @@ from typing import Any
 
 import requests
 
+from .baseball_features import build_baseball_features
 from .snapshot_schema import make_snapshot, snapshots_to_frame
 
 BASE = "https://statsapi.mlb.com/api/v1"
@@ -20,7 +21,7 @@ def get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:
 
 
 def previous_pitcher_games(pitcher_id: int, before: str, limit: int = 10) -> list[dict[str, Any]]:
-    data = get_json("people/{}/stats".format(pitcher_id), {
+    data = get_json(f"people/{pitcher_id}/stats", {
         "stats": "gameLog",
         "group": "pitching",
         "season": before[:4],
@@ -31,18 +32,20 @@ def previous_pitcher_games(pitcher_id: int, before: str, limit: int = 10) -> lis
     return rows[:limit]
 
 
+def player_hand(pitcher_id: int) -> str:
+    data = get_json(f"people/{pitcher_id}", {})
+    people = data.get("people", [])
+    return str(people[0].get("pitchHand", {}).get("code", "")) if people else ""
+
+
 def build_features(pitcher_id: int, game_date: str) -> dict[str, float]:
     logs = previous_pitcher_games(pitcher_id, game_date)
-    if not logs:
-        return {"prior_games": 0.0, "prior_strikeouts": 0.0, "prior_ip": 0.0, "prior_k_per_9": 0.0}
-    ks = sum(float(x.get("stat", {}).get("strikeOuts", 0)) for x in logs)
-    ip = sum(float(x.get("stat", {}).get("inningsPitched", 0)) for x in logs)
-    return {
-        "prior_games": float(len(logs)),
-        "prior_strikeouts": ks,
-        "prior_ip": ip,
-        "prior_k_per_9": (ks * 9.0 / ip) if ip else 0.0,
-    }
+    hand = player_hand(pitcher_id)
+    return build_baseball_features(
+        pitcher_logs=[x.get("stat", {}) for x in logs],
+        pitcher_hand=hand,
+        recent_days_rest=5.0,
+    )
 
 
 def game_snapshots(game_date: str) -> list[Any]:
@@ -59,7 +62,6 @@ def game_snapshots(game_date: str) -> list[Any]:
                 pid = probable.get("id")
                 if not pid:
                     continue
-                box = team.get("score")
                 opponent = game.get("teams", {}).get("home" if side == "away" else "away", {}).get("team", {}).get("abbreviation", "")
                 try:
                     boxscore = get_json(f"game/{game_id}/boxscore", {})
@@ -80,7 +82,7 @@ def game_snapshots(game_date: str) -> list[Any]:
                     pitcher_name=probable.get("fullName", "Unknown"),
                     opponent_team=opponent,
                     features=features,
-                    source_versions={"mlb_stats_api": "v1", "reconstruction": "1.0.0"},
+                    source_versions={"mlb_stats_api": "v1", "reconstruction": "2.0.0"},
                     actual_strikeouts=int(ks),
                     actual_batters_faced=int(bf) if bf is not None else None,
                 ))
