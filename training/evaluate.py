@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 
 import numpy as np
 import pandas as pd
@@ -31,8 +32,9 @@ def evaluate_walk_forward(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Fit only on earlier snapshots and score the next unseen block."""
     data = frame.copy().sort_values("game_date").reset_index(drop=True)
+    data["game_date"] = pd.to_datetime(data["game_date"], errors="coerce")
     data[target_column] = pd.to_numeric(data[target_column], errors="coerce")
-    data = data.dropna(subset=[target_column])
+    data = data.dropna(subset=["game_date", target_column])
 
     rows: list[FoldMetrics] = []
     predictions: list[pd.DataFrame] = []
@@ -74,11 +76,9 @@ def line_metrics(predictions: pd.DataFrame, line: float) -> dict[str, float]:
         return {"line": line, "brier": float("nan"), "log_loss": float("nan"), "calibration_error": float("nan")}
     actual_over = (predictions["actual_strikeouts"] > line).astype(float).to_numpy()
     means = predictions["gbm_prediction"].to_numpy(dtype=float)
-    # Conservative fixed dispersion; distribution calibration will be learned
-    # after the historical snapshot set is sufficiently large.
     sd = np.sqrt(np.maximum(means * 1.15, 1.0))
     z = (line + 0.5 - means) / (sd * np.sqrt(2.0))
-    p_over = 0.5 * np.vectorize(lambda x: 1.0 - np.math.erf(x))(z)
+    p_over = 0.5 * np.array([math.erfc(value) for value in z])
     p_over = np.clip(p_over, 1e-6, 1 - 1e-6)
     cal = calibration_table(actual_over, p_over)
     error = float(cal["absolute_calibration_error"].mean()) if not cal.empty else float("nan")
