@@ -13,12 +13,19 @@ from .matchup_features import build_matchup_features
 from .snapshot_schema import make_snapshot, snapshots_to_frame
 
 BASE = "https://statsapi.mlb.com/api/v1"
+SESSION = requests.Session()
+CACHE: dict[tuple[str, str], dict[str, Any]] = {}
 
 
 def get_json(path: str, params: dict[str, Any]) -> dict[str, Any]:
-    response = requests.get(f"{BASE}/{path.lstrip('/')}", params=params, timeout=30)
+    key = (path, json.dumps(params, sort_keys=True))
+    if key in CACHE:
+        return CACHE[key]
+    response = SESSION.get(f"{BASE}/{path.lstrip('/')}", params=params, timeout=30)
     response.raise_for_status()
-    return response.json()
+    data = response.json()
+    CACHE[key] = data
+    return data
 
 
 def previous_pitcher_games(pitcher_id: int, before: str, limit: int = 10) -> list[dict[str, Any]]:
@@ -132,7 +139,7 @@ def game_snapshots(game_date: str) -> list[Any]:
                     pitcher_name=probable.get("fullName", "Unknown"),
                     opponent_team=opponent_team.get("abbreviation", ""),
                     features=features,
-                    source_versions={"mlb_stats_api": "v1", "reconstruction": "2.2.1"},
+                    source_versions={"mlb_stats_api": "v1", "reconstruction": "2.2.2"},
                     actual_strikeouts=int(ks),
                     actual_batters_faced=int(bf) if bf is not None else None,
                 ))
@@ -157,7 +164,7 @@ def main() -> None:
         day = current.isoformat()
         try:
             snapshots.extend(game_snapshots(day))
-            print(json.dumps({"date": day, "snapshots": len(snapshots)}), flush=True)
+            print(json.dumps({"date": day, "snapshots": len(snapshots), "cache_entries": len(CACHE)}), flush=True)
         except requests.RequestException as exc:
             print(json.dumps({"date": day, "error": str(exc)}), flush=True)
         current += timedelta(days=1)
@@ -167,7 +174,7 @@ def main() -> None:
         raise SystemExit("No resolved pitcher snapshots were collected")
     args.output.parent.mkdir(parents=True, exist_ok=True)
     frame.to_csv(args.output, index=False)
-    print(json.dumps({"output": str(args.output), "rows": len(frame)}))
+    print(json.dumps({"output": str(args.output), "rows": len(frame), "cache_entries": len(CACHE)}))
 
 
 if __name__ == "__main__":
