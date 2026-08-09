@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from pathlib import Path
 from datetime import date
 import requests
 
 import pandas as pd
 import streamlit as st
 
-APP_DIR = Path(__file__).resolve().parents[1]
-TRACKER_PATH = APP_DIR / "data" / "bet_log.csv"
+from training.github_bet_store import load_bets
+
 MLB_API = "https://statsapi.mlb.com/api/v1"
 
 st.set_page_config(page_title="Bet Tracker", page_icon="📊", layout="wide")
@@ -16,13 +15,15 @@ st.set_page_config(page_title="Bet Tracker", page_icon="📊", layout="wide")
 st.title("📊 Bet Tracker")
 st.caption("Saved manual sportsbook analyses with live strikeout progress when MLB game data is available.")
 
-if not TRACKER_PATH.exists():
-    st.info("No saved bets yet. Analyze a sportsbook line in PitchLab Pro and click Save to bet tracker.")
+try:
+    records = load_bets()
+except Exception as exc:
+    st.error(f"Could not load the persistent bet tracker: {exc}")
     st.stop()
 
-tracker = pd.read_csv(TRACKER_PATH)
+tracker = pd.DataFrame(records)
 if tracker.empty:
-    st.info("The tracker file exists, but it has no saved bets yet.")
+    st.info("No saved bets yet. Analyze a sportsbook line in StrikeOut King 9000 and click Save to bet tracker.")
     st.stop()
 
 for col in ["model_probability", "implied_probability", "edge", "line", "projection", "actual_strikeouts"]:
@@ -31,7 +32,6 @@ for col in ["model_probability", "implied_probability", "edge", "line", "project
 
 
 def fetch_live_strikeouts(player_name: str, game_date: str) -> tuple[float | None, str]:
-    """Look up today's/current game's pitcher strikeouts from MLB StatsAPI."""
     try:
         games_resp = requests.get(
             f"{MLB_API}/schedule",
@@ -59,8 +59,7 @@ def fetch_live_strikeouts(player_name: str, game_date: str) -> tuple[float | Non
                 pitchers = teams.get(team_key, {}).get("players", {})
                 for player in pitchers.values():
                     person = player.get("person", {})
-                    full_name = person.get("fullName", "").strip().lower()
-                    if full_name == target:
+                    if person.get("fullName", "").strip().lower() == target:
                         stats = player.get("stats", {}).get("pitching", {})
                         ks = stats.get("strikeOuts")
                         if ks is not None:
@@ -79,7 +78,6 @@ c4.metric("Positive-edge bets", f"{(tracker['edge'] > 0).sum()} / {len(tracker)}
 st.subheader("Live bet progress")
 st.caption("Refresh while the game is live. The bar tracks actual strikeouts against your sportsbook line.")
 if st.button("🔄 Refresh live results", type="primary"):
-    st.cache_data.clear()
     st.rerun()
 
 for idx, row in tracker.sort_values("entered_at_utc", ascending=False).iterrows():
@@ -88,17 +86,18 @@ for idx, row in tracker.sort_values("entered_at_utc", ascending=False).iterrows(
     line = float(row.get("line", 0))
     game_date = str(row.get("game_date", ""))[:10]
     actual = row.get("actual_strikeouts")
-    status = "Saved"
 
     if pd.isna(actual):
         actual, status = fetch_live_strikeouts(player, game_date)
+    else:
+        status = "Saved"
 
     if actual is not None:
         tracker.loc[idx, "actual_strikeouts"] = actual
 
     progress_target = max(line, 0.5)
     progress = min(max((float(actual) if actual is not None else 0.0) / progress_target, 0.0), 1.0)
-    hit = (actual is not None and ((side == "Over" and actual > line) or (side == "Under" and actual < line)))
+    hit = actual is not None and ((side == "Over" and actual > line) or (side == "Under" and actual < line))
 
     st.markdown(f"**{player} — {side} {line:g}**")
     st.progress(progress, text=f"{int(actual) if actual is not None else 0} Ks / {line:g} line")
@@ -113,10 +112,7 @@ for idx, row in tracker.sort_values("entered_at_utc", ascending=False).iterrows(
     st.divider()
 
 st.subheader("Saved bets")
-show = tracker.copy()
-if "entered_at_utc" in show:
-    show = show.sort_values("entered_at_utc", ascending=False)
-
+show = tracker.sort_values("entered_at_utc", ascending=False).copy() if "entered_at_utc" in tracker else tracker.copy()
 columns = [
     "player", "game_date", "side", "line", "american_odds",
     "projection", "model_probability", "implied_probability", "edge",
