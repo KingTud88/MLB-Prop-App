@@ -1,151 +1,109 @@
 from __future__ import annotations
 
-import base64
-from pathlib import Path
-
 import requests
 import streamlit as st
 
-# Stable legacy engine source: this commit contains the original full projection app.
-# The previous d87e... reference was deleted, causing the 404 shown in the app logs.
 LEGACY = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/f0b28d2a9f91cc145736eb2d3e0c1a72d3275f43/streamlit_app.py"
+MASCOT_URL = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000.png"
 
-_original_markdown_fn = st.markdown
-_original_image_fn = st.image
+_original_markdown = st.markdown
+_original_image = st.image
 
-STYLE_OVERRIDE = r'''
+STYLE = r'''
 <style>
 [data-testid="stSidebar"]{width:205px!important;min-width:205px!important;background:linear-gradient(180deg,#061225 0%,#071a32 100%)!important}
 [data-testid="stSidebar"]>div:first-child{width:205px!important}
-[data-testid="stSidebar"] .block-container{padding:0 .65rem 1.2rem!important}
+[data-testid="stSidebar"] .block-container{padding:.3rem .65rem 1rem!important}
 [data-testid="stSidebarNav"]{display:none!important}
 [data-testid="stAppViewContainer"] .main{padding-top:0!important}
-[data-testid="stAppViewContainer"] .main .block-container{padding:0 1rem 2rem!important;margin-top:0!important;max-width:1500px!important}
-.sok-hero{display:grid!important;grid-template-columns:250px minmax(0,1fr) 220px!important;gap:1rem!important;align-items:center!important;height:auto!important;min-height:190px!important;margin:0!important;padding:0!important;overflow:visible!important}
-.sok-hero .sok-mascot-image{display:block!important;width:245px!important;height:210px!important;object-fit:contain!important;filter:drop-shadow(0 12px 18px rgba(0,0,0,.35))!important}
-.sok-sidebar-logo{display:flex!important;justify-content:center!important;align-items:center!important;min-height:55px!important;margin:0 0 .15rem!important}
-.sok-sidebar-logo .sok-mascot-image{display:block!important;width:140px!important;height:140px!important;object-fit:contain!important}
-.sok-sidebar-title{font-size:1.35rem!important}
-.sok-sidebar-sub{margin:.35rem 0 .55rem!important;font-size:.73rem!important}
-.sok-nav{gap:.12rem!important;margin:.35rem 0 .65rem!important}
-.sok-nav a,.sok-disabled-nav{padding:.48rem .5rem!important;font-size:.82rem!important}
-.sok-search-title{margin-top:.65rem!important}
-.sok-date{margin-top:.55rem!important}
-.sok-side-card{margin-top:.6rem!important}
-.sok-title{font-size:clamp(5rem,6.8vw,7.6rem)!important;line-height:.76!important;white-space:nowrap!important}
-.sok-ribbon{margin-top:.55rem!important;font-size:.82rem!important;padding:.35rem 1.1rem!important}
-.sok-status{position:relative!important;margin-top:0!important}
-.sok-status:before{content:"BUILT FOR\A CLE";white-space:pre;display:flex;align-items:center;justify-content:center;text-align:center;position:absolute;right:0;top:-118px;width:118px;height:88px;border:2px solid #6d7f92;border-radius:15px;background:linear-gradient(145deg,#142b48,#07172b);color:#fff;font-family:Impact,"Arial Narrow",sans-serif;font-size:1.05rem;line-height:.95;letter-spacing:.06em;box-shadow:0 10px 20px rgba(0,0,0,.25)}
-.matchup{margin-top:0!important}
-.matchup .team-logo{width:86px!important;height:86px!important;object-fit:contain!important;display:block!important;margin:0 auto!important;filter:drop-shadow(0 6px 10px rgba(0,0,0,.3))!important}
-.matchup .pitcher-block{display:flex!important;align-items:center!important;gap:1rem!important}
-.section-frame{border-width:2px!important;border-color:#e31837!important;border-radius:17px!important}
-.section-ribbon{font-size:1rem!important}
-.proj-card{min-height:220px!important;border-width:1px!important;border-radius:16px!important}
-.proj-value{font-size:3.65rem!important}
-.table-panel{border-radius:15px!important}
-[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"]{border-radius:8px!important;padding:.42rem .5rem!important;margin:.05rem 0!important;color:#dce6f0!important;font-weight:800!important}
-[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"]:hover{background:#102b4c!important;color:#fff!important}
-@media(max-width:1000px){.sok-hero{grid-template-columns:1fr!important;min-height:0!important}.sok-status:before{display:none!important}.sok-hero .sok-mascot-image{width:220px!important;height:180px!important;margin:auto!important}}
+[data-testid="stAppViewContainer"] .main .block-container{max-width:1500px!important;padding:0 .8rem 2rem!important;margin-top:0!important}
+.sok-sidebar-logo{display:flex!important;justify-content:center!important;align-items:center!important;height:100px!important;margin:0!important}
+.sok-sidebar-logo img{width:150px!important;height:100px!important;object-fit:contain!important;display:block!important}
+.sok-sidebar-title{font-size:1.3rem!important;line-height:1!important}
+.sok-sidebar-sub{font-size:.72rem!important;line-height:1.25!important;margin:.25rem 0 .4rem!important}
+.sok-nav{gap:.08rem!important;margin:.2rem 0 .45rem!important}
+.sok-nav a,.sok-disabled-nav{padding:.36rem .45rem!important;font-size:.78rem!important;border-radius:8px!important;color:#dce6f0!important;font-weight:800!important}
+.sok-disabled-nav{display:block!important}
+.sok-search-title{margin-top:.45rem!important;font-size:.85rem!important}
+.sok-lock{font-size:.68rem!important;line-height:1.25!important;margin-top:.25rem!important}
+.sok-date{margin-top:.4rem!important;padding:.55rem!important}
+.sok-side-card{margin-top:.45rem!important;padding:.6rem!important}
+.sok-hero{display:grid!important;grid-template-columns:250px minmax(0,1fr) 200px!important;gap:.8rem!important;align-items:center!important;min-height:165px!important;margin:0!important;padding:0!important}
+.sok-hero .sok-mascot-image{width:250px!important;height:205px!important;object-fit:contain!important;display:block!important;filter:drop-shadow(0 12px 18px rgba(0,0,0,.35))!important}
+.sok-title{font-size:clamp(4.6rem,6vw,6.6rem)!important;line-height:.78!important;white-space:nowrap!important}
+.sok-ribbon{margin-top:.45rem!important;font-size:.75rem!important;padding:.3rem 1rem!important}
+.sok-status{padding:.8rem!important}
+.sok-status:before{content:"BUILT FOR";display:block;text-align:center;font-family:Impact,"Arial Narrow",sans-serif;font-size:.7rem;letter-spacing:.06em;color:#fff;border:2px solid #6d7f92;border-radius:12px;padding:.25rem;margin-bottom:.35rem;background:linear-gradient(145deg,#142b48,#07172b)}
+.sok-status:after{content:"CLE";display:block;text-align:center;font-family:Impact,"Arial Narrow",sans-serif;font-size:1.25rem;letter-spacing:.08em;color:#e31837;border:2px solid #6d7f92;border-radius:12px;padding:.05rem;background:linear-gradient(145deg,#142b48,#07172b);margin-top:-.95rem}
+.matchup{margin-top:.1rem!important}
+.matchup .pitcher-block{display:flex!important;align-items:center!important;gap:.85rem!important}
+.matchup .team-logo{width:82px!important;height:82px!important;object-fit:contain!important;display:block!important;filter:drop-shadow(0 6px 10px rgba(0,0,0,.3))!important}
+.matchup .pitcher{font-size:1.8rem!important}
+.section-frame{margin-top:.8rem!important}
+.proj-card{min-height:205px!important}
+@media(max-width:1000px){.sok-hero{grid-template-columns:1fr!important;min-height:0!important}.sok-hero .sok-mascot-image{margin:auto!important}.sok-status:before,.sok-status:after{display:none!important}}
 </style>
 '''
 
-def patched_markdown(body=None, *args, **kwargs):
-    if isinstance(body, str) and '<style>' in body and '--navy:' in body:
-        return _original_markdown_fn(body + STYLE_OVERRIDE, *args, **kwargs)
-    return _original_markdown_fn(body, *args, **kwargs)
+def patched_markdown(body=None,*args,**kwargs):
+    if isinstance(body,str) and '<style>' in body and '--navy:' in body:
+        return _original_markdown(body + STYLE,*args,**kwargs)
+    return _original_markdown(body,*args,**kwargs)
 
-def patched_image(image, *args, **kwargs):
-    image_text = str(image) if isinstance(image, (str, Path)) else ""
-    if image_text:
-        path = Path(image_text)
-        if path.exists() and path.is_file() and path.suffix.lower() in {".svg", ".png", ".webp", ".jpg", ".jpeg"}:
-            try:
-                raw = path.read_bytes()
-                if raw.startswith(b"RIFF") and raw[8:12] == b"WEBP":
-                    mime = "image/webp"
-                elif path.suffix.lower() == ".svg":
-                    mime = "image/svg+xml"
-                elif path.suffix.lower() in {".jpg", ".jpeg"}:
-                    mime = "image/jpeg"
-                else:
-                    mime = "image/png"
-                src = f"data:{mime};base64,{base64.b64encode(raw).decode('ascii')}"
-                width = kwargs.get("width")
-                width_css = f"width:{int(width)}px;" if isinstance(width, (int,float)) else "max-width:100%;"
-                html = f'<div class="sok-local-image" style="{width_css}"><img class="sok-mascot-image" src="{src}" alt="StrikeOut King 9000 mascot"></div>'
-                return _original_markdown_fn(html, unsafe_allow_html=True)
-            except OSError:
-                pass
-    return _original_image_fn(image, *args, **kwargs)
+def patched_image(image,*args,**kwargs):
+    text=str(image) if isinstance(image,(str,bytes)) else ''
+    if 'strikeout_king_9000' in text:
+        width=kwargs.get('width',250)
+        html=f'<div class="sok-local-image"><img class="sok-mascot-image" src="{MASCOT_URL}" alt="StrikeOut King 9000 mascot" style="width:{int(width)}px"></div>'
+        return _original_markdown(html,unsafe_allow_html=True)
+    return _original_image(image,*args,**kwargs)
 
-st.markdown = patched_markdown
-st.image = patched_image
+st.markdown=patched_markdown
+st.image=patched_image
 
-response = requests.get(LEGACY, timeout=20)
+response=requests.get(LEGACY,timeout=20)
 response.raise_for_status()
-source = response.text
-source = source.replace('initial_sidebar_state="collapsed"', 'initial_sidebar_state="expanded"', 1)
+source=response.text
 
-source = source.replace(
-    'logo_path=ASSET_DIR/"strikeout_king_9000.svg"',
-    'logo_path=ASSET_DIR/"strikeout_king_9000.svg"\nhero_logo_path=ASSET_DIR/"strikeout_king_9000.png"\nteam_id_by_abbr={abbr:tid for tid,abbr in TEAM_ABBR.items()}',
-    1,
-)
-source = source.replace(
-    'if logo_path.exists():st.image(str(logo_path),width=175)',
-    'if hero_logo_path.exists():st.image(str(hero_logo_path),width=245)',
-    1,
-)
-
-nav_lines = [
-    'st.page_link("streamlit_app.py", label="⌂  Projection", use_container_width=True)',
-    'st.markdown("<div class=\\"sok-disabled-nav\\">♧  Distribution</div>", unsafe_allow_html=True)',
-    'st.markdown("<div class=\\"sok-disabled-nav\\">♨  Form &amp; Workload</div>", unsafe_allow_html=True)',
-    'st.markdown("<div class=\\"sok-disabled-nav\\">▤  Model Card</div>", unsafe_allow_html=True)',
-    'st.page_link("pages/2_Bet_Tracker.py", label="♧  Bet Tracker", use_container_width=True)',
-    'st.page_link("pages/3_Odds_API.py", label="◎  Odds API", use_container_width=True)',
-    'st.page_link("pages/4_Projection_History.py", label="▣  Projection History", use_container_width=True)',
-    'st.page_link("pages/5_Daily_Projection_Run.py", label="▤  Daily Projection Run", use_container_width=True)',
-]
-lines = source.splitlines()
-nav_index = next((i for i, line in enumerate(lines) if 'class="sok-nav"' in line and 'st.markdown' in line), None)
-if nav_index is not None:
-    indent = lines[nav_index][:len(lines[nav_index]) - len(lines[nav_index].lstrip())]
-    lines[nav_index:nav_index + 1] = [indent + line for line in nav_lines]
-    source = "\n".join(lines) + "\n"
-
-old_matchup = 'st.markdown(f\'<div class="matchup"><div><div class="pitcher">{game.pitcher_name.upper()}</div><div class="teams">{game.team} <span>vs</span> {game.opponent}</div><div class="detail">⚾ {game.venue} · {game.side} · {game.status}</div></div><div class="cle-badge">C</div><div class="live-schedule"><div class="head">LIVE SCHEDULE</div><div class="row">▣ &nbsp; Today &nbsp; <span>{game_clock}</span></div><div class="row">Scheduled &nbsp; • &nbsp; {game.side}</div></div></div>\',unsafe_allow_html=True)'
-new_matchup = 'team_logo_id=team_id_by_abbr.get(game.team,114)\nteam_logo_url=f"https://www.mlbstatic.com/team-logos/{team_logo_id}.svg"\nst.markdown(f\'<div class="matchup"><div class="pitcher-block"><img class="team-logo" src="{team_logo_url}" alt="{game.team} logo"><div><div class="pitcher">{game.pitcher_name.upper()}</div><div class="teams">{game.team} <span>vs</span> {game.opponent}</div><div class="detail">⚾ {game.venue} · {game.side} · {game.status}</div></div></div><div></div><div class="live-schedule"><div class="head">LIVE SCHEDULE</div><div class="row">▣ &nbsp; Today &nbsp; <span>{game_clock}</span></div><div class="row">Scheduled &nbsp; • &nbsp; {game.side}</div></div></div>\',unsafe_allow_html=True)'
-if old_matchup in source:
-    source = source.replace(old_matchup, new_matchup, 1)
-
-old_market = '''try:k_line=float(st.session_state.get("odds_selected_line",5.5))
-except (TypeError,ValueError):k_line=5.5
-try:outs_line=float(st.session_state.get("odds_selected_outs_line",15.5))
-except (TypeError,ValueError):outs_line=15.5
-k_over=over_probability(projection.k_samples,k_line);outs_over=over_probability(projection.outs_samples,outs_line);k_lo,k_hi=interval(projection.k_samples);o_lo,o_hi=interval(projection.outs_samples)
+# Keep the full original search/lock behavior, but match the approved sidebar order.
+old_sidebar='''    selected_date=st.date_input("Slate date",value=odds_default_date)
+    st.markdown(f'<div class="sok-date"><div class="label">SLATE DATE</div><div class="value">{selected_date:%Y/%m/%d}</div><div class="updated">Updated {now:%I:%M %p ET}</div></div>',unsafe_allow_html=True)
+    st.markdown('<div class="sok-search-title">PITCHER SEARCH</div>',unsafe_allow_html=True)
+    pitcher_query=st.text_input("Search pitcher",placeholder="Search pitcher...",label_visibility="collapsed",key="sok_pitcher_search")
+    st.markdown('<div class="sok-lock">Search and select a pitcher to lock the projection 🔒</div>',unsafe_allow_html=True)
+    st.markdown('<div class="sok-side-card"><div class="title">ABOUT STRIKEOUT KING 9000</div><p>Elite two-path projections combining simulated games and mathematical modeling for maximum accuracy.</p><div class="stars">★ ★ ★ ★ ★</div></div>',unsafe_allow_html=True)
 '''
-new_market = '''try:k_line=float(st.session_state.get("odds_selected_line",5.5))
-except (TypeError,ValueError):k_line=5.5
-try:outs_line=float(st.session_state.get("odds_selected_outs_line",15.5))
-except (TypeError,ValueError):outs_line=15.5
-k_side=str(st.session_state.get("odds_selected_side","Over")).title()
-k_over=over_probability(projection.k_samples,k_line);k_market_prob=k_over if k_side=="Over" else 1-k_over
-k_market_label=str(st.session_state.get("odds_selected_display_line",f"OVER {k_line:g}"))
-outs_over=over_probability(projection.outs_samples,outs_line);k_lo,k_hi=interval(projection.k_samples);o_lo,o_hi=interval(projection.outs_samples)
+new_sidebar='''    st.markdown('<div class="sok-search-title">PITCHER SEARCH</div>',unsafe_allow_html=True)
+    pitcher_query=st.text_input("Search pitcher",placeholder="Search pitcher...",label_visibility="collapsed",key="sok_pitcher_search")
+    st.markdown('<div class="sok-lock">Search and select a pitcher to lock the projection 🔒</div>',unsafe_allow_html=True)
+    selected_date=st.date_input("Slate date",value=odds_default_date)
+    st.markdown(f'<div class="sok-date"><div class="label">SLATE DATE</div><div class="value">{selected_date:%Y/%m/%d}</div><div class="updated">Updated {now:%I:%M %p ET}</div></div>',unsafe_allow_html=True)
+    st.markdown('<div class="sok-side-card"><div class="title">ABOUT STRIKEOUT KING 9000</div><p>Elite two-path projections combining simulated games and mathematical modeling for maximum accuracy.</p><div class="stars">★ ★ ★ ★ ★</div></div>',unsafe_allow_html=True)
 '''
-if old_market in source:
-    source = source.replace(old_market, new_market, 1)
+source=source.replace(old_sidebar,new_sidebar,1)
 
-old_card = '("5.5+","OVER 5.5 STRIKEOUTS",f"{k_over:.1%}",f"↑ FAIR {fair_american(k_over)}")'
-new_card = '("K+",k_market_label,f"{k_market_prob:.1%}",f"↑ FAIR {fair_american(k_market_prob)}")'
-if old_card in source:
-    source = source.replace(old_card, new_card, 1)
+# Full approved navigation.
+old_nav='<div class="sok-nav"><a class="active" href="/">⌂ &nbsp; Projection</a><a href="/2_Bet_Tracker">♧ &nbsp; Bet Tracker</a><a href="/3_Odds_API">◎ &nbsp; Odds API</a><a href="/4_Projection_History">▣ &nbsp; Projection History</a><a href="/5_Daily_Projection_Run">▤ &nbsp; Daily Projection Run</a></div>'
+new_nav='<div class="sok-nav"><a class="active" href="/">⌂ &nbsp; Projection</a><div class="sok-disabled-nav">♧ &nbsp; Distribution</div><div class="sok-disabled-nav">♨ &nbsp; Form &amp; Workload</div><div class="sok-disabled-nav">▤ &nbsp; Model Card</div><a href="/2_Bet_Tracker">♧ &nbsp; Bet Tracker</a><a href="/3_Odds_API">◎ &nbsp; Odds API</a><a href="/4_Projection_History">▣ &nbsp; Projection History</a><a href="/5_Daily_Projection_Run">▤ &nbsp; Daily Projection Run</a></div>'
+source=source.replace(old_nav,new_nav,1)
 
-projection_end = 'st.caption("Probabilities are model estimates, not guarantees.")\n'
-if projection_end in source and 'render_merged_odds(game, selected_date, projection)' not in source:
-    source = source.replace(projection_end, projection_end + 'from training.merged_odds import render_merged_odds\nrender_merged_odds(game, selected_date, projection)\n', 1)
+# Always use the real mascot asset in the approved hero/sidebar locations.
+old_side_logo='''    if logo_path.exists():st.markdown('<div class="sok-sidebar-logo">',unsafe_allow_html=True);st.image(str(logo_path),width=130);st.markdown('</div>',unsafe_allow_html=True)'''
+new_side_logo='''    st.markdown(f'<div class="sok-sidebar-logo"><img src="{MASCOT_URL}" alt="StrikeOut King 9000"></div>',unsafe_allow_html=True)'''
+source=source.replace(old_side_logo,new_side_logo,1)
+old_hero_logo='''with h1:
+    if logo_path.exists():st.image(str(logo_path),width=175)'''
+new_hero_logo='''with h1:
+    st.markdown(f'<div class="sok-local-image"><img class="sok-mascot-image" src="{MASCOT_URL}" alt="StrikeOut King 9000 mascot"></div>',unsafe_allow_html=True)'''
+source=source.replace(old_hero_logo,new_hero_logo,1)
 
-compile(source, LEGACY, "exec")
-exec(compile(source, LEGACY, "exec"), globals(), globals())
+# Put the scheduled pitcher's actual MLB team logo directly beside the name.
+old_matchup='''st.markdown(f'<div class="matchup"><div><div class="pitcher">{game.pitcher_name.upper()}</div><div class="teams">{game.team} <span>vs</span> {game.opponent}</div><div class="detail">⚾ {game.venue} · {game.side} · {game.status}</div></div><div class="cle-badge">C</div><div class="live-schedule">'''
+new_matchup='''team_id_by_abbr={abbr:tid for tid,abbr in TEAM_ABBR.items()}
+team_logo_id=team_id_by_abbr.get(game.team,114)
+team_logo_url=f"https://www.mlbstatic.com/team-logos/{team_logo_id}.svg"
+st.markdown(f'<div class="matchup"><div class="pitcher-block"><img class="team-logo" src="{team_logo_url}" alt="{game.team} logo"><div><div class="pitcher">{game.pitcher_name.upper()}</div><div class="teams">{game.team} <span>vs</span> {game.opponent}</div><div class="detail">⚾ {game.venue} · {game.side} · {game.status}</div></div></div><div class="cle-badge">C</div><div class="live-schedule">'''
+source=source.replace(old_matchup,new_matchup,1)
+
+compile(source,LEGACY,'exec')
+exec(compile(source,LEGACY,'exec'),globals(),globals())
