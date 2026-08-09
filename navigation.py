@@ -6,11 +6,10 @@ MASCOT_URL = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/asse
 
 
 def render_sidebar(active: str = "projection") -> None:
-    """Render the single shared app navigation using Streamlit page links.
+    """Render the shared app navigation.
 
-    st.page_link is intentional here: ordinary HTML/Markdown hrefs create a new
-    browser session and can produce Page not found when used with Streamlit's
-    multipage routing. These links are registered against the real pages/ files.
+    Odds/market functionality is intentionally part of the Projection command
+    center now, so there is no separate Odds API page in the primary workflow.
     """
     st.markdown(
         """
@@ -38,10 +37,10 @@ def render_sidebar(active: str = "projection") -> None:
         st.markdown('<div class="sk-nav-title">StrikeOut <span>King 9000</span></div>', unsafe_allow_html=True)
         st.markdown('<div class="sk-nav-sub">CLE-themed distributional MLB starter projections</div>', unsafe_allow_html=True)
 
+        # Projection is the master workspace. Live odds are surfaced inside it.
         links = [
             ("projection", "streamlit_app.py", "⌂", "Projection"),
             ("bets", "pages/2_Bet_Tracker.py", "♧", "Bet Tracker"),
-            ("odds", "pages/3_Odds_API.py", "◎", "Odds API"),
             ("history", "pages/4_Projection_History.py", "▣", "Projection History"),
             ("daily", "pages/5_Daily_Projection_Run.py", "▤", "Daily Projection Run"),
         ]
