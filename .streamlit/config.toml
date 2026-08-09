@@ -11,5 +11,8 @@ borderColor = "#274B7A"
 showWidgetBorder = true
 dataframeHeaderBackgroundColor = "#0B214D"
 
+[client]
+showSidebarNavigation = false
+
 [server]
 headless = true
