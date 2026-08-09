@@ -99,7 +99,7 @@ class MLBClient:
         if not isinstance(payload,dict):raise ValueError("Unexpected MLB response format")
         return payload
 
-@st.cache_data(ttl=120,show_spinner=False)
+@st.cache_resource(ttl=120,show_spinner=False)
 def get_schedule(day:str)->tuple[list[GamePitcher],str|None]:
     try:payload=MLBClient().get("schedule",{"sportId":1,"date":day,"hydrate":"probablePitcher,team,venue,linescore"})
     except (requests.RequestException,ValueError) as exc:return [],f"Schedule unavailable: {exc}"
