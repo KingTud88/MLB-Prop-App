@@ -19,23 +19,22 @@ STYLE_OVERRIDE = r'''
 [data-testid="stSidebarNav"]{display:none!important}
 [data-testid="stAppViewContainer"] .main{padding-top:0!important}
 [data-testid="stAppViewContainer"] .main .block-container{padding:0 1rem 2rem!important;margin-top:0!important;max-width:1500px!important}
-/* Match the approved reference: a small, controlled header breathing room instead of the old 190px spacer. */
 .sok-hero{height:58px!important;min-height:58px!important;margin:0!important;padding:0!important;display:block!important;overflow:visible!important}
-.sok-sidebar-logo{display:flex!important;justify-content:center!important;align-items:center!important;min-height:108px!important;margin:0 0 .2rem!important}
-.sok-sidebar-logo .sok-mascot-image{width:150px!important;height:105px!important;object-fit:contain!important;display:block!important}
+.sok-sidebar-logo{display:flex!important;justify-content:center!important;align-items:center!important;min-height:55px!important;margin:0 0 .15rem!important}
+.sok-sidebar-logo .sok-mascot-image{display:none!important}
 .sok-sidebar-title{font-size:1.45rem!important}
 .sok-sidebar-sub{margin:.35rem 0 .55rem!important;font-size:.73rem!important}
 .sok-nav{gap:.12rem!important;margin:.35rem 0 .65rem!important}
 .sok-nav a{padding:.48rem .5rem!important;font-size:.82rem!important}
+.sok-disabled-nav{color:#dce6f0!important;padding:.48rem .5rem!important;border-radius:8px!important;font-weight:800!important;font-size:.82rem!important;opacity:.95!important}
+.sok-disabled-nav:hover{background:#102b4c!important;color:#fff!important}
 .sok-search-title{margin-top:.65rem!important}
 .sok-date{margin-top:.55rem!important}
 .sok-side-card{margin-top:.6rem!important}
-/* The actual Streamlit columns render after the marker div, so style them through their native classes. */
 .sok-title{font-size:clamp(4.4rem,6vw,6.4rem)!important;line-height:.78!important;white-space:nowrap!important}
 .sok-ribbon{margin-top:.55rem!important;font-size:.78rem!important;padding:.32rem 1rem!important}
-.sok-status{margin-top:0!important}
+.sok-status{position:relative!important;margin-top:0!important}
 .sok-status:before{content:"BUILT FOR\A CLE";white-space:pre;display:flex;align-items:center;justify-content:center;text-align:center;position:absolute;right:0;top:-118px;width:118px;height:88px;border:2px solid #6d7f92;border-radius:15px;background:linear-gradient(145deg,#142b48,#07172b);color:#fff;font-family:Impact,"Arial Narrow",sans-serif;font-size:1.05rem;line-height:.95;letter-spacing:.06em;box-shadow:0 10px 20px rgba(0,0,0,.25)}
-.sok-status{position:relative}
 .matchup{margin-top:0!important}
 .section-frame{border-width:2px!important;border-color:#e31837!important;border-radius:17px!important}
 .section-ribbon{font-size:1rem!important}
