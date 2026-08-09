@@ -149,7 +149,19 @@ try:
 except ValueError:
     odds_default_date = query_day
 with st.sidebar:
-    st.markdown("## StrikeOut King 9000"); st.caption(f"Distributional MLB starter projections · v{APP_VERSION}"); selected_date=st.date_input("Slate date",value=odds_default_date); st.markdown("### Model controls"); simulations=st.select_slider("Simulation draws",[5000,10000,25000,50000],value=25000); opponent_k_pct=st.slider("Projected lineup K%",15.0,32.0,22.4,.1); pitch_limit=st.slider("Expected pitch limit",60,115,92); umpire_k_factor=st.slider("Umpire K factor",.94,1.06,1.00,.01); weather_factor=st.slider("Weather K factor",.96,1.04,1.00,.01); rest_days=st.slider("Days rest",3,10,5); rest_factor=.96 if rest_days<=3 else 1.0 if rest_days<=6 else 1.01; st.caption("Market lines affect edge display only, never the baseball forecast.")
+    st.markdown("## StrikeOut King 9000")
+    st.caption(f"Distributional MLB starter projections · v{APP_VERSION}")
+    selected_date=st.date_input("Slate date",value=odds_default_date)
+    st.caption("Model inputs are now handled by the projection engine; legacy manual controls have been removed.")
+
+# Keep stable internal defaults for the current projection engine while dedicated feeds are added.
+simulations=25000
+opponent_k_pct=22.4
+pitch_limit=92
+umprire_k_factor=1.00
+umpire_k_factor=1.00
+weather_factor=1.00
+rest_factor=1.00
 
 schedule,schedule_error=get_schedule(selected_date.isoformat()); st.title("⚾ StrikeOut King 9000"); st.markdown("Pregame strikeout and starter-outs distributions with transparent assumptions and uncertainty.")
 if schedule_error:st.error(schedule_error)
@@ -249,7 +261,7 @@ if odds_transfer_active:
     st.session_state["manual_odds"] = int(st.session_state.get("odds_selected_odds", -110))
     st.session_state["odds_selection_applied"] = True
 
-st.divider(); st.subheader("Manual sportsbook line"); st.caption("Enter the line and price you see at your sportsbook. No sportsbook API or paid credits required.")
+st.divider(); st.subheader("Manual sportsbook line (fallback)"); st.caption("Use this only when an Odds API line is unavailable. No sportsbook API or paid credits required.")
 manual_col1,manual_col2,manual_col3,manual_col4=st.columns([1.2,1,1,1])
 with manual_col1:manual_side=st.selectbox("Side",["Over","Under"],key="manual_side")
 with manual_col2:manual_line=st.number_input("K line",.5,15.5,float(k_line),.5,key="manual_line")
