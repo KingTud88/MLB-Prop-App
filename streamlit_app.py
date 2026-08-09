@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import base64
 import requests
 import streamlit as st
 from pathlib import Path
 
 LEGACY = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/d87e181aed527cebd1b902e7cc224aa96b06fbcc/streamlit_app.py"
-ASSET_DIR = Path(__file__).resolve().parent / "assets"
 MASCOT_URL = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000.svg"
 
 _original_markdown_fn = st.markdown
@@ -14,10 +12,10 @@ _original_image_fn = st.image
 
 CLE_OVERRIDE = r'''
 <style>
-/* Reference layout: the custom StrikeOut King sidebar is the only navigation. */
+/* Reference layout: one custom sidebar, exact mascot, and the reference hero proportions. */
 [data-testid="stSidebar"]{width:205px!important;min-width:205px!important}
+[data-testid="stSidebar"]>div:first-child{width:205px!important}
 [data-testid="stSidebarNav"]{display:none!important}
-[data-testid="stSidebar"] section[data-testid="stSidebarNav"]{display:none!important}
 .block-container{max-width:1540px!important;padding:.75rem 1rem 2rem!important}
 .sok-sidebar-logo{height:145px!important;margin:-.2rem 0 .2rem!important;display:flex!important;justify-content:center!important;align-items:center!important}
 .sok-sidebar-logo .sok-mascot-image{height:140px!important;width:140px!important;max-height:140px!important;object-fit:contain!important;display:block!important;margin:0 auto!important}
@@ -40,22 +38,14 @@ def patched_markdown(body=None,*args,**kwargs):
     return _original_markdown_fn(body,*args,**kwargs)
 
 def patched_image(image,*args,**kwargs):
-    """Render the custom mascot in the browser instead of asking Pillow to decode it.
-
-    The repository asset is known to be browser-renderable but the Streamlit Cloud
-    Pillow build currently lacks the WebP decoder needed by the mislabeled PNG
-    payload.  The SVG wrapper references the same mascot PNG, so a browser <img>
-    avoids the server-side decoder entirely and preserves the exact artwork.
-    """
-    if isinstance(image,str) and ('strikeout_king_9000' in image or image.endswith('.svg')):
+    """Render the mascot in the browser, including when legacy code passes a Path."""
+    image_text = str(image) if isinstance(image,(str,Path)) else ""
+    if "strikeout_king_9000" in image_text or image_text.lower().endswith(".svg"):
         width = kwargs.get("width")
-        style = ""
-        if isinstance(width,(int,float)):
-            style += f"width:{int(width)}px;"
-        alt = "StrikeOut King 9000 mascot"
+        style = f"width:{int(width)}px;" if isinstance(width,(int,float)) else ""
         html = (
             f'<div class="sok-mascot-wrap" style="{style}">'
-            f'<img class="sok-mascot-image" src="{MASCOT_URL}" alt="{alt}" />'
+            f'<img class="sok-mascot-image" src="{MASCOT_URL}" alt="StrikeOut King 9000 mascot" />'
             f'</div>'
         )
         return _original_markdown_fn(html, unsafe_allow_html=True)
@@ -67,5 +57,22 @@ st.image = patched_image
 response = requests.get(LEGACY, timeout=20)
 response.raise_for_status()
 source = response.text
+
+# Streamlit 1.60+ supports a locked sidebar. This prevents the browser's remembered
+# collapsed state from destroying the reference layout.
+source = source.replace('initial_sidebar_state="expanded"', 'initial_sidebar_state="locked"')
+
+# Replace ordinary HTML href navigation with Streamlit's real multipage router.
+# HTML links create a fresh browser session and can trigger "Page not found"; page_link
+# registers against the actual files in pages/ and preserves Streamlit session state.
+old_nav = '<div class="sok-nav"><a class="active" href="/">⌂ &nbsp; Projection</a><a href="/2_Bet_Tracker">♧ &nbsp; Bet Tracker</a><a href="/3_Odds_API">◎ &nbsp; Odds API</a><a href="/4_Projection_History">▣ &nbsp; Projection History</a><a href="/5_Daily_Projection_Run">▤ &nbsp; Daily Projection Run</a></div>'
+new_nav = '''<div class="sok-nav">''' + '''</div>'''
+source = source.replace(old_nav, new_nav)
+
+# The shared navigation is rendered by real st.page_link widgets below the legacy
+# sidebar's content. Insert them where the old HTML nav used to be.
+nav_code = '''\nwith st.sidebar:\n    st.page_link("streamlit_app.py", label="⌂  Projection", use_container_width=True)\n    st.page_link("pages/2_Bet_Tracker.py", label="♧  Bet Tracker", use_container_width=True)\n    st.page_link("pages/3_Odds_API.py", label="◎  Odds API", use_container_width=True)\n    st.page_link("pages/4_Projection_History.py", label="▣  Projection History", use_container_width=True)\n    st.page_link("pages/5_Daily_Projection_Run.py", label="▤  Daily Projection Run", use_container_width=True)\n'''
+source = source.replace(new_nav, new_nav + nav_code)
+
 code = compile(source, LEGACY, "exec")
 exec(code, globals(), globals())
