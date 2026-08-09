@@ -3,16 +3,20 @@ from __future__ import annotations
 import requests
 import streamlit as st
 from pathlib import Path
+from PIL import Image
 
 LEGACY = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/d87e181aed527cebd1b902e7cc224aa96b06fbcc/streamlit_app.py"
-MASCOT_URL = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000.png"
+MASCOT_PATH = Path(__file__).resolve().parent / "assets" / "strikeout_king_9000.png"
 
 _original_markdown_fn = st.markdown
 _original_image_fn = st.image
 
 CLE_OVERRIDE = r'''
 <style>
+/* Reference layout: the custom StrikeOut King sidebar is the only navigation. */
 [data-testid="stSidebar"]{width:205px!important;min-width:205px!important}
+[data-testid="stSidebarNav"]{display:none!important}
+[data-testid="stSidebar"] section[data-testid="stSidebarNav"]{display:none!important}
 .block-container{max-width:1540px!important;padding:.75rem 1rem 2rem!important}
 .sok-sidebar-logo{height:145px!important;margin:-.2rem 0 .2rem!important;display:flex!important;justify-content:center!important;align-items:center!important}
 .sok-sidebar-logo img{height:140px!important;width:140px!important;max-height:140px!important;object-fit:contain!important}
@@ -36,8 +40,14 @@ def patched_markdown(body=None,*args,**kwargs):
 
 def patched_image(image,*args,**kwargs):
     if isinstance(image,str) and ('strikeout_king_9000' in image or image.endswith('.svg')):
-        kwargs.setdefault("output_format", "WEBP")
-        image=MASCOT_URL
+        # The repository asset is WebP bytes with a legacy .png/.svg reference.
+        # Decode it with Pillow first so Streamlit receives an actual image object.
+        if MASCOT_PATH.exists():
+            with Image.open(MASCOT_PATH) as mascot:
+                mascot.load()
+                image=mascot.convert("RGBA")
+        else:
+            image=MASCOT_PATH
     return _original_image_fn(image,*args,**kwargs)
 
 st.markdown = patched_markdown
