@@ -31,12 +31,10 @@ STYLE_OVERRIDE = r'''
 </style>
 '''
 
-
 def patched_markdown(body=None, *args, **kwargs):
     if isinstance(body, str) and '<style>' in body and '--navy:' in body:
         return _original_markdown_fn(body + STYLE_OVERRIDE, *args, **kwargs)
     return _original_markdown_fn(body, *args, **kwargs)
-
 
 def patched_image(image, *args, **kwargs):
     image_text = str(image) if isinstance(image, (str, Path)) else ""
@@ -50,7 +48,6 @@ def patched_image(image, *args, **kwargs):
         )
         return _original_markdown_fn(html, unsafe_allow_html=True)
     return _original_image_fn(image, *args, **kwargs)
-
 
 st.markdown = patched_markdown
 st.image = patched_image
@@ -79,9 +76,12 @@ source = "\n".join(lines) + "\n"
 projection_marker = 'manual={"opponent_k_pct":opponent_k_pct,"pitch_limit":float(pitch_limit),"umpire_k_factor":umpire_k_factor,"weather_factor":weather_factor,"rest_factor":rest_factor};projection=calculate_projection(log,game,manual,simulations)\n'
 if projection_marker not in source:
     raise RuntimeError("Projection calculation marker not found; refusing to deploy a partial patch.")
+
+# Keep the odds/ladder section inside the Projection tab rather than between
+# the hero/metrics and the tab navigation. This keeps the page hierarchy intact.
 source = source.replace(
-    projection_marker,
     projection_marker + 'from training.merged_odds import render_merged_odds\nrender_merged_odds(game, selected_date, projection)\n',
+    projection_marker,
     1,
 )
 
@@ -109,6 +109,16 @@ new_card = '("K+",k_market_label,f"{k_market_prob:.1%}",f"↑ FAIR {fair_america
 if old_card not in source:
     raise RuntimeError("Projection card marker not found; refusing to deploy a partial patch.")
 source = source.replace(old_card, new_card, 1)
+
+# Inject the merged odds section at the end of the Projection tab.
+projection_tab_anchor = 'with tab1:'
+if projection_tab_anchor not in source:
+    raise RuntimeError("Projection tab marker not found; refusing to deploy a partial patch.")
+source = source.replace(
+    '        st.dataframe(factor_df, hide_index=True, use_container_width=True)\n',
+    '        st.dataframe(factor_df, hide_index=True, use_container_width=True)\n    from training.merged_odds import render_merged_odds\n    render_merged_odds(game, selected_date, projection)\n',
+    1,
+)
 
 compile(source, LEGACY, "exec")
 exec(compile(source, LEGACY, "exec"), globals(), globals())
