@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import requests
 import streamlit as st
+from pathlib import Path
 
 LEGACY = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/d87e181aed527cebd1b902e7cc224aa96b06fbcc/streamlit_app.py"
-MASCOT_URL = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000.png"
+APP_DIR = Path(__file__).resolve().parent
+MASCOT_PATH = APP_DIR / "assets" / "strikeout_king_9000.png"
 
 _original_markdown_fn = st.markdown
 _original_image_fn = st.image
@@ -44,8 +46,10 @@ def patched_markdown(body=None,*args,**kwargs):
     return _original_markdown_fn(body,*args,**kwargs)
 
 def patched_image(image,*args,**kwargs):
-    if isinstance(image,(str,bytes)) and isinstance(image,str) and ('strikeout_king_9000' in image or image.endswith('.svg')):
-        image=MASCOT_URL
+    # The legacy app references the SVG mascot. Always serve the bundled PNG
+    # locally so Streamlit Cloud does not depend on a remote raw.githubusercontent URL.
+    if isinstance(image,str) and ('strikeout_king_9000' in image or image.endswith('.svg')):
+        image=str(MASCOT_PATH)
     return _original_image_fn(image,*args,**kwargs)
 
 st.markdown = patched_markdown
