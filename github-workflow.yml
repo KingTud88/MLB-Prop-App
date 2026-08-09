@@ -1,5 +1,9 @@
 name: quality
-on: [push, pull_request]
+
+on:
+  push:
+  pull_request:
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -9,5 +13,6 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r requirements.txt ruff pytest
-      - run: ruff check app.py
-      - run: python -m py_compile app.py
+      - run: ruff check streamlit_app.py navigation.py engine tests
+      - run: python -m py_compile streamlit_app.py navigation.py
+      - run: pytest -q
