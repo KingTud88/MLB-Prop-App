@@ -1,20 +1,28 @@
 from __future__ import annotations
 
+import time
 import requests
 import pandas as pd
 import streamlit as st
 from training.github_bet_store import load_bets
 
 MLB_API = "https://statsapi.mlb.com/api/v1"
+MLB_HEADERS = {"Cache-Control": "no-cache", "Pragma": "no-cache"}
 
 st.set_page_config(page_title="Bet Tracker", page_icon="📊", layout="wide")
 st.title("📊 Bet Tracker")
 st.caption("Persistent bets with live strikeout progress from MLB game data.")
 
 
+def _fresh_params(**kwargs):
+    params = dict(kwargs)
+    params["_"] = str(time.time_ns())
+    return params
+
+
 def _resolve_pitcher_id(name: str) -> int | None:
     try:
-        r = requests.get(f"{MLB_API}/people/search", params={"names": name}, timeout=10)
+        r = requests.get(f"{MLB_API}/people/search", params=_fresh_params(names=name), headers=MLB_HEADERS, timeout=10)
         if not r.ok:
             return None
         people = r.json().get("people", [])
@@ -32,14 +40,15 @@ def _date_pitching_stats(pitcher_id: int, game_date: str) -> tuple[float | None,
     try:
         r = requests.get(
             f"{MLB_API}/stats",
-            params={
-                "stats": "byDateRange",
-                "group": "pitching",
-                "personId": pitcher_id,
-                "startDate": game_date,
-                "endDate": game_date,
-                "sportIds": 1,
-            },
+            params=_fresh_params(
+                stats="byDateRange",
+                group="pitching",
+                personId=pitcher_id,
+                startDate=game_date,
+                endDate=game_date,
+                sportIds=1,
+            ),
+            headers=MLB_HEADERS,
             timeout=10,
         )
         if not r.ok:
@@ -96,8 +105,6 @@ def live_strikeouts(player_name: str, game_date: str, game_pk: int | None = None
         target = player_name.strip().lower()
         resolved_pitcher_id = pitcher_id or _resolve_pitcher_id(player_name)
 
-        # Most direct path: MLB's date-range pitching stats. This works even when
-        # the schedule no longer exposes a probablePitcher after first pitch.
         if resolved_pitcher_id:
             direct_ks, direct_status = _date_pitching_stats(resolved_pitcher_id, game_date)
             if direct_ks is not None:
@@ -109,7 +116,8 @@ def live_strikeouts(player_name: str, game_date: str, game_pk: int | None = None
 
         schedule = requests.get(
             f"{MLB_API}/schedule",
-            params={"sportId": 1, "date": game_date, "hydrate": "probablePitcher,team"},
+            params=_fresh_params(sportId=1, date=game_date, hydrate="probablePitcher,team"),
+            headers=MLB_HEADERS,
             timeout=10,
         )
         schedule.raise_for_status()
@@ -130,7 +138,12 @@ def live_strikeouts(player_name: str, game_date: str, game_pk: int | None = None
 
         last_status = "Scheduled"
         for candidate_game_pk, candidate_pitcher_id in candidates:
-            response = requests.get(f"{MLB_API}/game/{candidate_game_pk}/feed/live", timeout=10)
+            response = requests.get(
+                f"{MLB_API}/game/{candidate_game_pk}/feed/live",
+                params=_fresh_params(),
+                headers=MLB_HEADERS,
+                timeout=10,
+            )
             if response.status_code == 404:
                 continue
             response.raise_for_status()
@@ -143,7 +156,12 @@ def live_strikeouts(player_name: str, game_date: str, game_pk: int | None = None
             if ks is not None:
                 return ks, status
 
-            box = requests.get(f"{MLB_API}/game/{candidate_game_pk}/boxscore", timeout=10)
+            box = requests.get(
+                f"{MLB_API}/game/{candidate_game_pk}/boxscore",
+                params=_fresh_params(),
+                headers=MLB_HEADERS,
+                timeout=10,
+            )
             if box.ok:
                 box_data = box.json()
                 box_status = box_data.get("gameData", {}).get("status", {}) or {}
