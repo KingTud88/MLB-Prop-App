@@ -9,6 +9,7 @@ import requests
 BASE_URL = "https://api.the-odds-api.com/v4"
 SPORT_KEY = "baseball_mlb"
 PLAYER_MARKET = "pitcher_strikeouts"
+ALTERNATE_PLAYER_MARKET = "pitcher_strikeouts_alternate"
 
 
 def get_api_key(secrets: Any = None) -> str | None:
@@ -56,13 +57,21 @@ def get_events(api_key: str, game_date: date) -> tuple[list[dict[str, Any]], dic
     return list(data or []), headers
 
 
-def get_event_pitcher_strikeouts(api_key: str, event_id: str, region: str = "us") -> tuple[dict[str, Any], dict[str, str]]:
+def get_event_pitcher_strikeouts(
+    api_key: str,
+    event_id: str,
+    region: str = "us",
+    include_alternate: bool = False,
+) -> tuple[dict[str, Any], dict[str, str]]:
+    markets = PLAYER_MARKET
+    if include_alternate:
+        markets = f"{PLAYER_MARKET},{ALTERNATE_PLAYER_MARKET}"
     data, headers = _request(
         f"/sports/{SPORT_KEY}/events/{event_id}/odds",
         api_key,
         {
             "regions": region,
-            "markets": PLAYER_MARKET,
+            "markets": markets,
             "oddsFormat": "american",
             "dateFormat": "iso",
         },
@@ -72,10 +81,12 @@ def get_event_pitcher_strikeouts(api_key: str, event_id: str, region: str = "us"
 
 def flatten_pitcher_strikeouts(event: dict[str, Any]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
+    valid_markets = {PLAYER_MARKET, ALTERNATE_PLAYER_MARKET}
     for bookmaker in event.get("bookmakers", []) or []:
         title = bookmaker.get("title") or bookmaker.get("key", "Unknown")
         for market in bookmaker.get("markets", []) or []:
-            if market.get("key") != PLAYER_MARKET:
+            market_key = market.get("key")
+            if market_key not in valid_markets:
                 continue
             for outcome in market.get("outcomes", []) or []:
                 rows.append(
@@ -83,6 +94,7 @@ def flatten_pitcher_strikeouts(event: dict[str, Any]) -> list[dict[str, Any]]:
                         "bookmaker": title,
                         "bookmaker_key": bookmaker.get("key", ""),
                         "last_update": market.get("last_update", bookmaker.get("last_update", "")),
+                        "market": market_key,
                         "side": outcome.get("name", ""),
                         "player": outcome.get("description", ""),
                         "line": outcome.get("point"),
