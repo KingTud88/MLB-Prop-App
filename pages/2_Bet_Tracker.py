@@ -7,7 +7,7 @@ import streamlit as st
 from training.github_bet_store import load_bets
 
 MLB_API = "https://statsapi.mlb.com/api/v1"
-MLB_HEADERS = {"Cache-Control": "no-cache", "Pragma": "no-cache"}
+MLB_HEADERS = {"Cache-Control": "no-cache", "Pragma": "no-cache", "Accept": "application/json"}
 
 st.set_page_config(page_title="Bet Tracker", page_icon="📊", layout="wide")
 st.title("📊 Bet Tracker")
@@ -36,7 +36,6 @@ def _resolve_pitcher_id(name: str) -> int | None:
 
 
 def _date_pitching_stats(pitcher_id: int, game_date: str) -> tuple[float | None, str]:
-    """Ask MLB directly for this pitcher's pitching stats on the saved date."""
     try:
         r = requests.get(
             f"{MLB_API}/stats",
@@ -61,8 +60,36 @@ def _date_pitching_stats(pitcher_id: int, game_date: str) -> tuple[float | None,
         if ks is not None:
             return float(ks), "Live stats"
         return None, "Pitching stats found, but strikeouts are not posted yet"
-    except Exception as exc:
-        return None, f"Date-stat lookup unavailable: {exc}"
+    except Exception:
+        return None, "Date-stat lookup unavailable"
+
+
+def _game_pitching_stats(game_pk: int, pitcher_id: int | None, target: str) -> tuple[float | None, str]:
+    """Use MLB's by-game pitching stats endpoint; this is more direct than a cached game feed."""
+    try:
+        r = requests.get(
+            f"{MLB_API}/stats",
+            params=_fresh_params(stats="byGamePk", group="pitching", gamePk=game_pk, sportIds=1),
+            headers=MLB_HEADERS,
+            timeout=10,
+        )
+        if not r.ok:
+            return None, "Game pitching stats unavailable"
+        splits = []
+        for block in r.json().get("stats", []):
+            splits.extend(block.get("splits", []) or [])
+        target = target.strip().lower()
+        for split in splits:
+            player = split.get("player", {}) or {}
+            pid = player.get("id")
+            pname = player.get("fullName", "").strip().lower()
+            if (pitcher_id and pid == pitcher_id) or pname == target:
+                ks = (split.get("stat", {}) or {}).get("strikeOuts")
+                if ks is not None:
+                    return float(ks), "Live stats"
+        return None, "No game pitching stats posted yet"
+    except Exception:
+        return None, "Game pitching stats lookup unavailable"
 
 
 def _pitcher_ks_from_feed(data: dict, target: str, pitcher_id: int | None) -> float | None:
@@ -105,18 +132,13 @@ def live_strikeouts(player_name: str, game_date: str, game_pk: int | None = None
         target = player_name.strip().lower()
         resolved_pitcher_id = pitcher_id or _resolve_pitcher_id(player_name)
 
-        if resolved_pitcher_id:
-            direct_ks, direct_status = _date_pitching_stats(resolved_pitcher_id, game_date)
-            if direct_ks is not None:
-                return direct_ks, direct_status
-
         candidates: list[tuple[int, int]] = []
         if game_pk:
             candidates.append((int(game_pk), int(resolved_pitcher_id or 0)))
 
         schedule = requests.get(
             f"{MLB_API}/schedule",
-            params=_fresh_params(sportId=1, date=game_date, hydrate="probablePitcher,team"),
+            params=_fresh_params(sportId=1, date=game_date, hydrate="probablePitcher,team,linescore"),
             headers=MLB_HEADERS,
             timeout=10,
         )
@@ -138,6 +160,12 @@ def live_strikeouts(player_name: str, game_date: str, game_pk: int | None = None
 
         last_status = "Scheduled"
         for candidate_game_pk, candidate_pitcher_id in candidates:
+            # First try the direct by-game stats endpoint. This can return current stats
+            # even when the general live feed is still showing an old scheduled state.
+            ks, stats_status = _game_pitching_stats(candidate_game_pk, candidate_pitcher_id or resolved_pitcher_id, target)
+            if ks is not None:
+                return ks, stats_status
+
             response = requests.get(
                 f"{MLB_API}/game/{candidate_game_pk}/feed/live",
                 params=_fresh_params(),
