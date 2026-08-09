@@ -4,7 +4,9 @@ import requests
 import streamlit as st
 
 LEGACY = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/f0b28d2a9f91cc145736eb2d3e0c1a72d3275f43/streamlit_app.py"
-MASCOT_URL = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000.png"
+# Use the verified PNG asset. The main .png is actually WebP data despite its extension,
+# which is why browsers/Streamlit were showing the alt text instead of the mascot.
+MASCOT_URL = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000_96.png"
 
 _original_markdown = st.markdown
 _original_image = st.image
@@ -29,7 +31,7 @@ STYLE = r'''
 .sok-date{margin-top:.4rem!important;padding:.55rem!important}
 .sok-side-card{margin-top:.45rem!important;padding:.6rem!important}
 .sok-hero{display:grid!important;grid-template-columns:250px minmax(0,1fr) 200px!important;gap:.8rem!important;align-items:center!important;min-height:165px!important;margin:0!important;padding:0!important}
-.sok-hero .sok-mascot-image{width:250px!important;height:205px!important;object-fit:contain!important;display:block!important;filter:drop-shadow(0 12px 18px rgba(0,0,0,.35))!important}
+.sok-hero .sok-mascot-image{width:250px!important;height:205px!important;object-fit:contain!important;display:block!important;filter:drop-shadow(0 12px 18px rgba(0,0,0,.35))!important;image-rendering:auto!important}
 .sok-title{font-size:clamp(4.6rem,6vw,6.6rem)!important;line-height:.78!important;white-space:nowrap!important}
 .sok-ribbon{margin-top:.45rem!important;font-size:.75rem!important;padding:.3rem 1rem!important}
 .sok-status{padding:.8rem!important}
@@ -87,7 +89,7 @@ old_nav='<div class="sok-nav"><a class="active" href="/">⌂ &nbsp; Projection</
 new_nav='<div class="sok-nav"><a class="active" href="/">⌂ &nbsp; Projection</a><div class="sok-disabled-nav">♧ &nbsp; Distribution</div><div class="sok-disabled-nav">♨ &nbsp; Form &amp; Workload</div><div class="sok-disabled-nav">▤ &nbsp; Model Card</div><a href="/2_Bet_Tracker">♧ &nbsp; Bet Tracker</a><a href="/3_Odds_API">◎ &nbsp; Odds API</a><a href="/4_Projection_History">▣ &nbsp; Projection History</a><a href="/5_Daily_Projection_Run">▤ &nbsp; Daily Projection Run</a></div>'
 source=source.replace(old_nav,new_nav,1)
 
-# Always use the real mascot asset in the approved hero/sidebar locations.
+# Always use the verified real PNG mascot asset in the approved hero/sidebar locations.
 old_side_logo='''    if logo_path.exists():st.markdown('<div class="sok-sidebar-logo">',unsafe_allow_html=True);st.image(str(logo_path),width=130);st.markdown('</div>',unsafe_allow_html=True)'''
 new_side_logo='''    st.markdown(f'<div class="sok-sidebar-logo"><img src="{MASCOT_URL}" alt="StrikeOut King 9000"></div>',unsafe_allow_html=True)'''
 source=source.replace(old_side_logo,new_side_logo,1)
