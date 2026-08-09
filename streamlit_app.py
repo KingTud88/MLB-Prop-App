@@ -29,7 +29,6 @@ CLE_OVERRIDE = r'''
 .section-ribbon,.table-title{background:linear-gradient(180deg,#ed193a,#c60c2a)!important;border-color:#ff4d67!important}
 .proj-card{min-height:220px!important;border:2px solid #405970!important;border-radius:16px!important;background:linear-gradient(145deg,#102d4b,#07182d)!important;box-shadow:0 15px 28px rgba(0,0,0,.25)!important}
 .proj-value{font-family:Impact,Haettenschweiler,"Arial Narrow Bold",sans-serif!important;font-size:3.8rem!important}
-/* Make Streamlit's page-link widgets look like the reference red/navy rail. */
 [data-testid="stSidebar"] [data-testid="stPageLink-NavLink"]{border-radius:8px!important;padding:.42rem .55rem!important;margin:.08rem 0!important;color:#dce6f0!important;font-weight:800!important;text-decoration:none!important}
 [data-testid="stSidebar"] [data-testid="stPageLink-NavLink"]:hover{background:#102b4c!important;color:#fff!important}
 </style>
@@ -62,15 +61,16 @@ response.raise_for_status()
 source = response.text
 source = source.replace('initial_sidebar_state="expanded"', 'initial_sidebar_state="locked"')
 
-# Replace ordinary HTML href navigation with Streamlit's real multipage router.
-old_nav = '<div class="sok-nav"><a class="active" href="/">⌂ &nbsp; Projection</a><a href="/2_Bet_Tracker">♧ &nbsp; Bet Tracker</a><a href="/3_Odds_API">◎ &nbsp; Odds API</a><a href="/4_Projection_History">▣ &nbsp; Projection History</a><a href="/5_Daily_Projection_Run">▤ &nbsp; Daily Projection Run</a></div>'
-new_nav = '''<div class="sok-nav"></div>'''
-source = source.replace(old_nav, new_nav)
-
-# This code is inserted inside the legacy `with st.sidebar:` block, so do not nest
-# another sidebar context. st.page_link handles Streamlit's actual page router.
-nav_code = '''\nst.page_link("streamlit_app.py", label="⌂  Projection", use_container_width=True)\nst.page_link("pages/2_Bet_Tracker.py", label="♧  Bet Tracker", use_container_width=True)\nst.page_link("pages/3_Odds_API.py", label="◎  Odds API", use_container_width=True)\nst.page_link("pages/4_Projection_History.py", label="▣  Projection History", use_container_width=True)\nst.page_link("pages/5_Daily_Projection_Run.py", label="▤  Daily Projection Run", use_container_width=True)\n'''
-source = source.replace(new_nav, new_nav + nav_code)
+# Replace the legacy raw-HTML sidebar navigation with real Streamlit page links.
+old_nav_stmt = '''st.markdown('<div class="sok-nav"><a class="active" href="/">⌂ &nbsp; Projection</a><a href="/2_Bet_Tracker">♧ &nbsp; Bet Tracker</a><a href="/3_Odds_API">◎ &nbsp; Odds API</a><a href="/4_Projection_History">▣ &nbsp; Projection History</a><a href="/5_Daily_Projection_Run">▤ &nbsp; Daily Projection Run</a></div>',unsafe_allow_html=True)'''
+nav_code = '''st.page_link("streamlit_app.py", label="⌂  Projection", use_container_width=True)
+st.page_link("pages/2_Bet_Tracker.py", label="♧  Bet Tracker", use_container_width=True)
+st.page_link("pages/3_Odds_API.py", label="◎  Odds API", use_container_width=True)
+st.page_link("pages/4_Projection_History.py", label="▣  Projection History", use_container_width=True)
+st.page_link("pages/5_Daily_Projection_Run.py", label="▤  Daily Projection Run", use_container_width=True)'''
+if old_nav_stmt not in source:
+    raise RuntimeError("Legacy sidebar navigation block was not found; refusing to deploy a partial patch.")
+source = source.replace(old_nav_stmt, nav_code, 1)
 
 code = compile(source, LEGACY, "exec")
 exec(code, globals(), globals())
