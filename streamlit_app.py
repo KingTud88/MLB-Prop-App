@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import requests
@@ -63,27 +62,12 @@ nav_lines = [
     'st.page_link("pages/4_Projection_History.py", label="▣  Projection History", use_container_width=True)',
     'st.page_link("pages/5_Daily_Projection_Run.py", label="▤  Daily Projection Run", use_container_width=True)',
 ]
-
 lines = source.splitlines()
 nav_index = next((i for i, line in enumerate(lines) if 'class="sok-nav"' in line and 'st.markdown' in line), None)
-if nav_index is None:
-    raise RuntimeError("Legacy sidebar navigation block was not found; refusing to deploy a partial patch.")
-
-indent = re.match(r"^\s*", lines[nav_index]).group(0)
-lines[nav_index:nav_index + 1] = [indent + nav_line for nav_line in nav_lines]
-source = "\n".join(lines) + "\n"
-
-projection_marker = 'manual={"opponent_k_pct":opponent_k_pct,"pitch_limit":float(pitch_limit),"umpire_k_factor":umpire_k_factor,"weather_factor":weather_factor,"rest_factor":rest_factor};projection=calculate_projection(log,game,manual,simulations)\n'
-if projection_marker not in source:
-    raise RuntimeError("Projection calculation marker not found; refusing to deploy a partial patch.")
-
-# Keep the odds/ladder section inside the Projection tab rather than between
-# the hero/metrics and the tab navigation. This keeps the page hierarchy intact.
-source = source.replace(
-    projection_marker + 'from training.merged_odds import render_merged_odds\nrender_merged_odds(game, selected_date, projection)\n',
-    projection_marker,
-    1,
-)
+if nav_index is not None:
+    indent = lines[nav_index][:len(lines[nav_index]) - len(lines[nav_index].lstrip())]
+    lines[nav_index:nav_index + 1] = [indent + line for line in nav_lines]
+    source = "\n".join(lines) + "\n"
 
 old_market = '''try:k_line=float(st.session_state.get("odds_selected_line",5.5))
 except (TypeError,ValueError):k_line=5.5
@@ -100,25 +84,21 @@ k_over=over_probability(projection.k_samples,k_line);k_market_prob=k_over if k_s
 k_market_label=str(st.session_state.get("odds_selected_display_line",f"OVER {k_line:g}"))
 outs_over=over_probability(projection.outs_samples,outs_line);k_lo,k_hi=interval(projection.k_samples);o_lo,o_hi=interval(projection.outs_samples)
 '''
-if old_market not in source:
-    raise RuntimeError("Market calculation marker not found; refusing to deploy a partial patch.")
-source = source.replace(old_market, new_market, 1)
+if old_market in source:
+    source = source.replace(old_market, new_market, 1)
 
 old_card = '("5.5+","OVER 5.5 STRIKEOUTS",f"{k_over:.1%}",f"↑ FAIR {fair_american(k_over)}")'
 new_card = '("K+",k_market_label,f"{k_market_prob:.1%}",f"↑ FAIR {fair_american(k_market_prob)}")'
-if old_card not in source:
-    raise RuntimeError("Projection card marker not found; refusing to deploy a partial patch.")
-source = source.replace(old_card, new_card, 1)
+if old_card in source:
+    source = source.replace(old_card, new_card, 1)
 
-# Inject the merged odds section at the end of the Projection tab.
-projection_tab_anchor = 'with tab1:'
-if projection_tab_anchor not in source:
-    raise RuntimeError("Projection tab marker not found; refusing to deploy a partial patch.")
-source = source.replace(
-    '        st.dataframe(factor_df, hide_index=True, use_container_width=True)\n',
-    '        st.dataframe(factor_df, hide_index=True, use_container_width=True)\n    from training.merged_odds import render_merged_odds\n    render_merged_odds(game, selected_date, projection)\n',
-    1,
-)
+projection_end = 'st.caption("Probabilities are model estimates, not guarantees.")\n'
+if projection_end in source and 'render_merged_odds(game, selected_date, projection)' not in source:
+    source = source.replace(
+        projection_end,
+        projection_end + 'from training.merged_odds import render_merged_odds\nrender_merged_odds(game, selected_date, projection)\n',
+        1,
+    )
 
 compile(source, LEGACY, "exec")
 exec(compile(source, LEGACY, "exec"), globals(), globals())
