@@ -6,7 +6,9 @@ from pathlib import Path
 import requests
 import streamlit as st
 
-LEGACY = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/d87e181aed527cebd1b902e7cc224aa96b06fbcc/streamlit_app.py"
+# Stable legacy engine source: this commit contains the original full projection app.
+# The previous d87e... reference was deleted, causing the 404 shown in the app logs.
+LEGACY = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/f0b28d2a9f91cc145736eb2d3e0c1a72d3275f43/streamlit_app.py"
 
 _original_markdown_fn = st.markdown
 _original_image_fn = st.image
