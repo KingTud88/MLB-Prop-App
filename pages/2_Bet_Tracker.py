@@ -12,6 +12,50 @@ st.title("📊 Bet Tracker")
 st.caption("Persistent bets with live strikeout progress from MLB game data.")
 
 
+def _resolve_pitcher_id(name: str) -> int | None:
+    try:
+        r = requests.get(f"{MLB_API}/people/search", params={"names": name}, timeout=10)
+        if not r.ok:
+            return None
+        people = r.json().get("people", [])
+        target = name.strip().lower()
+        for person in people:
+            if person.get("fullName", "").strip().lower() == target and person.get("id"):
+                return int(person["id"])
+        return int(people[0]["id"]) if people and people[0].get("id") else None
+    except Exception:
+        return None
+
+
+def _date_pitching_stats(pitcher_id: int, game_date: str) -> tuple[float | None, str]:
+    """Ask MLB directly for this pitcher's pitching stats on the saved date."""
+    try:
+        r = requests.get(
+            f"{MLB_API}/stats",
+            params={
+                "stats": "byDateRange",
+                "group": "pitching",
+                "personId": pitcher_id,
+                "startDate": game_date,
+                "endDate": game_date,
+                "sportIds": 1,
+            },
+            timeout=10,
+        )
+        if not r.ok:
+            return None, "Stats endpoint unavailable"
+        splits = r.json().get("stats", [{}])[0].get("splits", [])
+        if not splits:
+            return None, "No pitching stats posted for this date yet"
+        stat = splits[0].get("stat", {}) or {}
+        ks = stat.get("strikeOuts")
+        if ks is not None:
+            return float(ks), "Live stats"
+        return None, "Pitching stats found, but strikeouts are not posted yet"
+    except Exception as exc:
+        return None, f"Date-stat lookup unavailable: {exc}"
+
+
 def _pitcher_ks_from_feed(data: dict, target: str, pitcher_id: int | None) -> float | None:
     players = {}
     teams = data.get("liveData", {}).get("boxscore", {}).get("teams", {})
@@ -30,7 +74,6 @@ def _pitcher_ks_from_feed(data: dict, target: str, pitcher_id: int | None) -> fl
         if ks is not None:
             return float(ks)
 
-    # Fallback: count strikeout events charged to the saved pitcher.
     strikeouts = 0
     found_pitcher_events = False
     for play in data.get("liveData", {}).get("plays", {}).get("allPlays", []):
@@ -51,10 +94,18 @@ def _pitcher_ks_from_feed(data: dict, target: str, pitcher_id: int | None) -> fl
 def live_strikeouts(player_name: str, game_date: str, game_pk: int | None = None, pitcher_id: int | None = None) -> tuple[float | None, str]:
     try:
         target = player_name.strip().lower()
-        candidates: list[tuple[int, int]] = []
+        resolved_pitcher_id = pitcher_id or _resolve_pitcher_id(player_name)
 
-        if game_pk and pitcher_id:
-            candidates.append((int(game_pk), int(pitcher_id)))
+        # Most direct path: MLB's date-range pitching stats. This works even when
+        # the schedule no longer exposes a probablePitcher after first pitch.
+        if resolved_pitcher_id:
+            direct_ks, direct_status = _date_pitching_stats(resolved_pitcher_id, game_date)
+            if direct_ks is not None:
+                return direct_ks, direct_status
+
+        candidates: list[tuple[int, int]] = []
+        if game_pk:
+            candidates.append((int(game_pk), int(resolved_pitcher_id or 0)))
 
         schedule = requests.get(
             f"{MLB_API}/schedule",
@@ -67,10 +118,12 @@ def live_strikeouts(player_name: str, game_date: str, game_pk: int | None = None
                 for side in ("away", "home"):
                     pitcher = game.get("teams", {}).get(side, {}).get("probablePitcher", {}) or {}
                     name = pitcher.get("fullName", "").strip().lower()
-                    if name == target and game.get("gamePk"):
-                        pair = (int(game["gamePk"]), int(pitcher.get("id", 0) or 0))
-                        if pair not in candidates:
-                            candidates.append(pair)
+                    pid = int(pitcher.get("id", 0) or 0)
+                    if (resolved_pitcher_id and pid == resolved_pitcher_id) or name == target:
+                        if game.get("gamePk"):
+                            pair = (int(game["gamePk"]), pid or int(resolved_pitcher_id or 0))
+                            if pair not in candidates:
+                                candidates.append(pair)
 
         if not candidates:
             return None, "No MLB game found for this pitcher on the saved date."
@@ -86,11 +139,10 @@ def live_strikeouts(player_name: str, game_date: str, game_pk: int | None = None
             status = game_status.get("detailedState") or game_status.get("abstractGameState") or "Unknown"
             last_status = status
 
-            ks = _pitcher_ks_from_feed(data, target, candidate_pitcher_id)
+            ks = _pitcher_ks_from_feed(data, target, candidate_pitcher_id or resolved_pitcher_id)
             if ks is not None:
                 return ks, status
 
-            # Some live feeds expose boxscore data more reliably through the boxscore endpoint.
             box = requests.get(f"{MLB_API}/game/{candidate_game_pk}/boxscore", timeout=10)
             if box.ok:
                 box_data = box.json()
