@@ -1,0 +1,2 @@
+game_pk,game_date,pitcher_id,player,team,opponent,venue,game_time,captured_at_utc,app_version,projection,k_sd,k_range_low,k_range_high,confidence,data_quality,simulation_draws,opponent_k_pct,pitch_limit,umpire_k_factor,weather_factor,rest_factor,actual_strikeouts,resolved_at_utc
+824564,2026-08-09,676282,Joey Cantillo,CLE,CHW,Rate Field,2026-08-09T18:10:00Z,2026-08-09T04:08:32.627786+00:00,2.0.2,5.832334086679174,2.4103490636618696,2,10,High,100,25000,22.4,92,1.0,1.0,1.0,,
