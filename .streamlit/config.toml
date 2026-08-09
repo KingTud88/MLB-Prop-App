@@ -5,6 +5,11 @@ backgroundColor = "#071A3D"
 secondaryBackgroundColor = "#122A5A"
 textColor = "#FFFFFF"
 font = "sans serif"
+headingFont = "sans serif"
+baseRadius = "large"
+borderColor = "#274B7A"
+showWidgetBorder = true
+dataframeHeaderBackgroundColor = "#0B214D"
 
 [server]
 headless = true
