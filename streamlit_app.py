@@ -14,60 +14,142 @@ import pandas as pd
 import requests
 import streamlit as st
 
-APP_VERSION = "2.0.3"
+APP_VERSION = "2.0.4"
 EASTERN = ZoneInfo("America/New_York")
 MLB_API = "https://statsapi.mlb.com/api/v1"
 APP_DIR = Path(__file__).resolve().parent
 DATA_DIR = APP_DIR / "data"
+ASSET_DIR = APP_DIR / "assets"
 
 TEAM_ABBR = {
     108:"LAA",109:"ARI",110:"BAL",111:"BOS",112:"CHC",113:"CIN",114:"CLE",
     115:"COL",116:"DET",117:"HOU",118:"KCR",119:"LAD",120:"WSH",121:"NYM",
     133:"ATH",134:"PIT",135:"SDP",136:"SEA",137:"SFG",138:"STL",139:"TBR",
     140:"TEX",141:"TOR",142:"MIN",143:"PHI",144:"ATL",145:"CHW",146:"MIA",
-    147:"NYY",158:"MIL"
+    147:"NYY",158:"MIL",
 }
 PARK_K_FACTOR = {
     "Coors Field":0.94,"T-Mobile Park":1.05,"Petco Park":1.03,
     "Oracle Park":1.02,"Dodger Stadium":1.01,"Yankee Stadium":0.99,
-    "Fenway Park":0.98,"Wrigley Field":1.00
+    "Fenway Park":0.98,"Wrigley Field":1.00,
 }
 
-st.set_page_config(page_title="StrikeOut King 9000", page_icon="⚾", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(
+    page_title="StrikeOut King 9000",
+    page_icon="⚾",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
-st.markdown("""
+st.markdown(
+r"""
 <style>
-:root{--navy:#06152d;--navy2:#0a2143;--panel:#0b1c35;--panel2:#102743;--red:#e31837;--red2:#ff334d;--white:#f7f8fa;--muted:#9fb1c7;--green:#34e27a;--line:#27425f}
-.stApp{background:radial-gradient(circle at 72% 0%,rgba(25,65,120,.28),transparent 34%),linear-gradient(150deg,#04101f 0%,#07172d 55%,#05111f 100%);color:var(--white)}
-[data-testid="stSidebar"]{background:linear-gradient(180deg,#061225,#081a33);border-right:1px solid #183657}
-[data-testid="stSidebar"] .block-container{padding-top:1rem}
-.block-container{max-width:1540px;padding-top:1.2rem}
-h1,h2,h3,h4{font-family:Impact,"Arial Narrow",Haettenschweiler,sans-serif;letter-spacing:.025em}
-h1{font-size:3.2rem!important;text-transform:uppercase}
-h2,h3{color:var(--white)}
-[data-testid="stMetric"]{background:linear-gradient(155deg,#102b4a,#081a31);border:1px solid #365271;border-radius:18px;padding:18px 18px 14px;box-shadow:0 10px 28px rgba(0,0,0,.22)}
-[data-testid="stMetricLabel"]{color:#b8c7d8!important;font-weight:800}
-[data-testid="stMetricValue"]{font-family:Impact,"Arial Narrow",sans-serif;font-size:2.35rem!important}
-.stButton>button{border-radius:10px;border:1px solid #ef2945;background:linear-gradient(180deg,#f0223f,#c90f2d);color:white;font-weight:900}
-.stButton>button:hover{border-color:#ff6a7b;color:white}
-div[data-baseweb="select"]>div,div[data-testid="stNumberInput"]>div{background:#0d2a55!important;border:1px solid #31537b!important;border-radius:10px!important}
+:root{
+  --navy:#06162b;
+  --navy2:#0a2140;
+  --navy3:#0d294b;
+  --red:#e31837;
+  --red2:#ff2948;
+  --white:#f8f9fb;
+  --muted:#a7b7ca;
+  --green:#2fe777;
+  --gold:#f2c14e;
+  --line:#294968;
+}
+html,body,.stApp{
+  background:
+    radial-gradient(circle at 72% 4%,rgba(24,62,112,.34),transparent 28%),
+    linear-gradient(155deg,#03101f 0%,#06182f 52%,#04111f 100%);
+  color:var(--white);
+}
+.stApp:before{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  opacity:.12;
+  background-image:
+    linear-gradient(135deg,transparent 0 46%,rgba(255,255,255,.05) 46.5% 47%,transparent 47.5%),
+    linear-gradient(45deg,transparent 0 46%,rgba(255,255,255,.035) 46.5% 47%,transparent 47.5%);
+  background-size:54px 54px;
+}
+[data-testid="stSidebar"]{
+  width:208px!important;
+  min-width:208px!important;
+  background:linear-gradient(180deg,#061225 0%,#071a32 100%)!important;
+  border-right:1px solid #26435f!important;
+}
+[data-testid="stSidebar"]>div:first-child{width:208px!important}
+[data-testid="stSidebar"] .block-container{padding:1.0rem .8rem 1.2rem!important}
+.block-container{max-width:1500px!important;padding:1.0rem 1.25rem 2rem!important}
+h1,h2,h3,h4,.sok-font{font-family:Impact,"Arial Narrow",Haettenschweiler,"Arial Black",sans-serif!important;letter-spacing:.035em;text-transform:uppercase}
+.stCaption,.small-muted{color:var(--muted)!important}
+div[data-baseweb="select"]>div,div[data-testid="stTextInput"]>div{background:#09244a!important;border:1px solid #315b88!important;border-radius:10px!important}
 input{color:#fff!important}
-.sok-title{font-family:Impact,"Arial Narrow",Haettenschweiler,sans-serif;font-size:4.4rem;line-height:.88;letter-spacing:.02em;text-transform:uppercase;color:#fff;text-shadow:3px 3px 0 #102b50}
-.sok-title span{display:block;color:var(--red);text-shadow:3px 3px 0 #fff}
-.sok-sub{color:#aabbd0;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
-.badge{display:inline-block;padding:7px 12px;border-radius:999px;background:#113b2b;color:#5df29a;font-weight:900;letter-spacing:.04em}
-.live-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#31e66f;margin-right:7px}
-.game-card{border:1px solid #3a5775;border-radius:18px;padding:18px 22px;background:linear-gradient(145deg,#0c2645,#08182f)}
-.section-bar{background:linear-gradient(90deg,#b70e29,#ef1939,#b70e29);color:#fff;text-align:center;font-family:Impact,"Arial Narrow",sans-serif;letter-spacing:.08em;text-transform:uppercase;padding:7px 16px;border-radius:10px;margin:8px auto 14px;max-width:360px}
-.projection-card{background:linear-gradient(160deg,#102b49,#08192f);border:1px solid #42617f;border-radius:20px;padding:20px;min-height:180px;box-shadow:0 12px 25px rgba(0,0,0,.2)}
-.projection-card .label{font-weight:900;color:#c8d5e3;text-transform:uppercase;font-size:.82rem;letter-spacing:.06em}
-.projection-card .value{font-family:Impact,"Arial Narrow",sans-serif;font-size:3rem;margin:12px 0 8px}
-.projection-card .pill{display:inline-block;border:1px solid #146b46;background:#0d3d2b;color:#4ee58d;padding:5px 10px;border-radius:999px;font-weight:900;font-size:.78rem}
-.table-card{border:1px solid #3b5772;border-radius:18px;padding:12px 16px;background:linear-gradient(150deg,#0b213d,#07172b)}
-.locked{color:#58ed93;font-weight:900}
-.small-muted{color:var(--muted);font-size:.86rem}
-.footer-sok{margin-top:28px;padding:22px;text-align:center;border-top:1px solid #203d5b;color:#b9c8d8;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
-.footer-sok strong{color:var(--red);font-family:Impact,"Arial Narrow",sans-serif;font-size:1.4rem}
+.stButton>button{border-radius:9px!important;border:1px solid #ff405b!important;background:linear-gradient(180deg,#ef1738,#c90b2b)!important;color:#fff!important;font-weight:900!important;letter-spacing:.04em!important;box-shadow:0 7px 16px rgba(227,24,55,.18)}
+.stButton>button:hover{border-color:#ff8a9a!important;color:#fff!important}
+.stProgress>div>div>div{background:linear-gradient(90deg,#e31837,#ff2948)!important}
+[data-testid="stMetric"]{background:transparent!important;border:0!important;box-shadow:none!important}
+hr{border-color:#1f3b57!important}
+.sok-sidebar-logo{display:flex;justify-content:center;margin:0 0 .35rem}
+.sok-sidebar-title{font-family:Impact,"Arial Narrow",sans-serif;text-align:center;font-size:1.35rem;line-height:1;color:#fff}
+.sok-sidebar-title span{color:var(--red)}
+.sok-sidebar-sub{color:#b7c6d7;font-size:.78rem;line-height:1.35;text-align:center;margin:.5rem 0 .8rem}
+.sok-nav{display:flex;flex-direction:column;gap:.2rem;margin:.6rem 0 1rem}
+.sok-nav a{color:#dce6f0!important;text-decoration:none!important;padding:.55rem .55rem;border-radius:8px;font-weight:800;font-size:.83rem}
+.sok-nav a:hover{background:#102b4c;color:#fff!important}
+.sok-nav .active{background:linear-gradient(90deg,#ed1838,#bd0d2b);color:#fff!important}
+.sok-side-card{border:1px solid #35516d;border-radius:12px;background:linear-gradient(145deg,#0a203a,#07162b);padding:.75rem;margin-top:.8rem}
+.sok-side-card .title{color:var(--red2);font-family:Impact,"Arial Narrow",sans-serif;font-size:.82rem;letter-spacing:.05em}
+.sok-side-card p{color:#bdcbd9;font-size:.74rem;line-height:1.45;margin:.35rem 0 0}
+.sok-side-card .stars{color:var(--red);letter-spacing:.18em;margin-top:.4rem}
+.sok-date{border:1px solid #35516d;border-radius:12px;padding:.7rem;background:#081a31;margin-top:.7rem}
+.sok-date .label{color:#ff2948;font-family:Impact,"Arial Narrow",sans-serif;font-size:.78rem}
+.sok-date .value{color:#fff;font-family:Impact,"Arial Narrow",sans-serif;font-size:1.15rem;margin-top:.15rem}
+.sok-date .updated{color:#9eb0c4;font-size:.68rem;margin-top:.25rem}
+.sok-search-title{color:#ff2948;font-family:Impact,"Arial Narrow",sans-serif;font-size:.9rem;letter-spacing:.08em;text-align:center;margin-top:1rem}
+.sok-lock{color:#aebdcd;font-size:.72rem;line-height:1.35;margin-top:.4rem;text-align:center}
+.sok-hero{display:grid;grid-template-columns:180px 1fr 190px;gap:1.0rem;align-items:center;min-height:190px}
+.sok-logo-large{width:170px;filter:drop-shadow(0 12px 12px rgba(0,0,0,.35))}
+.sok-title{font-size:5.0rem;line-height:.82;color:#fff;text-shadow:4px 4px 0 #182e52,0 10px 24px rgba(0,0,0,.25)}
+.sok-title .red{color:var(--red);text-shadow:3px 3px 0 #f7f8fa,5px 5px 0 #162d50}
+.sok-ribbon{display:inline-block;margin-top:.75rem;padding:.35rem 1.1rem;border:2px solid var(--red);color:#fff;background:#091a31;font-family:Impact,"Arial Narrow",sans-serif;letter-spacing:.11em;font-size:.82rem;clip-path:polygon(4% 0,96% 0,100% 50%,96% 100%,4% 100%,0 50%)}
+.sok-status{border:1px solid #35516d;border-radius:16px;padding:1rem;background:linear-gradient(145deg,#0c2340,#07172b);box-shadow:0 12px 24px rgba(0,0,0,.18)}
+.sok-status .head{font-family:Impact,"Arial Narrow",sans-serif;letter-spacing:.08em;font-size:.85rem}
+.sok-status .live{color:var(--green);font-family:Impact,"Arial Narrow",sans-serif;font-size:1.1rem}
+.sok-status .quality{color:#aebed0;font-size:.75rem;line-height:1.4}
+.sok-status .bar{height:7px;border-radius:999px;background:#26101a;overflow:hidden;margin-top:.45rem}
+.sok-status .bar span{display:block;height:100%;background:linear-gradient(90deg,#e31837,#ff2948)}
+.matchup{display:grid;grid-template-columns:1.5fr 1fr 1fr;align-items:center;border:1px solid #35516d;border-radius:16px;background:linear-gradient(145deg,#0b2340,#07172b);padding:1rem 1.2rem;box-shadow:0 12px 25px rgba(0,0,0,.18)}
+.matchup .pitcher{font-family:Impact,"Arial Narrow",sans-serif;font-size:2.0rem;line-height:1}
+.matchup .teams{color:var(--red2);font-weight:950;font-size:1.15rem;margin-top:.25rem}
+.matchup .teams span{color:#fff}
+.matchup .detail{color:#aebed0;font-size:.8rem;margin-top:.4rem}
+.cle-badge{width:76px;height:76px;border-radius:50%;border:2px solid #3c5772;background:radial-gradient(circle,#1a3761,#07172b);display:flex;align-items:center;justify-content:center;font-family:Impact,"Arial Narrow",sans-serif;font-style:italic;font-size:3.2rem;color:#fff;text-shadow:3px 3px 0 var(--red);box-shadow:inset 0 0 0 7px rgba(227,24,55,.08)}
+.live-schedule{border-left:1px solid #2d4763;padding-left:1.1rem}
+.live-schedule .head{color:#2fe777;font-family:Impact,"Arial Narrow",sans-serif;letter-spacing:.08em;font-size:1.0rem}
+.live-schedule .row{color:#dce5ee;font-size:.83rem;margin-top:.4rem}
+.live-schedule .row span{color:#9fb1c6}
+.section-frame{border:2px solid var(--red);border-radius:16px;padding:1.05rem;margin-top:1.0rem;background:linear-gradient(160deg,rgba(7,25,47,.94),rgba(5,17,32,.94))}
+.section-ribbon{display:table;margin:-2.0rem auto .9rem;padding:.42rem 2.3rem;background:linear-gradient(180deg,#ed193a,#c60c2a);border:2px solid #ff4d67;color:#fff;font-family:Impact,"Arial Narrow",sans-serif;letter-spacing:.07em;font-size:1.0rem;clip-path:polygon(4% 0,96% 0,100% 50%,96% 100%,4% 100%,0 50%)}
+.proj-card{position:relative;min-height:205px;border:1px solid #4a6075;border-radius:15px;background:radial-gradient(circle at 15% 15%,rgba(255,255,255,.07),transparent 25%),linear-gradient(145deg,#102c4a,#07182e);padding:1.1rem;box-shadow:0 14px 25px rgba(0,0,0,.22);overflow:hidden}
+.proj-card:after{content:"";position:absolute;inset:auto -20px -42px -20px;height:95px;background:linear-gradient(180deg,transparent,rgba(227,24,55,.08));transform:skewY(-5deg)}
+.proj-label{color:#d5e0ea;font-family:Impact,"Arial Narrow",sans-serif;font-size:.78rem;letter-spacing:.08em;line-height:1.2}
+.proj-icon{width:42px;height:42px;border-radius:50%;border:2px solid #b9c6d3;display:inline-flex;align-items:center;justify-content:center;margin-bottom:.55rem;font-family:Impact,"Arial Narrow",sans-serif;color:#fff;background:linear-gradient(145deg,#16375d,#07182e)}
+.proj-value{position:relative;z-index:1;font-family:Impact,"Arial Narrow",sans-serif;font-size:3.35rem;line-height:1;margin:.5rem 0 .65rem;color:#fff}
+.proj-pill{position:relative;z-index:1;display:inline-block;border:1px solid #0d8150;background:#0a3b2a;color:#4bf092;border-radius:999px;padding:.35rem .65rem;font-size:.72rem;font-weight:950}
+.table-panel{border:1px solid #35516d;border-radius:15px;background:linear-gradient(145deg,#0a203b,#06162a);overflow:hidden;box-shadow:0 12px 22px rgba(0,0,0,.16)}
+.table-title{display:block;text-align:center;margin:0 auto;padding:.45rem 1.5rem;background:linear-gradient(180deg,#ed193a,#c60c2a);color:#fff;font-family:Impact,"Arial Narrow",sans-serif;letter-spacing:.07em;font-size:1rem}
+.sok-table{width:100%;border-collapse:collapse;color:#e6edf4;font-size:.78rem}
+.sok-table th{color:#d9e2eb;background:#0b1d34;font-family:Impact,"Arial Narrow",sans-serif;letter-spacing:.05em;font-weight:500}
+.sok-table th,.sok-table td{padding:.62rem .65rem;border-bottom:1px solid #223d58;text-align:left}
+.sok-table tr:last-child td{border-bottom:0}
+.sok-table .good{color:#42ef90;font-weight:900}
+.sok-table .bad{color:#ff5b72;font-weight:900}
+.footer-sok{margin-top:1.5rem;padding:1.3rem;border-top:1px solid #27445f;background:linear-gradient(180deg,rgba(4,16,31,.35),rgba(4,16,31,.75));text-align:center;color:#aebed0;font-weight:900;letter-spacing:.13em;text-transform:uppercase}
+.footer-sok strong{color:var(--red);font-family:Impact,"Arial Narrow",sans-serif;font-size:1.25rem}
+.details-wrap{margin-top:1rem;border-top:1px solid #203b57;padding-top:.5rem}
+@media(max-width:1000px){.sok-hero{grid-template-columns:120px 1fr}.sok-status{display:none}.sok-title{font-size:3.6rem}.matchup{grid-template-columns:1fr}.live-schedule{border-left:0;border-top:1px solid #2d4763;padding:1rem 0 0;margin-top:1rem}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -109,6 +191,7 @@ class MLBClient:
         if not isinstance(payload,dict): raise ValueError("Unexpected MLB response format")
         return payload
 
+@st.cache_data(ttl=120,show_spinner=False)
 def get_schedule(day:str)->tuple[list[GamePitcher],str|None]:
     try: payload=MLBClient().get("schedule",{"sportId":1,"date":day,"hydrate":"probablePitcher,team,venue,linescore"})
     except (requests.RequestException,ValueError) as exc: return [],f"Schedule unavailable: {exc}"
@@ -154,7 +237,7 @@ def negbin_pmf(mean:float,dispersion:float,maximum:int)->np.ndarray:
     probs=np.array([math.exp(math.lgamma(k+r)-math.lgamma(r)-math.lgamma(k+1)+r*math.log(p)+k*math.log(1-p)) for k in range(maximum+1)]);probs[-1]+=max(0.0,1.0-probs.sum());return probs/probs.sum()
 
 def discrete_normal_probs(mean:float,sd:float,maximum:int=27)->np.ndarray:
-    xs=np.arange(maximum+1);z_hi=(xs+.5-mean)/(sd*math.sqrt(2));z_lo=(xs-.5-mean)/(sd*math.sqrt(2));erf=np.vectorize(math.erf);probs=.5*(erf(z_hi)-erf(z_lo));probs[0]+=.5*(1+math.erf((-0.5-mean)/(sd*math.sqrt(2))));probs[-1]+=.5*(1-math.erf((maximum+.5-mean)/(sd*math.sqrt(2))));probs=np.clip(probs,0,None);return probs/probs.sum()
+    xs=np.arange(maximum+1);z_hi=(xs+.5-mean)/(sd*math.sqrt(2));z_lo=(xs-.5-mean)/(sd*math.sqrt(2));erf=np.vectorize(math.erf);probs=.5*(erf(z_hi)-erf(z_lo));probs[0]+=.5*(1+math.erf((-0.5-mean)/(sd*math.sqrt(2)));probs[-1]+=.5*(1-math.erf((maximum+.5-mean)/(sd*math.sqrt(2))));probs=np.clip(probs,0,None);return probs/probs.sum()
 
 def calculate_projection(log:pd.DataFrame,game:GamePitcher,manual:dict[str,float],simulations:int)->Projection:
     starts=log[log["games_started"]>0].copy().tail(35)
@@ -165,21 +248,29 @@ def over_probability(samples:np.ndarray,line:float)->float:return float(np.mean(
 def fair_american(probability:float)->str:
     p=float(np.clip(probability,.001,.999));odds=-100*p/(1-p) if p>=.5 else 100*(1-p)/p;return f"{odds:+.0f}"
 def interval(samples:np.ndarray,low:float=.10,high:float=.90)->tuple[int,int]:return int(np.quantile(samples,low)),int(np.quantile(samples,high))
+def html_table(headers:list[str],rows:list[list[str]])->str:
+    head="".join(f"<th>{h}</th>" for h in headers)
+    body=[]
+    for row in rows: body.append("<tr>"+"".join(f"<td>{cell}</td>" for cell in row)+"</tr>")
+    return f'<table class="sok-table"><thead><tr>{head}</tr></thead><tbody>{"".join(body)}</tbody></table>'
 
 now=datetime.now(EASTERN);query_day=now.date();odds_date_value=st.session_state.get("odds_selected_date")
-try:odds_default_date=datetime.strptime(str(odds_date_value),"%Y-%m-%d").date() if odds_date_value else query_day
-except ValueError:odds_default_date=query_day
+try: odds_default_date=datetime.strptime(str(odds_date_value),"%Y-%m-%d").date() if odds_date_value else query_day
+except ValueError: odds_default_date=query_day
+logo_path=ASSET_DIR/"strikeout_king_9000.svg"
 
 with st.sidebar:
-    logo_path=APP_DIR/"assets"/"strikeout_king_9000.svg"
-    if logo_path.exists():st.image(str(logo_path),width=150)
-    st.markdown("### StrikeOut King 9000")
-    st.caption("CLE-themed distributional MLB starter projections")
+    if logo_path.exists():
+        st.markdown('<div class="sok-sidebar-logo">',unsafe_allow_html=True);st.image(str(logo_path),width=130);st.markdown('</div>',unsafe_allow_html=True)
+    st.markdown('<div class="sok-sidebar-title">StrikeOut <span>King 9000</span></div>',unsafe_allow_html=True)
+    st.markdown('<div class="sok-sidebar-sub">CLE-themed distributional MLB starter projections</div>',unsafe_allow_html=True)
+    st.markdown('<div class="sok-nav"><a class="active" href="/">⌂ &nbsp; Projection</a><a href="/2_Bet_Tracker">♧ &nbsp; Bet Tracker</a><a href="/3_Odds_API">◎ &nbsp; Odds API</a><a href="/4_Projection_History">▣ &nbsp; Projection History</a><a href="/5_Daily_Projection_Run">▤ &nbsp; Daily Projection Run</a></div>',unsafe_allow_html=True)
     selected_date=st.date_input("Slate date",value=odds_default_date)
-    st.markdown("---")
-    st.markdown("**PITCHER SEARCH**")
-    pitcher_query=st.text_input("Search pitcher",placeholder="Search pitcher...",label_visibility="collapsed")
-    st.caption("Search and select a pitcher to lock the projection 🔒")
+    st.markdown(f'<div class="sok-date"><div class="label">SLATE DATE</div><div class="value">{selected_date:%Y/%m/%d}</div><div class="updated">Updated {now:%I:%M %p ET}</div></div>',unsafe_allow_html=True)
+    st.markdown('<div class="sok-search-title">PITCHER SEARCH</div>',unsafe_allow_html=True)
+    pitcher_query=st.text_input("Search pitcher",placeholder="Search pitcher...",label_visibility="collapsed",key="sok_pitcher_search")
+    st.markdown('<div class="sok-lock">Search and select a pitcher to lock the projection 🔒</div>',unsafe_allow_html=True)
+    st.markdown('<div class="sok-side-card"><div class="title">ABOUT STRIKEOUT KING 9000</div><p>Elite two-path projections combining simulated games and mathematical modeling for maximum accuracy.</p><div class="stars">★ ★ ★ ★ ★</div></div>',unsafe_allow_html=True)
 
 simulations=25000;opponent_k_pct=22.4;pitch_limit=92;umpire_k_factor=1.00;weather_factor=1.00;rest_factor=1.00
 schedule,schedule_error=get_schedule(selected_date.isoformat())
@@ -192,8 +283,8 @@ if odds_pitcher_name and odds_game_date==selected_date.isoformat():
 filtered=[g for g in schedule if not pitcher_query or pitcher_query.lower() in g.pitcher_name.lower()]
 if not filtered:filtered=schedule
 if selected_key not in {g.key for g in filtered}:selected_key=filtered[0].key
-selected_key=st.selectbox("Pitcher",[g.key for g in filtered],index=[g.key for g in filtered].index(selected_key),format_func=lambda key:f"{options[key].pitcher_name} · {options[key].team} vs {options[key].opponent}")
-if st.button("🔒 Lock pitcher",use_container_width=True):st.session_state["locked_pitcher_key"]=selected_key;st.rerun()
+selected_key=st.selectbox("Pitcher",[g.key for g in filtered],index=[g.key for g in filtered].index(selected_key),format_func=lambda key:f"{options[key].pitcher_name} · {options[key].team} vs {options[key].opponent}",label_visibility="collapsed")
+if st.button("🔒 LOCK PITCHER",use_container_width=True):st.session_state["locked_pitcher_key"]=selected_key;st.rerun()
 game=options[selected_key];season=selected_date.year;log,history_error=get_pitcher_game_log(game.pitcher_id,season)
 if log.empty and season>2000:
     previous_log,previous_error=get_pitcher_game_log(game.pitcher_id,season-1)
@@ -203,75 +294,70 @@ if history_error:st.warning(history_error)
 if log.empty:st.error("A projection cannot be issued without a pitcher game history.");st.stop()
 manual={"opponent_k_pct":opponent_k_pct,"pitch_limit":float(pitch_limit),"umpire_k_factor":umpire_k_factor,"weather_factor":weather_factor,"rest_factor":rest_factor};projection=calculate_projection(log,game,manual,simulations)
 
-from training.github_projection_store import save_projection
-archive_key=f"{selected_date.isoformat()}:{game.game_pk}:{game.pitcher_id}"
-if archive_key not in st.session_state.get("projection_archive_attempted",set()):
-    st.session_state.setdefault("projection_archive_attempted",set()).add(archive_key)
-    if any(token in game.status.lower() for token in ("scheduled","pre-game","warmup")):
-        try:
+try:
+    from training.github_projection_store import save_projection
+    archive_key=f"{selected_date.isoformat()}:{game.game_pk}:{game.pitcher_id}";attempted=st.session_state.setdefault("projection_archive_attempted",set())
+    if archive_key not in attempted:
+        attempted.add(archive_key)
+        if any(token in game.status.lower() for token in ("scheduled","pre-game","warmup")):
             k_lo,k_hi=interval(projection.k_samples);save_projection({"game_pk":game.game_pk,"game_date":selected_date.isoformat(),"pitcher_id":game.pitcher_id,"player":game.pitcher_name,"team":game.team,"opponent":game.opponent,"venue":game.venue,"game_time":game.game_time,"captured_at_utc":now.astimezone(ZoneInfo("UTC")).isoformat(),"app_version":APP_VERSION,"projection":projection.mean_k,"k_sd":projection.k_sd,"k_range_low":k_lo,"k_range_high":k_hi,"confidence":projection.confidence,"data_quality":projection.data_quality,"simulation_draws":simulations,"opponent_k_pct":opponent_k_pct,"pitch_limit":pitch_limit,"umpire_k_factor":umpire_k_factor,"weather_factor":weather_factor,"rest_factor":rest_factor,"actual_strikeouts":"","resolved_at_utc":""})
-        except Exception as exc:st.warning(f"Projection archive unavailable: {exc}")
+except Exception as exc: st.session_state["projection_archive_warning"]=str(exc)
 
-hero_left,hero_mid,hero_right=st.columns([1.1,3.8,1.2])
-with hero_left:
-    if logo_path.exists():st.image(str(logo_path),width=180)
-with hero_mid:
-    st.markdown('<div class="sok-title">STRIKEOUT<span>KING 9000</span></div><div class="sok-sub">MLB PITCHER PROJECTION ENGINE · TWO-PATH ANALYTICS</div>',unsafe_allow_html=True)
-with hero_right:
-    st.markdown(f'<div class="table-card"><b>DATA STATUS</b><br><span class="live-dot"></span><span class="locked">{projection.confidence.upper()}</span><br><span class="small-muted">Quality {projection.data_quality}/100</span></div>',unsafe_allow_html=True)
+st.markdown('<div class="sok-hero">',unsafe_allow_html=True)
+h1,h2,h3=st.columns([1.15,4.1,1.25])
+with h1:
+    if logo_path.exists():st.image(str(logo_path),width=175)
+with h2:
+    st.markdown('<div class="sok-title">STRIKEOUT<br><span class="red">KING 9000</span></div><div class="sok-ribbon">★ MLB PITCHER PROJECTION ENGINE ★ TWO-PATH ANALYTICS ★</div>',unsafe_allow_html=True)
+with h3:
+    pct=projection.data_quality;st.markdown(f'<div class="sok-status"><div class="head">DATA STATUS</div><div class="live">● {projection.confidence.upper()}</div><div class="quality">High confidence<br>Data quality {pct}/100</div><div class="bar"><span style="width:{pct}%"></span></div></div>',unsafe_allow_html=True)
+st.markdown('</div>',unsafe_allow_html=True)
 
-st.markdown(f'<div class="game-card"><div style="font-size:1.65rem;font-weight:900">{game.pitcher_name.upper()}</div><div style="color:#ff334d;font-weight:900;font-size:1.2rem">{game.team} <span style="color:white">vs</span> {game.opponent}</div><div class="small-muted">⚾ {game.venue} · {game.side} · {game.status} · Updated {now:%I:%M %p ET}</div></div>',unsafe_allow_html=True)
-st.markdown('<span class="badge"><span class="live-dot"></span>LIVE SCHEDULE</span>',unsafe_allow_html=True)
-line_col1,line_col2,line_col3=st.columns([1,1,1.5])
-with line_col1:k_line=st.number_input("Strikeout line",.5,15.5,5.5,.5)
-with line_col2:outs_line=st.number_input("Outs line",.5,26.5,15.5,.5)
-with line_col3:st.markdown("#### Model status");st.progress(projection.data_quality/100,text=f"{projection.confidence} confidence · {simulations:,} simulation draws")
+game_dt=pd.to_datetime(game.game_time,errors="coerce")
+if pd.notna(game_dt): game_clock=game_dt.tz_convert(EASTERN).strftime("%I:%M %p ET") if game_dt.tzinfo else game_dt.strftime("%I:%M %p ET")
+else: game_clock="Time TBD"
+st.markdown(f'<div class="matchup"><div><div class="pitcher">{game.pitcher_name.upper()}</div><div class="teams">{game.team} <span>vs</span> {game.opponent}</div><div class="detail">⚾ {game.venue} · {game.side} · {game.status}</div></div><div class="cle-badge">C</div><div class="live-schedule"><div class="head">LIVE SCHEDULE</div><div class="row">▣ &nbsp; Today &nbsp; <span>{game_clock}</span></div><div class="row">Scheduled &nbsp; • &nbsp; {game.side}</div></div></div>',unsafe_allow_html=True)
 
+try: k_line=float(st.session_state.get("odds_selected_line",5.5))
+except (TypeError,ValueError): k_line=5.5
+try: outs_line=float(st.session_state.get("odds_selected_outs_line",15.5))
+except (TypeError,ValueError): outs_line=15.5
 k_over=over_probability(projection.k_samples,k_line);outs_over=over_probability(projection.outs_samples,outs_line);k_lo,k_hi=interval(projection.k_samples);o_lo,o_hi=interval(projection.outs_samples)
-st.markdown('<div class="section-bar">PROJECTION SUMMARY</div>',unsafe_allow_html=True)
+
+st.markdown('<div class="section-frame"><div class="section-ribbon">PROJECTION SUMMARY</div>',unsafe_allow_html=True)
 m1,m2,m3,m4=st.columns(4)
-for col,(label,value,pill) in zip((m1,m2,m3,m4),[("PROJECTED STRIKEOUTS",f"{projection.mean_k:.2f}",f"↑ 80% RANGE {k_lo}-{k_hi}"),(f"OVER {k_line:g} STRIKEOUTS",f"{k_over:.1%}",f"↑ FAIR {fair_american(k_over)}"),("PROJECTED OUTS",f"{projection.mean_outs:.2f}",f"↑ 80% RANGE {o_lo}-{o_hi}"),(f"OVER {outs_line:g} OUTS",f"{outs_over:.1%}",f"↑ FAIR {fair_american(outs_over)}")]):
-    with col:st.markdown(f'<div class="projection-card"><div class="label">{label}</div><div class="value">{value}</div><div class="pill">{pill}</div></div>',unsafe_allow_html=True)
+cards=[("K","PROJECTED STRIKEOUTS",f"{projection.mean_k:.2f}",f"↑ 80% RANGE {k_lo}-{k_hi}"),("5.5+","OVER 5.5 STRIKEOUTS",f"{k_over:.1%}",f"↑ FAIR {fair_american(k_over)}"),("OUT","PROJECTED OUTS",f"{projection.mean_outs:.2f}",f"↑ 80% RANGE {o_lo}-{o_hi}"),("15.5+","OVER 15.5 OUTS",f"{outs_over:.1%}",f"↑ FAIR {fair_american(outs_over)}")]
+for col,(icon,label,value,pill) in zip((m1,m2,m3,m4),cards):
+    with col:st.markdown(f'<div class="proj-card"><div class="proj-icon">{icon}</div><div class="proj-label">{label}</div><div class="proj-value">{value}</div><div class="proj-pill">{pill}</div></div>',unsafe_allow_html=True)
+st.markdown('</div>',unsafe_allow_html=True)
 
-tab1,tab2,tab3,tab4=st.tabs(["Projection","Distribution","Form & Workload","Model Card"])
-with tab1:
-    st.markdown('<div class="section-bar">PROBABILITY TABLE</div>',unsafe_allow_html=True)
-    prob_df=pd.DataFrame([{"Market":f"K OVER {k_line:g}","Probability":k_over,"Fair odds":fair_american(k_over),"Projection":projection.mean_k},{"Market":f"K UNDER {k_line:g}","Probability":1-k_over,"Fair odds":fair_american(1-k_over),"Projection":projection.mean_k},{"Market":f"OUTS OVER {outs_line:g}","Probability":outs_over,"Fair odds":fair_american(outs_over),"Projection":projection.mean_outs},{"Market":f"OUTS UNDER {outs_line:g}","Probability":1-outs_over,"Fair odds":fair_american(1-outs_over),"Projection":projection.mean_outs}])
-    st.dataframe(prob_df.style.format({"Probability":"{:.1%}","Projection":"{:.2f}"}),hide_index=True,use_container_width=True);st.caption("Probabilities are model estimates, not guarantees.")
-    st.markdown('<div class="section-bar">PROJECTION DRIVERS</div>',unsafe_allow_html=True)
-    factor_df=pd.DataFrame(projection.factors,columns=["Factor","Impact"]);factor_df["Direction"]=np.where(factor_df["Impact"]>=0,"↑ Raises","↓ Lowers");factor_df["Impact"]=factor_df["Impact"].map(lambda x:f"{x:+.1%}");st.dataframe(factor_df,hide_index=True,use_container_width=True)
-with tab2:
-    c1,c2=st.columns(2)
-    with c1:st.subheader("Strikeout distribution");st.bar_chart(pd.DataFrame({"Probability":projection.k_probs},index=np.arange(len(projection.k_probs))),color="#e31837")
-    with c2:st.subheader("Outs distribution");st.bar_chart(pd.DataFrame({"Probability":projection.outs_probs},index=np.arange(len(projection.outs_probs))),color="#315f93")
-with tab3:
-    display=log.tail(15).copy();display["K/BF"]=display["strikeouts"]/display["batters_faced"].replace(0,np.nan);display["Pitches/BF"]=display["pitches"]/display["batters_faced"].replace(0,np.nan);st.line_chart(display.set_index("date")[["strikeouts","outs"]]);st.dataframe(display[["date","opponent","strikeouts","outs","batters_faced","pitches","K/BF","Pitches/BF"]].sort_values("date",ascending=False).style.format({"K/BF":"{:.1%}","Pitches/BF":"{:.2f}"}),hide_index=True,use_container_width=True)
-with tab4:
-    st.markdown("### Two-path projection engine");st.markdown("- Independent game simulation plus mathematical probability modeling.\n- Exponentially weighted recent form with empirical-Bayes shrinkage.\n- Negative Binomial strikeout distribution and bounded outs distribution.\n- Archived pregame snapshots remain separate from the Bet Tracker.\n- Calibration and walk-forward evaluation remain part of the production roadmap.")
-    manifest={"app_version":APP_VERSION,"prediction_timestamp_et":now.isoformat(),"game_pk":game.game_pk,"pitcher_id":game.pitcher_id,"inputs":manual,"simulation_draws":simulations,"confidence":projection.confidence};st.download_button("Download prediction manifest",json.dumps(manifest,indent=2),file_name=f"projection_{game.game_pk}_{game.pitcher_id}.json",mime="application/json")
+left,right=st.columns([1,1])
+with left:
+    prob_rows=[[f"K OVER {k_line:g}",f"{k_over:.1%}",fair_american(k_over),f"{projection.mean_k:.2f}"],[f"K UNDER {k_line:g}",f"{1-k_over:.1%}",fair_american(1-k_over),f"{projection.mean_k:.2f}"],[f"OUTS OVER {outs_line:g}",f"{outs_over:.1%}",fair_american(outs_over),f"{projection.mean_outs:.2f}"],[f"OUTS UNDER {outs_line:g}",f"{1-outs_over:.1%}",fair_american(1-outs_over),f"{projection.mean_outs:.2f}"]]
+    st.markdown('<div class="table-panel"><div class="table-title">PROBABILITY TABLE</div>'+html_table(["MARKET","PROBABILITY","FAIR ODDS","PROJECTION"],prob_rows)+'</div>',unsafe_allow_html=True)
+with right:
+    driver_rows=[]
+    for factor,impact in projection.factors:
+        direction="↑ Raises" if impact>=0 else "↓ Lowers";cls="good" if impact>=0 else "bad";driver_rows.append([factor,f"{impact:+.1%}",f'<span class="{cls}">{direction}</span>'])
+    st.markdown('<div class="table-panel"><div class="table-title">PROJECTION DRIVERS</div>'+html_table(["FACTOR","IMPACT","DIRECTION"],driver_rows)+'</div>',unsafe_allow_html=True)
+st.caption("Probabilities are model estimates, not guarantees.")
 
-from training.manual_lines import ManualLine,analyze_manual_line,confidence_tier
-from training.github_bet_store import save_bet,load_bets
-with st.expander("Betting line fallback · sportsbook line"):
-    st.caption("Use only when an Odds API line is unavailable. This does not change the projection itself.")
-    odds_transfer_active=st.session_state.get("odds_selected_date")==selected_date.isoformat() and st.session_state.get("odds_selected_line") is not None and not st.session_state.get("odds_selection_applied",False)
-    if odds_transfer_active:
-        st.session_state["manual_side"]=str(st.session_state.get("odds_selected_side","Over"));st.session_state["manual_line"]=float(st.session_state.get("odds_selected_line"));st.session_state["manual_odds"]=int(st.session_state.get("odds_selected_odds",-110));st.session_state["odds_selection_applied"]=True
-    b1,b2,b3,b4=st.columns([1.2,1,1,1])
-    with b1:manual_side=st.selectbox("Side",["Over","Under"],key="manual_side")
-    with b2:manual_line=st.number_input("K line",.5,15.5,float(k_line),.5,key="manual_line")
-    with b3:manual_odds=st.number_input("American odds",-500,500,-110,5,key="manual_odds")
-    with b4:st.write("");analyze_button=st.button("Analyze line",type="primary",use_container_width=True)
-    if analyze_button:
-        manual_over=over_probability(projection.k_samples,manual_line);analysis=analyze_manual_line(projection.mean_k,manual_over,manual_line,manual_side,int(manual_odds));st.session_state["pending_manual_bet"]={"analysis":analysis,"record":ManualLine(game.pitcher_name,selected_date.isoformat(),manual_line,manual_side,int(manual_odds))}
-    pending=st.session_state.get("pending_manual_bet")
-    if pending:
-        analysis=pending["analysis"];confidence=confidence_tier(analysis["model_probability"],analysis["edge"]);a1,a2,a3,a4=st.columns(4);a1.metric("Model probability",f"{analysis['model_probability']:.1%}");a2.metric("Sportsbook implied",f"{analysis['implied_probability']:.1%}");a3.metric("Model edge",f"{analysis['edge']:+.1%}");a4.metric("Provisional confidence",confidence);st.info("Confidence is provisional until historical sportsbook lines are available for calibration.")
-        if st.button("Save to Bet Tracker",key="save_bet"):
-            record={**pending["record"].__dict__,**analysis,"confidence":confidence,"game_pk":game.game_pk,"pitcher_id":game.pitcher_id,"actual_strikeouts":""};save_bet(record);st.session_state.pop("pending_manual_bet",None);st.success("Bet saved to the persistent tracker.")
-tracker_rows=load_bets()
-if tracker_rows:
-    with st.expander("Recent Bet Tracker"):
-        tracker=pd.DataFrame(tracker_rows);st.dataframe(tracker.sort_values("entered_at_utc",ascending=False),hide_index=True,use_container_width=True)
+st.markdown('<div class="details-wrap">',unsafe_allow_html=True)
+with st.expander("Distribution, form & workload, and model card"):
+    t1,t2,t3=st.tabs(["Distribution","Form & Workload","Model Card"])
+    with t1:
+        c1,c2=st.columns(2)
+        with c1:
+            st.subheader("Strikeout distribution")
+            st.bar_chart(pd.DataFrame({"Probability":projection.k_probs},index=np.arange(len(projection.k_probs))),color="#e31837")
+        with c2:
+            st.subheader("Outs distribution")
+            st.bar_chart(pd.DataFrame({"Probability":projection.outs_probs},index=np.arange(len(projection.outs_probs))),color="#315f93")
+    with t2:
+        display=log.tail(15).copy();display["K/BF"]=display["strikeouts"]/display["batters_faced"].replace(0,np.nan);display["Pitches/BF"]=display["pitches"]/display["batters_faced"].replace(0,np.nan);st.line_chart(display.set_index("date")[["strikeouts","outs"]]);st.dataframe(display[["date","opponent","strikeouts","outs","batters_faced","pitches","K/BF","Pitches/BF"]].sort_values("date",ascending=False),hide_index=True,use_container_width=True)
+    with t3:
+        st.markdown("### Two-path projection engine\n- Independent simulated games plus mathematical probability modeling.\n- Exponentially weighted recent form with empirical-Bayes shrinkage.\n- Negative Binomial strikeout distribution and bounded outs distribution.\n- Frozen pregame snapshots are archived separately from the Bet Tracker.\n- The daily projection runner can build the larger historical pitcher database.")
+        manifest={"app_version":APP_VERSION,"prediction_timestamp_et":now.isoformat(),"game_pk":game.game_pk,"pitcher_id":game.pitcher_id,"inputs":manual,"simulation_draws":simulations,"confidence":projection.confidence};st.download_button("Download prediction manifest",json.dumps(manifest,indent=2),file_name=f"projection_{game.game_pk}_{game.pitcher_id}.json",mime="application/json")
+st.markdown('</div>',unsafe_allow_html=True)
 
-st.markdown('<div class="footer-sok">★ ★ ★ &nbsp; BUILT FOR <strong>CLE BASEBALL</strong> &nbsp; ★ ★ ★<br><span class="small-muted">ELITE DATA · ELITE PROJECTIONS · ELITE RESULTS</span></div>',unsafe_allow_html=True)
+st.markdown('<div class="footer-sok">★ ★ ★ &nbsp; BUILT FOR <strong>CLE BASEBALL</strong> &nbsp; ★ ★ ★<br><span>ELITE DATA · ELITE PROJECTIONS · ELITE RESULTS</span></div>',unsafe_allow_html=True)
