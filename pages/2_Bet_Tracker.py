@@ -132,6 +132,14 @@ def live_strikeouts(player_name: str, game_date: str, game_pk: int | None = None
         target = player_name.strip().lower()
         resolved_pitcher_id = pitcher_id or _resolve_pitcher_id(player_name)
 
+        # Important fallback: MLB's person/date stats endpoint can expose the current
+        # pitching line even when the schedule/game feed still reports the game as
+        # Scheduled. This is especially useful during live games where the feed is stale.
+        if resolved_pitcher_id:
+            date_ks, date_status = _date_pitching_stats(resolved_pitcher_id, game_date)
+            if date_ks is not None:
+                return date_ks, date_status
+
         candidates: list[tuple[int, int]] = []
         if game_pk:
             candidates.append((int(game_pk), int(resolved_pitcher_id or 0)))
@@ -160,8 +168,6 @@ def live_strikeouts(player_name: str, game_date: str, game_pk: int | None = None
 
         last_status = "Scheduled"
         for candidate_game_pk, candidate_pitcher_id in candidates:
-            # First try the direct by-game stats endpoint. This can return current stats
-            # even when the general live feed is still showing an old scheduled state.
             ks, stats_status = _game_pitching_stats(candidate_game_pk, candidate_pitcher_id or resolved_pitcher_id, target)
             if ks is not None:
                 return ks, stats_status
