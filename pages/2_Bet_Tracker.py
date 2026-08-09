@@ -7,6 +7,7 @@ import streamlit as st
 from training.github_bet_store import load_bets
 
 MLB_API = "https://statsapi.mlb.com/api/v1"
+MLB_LIVE_API = "https://statsapi.mlb.com/api/v1.1"
 MLB_HEADERS = {"Cache-Control": "no-cache", "Pragma": "no-cache", "Accept": "application/json"}
 
 st.set_page_config(page_title="Bet Tracker", page_icon="📊", layout="wide")
@@ -132,9 +133,6 @@ def live_strikeouts(player_name: str, game_date: str, game_pk: int | None = None
         target = player_name.strip().lower()
         resolved_pitcher_id = pitcher_id or _resolve_pitcher_id(player_name)
 
-        # Important fallback: MLB's person/date stats endpoint can expose the current
-        # pitching line even when the schedule/game feed still reports the game as
-        # Scheduled. This is especially useful during live games where the feed is stale.
         if resolved_pitcher_id:
             date_ks, date_status = _date_pitching_stats(resolved_pitcher_id, game_date)
             if date_ks is not None:
@@ -172,8 +170,10 @@ def live_strikeouts(player_name: str, game_date: str, game_pk: int | None = None
             if ks is not None:
                 return ks, stats_status
 
+            # MLB's live game feed is served from the v1.1 endpoint. The old v1
+            # path can return a stale/scheduled response or 404 for live games.
             response = requests.get(
-                f"{MLB_API}/game/{candidate_game_pk}/feed/live",
+                f"{MLB_LIVE_API}/game/{candidate_game_pk}/feed/live",
                 params=_fresh_params(),
                 headers=MLB_HEADERS,
                 timeout=10,
