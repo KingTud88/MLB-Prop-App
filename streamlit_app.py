@@ -60,14 +60,9 @@ response.raise_for_status()
 source = response.text
 source = source.replace('initial_sidebar_state="expanded"', 'initial_sidebar_state="collapsed"', 1)
 
-# Replace the old href-based sidebar navigation without changing the
-# indentation of the surrounding legacy `with st.sidebar:` block. The
-# previous patch added its own four spaces on top of the existing indentation,
-# which produced the repeated `IndentationError: unexpected indent` failures.
 nav_lines = [
     'st.page_link("streamlit_app.py", label="⌂  Projection", use_container_width=True)',
     'st.page_link("pages/2_Bet_Tracker.py", label="♧  Bet Tracker", use_container_width=True)',
-    'st.page_link("pages/3_Odds_API.py", label="◎  Odds API", use_container_width=True)',
     'st.page_link("pages/4_Projection_History.py", label="▣  Projection History", use_container_width=True)',
     'st.page_link("pages/5_Daily_Projection_Run.py", label="▤  Daily Projection Run", use_container_width=True)',
 ]
@@ -81,7 +76,39 @@ indent = re.match(r"^\s*", lines[nav_index]).group(0)
 lines[nav_index:nav_index + 1] = [indent + nav_line for nav_line in nav_lines]
 source = "\n".join(lines) + "\n"
 
-# Validate the generated legacy program before executing it. This catches
-# malformed navigation edits during deployment instead of at runtime.
+projection_marker = 'manual={"opponent_k_pct":opponent_k_pct,"pitch_limit":float(pitch_limit),"umpire_k_factor":umpire_k_factor,"weather_factor":weather_factor,"rest_factor":rest_factor};projection=calculate_projection(log,game,manual,simulations)\n'
+if projection_marker not in source:
+    raise RuntimeError("Projection calculation marker not found; refusing to deploy a partial patch.")
+source = source.replace(
+    projection_marker,
+    projection_marker + 'from training.merged_odds import render_merged_odds\nrender_merged_odds(game, selected_date, projection)\n',
+    1,
+)
+
+old_market = '''try:k_line=float(st.session_state.get("odds_selected_line",5.5))
+except (TypeError,ValueError):k_line=5.5
+try:outs_line=float(st.session_state.get("odds_selected_outs_line",15.5))
+except (TypeError,ValueError):outs_line=15.5
+k_over=over_probability(projection.k_samples,k_line);outs_over=over_probability(projection.outs_samples,outs_line);k_lo,k_hi=interval(projection.k_samples);o_lo,o_hi=interval(projection.outs_samples)
+'''
+new_market = '''try:k_line=float(st.session_state.get("odds_selected_line",5.5))
+except (TypeError,ValueError):k_line=5.5
+try:outs_line=float(st.session_state.get("odds_selected_outs_line",15.5))
+except (TypeError,ValueError):outs_line=15.5
+k_side=str(st.session_state.get("odds_selected_side","Over")).title()
+k_over=over_probability(projection.k_samples,k_line);k_market_prob=k_over if k_side=="Over" else 1-k_over
+k_market_label=str(st.session_state.get("odds_selected_display_line",f"OVER {k_line:g}"))
+outs_over=over_probability(projection.outs_samples,outs_line);k_lo,k_hi=interval(projection.k_samples);o_lo,o_hi=interval(projection.outs_samples)
+'''
+if old_market not in source:
+    raise RuntimeError("Market calculation marker not found; refusing to deploy a partial patch.")
+source = source.replace(old_market, new_market, 1)
+
+old_card = '("5.5+","OVER 5.5 STRIKEOUTS",f"{k_over:.1%}",f"↑ FAIR {fair_american(k_over)}")'
+new_card = '("K+",k_market_label,f"{k_market_prob:.1%}",f"↑ FAIR {fair_american(k_market_prob)}")'
+if old_card not in source:
+    raise RuntimeError("Projection card marker not found; refusing to deploy a partial patch.")
+source = source.replace(old_card, new_card, 1)
+
 compile(source, LEGACY, "exec")
 exec(compile(source, LEGACY, "exec"), globals(), globals())
