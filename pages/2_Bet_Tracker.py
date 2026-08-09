@@ -11,17 +11,51 @@ st.set_page_config(page_title="Bet Tracker", page_icon="📊", layout="wide")
 st.title("📊 Bet Tracker")
 st.caption("Persistent bets with live strikeout progress from MLB game data.")
 
-@st.cache_data(ttl=30, show_spinner=False)
+
+def _pitcher_ks_from_feed(data: dict, target: str, pitcher_id: int | None) -> float | None:
+    players = {}
+    teams = data.get("liveData", {}).get("boxscore", {}).get("teams", {})
+    for side in ("away", "home"):
+        players.update(teams.get(side, {}).get("players", {}))
+
+    player = players.get(f"ID{pitcher_id}") if pitcher_id else None
+    if not player:
+        for value in players.values():
+            if value.get("person", {}).get("fullName", "").strip().lower() == target:
+                player = value
+                break
+    if player:
+        stats = player.get("stats", {}).get("pitching", {}) or {}
+        ks = stats.get("strikeOuts")
+        if ks is not None:
+            return float(ks)
+
+    # Fallback: count strikeout events charged to the saved pitcher.
+    strikeouts = 0
+    found_pitcher_events = False
+    for play in data.get("liveData", {}).get("plays", {}).get("allPlays", []):
+        matchup = play.get("matchup", {}) or {}
+        pitcher = matchup.get("pitcher", {}) or {}
+        pid = pitcher.get("id")
+        pname = pitcher.get("fullName", "").strip().lower()
+        if (pitcher_id and pid == pitcher_id) or (not pitcher_id and pname == target):
+            found_pitcher_events = True
+            event = str(play.get("result", {}).get("event", "")).lower()
+            event_type = str(play.get("result", {}).get("eventType", "")).lower()
+            if event == "strikeout" or event_type == "strikeout":
+                strikeouts += 1
+    return float(strikeouts) if found_pitcher_events else None
+
+
+@st.cache_data(ttl=15, show_spinner=False)
 def live_strikeouts(player_name: str, game_date: str, game_pk: int | None = None, pitcher_id: int | None = None) -> tuple[float | None, str]:
     try:
         target = player_name.strip().lower()
-        candidates = []
+        candidates: list[tuple[int, int]] = []
 
-        # First use the saved game if it exists and is valid.
         if game_pk and pitcher_id:
             candidates.append((int(game_pk), int(pitcher_id)))
 
-        # Always resolve the saved pitcher/date through MLB's schedule as a fallback.
         schedule = requests.get(
             f"{MLB_API}/schedule",
             params={"sportId": 1, "date": game_date, "hydrate": "probablePitcher,team"},
@@ -41,7 +75,6 @@ def live_strikeouts(player_name: str, game_date: str, game_pk: int | None = None
         if not candidates:
             return None, "No MLB game found for this pitcher on the saved date."
 
-        # Prefer a candidate whose live feed is available.
         last_status = "Scheduled"
         for candidate_game_pk, candidate_pitcher_id in candidates:
             response = requests.get(f"{MLB_API}/game/{candidate_game_pk}/feed/live", timeout=10)
@@ -49,27 +82,34 @@ def live_strikeouts(player_name: str, game_date: str, game_pk: int | None = None
                 continue
             response.raise_for_status()
             data = response.json()
-            status = data.get("gameData", {}).get("status", {}).get("abstractGameState") or data.get("gameData", {}).get("status", {}).get("detailedState") or "Unknown"
+            game_status = data.get("gameData", {}).get("status", {}) or {}
+            status = game_status.get("detailedState") or game_status.get("abstractGameState") or "Unknown"
             last_status = status
-            players = {}
-            for side in ("away", "home"):
-                players.update(data.get("liveData", {}).get("boxscore", {}).get("teams", {}).get(side, {}).get("players", {}))
-            player = players.get(f"ID{candidate_pitcher_id}") if candidate_pitcher_id else None
-            if not player:
-                for value in players.values():
-                    if value.get("person", {}).get("fullName", "").strip().lower() == target:
-                        player = value
-                        break
-            if not player:
-                continue
-            stats = player.get("stats", {}).get("pitching", {})
-            ks = stats.get("strikeOuts")
+
+            ks = _pitcher_ks_from_feed(data, target, candidate_pitcher_id)
             if ks is not None:
-                return float(ks), status
+                return ks, status
+
+            # Some live feeds expose boxscore data more reliably through the boxscore endpoint.
+            box = requests.get(f"{MLB_API}/game/{candidate_game_pk}/boxscore", timeout=10)
+            if box.ok:
+                box_data = box.json()
+                box_status = box_data.get("gameData", {}).get("status", {}) or {}
+                status = box_status.get("detailedState") or box_status.get("abstractGameState") or status
+                last_status = status
+                teams = box_data.get("teams", {}) or {}
+                for side in ("away", "home"):
+                    for value in (teams.get(side, {}).get("players", {}) or {}).values():
+                        person = value.get("person", {}) or {}
+                        if (candidate_pitcher_id and person.get("id") == candidate_pitcher_id) or person.get("fullName", "").strip().lower() == target:
+                            stats = value.get("stats", {}).get("pitching", {}) or {}
+                            if stats.get("strikeOuts") is not None:
+                                return float(stats["strikeOuts"]), status
 
         return None, f"Game found, but MLB has not posted pitching stats yet ({last_status})."
     except Exception as exc:
         return None, f"Live lookup unavailable: {exc}"
+
 
 try:
     records = load_bets()
@@ -109,7 +149,7 @@ for idx,row in tracker.sort_values("entered_at_utc",ascending=False).iterrows():
     st.progress(progress,text=f"{int(current)} Ks / {line:g} line")
     if actual is None:
         st.caption(f"{status}")
-    elif status == "Final":
+    elif status.lower() == "final":
         won=(current > line) if side == "Over" else (current < line)
         st.write(f"Final: **{int(current)} Ks** · **{'WIN' if won else 'LOSS'}**")
     else:
