@@ -1,11 +1,20 @@
 from __future__ import annotations
 
+import base64
 import os
+from pathlib import Path
 import requests
 import streamlit as st
 
 LEGACY = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/f0b28d2a9f91cc145736eb2d3e0c1a72d3275f43/streamlit_app.py"
-MASCOT_URL = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000_96.png"
+BASE_DIR = Path(__file__).resolve().parent
+MASCOT_PATH = BASE_DIR / "assets" / "strikeout_king_9000_96.png"
+if not MASCOT_PATH.exists():
+    MASCOT_PATH = BASE_DIR / "assets" / "strikeout_king_9000.png"
+try:
+    MASCOT_DATA_URI = "data:image/png;base64," + base64.b64encode(MASCOT_PATH.read_bytes()).decode("ascii")
+except Exception:
+    MASCOT_DATA_URI = ""
 
 _original_markdown = st.markdown
 _original_image = st.image
@@ -60,12 +69,16 @@ def patched_markdown(body=None,*args,**kwargs):
         return _original_markdown(body + STYLE,*args,**kwargs)
     return _original_markdown(body,*args,**kwargs)
 
+def _mascot_html(width=250, extra_class=""):
+    if MASCOT_DATA_URI:
+        return f'<div class="sok-local-image {extra_class}"><img class="sok-mascot-image" src="{MASCOT_DATA_URI}" alt="StrikeOut King 9000 mascot" style="width:{int(width)}px"></div>'
+    return '<div class="sok-local-image"><span>StrikeOut King 9000</span></div>'
+
 def patched_image(image,*args,**kwargs):
-    text=str(image) if isinstance(image,(str,bytes)) else ''
+    text=str(image) if isinstance(image,(str,bytes,Path)) else ''
     if 'strikeout_king_9000' in text:
         width=kwargs.get('width',250)
-        html=f'<div class="sok-local-image"><img class="sok-mascot-image" src="{MASCOT_URL}" alt="StrikeOut King 9000 mascot" style="width:{int(width)}px"></div>'
-        return _original_markdown(html,unsafe_allow_html=True)
+        return _original_markdown(_mascot_html(width),unsafe_allow_html=True)
     return _original_image(image,*args,**kwargs)
 
 st.markdown=patched_markdown
@@ -96,14 +109,14 @@ old_nav='<div class="sok-nav"><a class="active" href="/">⌂ &nbsp; Projection</
 new_nav='<div class="sok-nav"><a class="active" href="/">⌂ &nbsp; Projection</a><div class="sok-disabled-nav">♧ &nbsp; Distribution</div><div class="sok-disabled-nav">♨ &nbsp; Form &amp; Workload</div><div class="sok-disabled-nav">▤ &nbsp; Model Card</div><a href="/2_Bet_Tracker">♧ &nbsp; Bet Tracker</a><a href="/4_Projection_History">▣ &nbsp; Projection History</a><a href="/5_Daily_Projection_Run">▤ &nbsp; Daily Projection Run</a></div>'
 source=source.replace(old_nav,new_nav,1)
 
-# Use the verified PNG mascot everywhere.
+# Use the verified mascot asset locally so the browser never has to fetch it from raw.githubusercontent.com.
 old_side_logo='''    if logo_path.exists():st.markdown('<div class="sok-sidebar-logo">',unsafe_allow_html=True);st.image(str(logo_path),width=130);st.markdown('</div>',unsafe_allow_html=True)'''
-new_side_logo='''    st.markdown(f'<div class="sok-sidebar-logo"><img src="{MASCOT_URL}" alt="StrikeOut King 9000"></div>',unsafe_allow_html=True)'''
+new_side_logo='''    st.markdown(f'<div class="sok-sidebar-logo"><img src="{MASCOT_DATA_URI}" alt="StrikeOut King 9000"></div>',unsafe_allow_html=True)'''
 source=source.replace(old_side_logo,new_side_logo,1)
 old_hero_logo='''with h1:
     if logo_path.exists():st.image(str(logo_path),width=175)'''
 new_hero_logo='''with h1:
-    st.markdown(f'<div class="sok-local-image"><img class="sok-mascot-image" src="{MASCOT_URL}" alt="StrikeOut King 9000 mascot"></div>',unsafe_allow_html=True)'''
+    st.markdown(_mascot_html(250),unsafe_allow_html=True)'''
 source=source.replace(old_hero_logo,new_hero_logo,1)
 
 # Put the scheduled pitcher's actual MLB team logo directly beside the name.
