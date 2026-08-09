@@ -337,7 +337,7 @@ with tab4:
     st.download_button("Download prediction manifest", json.dumps(manifest,indent=2), file_name=f"projection_{game.game_pk}_{game.pitcher_id}.json", mime="application/json")
 
 # Manual sportsbook line + tracking layer. This does not change the baseball forecast.
-from training.manual_lines import ManualLine, analyze_manual_line, append_bet_log
+from training.manual_lines import ManualLine, analyze_manual_line, append_bet_log, confidence_tier
 
 st.divider()
 st.subheader("Manual sportsbook line")
@@ -356,7 +356,15 @@ with manual_col4:
 if analyze_button:
     manual_over = over_probability(projection.k_samples, manual_line)
     analysis = analyze_manual_line(projection.mean_k, manual_over, manual_line, manual_side, int(manual_odds))
-    confidence = __import__("training.manual_lines", fromlist=["confidence_tier"]).confidence_tier(analysis["model_probability"], analysis["edge"])
+    st.session_state["pending_manual_bet"] = {
+        "analysis": analysis,
+        "record": ManualLine(game.pitcher_name, selected_date.isoformat(), manual_line, manual_side, int(manual_odds)),
+    }
+
+pending = st.session_state.get("pending_manual_bet")
+if pending:
+    analysis = pending["analysis"]
+    confidence = confidence_tier(analysis["model_probability"], analysis["edge"])
     a1,a2,a3,a4 = st.columns(4)
     a1.metric("Model probability", f"{analysis['model_probability']:.1%}")
     a2.metric("Sportsbook implied", f"{analysis['implied_probability']:.1%}")
@@ -364,8 +372,8 @@ if analyze_button:
     a4.metric("Provisional confidence", confidence)
     st.info("Confidence is provisional until historical sportsbook lines are available for calibration.")
     if st.button("Save to bet tracker", key="save_bet"):
-        record = ManualLine(game.pitcher_name, selected_date.isoformat(), manual_line, manual_side, int(manual_odds))
-        append_bet_log(APP_DIR / "data" / "bet_log.csv", record, analysis)
+        append_bet_log(APP_DIR / "data" / "bet_log.csv", pending["record"], analysis)
+        st.session_state.pop("pending_manual_bet", None)
         st.success("Bet saved to the local tracker.")
 
 tracker_path = DATA_DIR / "bet_log.csv"
