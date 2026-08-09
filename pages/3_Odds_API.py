@@ -99,6 +99,7 @@ if players:
         st.session_state["odds_selected_pitcher"] = str(selected["player"])
         st.session_state["odds_selected_date"] = selected_date.isoformat()
         st.session_state["odds_selected_event_id"] = str(selected_event_id)
+        st.session_state["odds_selection_applied"] = False
         st.success(
             f"Loaded {selected['player']} — {selected['side']} {selected['line']} at {int(selected['american_odds']):+d}. "
             "Go back to StrikeOut King 9000 and click Analyze line. The pitcher and sportsbook line will now carry over."
