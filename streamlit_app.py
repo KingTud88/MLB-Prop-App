@@ -15,7 +15,7 @@ import pandas as pd
 import requests
 import streamlit as st
 
-APP_VERSION = "2.0.1"
+APP_VERSION = "2.0.2"
 EASTERN = ZoneInfo("America/New_York")
 MLB_API = "https://statsapi.mlb.com/api/v1"
 APP_DIR = Path(__file__).resolve().parent
@@ -143,13 +143,29 @@ def load_local_csv(filename:str)->pd.DataFrame:
     return pd.DataFrame()
 
 now=datetime.now(EASTERN); query_day=now.date()
+# If the Odds API page just handed us a market, carry its slate date into the
+# main page so the selected pitcher and line are analyzed against the same game.
+odds_date_value = st.session_state.get("odds_selected_date")
+try:
+    odds_default_date = datetime.strptime(str(odds_date_value), "%Y-%m-%d").date() if odds_date_value else query_day
+except ValueError:
+    odds_default_date = query_day
 with st.sidebar:
-    st.markdown("## StrikeOut King 9000"); st.caption(f"Distributional MLB starter projections · v{APP_VERSION}"); selected_date=st.date_input("Slate date",value=query_day); st.markdown("### Model controls"); simulations=st.select_slider("Simulation draws",[5000,10000,25000,50000],value=25000); opponent_k_pct=st.slider("Projected lineup K%",15.0,32.0,22.4,.1); pitch_limit=st.slider("Expected pitch limit",60,115,92); umpire_k_factor=st.slider("Umpire K factor",.94,1.06,1.00,.01); weather_factor=st.slider("Weather K factor",.96,1.04,1.00,.01); rest_days=st.slider("Days rest",3,10,5); rest_factor=.96 if rest_days<=3 else 1.0 if rest_days<=6 else 1.01; st.caption("Market lines affect edge display only, never the baseball forecast.")
+    st.markdown("## StrikeOut King 9000"); st.caption(f"Distributional MLB starter projections · v{APP_VERSION}"); selected_date=st.date_input("Slate date",value=odds_default_date); st.markdown("### Model controls"); simulations=st.select_slider("Simulation draws",[5000,10000,25000,50000],value=25000); opponent_k_pct=st.slider("Projected lineup K%",15.0,32.0,22.4,.1); pitch_limit=st.slider("Expected pitch limit",60,115,92); umpire_k_factor=st.slider("Umpire K factor",.94,1.06,1.00,.01); weather_factor=st.slider("Weather K factor",.96,1.04,1.00,.01); rest_days=st.slider("Days rest",3,10,5); rest_factor=.96 if rest_days<=3 else 1.0 if rest_days<=6 else 1.01; st.caption("Market lines affect edge display only, never the baseball forecast.")
 
 schedule,schedule_error=get_schedule(selected_date.isoformat()); st.title("⚾ StrikeOut King 9000"); st.markdown("Pregame strikeout and starter-outs distributions with transparent assumptions and uncertainty.")
 if schedule_error:st.error(schedule_error)
 if not schedule:st.warning("No announced probable pitchers are available for this date. Choose another date or wait for teams to announce starters."); st.stop()
-options={g.key:g for g in schedule}; selected_key=st.selectbox("Pitcher",list(options),format_func=lambda key:f"{options[key].pitcher_name} · {options[key].team} vs {options[key].opponent}"); game=options[selected_key]; season=selected_date.year; log,history_error=get_pitcher_game_log(game.pitcher_id,season)
+options={g.key:g for g in schedule}
+odds_pitcher_name = st.session_state.get("odds_selected_pitcher")
+odds_game_date = st.session_state.get("odds_selected_date")
+selected_index = 0
+if odds_pitcher_name and odds_game_date == selected_date.isoformat():
+    matches = [i for i, pitcher in enumerate(options.values()) if pitcher.pitcher_name.strip().lower() == str(odds_pitcher_name).strip().lower()]
+    if matches:
+        selected_index = matches[0]
+        st.info(f"Odds API line loaded for {odds_pitcher_name}. Review the line below, then click Analyze line.")
+selected_key=st.selectbox("Pitcher",list(options),index=selected_index,format_func=lambda key:f"{options[key].pitcher_name} · {options[key].team} vs {options[key].opponent}"); game=options[selected_key]; season=selected_date.year; log,history_error=get_pitcher_game_log(game.pitcher_id,season)
 if log.empty and season>2000:
     previous_log,previous_error=get_pitcher_game_log(game.pitcher_id,season-1)
     if not previous_log.empty:log,history_error=previous_log,None
