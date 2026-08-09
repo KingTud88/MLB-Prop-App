@@ -16,10 +16,12 @@ STYLE_OVERRIDE = r'''
 [data-testid="stSidebar"]{width:205px!important;min-width:205px!important}
 [data-testid="stSidebar"]>div:first-child{width:205px!important}
 [data-testid="stSidebarNav"]{display:none!important}
-.block-container{max-width:1540px!important;padding:.75rem 1rem 2rem!important}
+.block-container{max-width:1540px!important;padding:0 .75rem 2rem!important}
+[data-testid="stAppViewContainer"] .main{padding-top:0!important}
+[data-testid="stAppViewContainer"] .main .block-container{padding-top:0!important;margin-top:0!important}
 .sok-sidebar-logo{display:flex!important;justify-content:center!important;align-items:center!important;min-height:145px!important}
 .sok-sidebar-logo .sok-mascot-image{width:140px!important;height:140px!important;object-fit:contain!important;display:block!important}
-.sok-hero{min-height:300px!important;grid-template-columns:270px minmax(0,1fr) 220px!important}
+.sok-hero{min-height:300px!important;grid-template-columns:270px minmax(0,1fr) 220px!important;margin-top:-2.75rem!important}
 .sok-hero .sok-mascot-image{width:255px!important;height:295px!important;max-height:295px!important;object-fit:contain!important;filter:drop-shadow(0 18px 22px rgba(0,0,0,.5))!important}
 .sok-title{font-size:clamp(5rem,6.8vw,7.6rem)!important;line-height:.76!important;white-space:nowrap!important}
 .section-frame{border-width:2px!important;border-color:#e31837!important;border-radius:17px!important}
