@@ -78,7 +78,7 @@ def patched_image(image,*args,**kwargs):
     text=str(image) if isinstance(image,(str,bytes,Path)) else ''
     if 'strikeout_king_9000' in text:
         width=kwargs.get('width',250)
-        return _original_markdown(_mascot_html(width),unsafe_allow_html=True)
+        return _original_image(str(MASCOT_PATH),width=width)
     return _original_image(image,*args,**kwargs)
 
 st.markdown=patched_markdown
@@ -111,12 +111,12 @@ source=source.replace(old_nav,new_nav,1)
 
 # Use the verified mascot asset locally so the browser never has to fetch it from raw.githubusercontent.com.
 old_side_logo='''    if logo_path.exists():st.markdown('<div class="sok-sidebar-logo">',unsafe_allow_html=True);st.image(str(logo_path),width=130);st.markdown('</div>',unsafe_allow_html=True)'''
-new_side_logo='''    st.markdown(f'<div class="sok-sidebar-logo"><img src="{MASCOT_DATA_URI}" alt="StrikeOut King 9000"></div>',unsafe_allow_html=True)'''
+new_side_logo='''    st.markdown('<div class="sok-sidebar-logo">',unsafe_allow_html=True);st.image(str(MASCOT_PATH),width=130);st.markdown('</div>',unsafe_allow_html=True)'''
 source=source.replace(old_side_logo,new_side_logo,1)
 old_hero_logo='''with h1:
     if logo_path.exists():st.image(str(logo_path),width=175)'''
 new_hero_logo='''with h1:
-    st.markdown(_mascot_html(250),unsafe_allow_html=True)'''
+    st.image(str(MASCOT_PATH),width=250)'''
 source=source.replace(old_hero_logo,new_hero_logo,1)
 
 # Put the scheduled pitcher's actual MLB team logo directly beside the name.
