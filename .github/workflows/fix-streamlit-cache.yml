@@ -1,0 +1,41 @@
+name: Fix Streamlit schedule cache
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/fix-streamlit-cache.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix-cache:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Remove non-serializable schedule cache
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("streamlit_app.py")
+          text = p.read_text(encoding="utf-8")
+          old = '@st.cache_data(ttl=120, show_spinner=False)\ndef get_schedule'
+          new = 'def get_schedule'
+          if old not in text:
+              raise SystemExit("Expected schedule cache decorator was not found")
+          p.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
+
+      - name: Commit fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add streamlit_app.py
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix schedule cache serialization"
+          git push
