@@ -45,19 +45,25 @@ display["error"] = display.apply(
     axis=1,
 )
 
+display_columns = [
+    "game_date", "player", "team", "opponent", "projection", "k_range_low",
+    "k_range_high", "actual_strikeouts", "error", "status", "confidence",
+    "data_quality",
+]
+
+# Use Streamlit's native column formatting instead of pandas Styler. This avoids
+# pandas Styler serialization compatibility problems while keeping the table interactive.
 st.dataframe(
-    display[
-        ["game_date", "player", "team", "opponent", "projection", "k_range_low",
-         "k_range_high", "actual_strikeouts", "error", "status", "confidence",
-         "data_quality"]
-    ].style.format({
-        "projection": "{:.2f}",
-        "k_range_low": "{:.0f}",
-        "k_range_high": "{:.0f}",
-        "error": "{:+.2f}",
-    }),
+    display[display_columns],
     hide_index=True,
-    use_container_width=True,
+    width="stretch",
+    column_config={
+        "projection": st.column_config.NumberColumn("Projection", format="%.2f K"),
+        "k_range_low": st.column_config.NumberColumn("80% K low", format="%.0f"),
+        "k_range_high": st.column_config.NumberColumn("80% K high", format="%.0f"),
+        "actual_strikeouts": st.column_config.NumberColumn("Actual Ks", format="%.0f"),
+        "error": st.column_config.NumberColumn("Error", format="%+.2f K"),
+    },
 )
 
 st.download_button(
