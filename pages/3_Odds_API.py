@@ -91,9 +91,17 @@ if players:
     choice = st.selectbox("Sportsbook line", player_rows.index, format_func=lambda i: player_rows.loc[i, "label"])
     selected = player_rows.loc[choice]
     if st.button("Use this line in StrikeOut King", type="primary"):
+        # Keep the selected Odds API pitcher and market in Streamlit session state
+        # so the main StrikeOut King page can automatically load the same pitcher.
         st.session_state["manual_side"] = str(selected["side"])
         st.session_state["manual_line"] = float(selected["line"])
         st.session_state["manual_odds"] = int(selected["american_odds"])
-        st.success(f"Loaded {selected['side']} {selected['line']} at {int(selected['american_odds']):+d}. Go back to StrikeOut King 9000 and click Analyze line.")
+        st.session_state["odds_selected_pitcher"] = str(selected["player"])
+        st.session_state["odds_selected_date"] = selected_date.isoformat()
+        st.session_state["odds_selected_event_id"] = str(selected_event_id)
+        st.success(
+            f"Loaded {selected['player']} — {selected['side']} {selected['line']} at {int(selected['american_odds']):+d}. "
+            "Go back to StrikeOut King 9000 and click Analyze line. The pitcher and sportsbook line will now carry over."
+        )
 
 st.caption("The Odds API currently lists MLB pitcher strikeouts as `pitcher_strikeouts`. Player props are queried one event at a time, so we deliberately avoid polling the entire slate to conserve the 500-credit free allowance.")
