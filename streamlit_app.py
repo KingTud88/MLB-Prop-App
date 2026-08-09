@@ -141,7 +141,7 @@ def negbin_pmf(mean:float,dispersion:float,maximum:int)->np.ndarray:
     mean=max(mean,.05);dispersion=max(dispersion,.05);r=1.0/dispersion;p=r/(r+mean);probs=np.array([math.exp(math.lgamma(k+r)-math.lgamma(r)-math.lgamma(k+1)+r*math.log(p)+k*math.log(1-p)) for k in range(maximum+1)]);probs[-1]+=max(0.0,1.0-probs.sum());return probs/probs.sum()
 
 def discrete_normal_probs(mean:float,sd:float,maximum:int=27)->np.ndarray:
-    xs=np.arange(maximum+1);z_hi=(xs+.5-mean)/(sd*math.sqrt(2));z_lo=(xs-.5-mean)/(sd*math.sqrt(2));erf=np.vectorize(math.erf);probs=.5*(erf(z_hi)-erf(z_lo));probs[0]+=.5*(1+math.erf((-0.5-mean)/(sd*math.sqrt(2)));probs[-1]+=.5*(1-math.erf((maximum+.5-mean)/(sd*math.sqrt(2))));probs=np.clip(probs,0,None);return probs/probs.sum()
+    xs=np.arange(maximum+1);z_hi=(xs+.5-mean)/(sd*math.sqrt(2));z_lo=(xs-.5-mean)/(sd*math.sqrt(2));erf=np.vectorize(math.erf);probs=.5*(erf(z_hi)-erf(z_lo));probs[0]+=.5*(1+math.erf((-0.5-mean)/(sd*math.sqrt(2))));probs[-1]+=.5*(1-math.erf((maximum+.5-mean)/(sd*math.sqrt(2))));probs=np.clip(probs,0,None);return probs/probs.sum()
 
 def calculate_projection(log:pd.DataFrame,game:GamePitcher,manual:dict[str,float],simulations:int)->Projection:
     starts=log[log["games_started"]>0].copy().tail(35)
