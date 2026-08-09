@@ -91,11 +91,11 @@ if players:
     choice = st.selectbox("Sportsbook line", player_rows.index, format_func=lambda i: player_rows.loc[i, "label"])
     selected = player_rows.loc[choice]
     if st.button("Use this line in StrikeOut King", type="primary"):
-        # Keep the selected Odds API pitcher and market in Streamlit session state
-        # so the main StrikeOut King page can automatically load the same pitcher.
-        st.session_state["manual_side"] = str(selected["side"])
-        st.session_state["manual_line"] = float(selected["line"])
-        st.session_state["manual_odds"] = int(selected["american_odds"])
+        # These are separate non-widget keys so Streamlit does not delete them
+        # when the user switches from this page to the main StrikeOut King page.
+        st.session_state["odds_selected_side"] = str(selected["side"])
+        st.session_state["odds_selected_line"] = float(selected["line"])
+        st.session_state["odds_selected_odds"] = int(selected["american_odds"])
         st.session_state["odds_selected_pitcher"] = str(selected["player"])
         st.session_state["odds_selected_date"] = selected_date.isoformat()
         st.session_state["odds_selected_event_id"] = str(selected_event_id)
