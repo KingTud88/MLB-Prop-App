@@ -29,11 +29,7 @@ def _config() -> tuple[str | None, str]:
 
 
 def _headers(token: str) -> dict[str, str]:
-    return {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-    }
+    return {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
 
 
 def _read() -> tuple[list[dict[str, Any]], str | None]:
@@ -64,10 +60,7 @@ def _write(rows: list[dict[str, Any]], sha: str | None, message: str) -> None:
     writer.writeheader()
     writer.writerows([{field: row.get(field, "") for field in FIELDNAMES} for row in rows])
     url = f"https://api.github.com/repos/{repo}/contents/{PROJECTION_LOG_PATH}"
-    body = {
-        "message": message,
-        "content": base64.b64encode(output.getvalue().encode("utf-8")).decode("ascii"),
-    }
+    body = {"message": message, "content": base64.b64encode(output.getvalue().encode("utf-8")).decode("ascii")}
     if sha:
         body["sha"] = sha
     response = requests.put(url, headers=_headers(token), data=json.dumps(body), timeout=20)
@@ -75,18 +68,28 @@ def _write(rows: list[dict[str, Any]], sha: str | None, message: str) -> None:
 
 
 def save_projection(record: dict[str, Any]) -> bool:
+    return save_projections([record]) == 1
+
+
+def save_projections(records: list[dict[str, Any]]) -> int:
+    """Append many unique projections with one GitHub commit."""
+    if not records:
+        return 0
     rows, sha = _read()
-    key = (str(record.get("game_pk")), str(record.get("pitcher_id")), str(record.get("game_date")))
-    if any(
-        (str(row.get("game_pk")), str(row.get("pitcher_id")), str(row.get("game_date"))) == key
-        for row in rows
-    ):
-        return False
-    clean = {field: record.get(field, "") for field in FIELDNAMES}
-    clean["captured_at_utc"] = clean["captured_at_utc"] or datetime.now(timezone.utc).isoformat()
-    rows.append(clean)
-    _write(rows, sha, f"Archive projection: {record.get('player', 'unknown pitcher')}")
-    return True
+    existing = {(str(row.get("game_pk")), str(row.get("pitcher_id")), str(row.get("game_date"))) for row in rows}
+    added = 0
+    for record in records:
+        key = (str(record.get("game_pk")), str(record.get("pitcher_id")), str(record.get("game_date")))
+        if key in existing:
+            continue
+        clean = {field: record.get(field, "") for field in FIELDNAMES}
+        clean["captured_at_utc"] = clean["captured_at_utc"] or datetime.now(timezone.utc).isoformat()
+        rows.append(clean)
+        existing.add(key)
+        added += 1
+    if added:
+        _write(rows, sha, f"Archive {added} daily pitcher projection(s)")
+    return added
 
 
 def resolve_completed_projections() -> int:
