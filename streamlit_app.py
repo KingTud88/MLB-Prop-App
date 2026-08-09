@@ -143,8 +143,6 @@ def load_local_csv(filename:str)->pd.DataFrame:
     return pd.DataFrame()
 
 now=datetime.now(EASTERN); query_day=now.date()
-# If the Odds API page just handed us a market, carry its slate date into the
-# main page so the selected pitcher and line are analyzed against the same game.
 odds_date_value = st.session_state.get("odds_selected_date")
 try:
     odds_default_date = datetime.strptime(str(odds_date_value), "%Y-%m-%d").date() if odds_date_value else query_day
@@ -199,6 +197,20 @@ with tab4:
 from training.manual_lines import ManualLine, analyze_manual_line, confidence_tier
 from training.github_bet_store import save_bet
 
+# Apply an Odds API selection once when entering this page. We intentionally
+# keep these as separate non-widget keys because Streamlit cleans widget keys
+# when switching pages.
+odds_transfer_active = (
+    st.session_state.get("odds_selected_date") == selected_date.isoformat()
+    and st.session_state.get("odds_selected_line") is not None
+    and not st.session_state.get("odds_selection_applied", False)
+)
+if odds_transfer_active:
+    st.session_state["manual_side"] = str(st.session_state.get("odds_selected_side", "Over"))
+    st.session_state["manual_line"] = float(st.session_state["odds_selected_line"])
+    st.session_state["manual_odds"] = int(st.session_state.get("odds_selected_odds", -110))
+    st.session_state["odds_selection_applied"] = True
+
 st.divider(); st.subheader("Manual sportsbook line"); st.caption("Enter the line and price you see at your sportsbook. No sportsbook API or paid credits required.")
 manual_col1,manual_col2,manual_col3,manual_col4=st.columns([1.2,1,1,1])
 with manual_col1:manual_side=st.selectbox("Side",["Over","Under"],key="manual_side")
@@ -211,7 +223,7 @@ pending=st.session_state.get("pending_manual_bet")
 if pending:
     analysis=pending["analysis"]; confidence=confidence_tier(analysis["model_probability"],analysis["edge"]); a1,a2,a3,a4=st.columns(4); a1.metric("Model probability",f"{analysis['model_probability']:.1%}"); a2.metric("Sportsbook implied",f"{analysis['implied_probability']:.1%}"); a3.metric("Model edge",f"{analysis['edge']:+.1%}"); a4.metric("Provisional confidence",confidence); st.info("Confidence is provisional until historical sportsbook lines are available for calibration.")
     if st.button("Save to bet tracker",key="save_bet"):
-        record={**pending["record"].__dict__,**analysis,"confidence":confidence,"game_pk":game.game_pk,"pitcher_id":game.pitcher_id,"actual_strikeouts":""}; save_bet(record); st.session_state.pop("pending_manual_bet",None); st.success("Bet saved to the persistent tracker.")
+        record={**pending["record"].__dict__,**analysis,"confidence":confidence,"game_pk":game.game_pk,"pitcher_id":game.pitcher_id,"actual_strikeouts":""}; save_bet(record); st.session_state.pop("pending_manual_bet",None); st.session_state["odds_selected_pitcher"] = None; st.session_state["odds_selected_date"] = None; st.session_state["odds_selected_side"] = None; st.session_state["odds_selected_line"] = None; st.session_state["odds_selected_odds"] = None; st.session_state["odds_selection_applied"] = False; st.success("Bet saved to the persistent tracker.")
 
 from training.github_bet_store import load_bets
 tracker_rows=load_bets()
