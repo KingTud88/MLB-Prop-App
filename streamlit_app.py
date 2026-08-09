@@ -12,7 +12,6 @@ _original_image_fn = st.image
 
 CLE_OVERRIDE = r'''
 <style>
-/* Reference layout: one custom sidebar, exact mascot, and the reference hero proportions. */
 [data-testid="stSidebar"]{width:205px!important;min-width:205px!important}
 [data-testid="stSidebar"]>div:first-child{width:205px!important}
 [data-testid="stSidebarNav"]{display:none!important}
@@ -40,7 +39,6 @@ def patched_markdown(body=None,*args,**kwargs):
     return _original_markdown_fn(body,*args,**kwargs)
 
 def patched_image(image,*args,**kwargs):
-    """Render the mascot in the browser, including when legacy code passes a Path."""
     image_text = str(image) if isinstance(image,(str,Path)) else ""
     if "strikeout_king_9000" in image_text or image_text.lower().endswith(".svg"):
         width = kwargs.get("width")
@@ -61,9 +59,9 @@ response.raise_for_status()
 source = response.text
 source = source.replace('initial_sidebar_state="expanded"', 'initial_sidebar_state="collapsed"')
 
-# Replace the legacy raw-HTML sidebar navigation with real Streamlit page links.
 old_nav_stmt = '''st.markdown('<div class="sok-nav"><a class="active" href="/">⌂ &nbsp; Projection</a><a href="/2_Bet_Tracker">♧ &nbsp; Bet Tracker</a><a href="/3_Odds_API">◎ &nbsp; Odds API</a><a href="/4_Projection_History">▣ &nbsp; Projection History</a><a href="/5_Daily_Projection_Run">▤ &nbsp; Daily Projection Run</a></div>',unsafe_allow_html=True)'''
-nav_code = '''    st.page_link("streamlit_app.py", label="⌂  Projection", use_container_width=True)
+nav_code = '''with st.sidebar:
+    st.page_link("streamlit_app.py", label="⌂  Projection", use_container_width=True)
     st.page_link("pages/2_Bet_Tracker.py", label="♧  Bet Tracker", use_container_width=True)
     st.page_link("pages/3_Odds_API.py", label="◎  Odds API", use_container_width=True)
     st.page_link("pages/4_Projection_History.py", label="▣  Projection History", use_container_width=True)
