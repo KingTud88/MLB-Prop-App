@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "scripts/cleanup_legacy_ui.py"
+      - ".github/workflows/apply-legacy-ui-cleanup.yml"
 
 permissions:
   contents: write
