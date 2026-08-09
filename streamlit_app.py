@@ -87,10 +87,10 @@ def get_schedule(day: str) -> tuple[list[GamePitcher], str | None]:
         for game in block.get("games", []):
             teams=game.get("teams",{}); game_pk=int(game.get("gamePk",0)); venue=game.get("venue",{}).get("name","Unknown venue"); game_time=game.get("gameDate",""); status=game.get("status",{}).get("detailedState","Unknown")
             for side, opponent_side in (("away","home"),("home","away")):
-                node, opponent=teams.get(side,{}), teams.get(opponent_side,{})
+                node, opponent=teams.get(side,{}),teams.get(opponent_side,{})
                 pitcher=node.get("probablePitcher") or {}
                 if not pitcher.get("id") or not pitcher.get("fullName"): continue
-                team_node, opp_node=node.get("team",{}), opponent.get("team",{})
+                team_node, opp_node=node.get("team",{}),opponent.get("team",{})
                 team=TEAM_ABBR.get(team_node.get("id"),team_node.get("abbreviation","UNK")); opp=TEAM_ABBR.get(opp_node.get("id"),opp_node.get("abbreviation","UNK"))
                 rows.append(GamePitcher(f"{game_pk}:{pitcher['id']}",int(pitcher["id"]),pitcher["fullName"],team,opp,side.title(),venue,game_pk,game_time,status))
     return rows,None
@@ -171,6 +171,44 @@ if log.empty and season>2000:
 if history_error:st.warning(history_error)
 if log.empty:st.error("A projection cannot be issued without a pitcher game history."); st.stop()
 manual={"opponent_k_pct":opponent_k_pct,"pitch_limit":float(pitch_limit),"umpire_k_factor":umpire_k_factor,"weather_factor":weather_factor,"rest_factor":rest_factor}; projection=calculate_projection(log,game,manual,simulations); st.markdown(f"<span class='status-live'>LIVE SCHEDULE</span> &nbsp; <span class='small-muted'>{game.status} · {game.side} · {game.venue} · Updated {now:%I:%M %p ET}</span>",unsafe_allow_html=True)
+
+from training.github_projection_store import save_projection
+archive_key = f"{selected_date.isoformat()}:{game.game_pk}:{game.pitcher_id}"
+archiveable_status = game.status.lower()
+if archive_key not in st.session_state.get("projection_archive_attempted", set()):
+    st.session_state.setdefault("projection_archive_attempted", set()).add(archive_key)
+    if "scheduled" in archiveable_status or "pre-game" in archiveable_status or "warmup" in archiveable_status:
+        try:
+            k_lo, k_hi = interval(projection.k_samples)
+            save_projection({
+                "game_pk": game.game_pk,
+                "game_date": selected_date.isoformat(),
+                "pitcher_id": game.pitcher_id,
+                "player": game.pitcher_name,
+                "team": game.team,
+                "opponent": game.opponent,
+                "venue": game.venue,
+                "game_time": game.game_time,
+                "captured_at_utc": now.astimezone(ZoneInfo("UTC")).isoformat(),
+                "app_version": APP_VERSION,
+                "projection": projection.mean_k,
+                "k_sd": projection.k_sd,
+                "k_range_low": k_lo,
+                "k_range_high": k_hi,
+                "confidence": projection.confidence,
+                "data_quality": projection.data_quality,
+                "simulation_draws": simulations,
+                "opponent_k_pct": opponent_k_pct,
+                "pitch_limit": pitch_limit,
+                "umpire_k_factor": umpire_k_factor,
+                "weather_factor": weather_factor,
+                "rest_factor": rest_factor,
+                "actual_strikeouts": "",
+                "resolved_at_utc": "",
+            })
+        except Exception as exc:
+            st.warning(f"Projection archive unavailable: {exc}")
+
 line_col1,line_col2,line_col3=st.columns([1,1,2])
 with line_col1:k_line=st.number_input("Strikeout line",.5,15.5,5.5,.5)
 with line_col2:outs_line=st.number_input("Outs line",.5,26.5,15.5,.5)
@@ -207,7 +245,7 @@ odds_transfer_active = (
 )
 if odds_transfer_active:
     st.session_state["manual_side"] = str(st.session_state.get("odds_selected_side", "Over"))
-    st.session_state["manual_line"] = float(st.session_state["odds_selected_line"])
+    st.session_state["manual_line"] = float(st.session_state.get("odds_selected_line"))
     st.session_state["manual_odds"] = int(st.session_state.get("odds_selected_odds", -110))
     st.session_state["odds_selection_applied"] = True
 
