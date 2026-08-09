@@ -4,7 +4,6 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 import csv
-import math
 from typing import Any
 
 from training.github_bet_store import save_bet
@@ -18,6 +17,8 @@ class ManualLine:
     side: str
     american_odds: int | None = None
     entered_at_utc: str | None = None
+    game_pk: int | None = None
+    pitcher_id: int | None = None
 
 
 def american_to_implied_probability(odds: int | float | None) -> float | None:
