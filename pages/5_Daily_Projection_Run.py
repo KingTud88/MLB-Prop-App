@@ -7,11 +7,13 @@ import pandas as pd
 import streamlit as st
 
 from training.daily_projection_runner import run_daily_projections
+from training.daily_odds import enrich_daily_records
 from training.github_projection_store import load_projections, resolve_completed_projections, save_projections
+from training.odds_api import get_api_key, usage_summary
 
 st.set_page_config(page_title="Daily Projection Run", page_icon="📊", layout="wide")
 st.title("📊 Daily Projection Run")
-st.caption("Run StrikeOut King 9000 across the entire announced MLB starter slate and archive every projection separately from your bets.")
+st.caption("Run StrikeOut King 9000 across the announced MLB starter slate. Live sportsbook enrichment is optional and separate from the projection model.")
 
 EASTERN = ZoneInfo("America/New_York")
 today = datetime.now(EASTERN).date()
@@ -26,8 +28,18 @@ with st.sidebar:
     weather_factor = st.slider("Weather K factor", 0.96, 1.04, 1.00, 0.01)
     rest_days = st.slider("Days rest", 3, 10, 5)
     rest_factor = 0.96 if rest_days <= 3 else 1.0 if rest_days <= 6 else 1.01
+    odds_key = get_api_key(st.secrets)
+    enrich_odds = st.checkbox(
+        "Enrich with live Odds API",
+        value=False,
+        disabled=not bool(odds_key),
+        help="Optional. Fetches the current pitcher strikeout market for each announced starter and uses Odds API allowance.",
+    )
 
-st.info("This uses MLB schedule and pitcher-history data. It does not use Odds API credits, and it does not create bets.")
+if enrich_odds:
+    st.warning("Odds enrichment is ON. The MLB projection still comes from the model; sportsbook odds are an additional live-data column. Each game's pitcher-prop request consumes Odds API allowance.")
+else:
+    st.info("The Daily Projection Run works without Odds API. Turn on live Odds API enrichment when you want sportsbook strikeout lines alongside the model results.")
 
 if st.button("▶ Run full MLB starter slate", type="primary", use_container_width=True):
     with st.spinner("Running every announced starter and building the daily archive..."):
@@ -40,6 +52,12 @@ if st.button("▶ Run full MLB starter slate", type="primary", use_container_wid
             rest_factor=rest_factor,
             simulations=simulations,
         )
+        odds_errors = []
+        odds_usage = {}
+        if enrich_odds and odds_key:
+            records, odds_errors, odds_headers = enrich_daily_records(records, odds_key, slate_date)
+            odds_usage = usage_summary(odds_headers)
+            errors.extend(odds_errors)
         try:
             added = save_projections(records)
         except Exception as exc:
@@ -49,24 +67,31 @@ if st.button("▶ Run full MLB starter slate", type="primary", use_container_wid
     st.session_state["daily_run_errors"] = errors
     st.session_state["daily_run_skipped"] = skipped
     st.session_state["daily_run_added"] = added
+    st.session_state["daily_run_odds_usage"] = odds_usage
 
 if "daily_run_added" in st.session_state:
     added = st.session_state["daily_run_added"]
     records = st.session_state.get("daily_run_records", [])
     errors = st.session_state.get("daily_run_errors", [])
     skipped = st.session_state.get("daily_run_skipped", 0)
+    odds_usage = st.session_state.get("daily_run_odds_usage", {})
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Projected", len(records))
     c2.metric("Newly archived", added)
     c3.metric("Skipped", skipped)
     c4.metric("Errors", len(errors))
+    if odds_usage:
+        st.caption(f"Odds API usage · remaining {odds_usage['remaining']} · used {odds_usage['used']} · last request {odds_usage['last_cost']}")
     if records:
-        display = pd.DataFrame(records)[["player","team","opponent","projection","k_range_low","k_range_high","confidence","data_quality","status"]].copy()
-        display = display.rename(columns={"player":"Pitcher","team":"Team","opponent":"Opp","projection":"Projection K","k_range_low":"80% Low","k_range_high":"80% High","confidence":"Confidence","data_quality":"Data Quality","status":"Game Status"})
+        display_cols = ["player","team","opponent","projection","k_range_low","k_range_high","confidence","data_quality","status"]
+        if any("odds_market" in record for record in records):
+            display_cols += ["odds_market","odds_bookmaker"]
+        display = pd.DataFrame(records)[display_cols].copy()
+        display = display.rename(columns={"player":"Pitcher","team":"Team","opponent":"Opp","projection":"Projection K","k_range_low":"80% Low","k_range_high":"80% High","confidence":"Confidence","data_quality":"Data Quality","status":"Game Status","odds_market":"Live Odds","odds_bookmaker":"Book"})
         st.subheader(f"{slate_date:%B %-d, %Y} projection slate")
         st.dataframe(display, hide_index=True, width="stretch", column_config={"Projection K":st.column_config.NumberColumn(format="%.2f K"),"80% Low":st.column_config.NumberColumn(format="%.0f"),"80% High":st.column_config.NumberColumn(format="%.0f")})
     if errors:
-        st.warning("Some pitchers could not be projected:")
+        st.warning("Some pitchers or odds events could not be processed:")
         for error in errors:
             st.write(f"- {error}")
 
