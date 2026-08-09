@@ -7,6 +7,8 @@ import csv
 import math
 from typing import Any
 
+from training.github_bet_store import save_bet
+
 
 @dataclass
 class ManualLine:
@@ -79,3 +81,6 @@ def append_bet_log(path: str | Path, line: ManualLine, analysis: dict[str, Any],
         if not exists:
             writer.writeheader()
         writer.writerow(record)
+
+    # Also persist remotely so bets survive Streamlit restarts/redeploys.
+    save_bet(record)
