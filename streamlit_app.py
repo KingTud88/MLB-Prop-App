@@ -22,6 +22,10 @@ OVERRIDES = r'''
 [data-testid="stSidebar"] .block-container{padding:.35rem .65rem 1rem!important}
 [data-testid="stSidebarNav"]{display:none!important}
 [data-testid="stAppViewContainer"] .main .block-container{max-width:1500px!important;padding:0 .8rem 2rem!important}
+.sok-sidebar-brand{margin:0 0 .55rem!important;padding:.55rem .35rem .65rem!important;border:1px solid #35516d!important;border-radius:12px!important;background:linear-gradient(145deg,#071a2d,#020b17)!important;text-align:center!important;box-shadow:0 5px 18px rgba(0,0,0,.28)!important}
+.sok-sidebar-brand .strike{font-family:"Brush Script MT","Segoe Script",cursive!important;font-size:1.75rem!important;line-height:.9!important;font-weight:900!important;color:#f5f7fb!important;font-style:italic!important;text-shadow:1px 2px 0 #111!important}
+.sok-sidebar-brand .king{font-family:Impact,"Arial Narrow",sans-serif!important;font-size:1.35rem!important;line-height:1!important;color:#ed193a!important;font-style:italic!important;letter-spacing:.02em!important;text-shadow:1px 2px 0 #111!important}
+.sok-sidebar-brand .crown{color:#ed193a!important;font-size:1rem!important;display:block!important;margin-bottom:.1rem!important}
 .sok-search-title{margin-top:.45rem!important}.sok-lock{font-size:.68rem!important}.sok-date{margin-top:.4rem!important}
 .sok-two-path,.sok-odds-panel{margin-top:1rem!important;border:1px solid #35516d!important;border-radius:15px!important;background:linear-gradient(145deg,#0a203b,#06162a)!important;overflow:hidden!important}
 .sok-two-path-title,.sok-odds-title{display:block!important;text-align:center!important;padding:.5rem 1.5rem!important;background:linear-gradient(180deg,#ed193a,#c60c2a)!important;color:#fff!important;font-family:Impact,"Arial Narrow",sans-serif!important;letter-spacing:.07em!important;font-size:1rem!important}
@@ -32,6 +36,14 @@ OVERRIDES = r'''
 </style>
 '''
 
+SIDEBAR_BRAND = r'''
+<div class="sok-sidebar-brand">
+  <span class="crown">♛</span>
+  <div class="strike">StrikeOut</div>
+  <div class="king">King 9000</div>
+</div>
+'''
+
 def patched_markdown(body=None,*args,**kwargs):
     if isinstance(body,str) and '<style>' in body and '--navy:' in body:
         return _original_markdown(body+OVERRIDES,*args,**kwargs)
@@ -40,7 +52,12 @@ def patched_markdown(body=None,*args,**kwargs):
 def patched_image(image,*args,**kwargs):
     text=str(image) if isinstance(image,(str,bytes,Path)) else ''
     if 'strikeout_king_9000' in text and MASCOT_PATH.exists():
-        return _original_image(str(MASCOT_PATH),width=kwargs.get('width',250))
+        width=kwargs.get('width')
+        # The sidebar logo is the small branding image. Keep the mascot for the main
+        # hero/header while replacing the sidebar's duplicate mascot with the wordmark.
+        if width is not None and width <= 220:
+            return _original_markdown(SIDEBAR_BRAND,unsafe_allow_html=True)
+        return _original_image(str(MASCOT_PATH),width=width or 250)
     return _original_image(image,*args,**kwargs)
 
 st.markdown=patched_markdown
@@ -54,16 +71,12 @@ except requests.RequestException as exc:
     st.error(f"StrikeOut King 9000 source unavailable: {exc}")
     st.stop()
 
-# Guard the legacy source before we transform anything. This is the failure that caused
-# the repeated get_schedule NameError during the previous patch cycle.
 required=["class MLBClient:","def get_schedule(","def get_pitcher_game_log(","def calculate_projection(","def over_probability("]
 missing=[item for item in required if item not in source]
 if missing:
     st.error("Legacy source validation failed before execution: "+", ".join(missing))
     st.stop()
 
-# Keep the legacy model as Path 2. Rename only the function; all schedule/history/client
-# code stays byte-for-byte intact. Then add Path 1 and a 50/50 ensemble wrapper.
 source=source.replace("def calculate_projection(","def _sok_math_projection(",1)
 
 TWO_PATH=r'''
@@ -104,8 +117,6 @@ def calculate_projection(log,game,manual,simulations):
     seed=int(hashlib.sha256(f"{game.key}|{date.today()}|{APP_VERSION}|two-path-v5".encode()).hexdigest()[:8],16)
     sim_k,sim_outs=_sok_simulated_path(log,game,manual,simulations,seed)
     rng=np.random.default_rng(seed+1)
-    # Re-sample the mathematical distribution so the final ensemble is a true 50/50
-    # mixture of Path 1 and Path 2 rather than an average of two means.
     math_k=rng.choice(np.arange(len(math_projection.k_probs)),size=simulations,p=math_projection.k_probs)
     math_outs=rng.choice(np.arange(len(math_projection.outs_probs)),size=simulations,p=math_projection.outs_probs)
     use_sim=rng.random(simulations)<0.5
@@ -120,7 +131,6 @@ def calculate_projection(log,game,manual,simulations):
     }
     return Projection(float(final_k.mean()),float(final_outs.mean()),float(final_k.std(ddof=1)),float(final_outs.std(ddof=1)),k_probs,outs_probs,final_k,final_outs,math_projection.confidence,math_projection.data_quality,math_projection.factors)
 '''
-
 source=source.replace("def over_probability(",TWO_PATH+"\ndef over_probability(",1)
 
 PANEL=r'''
@@ -131,14 +141,10 @@ except Exception:
     pass
 '''
 marker=';projection=calculate_projection(log,game,manual,simulations)'
-if marker not in source:
-    marker='\nprojection=calculate_projection(log,game,manual,simulations)'
-if marker not in source:
-    raise RuntimeError("Projection execution marker not found")
+if marker not in source: marker='\nprojection=calculate_projection(log,game,manual,simulations)'
+if marker not in source: raise RuntimeError("Projection execution marker not found")
 source=source.replace(marker,marker+'\n'+PANEL,1)
 
-# Merge sportsbook odds into the Projection page. If the key is absent, model fair odds
-# remain available and the page never fails because of the external market feed.
 ODDS_HELPER=r'''
 def _sok_odds_api_key():
     key=os.environ.get("THE_ODDS_API_KEY","").strip()
@@ -166,6 +172,7 @@ def _sok_live_pitcher_odds(pitcher_name,team_abbr,opponent_abbr):
     except Exception:return {"status":"error","bookmakers":{},"lines":[]}
 '''
 source=source.replace('\nnow=datetime.now(EASTERN);query_day=now.date()',ODDS_HELPER+'\nnow=datetime.now(EASTERN);query_day=now.date()',1)
+
 ODDS_BLOCK=r'''
 try:
     live_odds=_sok_live_pitcher_odds(game.pitcher_name,game.team,game.opponent)
