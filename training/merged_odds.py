@@ -100,7 +100,7 @@ def render_merged_odds(game: Any, selected_date: Any, projection: Any) -> None:
                     st.session_state["main_odds_error"] = "Could not match this game to an Odds API event."
                     st.session_state.pop("main_odds_rows", None)
                 else:
-                    payload, headers = get_event_pitcher_strikeouts(api_key, str(event["id"]), "us")
+                    payload, headers = get_event_pitcher_strikeouts(api_key, str(event["id"]), "us", include_alternate=True)
                     rows = flatten_pitcher_strikeouts(payload)
                     rows = [
                         row for row in rows
@@ -145,6 +145,6 @@ def render_merged_odds(game: Any, selected_date: Any, projection: Any) -> None:
                 f"Odds API usage · remaining {usage['remaining']} · used {usage['used']} · last request {usage['last_cost']}"
             )
         elif not st.session_state.get("main_odds_error"):
-            st.caption("Fetch once to see every sportsbook's current pitcher strikeout line. The model ladder does not consume Odds API credits.")
+            st.caption("Fetch once to see every sportsbook's current pitcher strikeout line, including alternate milestone markets. The model ladder does not consume Odds API credits.")
 
     st.markdown("</div>", unsafe_allow_html=True)
