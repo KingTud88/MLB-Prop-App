@@ -60,15 +60,18 @@ source = response.text
 source = source.replace('initial_sidebar_state="expanded"', 'initial_sidebar_state="collapsed"')
 
 old_nav_stmt = '''st.markdown('<div class="sok-nav"><a class="active" href="/">⌂ &nbsp; Projection</a><a href="/2_Bet_Tracker">♧ &nbsp; Bet Tracker</a><a href="/3_Odds_API">◎ &nbsp; Odds API</a><a href="/4_Projection_History">▣ &nbsp; Projection History</a><a href="/5_Daily_Projection_Run">▤ &nbsp; Daily Projection Run</a></div>',unsafe_allow_html=True)'''
-nav_code = '''with st.sidebar:
-    st.page_link("streamlit_app.py", label="⌂  Projection", use_container_width=True)
-    st.page_link("pages/2_Bet_Tracker.py", label="♧  Bet Tracker", use_container_width=True)
-    st.page_link("pages/3_Odds_API.py", label="◎  Odds API", use_container_width=True)
-    st.page_link("pages/4_Projection_History.py", label="▣  Projection History", use_container_width=True)
-    st.page_link("pages/5_Daily_Projection_Run.py", label="▤  Daily Projection Run", use_container_width=True)'''
+# Use st.sidebar.page_link directly. This avoids an indentation-sensitive
+# `with st.sidebar:` block because the legacy source may already be nested.
+nav_code = '''st.sidebar.page_link("streamlit_app.py", label="⌂  Projection", use_container_width=True)
+st.sidebar.page_link("pages/2_Bet_Tracker.py", label="♧  Bet Tracker", use_container_width=True)
+st.sidebar.page_link("pages/3_Odds_API.py", label="◎  Odds API", use_container_width=True)
+st.sidebar.page_link("pages/4_Projection_History.py", label="▣  Projection History", use_container_width=True)
+st.sidebar.page_link("pages/5_Daily_Projection_Run.py", label="▤  Daily Projection Run", use_container_width=True)'''
 if old_nav_stmt not in source:
     raise RuntimeError("Legacy sidebar navigation block was not found; refusing to deploy a partial patch.")
 source = source.replace(old_nav_stmt, nav_code, 1)
 
-code = compile(source, LEGACY, "exec")
-exec(code, globals(), globals())
+# Validate the generated legacy source before executing it so a malformed
+# navigation replacement cannot take down the deployed app.
+compile(source, LEGACY, "exec")
+exec(compile(source, LEGACY, "exec"), globals(), globals())
