@@ -6,14 +6,13 @@ from pathlib import Path
 import requests
 import streamlit as st
 
-LEGACY = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/d87e181aed527cebd1b902e7cc224aa96b06bcc/streamlit_app.py"
+LEGACY = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/d87e181aed527cebd1b902e7cc224aa96b06fbcc/streamlit_app.py"
 
 _original_markdown_fn = st.markdown
 _original_image_fn = st.image
 
 STYLE_OVERRIDE = r'''
 <style>
-/* Approved reference layout */
 [data-testid="stSidebar"]{width:205px!important;min-width:205px!important;background:linear-gradient(180deg,#061225 0%,#071a32 100%)!important}
 [data-testid="stSidebar"]>div:first-child{width:205px!important}
 [data-testid="stSidebar"] .block-container{padding:0 .65rem 1.2rem!important}
@@ -55,7 +54,6 @@ def patched_markdown(body=None, *args, **kwargs):
     return _original_markdown_fn(body, *args, **kwargs)
 
 def patched_image(image, *args, **kwargs):
-    """Render local mascot assets as browser images so mislabeled WebP/legacy SVG files never hit PIL."""
     image_text = str(image) if isinstance(image, (str, Path)) else ""
     if image_text:
         path = Path(image_text)
@@ -66,7 +64,7 @@ def patched_image(image, *args, **kwargs):
                     mime = "image/webp"
                 elif path.suffix.lower() == ".svg":
                     mime = "image/svg+xml"
-                elif path.suffix.lower() == ".jpg" or path.suffix.lower() == ".jpeg":
+                elif path.suffix.lower() in {".jpg", ".jpeg"}:
                     mime = "image/jpeg"
                 else:
                     mime = "image/png"
@@ -87,7 +85,6 @@ response.raise_for_status()
 source = response.text
 source = source.replace('initial_sidebar_state="collapsed"', 'initial_sidebar_state="expanded"', 1)
 
-# Use the full mascot asset in the hero and create a team-abbreviation lookup for the matchup logo.
 source = source.replace(
     'logo_path=ASSET_DIR/"strikeout_king_9000.svg"',
     'logo_path=ASSET_DIR/"strikeout_king_9000.svg"\nhero_logo_path=ASSET_DIR/"strikeout_king_9000.png"\nteam_id_by_abbr={abbr:tid for tid,abbr in TEAM_ABBR.items()}',
@@ -116,13 +113,11 @@ if nav_index is not None:
     lines[nav_index:nav_index + 1] = [indent + line for line in nav_lines]
     source = "\n".join(lines) + "\n"
 
-# Replace the placeholder CLE circle with the scheduled pitcher's actual MLB team logo.
 old_matchup = 'st.markdown(f\'<div class="matchup"><div><div class="pitcher">{game.pitcher_name.upper()}</div><div class="teams">{game.team} <span>vs</span> {game.opponent}</div><div class="detail">⚾ {game.venue} · {game.side} · {game.status}</div></div><div class="cle-badge">C</div><div class="live-schedule"><div class="head">LIVE SCHEDULE</div><div class="row">▣ &nbsp; Today &nbsp; <span>{game_clock}</span></div><div class="row">Scheduled &nbsp; • &nbsp; {game.side}</div></div></div>\',unsafe_allow_html=True)'
 new_matchup = 'team_logo_id=team_id_by_abbr.get(game.team,114)\nteam_logo_url=f"https://www.mlbstatic.com/team-logos/{team_logo_id}.svg"\nst.markdown(f\'<div class="matchup"><div class="pitcher-block"><img class="team-logo" src="{team_logo_url}" alt="{game.team} logo"><div><div class="pitcher">{game.pitcher_name.upper()}</div><div class="teams">{game.team} <span>vs</span> {game.opponent}</div><div class="detail">⚾ {game.venue} · {game.side} · {game.status}</div></div></div><div></div><div class="live-schedule"><div class="head">LIVE SCHEDULE</div><div class="row">▣ &nbsp; Today &nbsp; <span>{game_clock}</span></div><div class="row">Scheduled &nbsp; • &nbsp; {game.side}</div></div></div>\',unsafe_allow_html=True)'
 if old_matchup in source:
     source = source.replace(old_matchup, new_matchup, 1)
 
-# Carry the selected sportsbook line/side into the K+ card without changing the underlying forecast.
 old_market = '''try:k_line=float(st.session_state.get("odds_selected_line",5.5))
 except (TypeError,ValueError):k_line=5.5
 try:outs_line=float(st.session_state.get("odds_selected_outs_line",15.5))
@@ -148,11 +143,7 @@ if old_card in source:
 
 projection_end = 'st.caption("Probabilities are model estimates, not guarantees.")\n'
 if projection_end in source and 'render_merged_odds(game, selected_date, projection)' not in source:
-    source = source.replace(
-        projection_end,
-        projection_end + 'from training.merged_odds import render_merged_odds\nrender_merged_odds(game, selected_date, projection)\n',
-        1,
-    )
+    source = source.replace(projection_end, projection_end + 'from training.merged_odds import render_merged_odds\nrender_merged_odds(game, selected_date, projection)\n', 1)
 
 compile(source, LEGACY, "exec")
 exec(compile(source, LEGACY, "exec"), globals(), globals())
