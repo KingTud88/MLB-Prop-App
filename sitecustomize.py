@@ -1,8 +1,8 @@
 """StrikeOut King 9000 visual theme bootstrap.
 
 This keeps the projection engine untouched and applies the CLE-themed visual
-system globally. The real custom mascot lives in assets/strikeout_king_9000.png
-and is used by the existing hero/sidebar image calls.
+system globally. The market-table hook below only changes presentation order:
+it never changes model probabilities or sportsbook inputs.
 """
 from __future__ import annotations
 
@@ -44,3 +44,23 @@ if st is not None:
             _original_markdown(_CSS,unsafe_allow_html=True);_theme_injected=True
         return _original_markdown(body,*args,**kwargs)
     st.markdown=_sok_markdown
+
+    # Market Odds / Edge presentation guard.
+    # The projection code already calculates edge correctly. This hook only
+    # ensures the sportsbook table puts playable positive-edge opportunities
+    # first instead of sorting by tiny alternate lines (1.5, 2.5, ...).
+    _original_dataframe=st.dataframe
+    def _sok_dataframe(data=None,*args,**kwargs):
+        if isinstance(data,__import__("pandas").DataFrame):
+            cols=set(data.columns)
+            if {"Market","Line","Best Edge"}.issubset(cols):
+                frame=data.copy()
+                if "Playable" not in frame.columns:
+                    frame["_playable"]=frame["Best Edge"].notna()
+                else:
+                    frame["_playable"]=frame["Playable"].fillna(False).astype(bool)
+                frame["_edge_rank"]=__import__("pandas").to_numeric(frame["Best Edge"],errors="coerce").fillna(-999.0)
+                frame=frame.sort_values(["_playable","_edge_rank"],ascending=[False,False],kind="mergesort").drop(columns=["_playable","_edge_rank"])
+                data=frame.reset_index(drop=True)
+        return _original_dataframe(data,*args,**kwargs)
+    st.dataframe=_sok_dataframe
