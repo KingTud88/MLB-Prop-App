@@ -1,5 +1,5 @@
 from __future__ import annotations
-import hashlib, math, os
+import hashlib, math, os, re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -13,12 +13,13 @@ import streamlit as st
 from engine.calibration import calibrate_blend, calibration_summary, milestone_calibration_report
 from engine.projection_engine import ProjectionEngine, ProjectionResult
 
-APP_VERSION = "3.3.0"
+APP_VERSION = "3.4.0"
 EASTERN = ZoneInfo("America/New_York")
 MLB_API = "https://statsapi.mlb.com/api/v1"
 ODDS_API = "https://api.the-odds-api.com/v4"
 APP_DIR = Path(__file__).resolve().parent
 TEAM_ABBR = {108:"LAA",109:"ARI",110:"BAL",111:"BOS",112:"CHC",113:"CIN",114:"CLE",115:"COL",116:"DET",117:"HOU",118:"KCR",119:"LAD",120:"WSH",121:"NYM",133:"ATH",134:"PIT",135:"SDP",136:"SEA",137:"SFG",138:"STL",139:"TBR",140:"TEX",141:"TOR",142:"MIN",143:"PHI",144:"ATL",145:"CHW",146:"MIA",147:"NYY",158:"MIL"}
+TEAM_NAMES = {"LAA":"Los Angeles Angels","ARI":"Arizona Diamondbacks","BAL":"Baltimore Orioles","BOS":"Boston Red Sox","CHC":"Chicago Cubs","CIN":"Cincinnati Reds","CLE":"Cleveland Guardians","COL":"Colorado Rockies","DET":"Detroit Tigers","HOU":"Houston Astros","KCR":"Kansas City Royals","LAD":"Los Angeles Dodgers","WSH":"Washington Nationals","NYM":"New York Mets","ATH":"Athletics","PIT":"Pittsburgh Pirates","SDP":"San Diego Padres","SEA":"Seattle Mariners","SFG":"San Francisco Giants","STL":"St. Louis Cardinals","TBR":"Tampa Bay Rays","TEX":"Texas Rangers","TOR":"Toronto Blue Jays","MIN":"Minnesota Twins","PHI":"Philadelphia Phillies","ATL":"Atlanta Braves","CHW":"Chicago White Sox","MIA":"Miami Marlins","NYY":"New York Yankees","MIL":"Milwaukee Brewers"}
 PARK_K_FACTOR = {"Coors Field":.94,"T-Mobile Park":1.05,"Petco Park":1.03,"Oracle Park":1.02,"Dodger Stadium":1.01,"Yankee Stadium":.99,"Fenway Park":.98,"Wrigley Field":1.00}
 
 st.set_page_config(page_title="StrikeOut King 9000", page_icon="⚾", layout="wide", initial_sidebar_state="expanded")
@@ -26,7 +27,7 @@ st.markdown("""<style>
 :root{--bg:#06111d;--panel:#0b1c2e;--line:#1b3851;--red:#f0193c;--green:#24e69b;--ink:#f2f6fa;--muted:#8fa5b7}
 .stApp{background:linear-gradient(145deg,#04101b,#091a2a);color:var(--ink)}
 [data-testid="stSidebar"]{background:#071727;border-right:1px solid #18334b}
-.block-container{padding-top:2.0rem;max-width:1500px}
+.block-container{padding-top:1.25rem;max-width:1500px}
 h1,h2,h3{letter-spacing:-.02em}
 .king-title{font-size:4rem;font-weight:900;line-height:.9;text-align:center}.king-red{color:var(--red)}
 .subline{text-align:center;color:#fff;border-bottom:2px solid var(--red);padding-bottom:10px;font-weight:800;letter-spacing:.12em}
@@ -36,6 +37,7 @@ h1,h2,h3{letter-spacing:-.02em}
 .reco-card{padding:14px 12px;text-align:center;min-height:150px;background:rgba(9,27,44,.94);border:1px solid #20425f;border-radius:16px}.reco-label{font-weight:900;color:#d8e5ef;letter-spacing:.05em;font-size:.92rem}.reco-side{font-size:2.15rem;font-weight:900;line-height:1.0;margin-top:8px}.reco-line{font-size:1.05rem;font-weight:900;margin-top:6px}.reco-meta{color:#9fb3c3;font-size:.78rem;margin-top:6px}.reco-good{color:#49efb0}.reco-neutral{color:#f2f6fa}.reco-warn{color:#ffd166}
 .badge{display:inline-block;background:#073d2c;border:1px solid #087c59;color:#49efb0;border-radius:999px;padding:5px 10px;font-weight:800;font-size:.82rem}
 .search-note{color:var(--muted);font-size:.82rem}
+.market-ok{color:#49efb0;font-weight:800}.market-empty{color:#8fa5b7}
 </style>""", unsafe_allow_html=True)
 
 @dataclass(frozen=True)
@@ -114,7 +116,7 @@ def implied_prob(price):
     except Exception:return None
 
 def market_recommendation(proj,odds_rows,market_key,default_line,kind):
-    rows=[r for r in odds_rows if r.get("market")==market_key and r.get("point") is not None]
+    base_key=market_key.replace("_alternate",""); allowed={market_key,base_key}; rows=[r for r in odds_rows if r.get("market") in allowed and r.get("point") is not None]
     line=default_line; over_price=under_price=None
     if rows:
         points=[]
@@ -129,34 +131,28 @@ def market_recommendation(proj,odds_rows,market_key,default_line,kind):
             elif name=="under": under_price=r.get("price")
     cutoff=int(math.floor(line)+1)
     if kind=="k":
-        sim=float(np.mean(proj.k_samples>=cutoff)); math_p=float(proj.engine.mathematical_probabilities.get(float(cutoff-1),0.0)); model=.5*sim+.5*math_p
-    else:
-        model=float(np.mean(proj.outs_samples>=cutoff))
+        sim=float(proj.engine.simulation_probabilities.get(float(line),np.mean(proj.k_samples>=cutoff))); math_p=float(proj.engine.mathematical_probabilities.get(float(line),0.0)); model=.5*sim+.5*math_p
+    else: model=float(np.mean(proj.outs_samples>=cutoff))
     over_edge=None; under_edge=None
     if over_price is not None: over_edge=model-(implied_prob(over_price) or 0)
     if under_price is not None: under_edge=(1-model)-(implied_prob(under_price) or 0)
     if over_edge is not None or under_edge is not None:
-        if (over_edge or -999) >= (under_edge or -999): side="OVER"; edge=over_edge
+        if (over_edge if over_edge is not None else -999) >= (under_edge if under_edge is not None else -999): side="OVER"; edge=over_edge
         else: side="UNDER"; edge=under_edge
-    else:
-        side="OVER" if model>=.5 else "UNDER"; edge=None
+    else: side="OVER" if model>=.5 else "UNDER"; edge=None
     confidence=abs(model-.5)*2
     return {"side":side,"line":line,"model":model,"edge":edge,"confidence":confidence,"has_market":bool(rows)}
 
 def render_reco(card,reco):
-    side=reco["side"]; cls="reco-good" if side=="OVER" and reco["model"]>=.5 or side=="UNDER" and reco["model"]<.5 else "reco-neutral"; edge=f"EDGE {reco['edge']:+.1%}" if reco["edge"] is not None else "MODEL LEAN"
-    meta=f"Model {reco['model']:.1%} · {edge}"
-    with card:
-        st.markdown(f'<div class="reco-card"><div class="reco-label">{reco["label"]}</div><div class="reco-side {cls}">{side}</div><div class="reco-line">{reco["line"]:g} LINE</div><div class="reco-meta">{meta}</div></div>',unsafe_allow_html=True)
+    side=reco["side"]; cls="reco-good" if side=="OVER" and reco["model"]>=.5 or side=="UNDER" and reco["model"]<.5 else "reco-neutral"; edge=f"EDGE {reco['edge']:+.1%}" if reco["edge"] is not None else "MODEL LEAN"; meta=f"Model {reco['model']:.1%} · {edge}"
+    with card: st.markdown(f'<div class="reco-card"><div class="reco-label">{reco["label"]}</div><div class="reco-side {cls}">{side}</div><div class="reco-line">{reco["line"]:g} LINE</div><div class="reco-meta">{meta}</div></div>',unsafe_allow_html=True)
 
 def render_calibration_dashboard():
     st.markdown("### Milestone Calibration Dashboard"); st.caption("Resolved pregame projections only. Sportsbook prices are excluded from training.")
     history=load_projection_history(); report=milestone_calibration_report(history,range(3,11),min_observations=30); display=report.copy()
     for col in ["Simulation Brier","Math Brier","Calibrated Brier"]: display[col]=display[col].map(lambda x:"—" if pd.isna(x) else f"{x:.4f}")
     for col in ["Simulation Weight","Math Weight","Actual Hit Rate"]: display[col]=display[col].map(lambda x:"—" if pd.isna(x) else f"{x:.1%}")
-    st.dataframe(display,use_container_width=True,hide_index=True)
-    resolved=int(pd.to_numeric(history.get("actual_strikeouts"),errors="coerce").notna().sum()) if not history.empty and "actual_strikeouts" in history.columns else 0
-    st.info(f"{resolved} resolved projections currently available. Each milestone learns independently after 30 valid observations; until then it stays at a 50/50 simulation/math baseline.")
+    st.dataframe(display,use_container_width=True,hide_index=True); resolved=int(pd.to_numeric(history.get("actual_strikeouts"),errors="coerce").notna().sum()) if not history.empty and "actual_strikeouts" in history.columns else 0; st.info(f"{resolved} resolved projections currently available. Each milestone learns independently after 30 valid observations; until then it stays at a 50/50 simulation/math baseline.")
 
 def ladder(proj,max_line=10):
     history=load_projection_history(); rows=[]
@@ -183,27 +179,53 @@ def get_odds_events():
 def get_event_props(event_id):
     key=get_secret()
     if not key:return [],"Odds API key not found in Streamlit secrets."
-    params={"apiKey":key,"regions":"us","markets":"pitcher_strikeouts_alternate,pitcher_outs_alternate","oddsFormat":"american"}
+    params={"apiKey":key,"regions":"us","markets":"pitcher_strikeouts,pitcher_strikeouts_alternate,pitcher_outs,pitcher_outs_alternate","oddsFormat":"american"}
     try:
         r=requests.get(f"{ODDS_API}/sports/baseball_mlb/events/{event_id}/odds",params=params,timeout=15); r.raise_for_status(); return r.json(),None
     except Exception as e:return [],f"Odds API unavailable: {e}"
 
+def normalize_team(value):
+    text=re.sub(r"[^a-z0-9]","",str(value).lower())
+    for abbr,name in TEAM_NAMES.items():
+        if text==re.sub(r"[^a-z0-9]","",abbr.lower()) or text==re.sub(r"[^a-z0-9]","",name.lower()): return abbr
+    aliases={"oaklandathletics":"ATH","oaklandas":"ATH","athletics":"ATH","washingtonnationals":"WSH","kansascityroyals":"KCR","tampabayrays":"TBR","sandiegopadres":"SDP","sanfranciscogiants":"SFG","stlouiscardinals":"STL","arizonadiamondbacks":"ARI","chicagowhitesox":"CHW","losangelesangels":"LAA","losangelesdodgers":"LAD","newyorkyankees":"NYY","newyorkmets":"NYM","torontobluejays":"TOR"}
+    return aliases.get(text,text)
+
 def find_odds_event(events,game):
-    target={game.team,game.opponent}
+    wanted={normalize_team(game.team),normalize_team(game.opponent)}
     for event in events if isinstance(events,list) else []:
-        teams={str(event.get("home_team","")),str(event.get("away_team",""))}
-        if teams==target or (game.team in teams and game.opponent in teams):return event.get("id")
+        teams={normalize_team(event.get("home_team","")),normalize_team(event.get("away_team",""))}
+        if teams==wanted or wanted.issubset(teams): return event.get("id")
     return None
 
 def extract_player_odds(payload,pitcher_name):
-    rows=[]
+    rows=[]; target=" ".join(str(pitcher_name).lower().split()); allowed={"pitcher_strikeouts","pitcher_strikeouts_alternate","pitcher_outs","pitcher_outs_alternate"}
     for bm in payload.get("bookmakers",[]) if isinstance(payload,dict) else []:
         for m in bm.get("markets",[]):
-            if m.get("key") not in ("pitcher_strikeouts_alternate","pitcher_outs_alternate"):continue
+            if m.get("key") not in allowed: continue
             for o in m.get("outcomes",[]):
-                if o.get("description","").lower()!=pitcher_name.lower():continue
+                desc=" ".join(str(o.get("description","")).lower().split())
+                if desc!=target: continue
                 rows.append({"book":bm.get("title",bm.get("key","")),"market":m["key"],"name":o.get("name"),"point":o.get("point"),"price":o.get("price")})
     return rows
+
+def market_model_probability(proj,market,line):
+    cutoff=int(math.floor(float(line))+1)
+    if market in ("pitcher_strikeouts","pitcher_strikeouts_alternate"):
+        sim=proj.engine.simulation_probabilities.get(float(line),float(np.mean(proj.k_samples>=cutoff))); math_p=proj.engine.mathematical_probabilities.get(float(line),0.0); return .5*sim+.5*math_p
+    return float(np.mean(proj.outs_samples>=cutoff))
+
+def build_market_table(proj,odds_rows):
+    grouped={}
+    for r in odds_rows:
+        try: line=float(r["point"])
+        except Exception: continue
+        key=(r["book"],r["market"],line); grouped.setdefault(key,{})[str(r.get("name","")).lower()]=r.get("price")
+    rows=[]
+    for (book,market,line),prices in grouped.items():
+        model=market_model_probability(proj,market,line); over=prices.get("over"); under=prices.get("under"); op=implied_prob(over) if over is not None else None; up=implied_prob(under) if under is not None else None; oe=model-op if op is not None else None; ue=(1-model)-up if up is not None else None; best=max([e for e in (oe,ue) if e is not None],default=None)
+        rows.append({"Market":"K" if "strikeouts" in market else "OUTS","Type":"ALT" if market.endswith("_alternate") else "MAIN","Book":book,"Line":f"{line:g}","Over":over,"Under":under,"Model":model,"Over Edge":oe,"Under Edge":ue,"Best Edge":best})
+    return pd.DataFrame(rows).sort_values(["Market","Line","Book"]) if rows else pd.DataFrame()
 
 with st.sidebar:
     st.markdown("## StrikeOut King 9000"); st.caption("CLE-themed MLB starter projection engine")
@@ -276,17 +298,10 @@ with left:
 with right:
     st.markdown('<div class="section-head">MARKET ODDS / EDGE</div>',unsafe_allow_html=True)
     if odds_err: st.caption(odds_err)
-    if odds_rows:
-        rows=[]
-        for r in odds_rows:
-            if r["market"]!="pitcher_strikeouts_alternate": continue
-            try: line=float(r["point"])
-            except Exception: continue
-            idx=min(max(int(math.floor(line))-3,0),len(kdf)-1); model=float(np.mean(proj.k_samples>=int(math.floor(line)+1))); implied=implied_prob(r["price"]); rows.append({"Book":r["book"],"Line":f"{line:g}+","Model":model,"Implied":implied,"Edge":model-implied if implied is not None else np.nan})
-        if rows:
-            mdf=pd.DataFrame(rows)
-            for c in ("Model","Implied","Edge"): mdf[c]=mdf[c].map(lambda x:"—" if pd.isna(x) else f"{x:.1%}")
-            st.dataframe(mdf,use_container_width=True,hide_index=True)
-        else: st.info("No matching alternate strikeout markets returned yet.")
-    else: st.info("Live market data will populate here when the API returns the pitcher props.")
+    market_df=build_market_table(proj,odds_rows)
+    if not market_df.empty:
+        for c in ("Model","Over Edge","Under Edge","Best Edge"): market_df[c]=market_df[c].map(lambda x:"—" if pd.isna(x) else f"{x:.1%}")
+        st.dataframe(market_df,use_container_width=True,hide_index=True)
+        st.caption("Live sportsbook prices are shown for both strikeout and total-outs markets. Edge compares the independent model probability with implied probability; market prices never feed the forecast.")
+    else: st.info("Live market data will populate here when the Odds API returns the pitcher props.")
 st.markdown(f'<div class="search-note">Data status: {proj.confidence} confidence · quality {proj.quality}/100 · locked: {locked} · engine v{APP_VERSION}</div>',unsafe_allow_html=True)
