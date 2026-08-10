@@ -4,6 +4,9 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+CALIBRATION_VERSION = "1.1"
+__all__ = ["CalibrationResult", "calibrate_blend", "milestone_calibration_report", "calibration_summary"]
+
 
 @dataclass(frozen=True)
 class CalibrationResult:
@@ -25,20 +28,14 @@ def calibrate_blend(
     min_observations: int = 30,
     grid_step: float = 0.02,
 ) -> CalibrationResult:
-    """Choose the simulation/math blend from resolved pregame projections only.
-
-    Calibration is deliberately chronological-safe at the caller: only rows
-    whose actual result is already known should be supplied. With too little
-    history the production blend stays at 50/50 rather than overfitting noise.
-    """
+    """Choose the simulation/math blend from resolved pregame projections only."""
     sim_col = f"sim_{line}p"
     math_col = f"math_{line}p"
     actual_col = "actual_strikeouts"
     if not {sim_col, math_col, actual_col}.issubset(frame.columns):
         return CalibrationResult(0.50, 0.50, 0, None, False, "Calibration fields are not populated yet.")
 
-    data = frame[[sim_col, math_col, actual_col]].copy()
-    data = data.dropna()
+    data = frame[[sim_col, math_col, actual_col]].copy().dropna()
     if len(data) < min_observations:
         return CalibrationResult(0.50, 0.50, len(data), None, False, f"Need {min_observations} resolved observations; only {len(data)} are available.")
 
@@ -51,26 +48,20 @@ def calibrate_blend(
         return CalibrationResult(0.50, 0.50, len(y), None, False, "Not enough valid resolved observations.")
 
     weights = np.arange(0.0, 1.0 + grid_step / 2.0, grid_step)
-    scores = []
-    for w in weights:
-        p = w * sim + (1.0 - w) * math
-        scores.append(_brier(y, p))
-    best_idx = int(np.argmin(scores))
-    raw_w = float(weights[best_idx])
-
+    scores = [_brier(y, w * sim + (1.0 - w) * math) for w in weights]
+    raw_w = float(weights[int(np.argmin(scores))])
     shrink = min(1.0, (len(y) - min_observations) / max(min_observations * 3.0, 1.0))
     final_w = 0.50 + shrink * (raw_w - 0.50)
     final_score = _brier(y, final_w * sim + (1.0 - final_w) * math)
     return CalibrationResult(final_w, 1.0 - final_w, len(y), final_score, True, "Weight learned from resolved historical projections.")
 
 
-def milestone_calibration_report(frame: pd.DataFrame, lines: range = range(3, 11), min_observations: int = 30) -> pd.DataFrame:
-    """Return one auditable calibration row per strikeout milestone.
-
-    The report compares simulation, mathematical, and calibrated Brier scores
-    and records the learned blend. It never treats sportsbook prices as model
-    training data.
-    """
+def milestone_calibration_report(
+    frame: pd.DataFrame,
+    lines: range = range(3, 11),
+    min_observations: int = 30,
+) -> pd.DataFrame:
+    """Return one auditable calibration row per strikeout milestone."""
     columns = [
         "Line", "Observations", "Status", "Simulation Brier", "Math Brier",
         "Calibrated Brier", "Simulation Weight", "Math Weight", "Actual Hit Rate",
@@ -92,7 +83,6 @@ def milestone_calibration_report(frame: pd.DataFrame, lines: range = range(3, 11
         sim = pd.to_numeric(data[sim_col], errors="coerce")
         math = pd.to_numeric(data[math_col], errors="coerce")
         valid = actual.notna() & sim.notna() & math.notna()
-        data = data.loc[valid]
         actual = actual.loc[valid]
         sim = np.clip(sim.loc[valid].to_numpy(float), 0.001, 0.999)
         math = np.clip(math.loc[valid].to_numpy(float), 0.001, 0.999)
