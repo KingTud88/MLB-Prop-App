@@ -1,0 +1,29 @@
+name: Fix engine dataclass
+
+on:
+  push:
+    paths:
+      - .fix_engine_dataclass
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python scripts/fix_engine_dataclass_3_1.py
+      - run: python -m py_compile streamlit_app.py engine/projection_engine.py engine/calibration.py
+      - name: Commit fix
+        run: |
+          rm -f .fix_engine_dataclass
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add streamlit_app.py .fix_engine_dataclass
+          git commit -m 'Fix projection engine wrapper' || exit 0
+          git push
