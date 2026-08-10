@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import requests
 import streamlit as st
 
@@ -8,7 +7,7 @@ import streamlit as st
 # We patch the single malformed validation-list token before compiling it.
 SOURCE_URL = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/2f63203addc9dc7f6002fece9b341a4f89d490bb/streamlit_app.py"
 BAD = 'required=["class MLBClient:","def get_schedule(","def get_pitcher_game_log(","def calculate_projection(","def over_probability(")]'
-GOOD = 'required=["class MLBClient:","def get_schedule(","def get_pitcher_game_log(","def calculate_projection(","def over_probability(")]'.replace('\")]', '")]')
+GOOD = 'required=["class MLBClient:","def get_schedule(","def get_pitcher_game_log(","def calculate_projection(","def over_probability(")]'.replace('(")]', '("]')
 
 try:
     response = requests.get(SOURCE_URL, timeout=20)
