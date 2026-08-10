@@ -9,7 +9,7 @@ import pandas as pd
 import requests
 import streamlit as st
 
-APP_VERSION="3.0.0"
+APP_VERSION="3.0.1"
 EASTERN=ZoneInfo("America/New_York")
 MLB_API="https://statsapi.mlb.com/api/v1"
 ODDS_API="https://api.the-odds-api.com/v4"
@@ -48,7 +48,6 @@ class MLBClient:
         return data
 
 def get_schedule(day):
-    """Fetch the MLB slate without Streamlit caching mutable/dataclass objects."""
     try:p=MLBClient().get("schedule",{"sportId":1,"date":day,"hydrate":"probablePitcher,team,venue"})
     except Exception as e:return [],str(e)
     rows=[]
@@ -162,9 +161,16 @@ if err:st.error(err)
 if not schedule:st.warning("No announced probable pitchers are available for this date."); st.stop()
 matches=[g for g in schedule if not search or search.lower() in g.pitcher_name.lower() or search.lower() in g.team.lower()]
 if not matches:st.info("No pitchers match that search."); st.stop()
-names=[f"{g.pitcher_name} · {g.team} vs {g.opponent}" for g in matches]; choice=st.selectbox("Matching pitchers",names,label_visibility="collapsed"); game=matches[names.index(choice)]
+names=[f"{g.pitcher_name} · {g.team} vs {g.opponent}" for g in matches]
+with st.sidebar:
+    choice=st.selectbox("Matching pitchers",names,label_visibility="collapsed",key="pitcher_selector")
+game=matches[names.index(choice)]
 locked=st.session_state.get("locked_pitcher")==game.key
-if st.sidebar.button("🔒 LOCK PITCHER" if not locked else "🔓 UNLOCK PITCHER",use_container_width=True):st.session_state["locked_pitcher"]=None if locked else game.key; st.rerun()
+with st.sidebar:
+    if st.button("🔒 LOCK PITCHER" if not locked else "🔓 UNLOCK PITCHER",use_container_width=True):
+        st.session_state["locked_pitcher"]=None if locked else game.key
+        st.rerun()
+
 log,herr=get_log(game.pitcher_id,selected_date.year)
 if log.empty:log,herr=get_log(game.pitcher_id,selected_date.year-1)
 if log.empty:st.error(herr or "Pitcher history unavailable."); st.stop()
@@ -177,8 +183,48 @@ else:
     odds_payload=[]
     if odds_err is None:odds_err="No matching Odds API event found for this MLB game."
 odds_rows=extract_player_odds(odds_payload,game.pitcher_name)
-if not locked:st.info("Lock the pitcher in the left rail to freeze all projection outputs for this pitcher.")
 
+if nav=="Distribution":
+    st.markdown('<div class="section-head">DISTRIBUTION</div>',unsafe_allow_html=True)
+    st.caption(f"{game.pitcher_name} · {game.team} vs {game.opponent}")
+    a,b=st.columns(2)
+    with a:st.markdown("### Strikeout probability distribution"); st.bar_chart(pd.DataFrame({"Probability":proj.k_probs},index=np.arange(len(proj.k_probs))))
+    with b:st.markdown("### Outs probability distribution"); st.bar_chart(pd.DataFrame({"Probability":proj.outs_probs},index=np.arange(len(proj.outs_probs))))
+    st.stop()
+elif nav=="Form & Workload":
+    st.markdown('<div class="section-head">FORM & WORKLOAD</div>',unsafe_allow_html=True)
+    st.caption(f"{game.pitcher_name} · last 15 starts")
+    d=log.tail(15).copy(); st.line_chart(d.set_index("date")[["k","outs"]]); st.dataframe(d.sort_values("date",ascending=False),use_container_width=True,hide_index=True)
+    st.stop()
+elif nav=="Model Card":
+    st.markdown('<div class="section-head">MODEL CARD</div>',unsafe_allow_html=True)
+    st.write("Two-path architecture: (1) Monte Carlo game simulation draws from the fitted strikeout/outs distributions; (2) analytical Negative Binomial / bounded-normal probabilities. Milestone probabilities blend both paths. Sportsbook prices are used only for edge display, not to create the baseball forecast.")
+    st.markdown("### Current model outputs")
+    st.dataframe(kdf[["Line","Probability","Simulation","Math","Fair Odds"]].assign(Probability=lambda x:x.Probability.map(lambda v:f"{v:.1%}"),Simulation=lambda x:x.Simulation.map(lambda v:f"{v:.1%}"),Math=lambda x:x.Math.map(lambda v:f"{v:.1%}")),use_container_width=True,hide_index=True)
+    st.stop()
+elif nav=="Bet Tracker":
+    st.markdown('<div class="section-head">BET TRACKER</div>',unsafe_allow_html=True)
+    st.caption("Current pitcher markets available from the Odds API are shown here when posted.")
+    if odds_err:st.info(odds_err)
+    if odds_rows:st.dataframe(pd.DataFrame(odds_rows),use_container_width=True,hide_index=True)
+    else:st.info("No live player-prop markets are currently available for this game.")
+    st.stop()
+elif nav=="Projection History":
+    st.markdown('<div class="section-head">PROJECTION HISTORY</div>',unsafe_allow_html=True)
+    history=st.session_state.get("projection_history",[])
+    current={"Date":selected_date.isoformat(),"Pitcher":game.pitcher_name,"Matchup":f"{game.team} vs {game.opponent}","Projected K":round(proj.mean_k,2),"3+":f"{kdf.iloc[0].Probability:.1%}","5+":f"{kdf.iloc[2].Probability:.1%}"}
+    if st.button("Save current projection"):
+        history.append(current); st.session_state["projection_history"]=history; st.rerun()
+    st.dataframe(pd.DataFrame(history) if history else pd.DataFrame([current]),use_container_width=True,hide_index=True)
+    st.stop()
+elif nav=="Daily Projection Run":
+    st.markdown('<div class="section-head">DAILY PROJECTION RUN</div>',unsafe_allow_html=True)
+    st.write(f"Slate: {selected_date.isoformat()} · {len(matches)} probable pitcher entries loaded.")
+    st.dataframe(pd.DataFrame([{"Pitcher":g.pitcher_name,"Team":g.team,"Opponent":g.opponent,"Status":g.status} for g in matches]),use_container_width=True,hide_index=True)
+    st.info("Select a pitcher from the left-rail dropdown to run the full two-path projection for that pitcher.")
+    st.stop()
+
+if not locked:st.info("Lock the pitcher in the left rail to freeze all projection outputs for this pitcher.")
 st.markdown('<div class="king-title">STRIKEOUT<br><span class="king-red">KING 9000</span></div><div class="subline">★ MLB PITCHER PROJECTION ENGINE ★ TWO-PATH ANALYTICS ★</div>',unsafe_allow_html=True)
 st.markdown(f'<div class="pitcher-card"><h2>{game.pitcher_name.upper()}</h2><b>{game.team} vs {game.opponent}</b><br><span class="search-note">{game.venue} · {game.side} · {game.status}</span></div>',unsafe_allow_html=True)
 st.markdown('<div class="section-head">PROJECTION SUMMARY</div>',unsafe_allow_html=True)
@@ -209,15 +255,5 @@ with right:
             st.dataframe(mdf,use_container_width=True,hide_index=True)
         else:st.info("No matching alternate strikeout markets returned yet.")
     else:st.info("Live market data will populate here when the API returns the pitcher props.")
-
-if nav=="Distribution":
-    st.markdown('<div class="section-head">DISTRIBUTION</div>',unsafe_allow_html=True); a,b=st.columns(2)
-    with a:st.bar_chart(pd.DataFrame({"Probability":proj.k_probs},index=np.arange(len(proj.k_probs))))
-    with b:st.bar_chart(pd.DataFrame({"Probability":proj.outs_probs},index=np.arange(len(proj.outs_probs))))
-elif nav=="Form & Workload":
-    st.markdown('<div class="section-head">FORM & WORKLOAD</div>',unsafe_allow_html=True); d=log.tail(15).copy(); st.line_chart(d.set_index("date")[["k","outs"]]); st.dataframe(d.sort_values("date",ascending=False),use_container_width=True,hide_index=True)
-elif nav=="Model Card":
-    st.markdown('<div class="section-head">MODEL CARD</div>',unsafe_allow_html=True); st.write("Two-path architecture: (1) Monte Carlo game simulation draws from the fitted strikeout/outs distributions; (2) analytical Negative Binomial / bounded-normal probabilities. Milestone probabilities blend both paths. Sportsbook prices are used only for edge display, not to create the baseball forecast.")
-elif nav in ("Bet Tracker","Projection History","Daily Projection Run"):st.info(f"{nav} module is retained as the next production integration point.")
 
 st.markdown(f'<div class="search-note">Data status: {proj.confidence} confidence · quality {proj.quality}/100 · locked: {locked} · engine v{APP_VERSION}</div>',unsafe_allow_html=True)
