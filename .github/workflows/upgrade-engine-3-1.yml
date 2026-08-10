@@ -11,7 +11,6 @@ permissions:
 
 jobs:
   upgrade:
-    if: ${{ hashFiles('.upgrade_engine_3_1') != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,8 +26,6 @@ jobs:
           rm -f .upgrade_engine_3_1
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add streamlit_app.py
-          git add engine/projection_engine.py engine/calibration.py
-          git add .upgrade_engine_3_1
+          git add streamlit_app.py engine/projection_engine.py engine/calibration.py .upgrade_engine_3_1
           git commit -m 'Integrate independent simulation math and calibration' || exit 0
           git push
