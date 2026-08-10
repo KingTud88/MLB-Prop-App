@@ -62,7 +62,6 @@ class ProjectionEngine:
     def _nb_pmf(mean: float, sd: float, max_k: int = 20) -> np.ndarray:
         mean = max(float(mean), 0.05)
         variance = max(float(sd) ** 2, mean + 0.01)
-        # NB variance = mean + mean^2 / r. Large r approaches Poisson.
         r = max(mean * mean / max(variance - mean, 1e-6), 0.25)
         p = r / (r + mean)
         values = []
@@ -76,8 +75,7 @@ class ProjectionEngine:
             )
             values.append(math.exp(log_p))
         probs = np.asarray(values, dtype=float)
-        tail = max(0.0, 1.0 - probs.sum())
-        probs[-1] += tail
+        probs[-1] += max(0.0, 1.0 - probs.sum())
         return probs / probs.sum()
 
     def mathematical_projection(self, features: Mapping[str, float]) -> tuple[float, float, dict[str, float]]:
@@ -135,8 +133,6 @@ class ProjectionEngine:
             active = bf > pa
             if not np.any(active):
                 break
-            # A small latent game effect creates realistic game-to-game variance
-            # while retaining PA-level independence inside each simulated game.
             latent = np.exp(rng.normal(0.0, 0.10, int(active.sum())))
             probs = np.clip(p_k * latent, 0.002, 0.70)
             outcomes[active] += rng.random(int(active.sum())) < probs
@@ -161,21 +157,22 @@ class ProjectionEngine:
         sim_probs: dict[float, float] = {}
         math_probs: dict[float, float] = {}
         ensemble_probs: dict[float, float] = {}
-        # Keep the requested integer milestone lines, but also expose half-lines
-        # so live sportsbook alternate markets (3.5, 4.5, 5.5, etc.) use the
-        # exact same independent simulation + mathematical paths rather than a
-        # missing dictionary key falling back to zero for the math path.
-        probability_lines = set(float(x) for x in lines)
-        for line in tuple(probability_lines):
-            if line < max(probability_lines):
-                probability_lines.add(line + 0.5)
+
+        # Always materialize the sportsbook half-lines we can receive from the
+        # Odds API. A 5.5 line means K >= 6, a 4.5 line means K >= 5, etc.
+        # This prevents the UI from accidentally reusing the neighboring
+        # integer milestone (for example 5+ = 52.4% being shown for 5.5).
+        probability_lines = {float(x) for x in lines}
+        probability_lines.update(float(x) + 0.5 for x in range(0, 20))
+
         for line in sorted(probability_lines):
-            cutoff = int(math.floor(float(line)) + 1)
+            cutoff = int(math.floor(float(line))) + 1
             sim_p = float(np.mean(sim_samples >= cutoff))
             math_p = float(math_pmf[cutoff:].sum()) if cutoff < len(math_pmf) else 0.0
+            blended = float(w * sim_p + (1.0 - w) * math_p)
             sim_probs[float(line)] = sim_p
             math_probs[float(line)] = math_p
-            ensemble_probs[float(line)] = float(w * sim_p + (1.0 - w) * math_p)
+            ensemble_probs[float(line)] = blended
 
         quality_inputs = [
             self._safe_float(features.get("historical_games"), 0),
@@ -215,10 +212,11 @@ class ProjectionEngine:
             data_quality=float(quality),
             drivers=driver_rows,
             metadata={
-                "engine_version": "1.1.0",
+                "engine_version": "1.2.0",
                 "simulation_draws": draws,
                 "simulation_weight": w,
                 "paths_independent": True,
                 "market_used_for_forecast": False,
+                "half_line_definition": "P(over x.5) = P(stat >= floor(x.5)+1)",
             },
         )
