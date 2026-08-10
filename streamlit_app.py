@@ -1,114 +1,29 @@
 from __future__ import annotations
-import hashlib
-from datetime import date
+
+import os
 import requests
 import streamlit as st
 
-LEGACY="https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/f0b28d2a9f91cc145736eb2d3e0c1a72d3275f43/streamlit_app.py"
-ASSET_BASE="https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets"
+# Surgical runtime wrapper: the production UI lives in the known-good commit below.
+# We patch the single malformed validation-list token before compiling it.
+SOURCE_URL = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/2f63203addc9dc7f6002fece9b341a4f89d490bb/streamlit_app.py"
+BAD = 'required=["class MLBClient:","def get_schedule(","def get_pitcher_game_log(","def calculate_projection(","def over_probability(")]'
+GOOD = 'required=["class MLBClient:","def get_schedule(","def get_pitcher_game_log(","def calculate_projection(","def over_probability(")]'.replace('\")]', '")]')
+
 try:
-    response=requests.get(LEGACY,timeout=20); response.raise_for_status(); source=response.text
+    response = requests.get(SOURCE_URL, timeout=20)
+    response.raise_for_status()
+    source = response.text
+    if BAD not in source:
+        st.error("StrikeOut King 9000 source changed: expected syntax marker was not found. Refusing to execute an unknown source.")
+        st.stop()
+    source = source.replace(BAD, GOOD, 1)
+    compile(source, SOURCE_URL, "exec")
 except requests.RequestException as exc:
-    st.error(f"StrikeOut King 9000 source unavailable: {exc}"); st.stop()
-required=["class MLBClient:","def get_schedule(","def get_pitcher_game_log(","def calculate_projection(","def over_probability(")]
-missing=[x for x in required if x not in source]
-if missing:
-    st.error("Legacy source validation failed before execution: "+", ".join(missing)); st.stop()
+    st.error(f"StrikeOut King 9000 source unavailable: {exc}")
+    st.stop()
+except SyntaxError as exc:
+    st.error(f"StrikeOut King 9000 source still has a syntax error after the surgical fix: {exc}")
+    st.stop()
 
-BRANDING_FIX_CSS=r"""
-<style>
-:root{--sidebar-w:228px}
-[data-testid="stSidebar"]{width:var(--sidebar-w)!important;min-width:var(--sidebar-w)!important}[data-testid="stSidebar"]>div:first-child{width:var(--sidebar-w)!important}[data-testid="stSidebar"] .block-container{padding:.9rem .72rem 1.2rem!important}
-.sok-sidebar-logo{width:100%!important;height:104px!important;margin:0 0 .55rem!important;display:flex!important;align-items:center!important;justify-content:center!important;border:1px solid #35516d!important;border-radius:14px!important;background:linear-gradient(145deg,#0b203a,#07162b)!important;overflow:hidden!important;position:relative!important}.sok-sidebar-logo>*{display:none!important}.sok-sidebar-title,.sok-sidebar-sub{display:none!important}.sok-sidebar-logo::after{content:"StrikeOut\A King 9000";white-space:pre;text-align:center;font-family:"Brush Script MT","Segoe Script",cursive!important;font-weight:900;font-size:29px;line-height:.9;color:#fff;text-shadow:2px 2px 0 #132a48}.sok-sidebar-logo::before{content:"♛";position:absolute;color:#e31837;font-size:18px;top:6px;left:50%;transform:translateX(-50%)}
-.sok-hero{display:flex!important;align-items:center!important;gap:22px!important;min-height:205px!important;width:100%!important;padding-top:4px!important}.sok-hero .sok-hero-mascot{flex:0 0 205px!important;width:205px!important;height:190px!important;display:flex!important;align-items:center!important;justify-content:center!important}.sok-hero .sok-hero-mascot img{width:190px!important;height:190px!important;object-fit:contain!important;display:block!important}.sok-hero .sok-hero-title{flex:1 1 auto!important;min-width:0!important}.sok-title{font-size:5rem!important;line-height:.82!important}.sok-hero-right{flex:0 0 335px!important;display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:18px!important}.sok-built-badge{width:105px;height:126px;box-sizing:border-box;border:2px solid #dbe4ee;border-radius:15px;background:linear-gradient(145deg,#0b203a,#07172b);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#fff;font-family:Impact,"Arial Narrow",sans-serif;font-size:15px;line-height:1.02;letter-spacing:.04em;box-shadow:0 8px 18px rgba(0,0,0,.2),inset 0 0 0 3px rgba(227,24,55,.10)}.sok-built-badge .cle{font-size:36px;color:#fff;text-shadow:2px 2px 0 #e31837;margin:4px 0}.sok-built-badge .stars{color:#e31837;font-size:13px;letter-spacing:3px}.sok-status{position:relative!important;margin-left:0!important;z-index:5!important;width:190px!important;box-sizing:border-box!important}.proj-card{min-height:205px!important}.section-frame{border:0!important;border-radius:0!important;padding:0!important;margin-top:1.15rem!important;background:transparent!important;box-shadow:none!important}.section-ribbon{position:relative!important;z-index:5!important;margin:0 auto .72rem!important}
-.two-path-panel{border:1px solid #35516d;border-radius:15px;background:linear-gradient(145deg,#0a203b,#06162a);overflow:hidden;box-shadow:0 12px 22px rgba(0,0,0,.16)}.two-path-title{display:block;text-align:center;margin:0 auto;padding:.45rem 1.5rem;background:linear-gradient(180deg,#ed193a,#c60c2a);color:#fff;font-family:Impact,"Arial Narrow",sans-serif;letter-spacing:.07em;font-size:1rem}.two-path-grid{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:0}.two-path-head,.two-path-cell{padding:.68rem .72rem;border-bottom:1px solid #223d58;color:#e6edf4;font-size:.78rem}.two-path-head{color:#d9e2eb;background:#0b1d34;font-family:Impact,"Arial Narrow",sans-serif;letter-spacing:.05em}.two-path-cell strong{font-family:Impact,"Arial Narrow",sans-serif;font-size:1rem}.two-path-good{color:#42ef90;font-weight:900}.two-path-muted{color:#9fb1c6}.two-path-foot{padding:.7rem .75rem;color:#aebed0;font-size:.74rem}.two-path-delta{color:#4bf092;font-weight:900}.two-path-kicker{color:#ff405b;font-weight:900;letter-spacing:.06em;text-transform:uppercase;font-size:.68rem}
-.sok-ladder-panel{border:1px solid #35516d;border-radius:15px;background:linear-gradient(145deg,#0a203b,#06162a);overflow:hidden;box-shadow:0 12px 22px rgba(0,0,0,.16);margin-bottom:1rem}.sok-ladder-title{display:block;text-align:center;padding:.45rem 1rem;background:linear-gradient(180deg,#ed193a,#c60c2a);color:#fff;font-family:Impact,"Arial Narrow",sans-serif;letter-spacing:.07em;font-size:1rem}.sok-ladder-sub{text-align:center;color:#9fb1c6;font-size:.72rem;padding:.48rem .7rem .15rem}.sok-ladder-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;padding:.65rem}.sok-ladder-rung{border:1px solid #35516d;border-radius:10px;background:#0b1d34;padding:.55rem .3rem;text-align:center}.sok-ladder-k{font-family:Impact,"Arial Narrow",sans-serif;font-size:1.25rem;color:#fff}.sok-ladder-p{font-family:Impact,"Arial Narrow",sans-serif;font-size:1.05rem;color:#42ef90;margin:.15rem 0}.sok-ladder-o{font-size:.68rem;color:#aebed0}.sok-ladder-edge{font-size:.65rem;color:#ff405b;font-weight:900;margin-top:.15rem}.sok-ladder-foot{padding:.55rem .75rem .7rem;color:#9fb1c6;font-size:.7rem;text-align:center;border-top:1px solid #223d58}.sok-ladder-highlight{border-color:#42ef90;box-shadow:0 0 0 1px rgba(66,239,144,.15) inset}
-@media(max-width:1150px){.sok-hero{gap:12px!important}.sok-hero .sok-hero-mascot{flex-basis:165px!important;width:165px!important}.sok-hero .sok-hero-mascot img{width:155px!important;height:155px!important}.sok-title{font-size:4.25rem!important}.sok-hero-right{flex-basis:300px!important;gap:10px!important}.sok-built-badge{width:90px;height:112px;font-size:13px}.sok-built-badge .cle{font-size:30px}.sok-status{width:180px!important}.sok-ladder-grid{grid-template-columns:repeat(4,1fr)}}@media(max-width:900px){.sok-hero{display:block!important;min-height:0!important}.sok-hero .sok-hero-mascot{width:180px!important;height:155px!important;margin:0 auto}.sok-hero .sok-hero-mascot img{width:155px!important;height:155px!important}.sok-hero-title{text-align:center!important}.sok-title{font-size:3.6rem!important}.sok-hero-right{justify-content:center!important;margin-top:16px!important}.two-path-grid{grid-template-columns:1fr 1fr}.sok-ladder-grid{grid-template-columns:repeat(3,1fr)}}
-</style>
-"""
-source=source.replace('st.markdown(r"""','st.markdown(BRANDING_FIX_CSS,unsafe_allow_html=True)\n\nst.markdown(r"""',1)
-source=source.replace('<a href="/3_Odds_API">◎ &nbsp; Odds API</a>','',1)
-source=source.replace('<div class="sok-nav"><a class="active" href="/">⌂ &nbsp; Projection</a><a href="/2_Bet_Tracker">♧ &nbsp; Bet Tracker</a><a href="/4_Projection_History">▣ &nbsp; Projection History</a><a href="/5_Daily_Projection_Run">▤ &nbsp; Daily Projection Run</a></div>','<div class="sok-nav"><a class="active" href="/">⌂ &nbsp; Projection</a><a href="#distribution">♟ &nbsp; Distribution</a><a href="#form-workload">♟ &nbsp; Form &amp; Workload</a><a href="#model-card">▣ &nbsp; Model Card</a><a href="/2_Bet_Tracker">♧ &nbsp; Bet Tracker</a><a href="/4_Projection_History">▣ &nbsp; Projection History</a><a href="/5_Daily_Projection_Run">▤ &nbsp; Daily Projection Run</a></div>',1)
-source=source.replace('if logo_path.exists():st.markdown(\'<div class="sok-sidebar-logo">\',unsafe_allow_html=True);st.image(str(logo_path),width=130);st.markdown(\'</div>\',unsafe_allow_html=True)','st.markdown(\'<div class="sok-sidebar-logo"></div>\',unsafe_allow_html=True)',1)
-
-old_hero='''st.markdown('<div class="sok-hero">',unsafe_allow_html=True);h1,h2,h3=st.columns([1.15,4.1,1.25])
-with h1:
-    if logo_path.exists():st.image(str(logo_path),width=175)
-with h2:st.markdown('<div class="sok-title">STRIKEOUT<br><span class="red">KING 9000</span></div><div class="sok-ribbon">★ MLB PITCHER PROJECTION ENGINE ★ TWO-PATH ANALYTICS ★</div>',unsafe_allow_html=True)
-with h3:
-    pct=projection.data_quality;st.markdown(f'<div class="sok-status"><div class="head">DATA STATUS</div><div class="live">● {projection.confidence.upper()}</div><div class="quality">High confidence<br>Data quality {pct}/100</div><div class="bar"><span style="width:{pct}%"></span></div></div>',unsafe_allow_html=True)
-st.markdown('</div>',unsafe_allow_html=True)'''
-new_hero="""pct=projection.data_quality
-st.markdown(f'''<div class="sok-hero"><div class="sok-hero-mascot"><img src="{ASSET_BASE}/strikeout_king_9000.png" alt="StrikeOut King 9000 mascot"></div><div class="sok-hero-title"><div class="sok-title">STRIKEOUT<br><span class="red">KING 9000</span></div><div class="sok-ribbon">★ MLB PITCHER PROJECTION ENGINE ★ TWO-PATH ANALYTICS ★</div></div><div class="sok-hero-right"><div class="sok-built-badge"><div>BUILT FOR</div><div class="cle">CLE</div><div>BASEBALL</div><div class="stars">★★★</div></div><div class="sok-status"><div class="head">DATA STATUS</div><div class="live">● {projection.confidence.upper()}</div><div class="quality">High confidence<br>Data quality {pct}/100</div><div class="bar"><span style="width:{pct}%"></span></div></div></div></div>''',unsafe_allow_html=True)"""
-if old_hero not in source:
-    st.error("Target hero block was not found; refusing to render a partial redesign."); st.stop()
-source=source.replace(old_hero,new_hero,1)
-
-source=source.replace("def calculate_projection(","def _sok_math_projection(",1)
-TWO_PATH=r'''
-TWO_PATH_DETAILS={}
-def _sok_simulated_path(log,game,manual,simulations,seed):
-    starts=log[log["games_started"]>0].copy().tail(35)
-    if starts.empty: starts=log.tail(20).copy()
-    if starts.empty: raise ValueError("No historical starts available for simulation.")
-    starts=starts.reset_index(drop=True); rng=np.random.default_rng(seed); n=len(starts)
-    ages=np.arange(n-1,-1,-1,dtype=float); weights=np.exp(-0.08*ages); weights/=weights.sum(); idx=rng.choice(n,size=simulations,p=weights)
-    bf=starts["batters_faced"].to_numpy(float)[idx]; outs=starts["outs"].to_numpy(float)[idx]
-    bf_sd=float(starts["batters_faced"].std(ddof=1)) if n>2 else 3.5; out_sd=float(starts["outs"].std(ddof=1)) if n>2 else 3.0
-    total_bf=float(starts["batters_faced"].sum()); total_k=float(starts["strikeouts"].sum()); alpha=max(.224*120+total_k,.5); beta=max(.776*120+total_bf-total_k,.5)
-    rate=rng.beta(alpha,beta,size=simulations); opp=manual["opponent_k_pct"]/22.4; park=PARK_K_FACTOR.get(game.venue,1.0); ump=manual["umpire_k_factor"]; weather=manual["weather_factor"]; rest=manual["rest_factor"]
-    mean_pitch=weighted_mean(starts["pitches"],5.0,88.0); limit=float(np.clip(manual["pitch_limit"]/max(mean_pitch,75.0),.78,1.12)); rate=np.clip(rate*opp*park*ump*weather,.02,.55)
-    sampled_bf=np.clip(np.rint(bf+rng.normal(0,max(bf_sd*.35,1.0),simulations)),12,35).astype(int); sampled_bf=np.clip(np.rint(sampled_bf*limit*rest),8,35).astype(int)
-    k=rng.binomial(sampled_bf,rate).astype(float); o=np.clip(np.rint(outs+rng.normal(0,max(out_sd*.35,1.0),simulations)),3,27); o=np.clip(np.rint(o*limit*rest),3,27).astype(float)
-    return k,o
-def calculate_projection(log,game,manual,simulations):
-    simulations=max(int(simulations),25000); math_projection=_sok_math_projection(log,game,manual,simulations); seed=int(hashlib.sha256(f"{game.key}|{date.today()}|{APP_VERSION}|two-path-v9".encode()).hexdigest()[:8],16)
-    sim_k,sim_outs=_sok_simulated_path(log,game,manual,simulations,seed); rng=np.random.default_rng(seed+1); math_k=rng.choice(np.arange(len(math_projection.k_probs)),size=simulations,p=math_projection.k_probs); math_outs=rng.choice(np.arange(len(math_projection.outs_probs)),size=simulations,p=math_projection.outs_probs)
-    use_sim=rng.random(simulations)<.5; final_k=np.where(use_sim,sim_k,math_k).astype(float); final_outs=np.where(use_sim,sim_outs,math_outs).astype(float)
-    k_probs=np.bincount(np.clip(np.rint(final_k).astype(int),0,18),minlength=19).astype(float); k_probs/=k_probs.sum(); outs_probs=np.bincount(np.clip(np.rint(final_outs).astype(int),0,27),minlength=28).astype(float); outs_probs/=outs_probs.sum()
-    TWO_PATH_DETAILS[game.key]={"sim_k":float(sim_k.mean()),"sim_outs":float(sim_outs.mean()),"math_k":float(math_projection.mean_k),"math_outs":float(math_projection.mean_outs),"ensemble_k":float(final_k.mean()),"ensemble_outs":float(final_outs.mean()),"simulations":simulations,"k_delta":float(sim_k.mean()-math_projection.mean_k),"outs_delta":float(sim_outs.mean()-math_projection.mean_outs)}; st.session_state["two_path_last"]=TWO_PATH_DETAILS[game.key]
-    return Projection(float(final_k.mean()),float(final_outs.mean()),float(final_k.std(ddof=1)),float(final_outs.std(ddof=1)),k_probs,outs_probs,final_k,final_outs,math_projection.confidence,math_projection.data_quality,math_projection.factors)
-'''
-source=source.replace("def over_probability(",TWO_PATH+"\ndef over_probability(",1)
-
-LADDER_HELPER=r'''
-def strikeout_ladder_html(projection, market_odds=None):
-    probs=np.asarray(projection.k_probs,dtype=float)
-    rows=[]
-    max_k=min(len(probs)-1,9)
-    for threshold in range(3,max_k+1):
-        p=float(probs[threshold:].sum())
-        fair=fair_american(p) if p>0 else "—"
-        edge=""
-        if market_odds and threshold in market_odds:
-            try: edge=f"{(p-float(market_odds[threshold])):+.1%} edge"
-            except (TypeError,ValueError): pass
-        rows.append((threshold,p,fair,edge))
-    cards=[]
-    for threshold,p,fair,edge in rows:
-        highlight=" sok-ladder-highlight" if abs(threshold-round(projection.mean_k))<=.5 else ""
-        edge_html=f'<div class="sok-ladder-edge">{edge}</div>' if edge else ""
-        cards.append(f'<div class="sok-ladder-rung{highlight}"><div class="sok-ladder-k">{threshold}+ K</div><div class="sok-ladder-p">{p:.1%}</div><div class="sok-ladder-o">Fair {fair}</div>{edge_html}</div>')
-    return '<div class="sok-ladder-panel"><div class="sok-ladder-title">STRIKEOUT LADDER</div><div class="sok-ladder-sub">Probability of finishing with at least each strikeout milestone • based on the final two-path distribution</div><div class="sok-ladder-grid">'+''.join(cards)+'</div><div class="sok-ladder-foot">Projected strikeouts: <strong>'+f'{projection.mean_k:.2f}'+'</strong> • Higher rungs are automatically less probable.</div></div>'
-'''
-source=source.replace("def over_probability(",LADDER_HELPER+"\ndef over_probability(",1)
-
-old_probability='''with left:
-    tp=TWO_PATH_DETAILS.get(game.key,st.session_state.get("two_path_last",{}))
-    if tp:
-        st.markdown(f'''<div class="two-path-panel"><div class="two-path-title">TWO-PATH PROJECTION ANALYSIS</div><div class="two-path-grid"><div class="two-path-head">PATH</div><div class="two-path-head">STRIKEOUTS</div><div class="two-path-head">OUTS</div><div class="two-path-head">WEIGHT</div><div class="two-path-cell"><span class="two-path-kicker">Mathematical Model</span></div><div class="two-path-cell"><strong>{tp["math_k"]:.2f}</strong></div><div class="two-path-cell"><strong>{tp["math_outs"]:.2f}</strong></div><div class="two-path-cell">50%</div><div class="two-path-cell"><span class="two-path-kicker">Simulated Games</span><div class="two-path-muted">{tp["simulations"]:,} games</div></div><div class="two-path-cell"><strong>{tp["sim_k"]:.2f}</strong></div><div class="two-path-cell"><strong>{tp["sim_outs"]:.2f}</strong></div><div class="two-path-cell">50%</div><div class="two-path-cell"><span class="two-path-kicker">Final Ensemble</span></div><div class="two-path-cell"><strong class="two-path-good">{tp["ensemble_k"]:.2f}</strong></div><div class="two-path-cell"><strong class="two-path-good">{tp["ensemble_outs"]:.2f}</strong></div><div class="two-path-cell">50/50</div></div><div class="two-path-foot">Path agreement: K <span class="two-path-delta">{tp["k_delta"]:+.2f}</span> • Outs <span class="two-path-delta">{tp["outs_delta"]:+.2f}</span> &nbsp;|&nbsp; Final projection uses the locked 50/50 ensemble.</div></div>''',unsafe_allow_html=True)
-    else:
-        st.markdown('<div class="two-path-panel"><div class="two-path-title">TWO-PATH PROJECTION ANALYSIS</div><div class="two-path-foot">Running mathematical model and simulated-game paths…</div></div>',unsafe_allow_html=True)'''
-new_probability='''with left:
-    st.markdown(strikeout_ladder_html(projection),unsafe_allow_html=True)
-    tp=TWO_PATH_DETAILS.get(game.key,st.session_state.get("two_path_last",{}))
-    if tp:
-        st.markdown(f'''<div class="two-path-panel"><div class="two-path-title">TWO-PATH PROJECTION ANALYSIS</div><div class="two-path-grid"><div class="two-path-head">PATH</div><div class="two-path-head">STRIKEOUTS</div><div class="two-path-head">OUTS</div><div class="two-path-head">WEIGHT</div><div class="two-path-cell"><span class="two-path-kicker">Mathematical Model</span></div><div class="two-path-cell"><strong>{tp["math_k"]:.2f}</strong></div><div class="two-path-cell"><strong>{tp["math_outs"]:.2f}</strong></div><div class="two-path-cell">50%</div><div class="two-path-cell"><span class="two-path-kicker">Simulated Games</span><div class="two-path-muted">{tp["simulations"]:,} games</div></div><div class="two-path-cell"><strong>{tp["sim_k"]:.2f}</strong></div><div class="two-path-cell"><strong>{tp["sim_outs"]:.2f}</strong></div><div class="two-path-cell">50%</div><div class="two-path-cell"><span class="two-path-kicker">Final Ensemble</span></div><div class="two-path-cell"><strong class="two-path-good">{tp["ensemble_k"]:.2f}</strong></div><div class="two-path-cell"><strong class="two-path-good">{tp["ensemble_outs"]:.2f}</strong></div><div class="two-path-cell">50/50</div></div><div class="two-path-foot">Path agreement: K <span class="two-path-delta">{tp["k_delta"]:+.2f}</span> • Outs <span class="two-path-delta">{tp["outs_delta"]:+.2f}</span> &nbsp;|&nbsp; Final projection uses the locked 50/50 ensemble.</div></div>''',unsafe_allow_html=True)
-    else:
-        st.markdown('<div class="two-path-panel"><div class="two-path-title">TWO-PATH PROJECTION ANALYSIS</div><div class="two-path-foot">Running mathematical model and simulated-game paths…</div></div>',unsafe_allow_html=True)'''
-if old_probability not in source:
-    st.error("Target Two-Path panel was not found; refusing to render a partial redesign."); st.stop()
-source=source.replace(old_probability,new_probability,1)
-source=source.replace("use_container_width=True","width=\"stretch\"")
-compile(source,LEGACY,"exec")
-exec(compile(source,LEGACY,"exec"),globals(),globals())
+exec(compile(source, SOURCE_URL, "exec"), globals(), globals())
