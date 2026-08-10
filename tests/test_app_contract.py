@@ -1,5 +1,9 @@
 from pathlib import Path
 
+import pandas as pd
+
+from engine.calibration import calibrate_blend, milestone_calibration_report
+
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "streamlit_app.py"
@@ -35,3 +39,30 @@ def test_navigation_does_not_expose_separate_odds_page():
     source = NAV.read_text(encoding="utf-8")
     assert '"pages/3_Odds_API.py"' not in source
     assert '"Projection"' in source
+
+
+def test_calibration_stays_50_50_until_minimum_sample():
+    frame = pd.DataFrame({
+        "sim_5p": [0.70] * 10,
+        "math_5p": [0.55] * 10,
+        "actual_strikeouts": [5, 4, 6, 3, 5, 4, 7, 2, 6, 5],
+    })
+    result = calibrate_blend(frame, 5, min_observations=30)
+    assert result.observations == 10
+    assert result.calibrated is False
+    assert result.weight_simulation == 0.50
+    assert result.weight_math == 0.50
+
+
+def test_milestone_report_covers_3_plus_through_10_plus():
+    rows = []
+    for actual in range(2, 12):
+        row = {"actual_strikeouts": actual}
+        for line in range(3, 11):
+            row[f"sim_{line}p"] = 0.60
+            row[f"math_{line}p"] = 0.50
+        rows.append(row)
+    report = milestone_calibration_report(pd.DataFrame(rows), min_observations=5)
+    assert list(report["Line"]) == [f"{line}+" for line in range(3, 11)]
+    assert len(report) == 8
+    assert set(["Simulation Brier", "Math Brier", "Calibrated Brier", "Simulation Weight", "Math Weight"]).issubset(report.columns)
