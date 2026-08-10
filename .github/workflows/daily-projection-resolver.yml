@@ -35,6 +35,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install numpy pandas requests
 
+      - name: Resolve completed projection rows
+        run: PYTHONPATH=. python automation/resolve_projection_log.py
+
       - name: Capture today's projections and resolve finished games
         run: PYTHONPATH=. python automation/daily_projection_runner.py
 
