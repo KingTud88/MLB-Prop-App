@@ -45,8 +45,7 @@ def resolve_from_pitcher_game_log(row: pd.Series) -> int | None:
         for split in block.get("splits", []):
             if str(split.get("date", ""))[:10] != game_date:
                 continue
-            stat = split.get("stat", {})
-            strikeouts = stat.get("strikeOuts")
+            strikeouts = split.get("stat", {}).get("strikeOuts")
             if strikeouts is not None:
                 return int(strikeouts)
     return None
@@ -70,13 +69,10 @@ def resolve_row(row: pd.Series) -> tuple[int | None, str | None, str | None]:
     game_pk = int(float(row["game_pk"]))
     player_id = f"ID{int(float(row['pitcher_id']))}"
     try:
-        # Primary source: the same official MLB pitcher game-log endpoint used
-        # by the projection engine. This avoids relying on a boxscore transition.
         strikeouts = resolve_from_pitcher_game_log(row)
         if strikeouts is not None:
             return strikeouts, datetime.now(timezone.utc).isoformat(), None
 
-        # Secondary official path for unusual game-log cases/doubleheaders.
         boxscore = get_json(f"game/{game_pk}/boxscore")
         status = boxscore.get("gameData", {}).get("status", {})
         if status.get("abstractGameState") == "Final":
@@ -108,13 +104,20 @@ def main() -> None:
         print("projection log is empty; nothing to resolve")
         return
 
+    # Old CSV rows may have an all-blank resolved_at_utc column that pandas reads
+    # as float64. Normalize it before writing ISO timestamps into the column.
+    if "resolved_at_utc" not in frame.columns:
+        frame["resolved_at_utc"] = ""
+    else:
+        frame["resolved_at_utc"] = frame["resolved_at_utc"].fillna("").astype(str)
+
     resolved = 0
     unresolved_reasons: dict[str, int] = {}
     for idx in frame.index:
         actual, timestamp, reason = resolve_row(frame.loc[idx])
         if actual is not None:
             frame.at[idx, "actual_strikeouts"] = actual
-            frame.at[idx, "resolved_at_utc"] = timestamp
+            frame.at[idx, "resolved_at_utc"] = timestamp or ""
             resolved += 1
         elif reason:
             unresolved_reasons[reason] = unresolved_reasons.get(reason, 0) + 1
