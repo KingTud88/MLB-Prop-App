@@ -161,7 +161,15 @@ class ProjectionEngine:
         sim_probs: dict[float, float] = {}
         math_probs: dict[float, float] = {}
         ensemble_probs: dict[float, float] = {}
-        for line in lines:
+        # Keep the requested integer milestone lines, but also expose half-lines
+        # so live sportsbook alternate markets (3.5, 4.5, 5.5, etc.) use the
+        # exact same independent simulation + mathematical paths rather than a
+        # missing dictionary key falling back to zero for the math path.
+        probability_lines = set(float(x) for x in lines)
+        for line in tuple(probability_lines):
+            if line < max(probability_lines):
+                probability_lines.add(line + 0.5)
+        for line in sorted(probability_lines):
             cutoff = int(math.floor(float(line)) + 1)
             sim_p = float(np.mean(sim_samples >= cutoff))
             math_p = float(math_pmf[cutoff:].sum()) if cutoff < len(math_pmf) else 0.0
