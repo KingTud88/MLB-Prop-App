@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import requests
 
@@ -34,28 +33,45 @@ def is_missing(value: object) -> bool:
     return str(value).strip() == ""
 
 
-def resolve_row(row: pd.Series) -> tuple[int | None, str | None]:
-    if not is_missing(row.get("actual_strikeouts")):
-        return int(float(row["actual_strikeouts"])), str(row.get("resolved_at_utc") or "")
-    if is_missing(row.get("game_pk")) or is_missing(row.get("pitcher_id")):
-        return None, None
-
-    try:
-        data = get_json(f"game/{int(float(row['game_pk']))}/boxscore")
-        status = data.get("gameData", {}).get("status", {})
-        if status.get("abstractGameState") != "Final":
-            return None, None
-
-        player_id = f"ID{int(float(row['pitcher_id']))}"
-        player = data.get("teams", {}).get("away", {}).get("players", {}).get(player_id)
-        if not player:
-            player = data.get("teams", {}).get("home", {}).get("players", {}).get(player_id)
+def _pitcher_from_boxscore(data: dict, player_id: str) -> int | None:
+    for side in ("away", "home"):
+        player = data.get("teams", {}).get(side, {}).get("players", {}).get(player_id)
         strikeouts = (player or {}).get("stats", {}).get("pitching", {}).get("strikeOuts")
+        if strikeouts is not None:
+            return int(strikeouts)
+    return None
+
+
+def resolve_row(row: pd.Series) -> tuple[int | None, str | None, str | None]:
+    if not is_missing(row.get("actual_strikeouts")):
+        return int(float(row["actual_strikeouts"])), str(row.get("resolved_at_utc") or ""), None
+    if is_missing(row.get("game_pk")) or is_missing(row.get("pitcher_id")):
+        return None, None, "missing game/pitcher id"
+
+    game_pk = int(float(row["game_pk"]))
+    player_id = f"ID{int(float(row['pitcher_id']))}"
+    try:
+        boxscore = get_json(f"game/{game_pk}/boxscore")
+        status = boxscore.get("gameData", {}).get("status", {})
+        if status.get("abstractGameState") == "Final":
+            strikeouts = _pitcher_from_boxscore(boxscore, player_id)
+            if strikeouts is not None:
+                return strikeouts, datetime.now(timezone.utc).isoformat(), None
+            return None, None, "final game but pitcher was not found in boxscore"
+
+        # Feed/live is a second official MLB path and can expose the final state
+        # even when the boxscore response is in a transitional state.
+        live = get_json(f"game/{game_pk}/feed/live")
+        live_status = live.get("gameData", {}).get("status", {})
+        if live_status.get("abstractGameState") != "Final":
+            return None, None, f"game not final ({live_status.get('abstractGameState', 'unknown')})"
+        live_boxscore = live.get("liveData", {}).get("boxscore", {})
+        strikeouts = _pitcher_from_boxscore(live_boxscore, player_id)
         if strikeouts is None:
-            return None, None
-        return int(strikeouts), datetime.now(timezone.utc).isoformat()
-    except (requests.RequestException, ValueError, TypeError, KeyError):
-        return None, None
+            return None, None, "final live feed but pitcher was not found"
+        return strikeouts, datetime.now(timezone.utc).isoformat(), None
+    except (requests.RequestException, ValueError, TypeError, KeyError) as exc:
+        return None, None, f"MLB API error: {type(exc).__name__}"
 
 
 def main() -> None:
@@ -69,15 +85,20 @@ def main() -> None:
         return
 
     resolved = 0
+    unresolved_reasons: dict[str, int] = {}
     for idx in frame.index:
-        actual, timestamp = resolve_row(frame.loc[idx])
+        actual, timestamp, reason = resolve_row(frame.loc[idx])
         if actual is not None:
             frame.at[idx, "actual_strikeouts"] = actual
             frame.at[idx, "resolved_at_utc"] = timestamp
             resolved += 1
+        elif reason:
+            unresolved_reasons[reason] = unresolved_reasons.get(reason, 0) + 1
 
     frame.to_csv(LOG_PATH, index=False)
     print(f"resolved {resolved} completed pitcher projections; rows={len(frame)}")
+    if unresolved_reasons:
+        print(f"unresolved reasons: {unresolved_reasons}")
 
 
 if __name__ == "__main__":
