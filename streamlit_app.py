@@ -7,6 +7,7 @@ import requests
 import streamlit as st
 
 LEGACY = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/f0b28d2a9f91cc145736eb2d3e0c1a72d3275f43/streamlit_app.py"
+ASSET_BASE = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/f0b28d2a9f91cc145736eb2d3e0c1a72d3275f43/assets"
 
 try:
     response = requests.get(LEGACY, timeout=20)
@@ -28,8 +29,87 @@ if missing:
     st.error("Legacy source validation failed before execution: " + ", ".join(missing))
     st.stop()
 
-# The approved visual target already lives in the legacy app. Keep that UI intact and
-# replace only the projection engine so the screen stays clean while both paths run.
+# Keep the approved target layout from the legacy app, but repair the asset-driven
+# branding that was disappearing in the hosted environment.  The current screenshots
+# show the underlying layout is correct; the missing pieces are the sidebar logo,
+# hero artwork, and CLE badge.
+BRANDING_FIX_CSS = f"""
+<style>
+/* --- StrikeOut King 9000 target-brand restoration --- */
+.sok-sidebar-logo{{
+  width:100%!important;
+  height:92px!important;
+  margin:0 0 .55rem!important;
+  display:block!important;
+  background:url('{ASSET_BASE}/strikeout_king_9000.png') center center/contain no-repeat!important;
+}}
+.sok-sidebar-logo>*{{display:none!important}}
+.sok-sidebar-title,.sok-sidebar-sub{{display:none!important}}
+
+/* The first hero column is the reserved artwork slot in the approved design. */
+.sok-hero>div:first-child{{
+  min-height:190px!important;
+  background:url('{ASSET_BASE}/strikeout_king_9000_hero.webp') center center/contain no-repeat!important;
+}}
+
+/* Prevent the old text-only hero treatment from competing with the artwork. */
+.sok-hero .sok-title{{
+  text-align:left!important;
+}}
+
+/* Target reference uses a dedicated CLE badge immediately left of Data Status. */
+.sok-status{{position:relative!important;margin-left:112px!important;}}
+.sok-status:before{{
+  content:'BUILT FOR CLE\\A BASEBALL';
+  white-space:pre;
+  position:absolute;
+  left:-108px;
+  top:0;
+  width:92px;
+  min-height:112px;
+  box-sizing:border-box;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  padding:10px 7px;
+  border:2px solid #dbe4ee;
+  border-radius:15px;
+  background:linear-gradient(145deg,#0b203a,#07172b);
+  color:#fff;
+  font-family:Impact,"Arial Narrow",sans-serif;
+  font-size:13px;
+  line-height:1.05;
+  letter-spacing:.045em;
+  text-shadow:0 1px 0 #000;
+  box-shadow:0 8px 18px rgba(0,0,0,.2),inset 0 0 0 3px rgba(227,24,55,.10);
+}}
+.sok-status:after{{
+  content:'★★★';
+  position:absolute;
+  left:-99px;
+  top:74px;
+  width:74px;
+  text-align:center;
+  color:#e31837;
+  font-size:12px;
+  letter-spacing:3px;
+}}
+
+/* Keep the target page proportions at desktop widths. */
+@media(min-width:1200px){{
+  .sok-hero{{grid-template-columns:190px 1fr 205px!important;gap:1rem!important;min-height:205px!important;}}
+  .sok-title{{font-size:5rem!important;}}
+}}
+</style>
+"""
+
+source = source.replace(
+    "st.markdown(r\"\"\"",
+    "st.markdown(BRANDING_FIX_CSS, unsafe_allow_html=True)\n\nst.markdown(r\"\"\"",
+    1,
+)
+
 source = source.replace("def calculate_projection(", "def _sok_math_projection(", 1)
 
 TWO_PATH = r'''
@@ -47,7 +127,6 @@ def _sok_simulated_path(log, game, manual, simulations, seed):
     rng = np.random.default_rng(seed)
     n = len(starts)
 
-    # Recency weighting keeps the simulation anchored to the pitcher's current form.
     ages = np.arange(n - 1, -1, -1, dtype=float)
     weights = np.exp(-0.08 * ages)
     weights /= weights.sum()
@@ -102,8 +181,6 @@ def calculate_projection(log, game, manual, simulations):
     )
     sim_k, sim_outs = _sok_simulated_path(log, game, manual, simulations, seed)
 
-    # Sample the mathematical distribution so the ensemble is a true distributional
-    # blend rather than simply averaging two point estimates.
     rng = np.random.default_rng(seed + 1)
     math_k = rng.choice(
         np.arange(len(math_projection.k_probs)),
@@ -142,8 +219,6 @@ def calculate_projection(log, game, manual, simulations):
         "ensemble_outs": float(final_outs.mean()),
         "simulations": simulations,
     }
-
-    # Keep the engine auditable without changing the approved target visual layout.
     st.session_state["two_path_last"] = TWO_PATH_DETAILS[game.key]
 
     return Projection(
@@ -163,7 +238,9 @@ def calculate_projection(log, game, manual, simulations):
 
 source = source.replace("def over_probability(", TWO_PATH + "\ndef over_probability(", 1)
 
-# Compile the generated legacy source before executing it so syntax failures are caught
-# before Streamlit begins rendering the app.
+# Streamlit 1.61+ compatibility: replace the deprecated width argument in the
+# legacy UI while preserving the target layout.
+source = source.replace("use_container_width=True", "width=\"stretch\"")
+
 compile(source, LEGACY, "exec")
 exec(compile(source, LEGACY, "exec"), globals(), globals())
