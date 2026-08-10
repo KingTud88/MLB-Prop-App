@@ -47,8 +47,8 @@ class MLBClient:
         if not isinstance(data,dict): raise ValueError("Unexpected MLB response")
         return data
 
-@st.cache_data(ttl=120,show_spinner=False)
 def get_schedule(day):
+    """Fetch the MLB slate without Streamlit caching mutable/dataclass objects."""
     try:p=MLBClient().get("schedule",{"sportId":1,"date":day,"hydrate":"probablePitcher,team,venue"})
     except Exception as e:return [],str(e)
     rows=[]
