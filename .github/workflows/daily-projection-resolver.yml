@@ -36,7 +36,7 @@ jobs:
           pip install numpy pandas requests
 
       - name: Capture today's projections and resolve finished games
-        run: python automation/daily_projection_runner.py
+        run: PYTHONPATH=. python automation/daily_projection_runner.py
 
       - name: Commit updated projection log
         run: |
