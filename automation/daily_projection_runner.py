@@ -162,6 +162,56 @@ def project(row: dict) -> dict | None:
     return out
 
 
+def row_has_complete_paths(row: pd.Series) -> bool:
+    return all(pd.notna(row.get(f"sim_{line}p")) and pd.notna(row.get(f"math_{line}p")) for line in range(3, 11))
+
+
+def row_is_pregame(row: pd.Series, now: datetime) -> bool:
+    try:
+        game_time = pd.to_datetime(row.get("game_time"), utc=True, errors="coerce")
+        return bool(pd.notna(game_time) and game_time.to_pydatetime() > now)
+    except Exception:
+        return False
+
+
+def fill_missing_pregame_paths(frame: pd.DataFrame) -> int:
+    """Complete two-path probabilities only for games that have not started.
+
+    We deliberately do not reconstruct missing probabilities for finished games:
+    using today's/postgame data would contaminate the historical calibration set.
+    """
+    if frame.empty:
+        return 0
+    now = datetime.now(timezone.utc)
+    updated = 0
+    for idx in frame.index:
+        row = frame.loc[idx]
+        if row_has_complete_paths(row) or not row_is_pregame(row, now):
+            continue
+        try:
+            projected = project({
+                "game_pk": int(row["game_pk"]),
+                "game_date": str(row["game_date"]),
+                "pitcher_id": int(row["pitcher_id"]),
+                "player": row.get("player", "Unknown"),
+                "team": row.get("team", "UNK"),
+                "opponent": row.get("opponent", "UNK"),
+                "venue": row.get("venue", "Unknown"),
+                "game_time": row.get("game_time", ""),
+                "status": row.get("status", "Scheduled"),
+            })
+        except Exception as exc:
+            print(f"Pregame path refresh failed for {row.get('player', 'Unknown')} ({row.get('game_pk')}): {exc}")
+            continue
+        if not projected:
+            continue
+        for line in range(3, 11):
+            frame.at[idx, f"sim_{line}p"] = projected[f"sim_{line}p"]
+            frame.at[idx, f"math_{line}p"] = projected[f"math_{line}p"]
+        updated += 1
+    return updated
+
+
 def resolve_row(row: pd.Series) -> tuple[object, str]:
     if pd.notna(row.get("actual_strikeouts")):
         return row.get("actual_strikeouts"), str(row.get("resolved_at_utc") or "")
@@ -220,6 +270,11 @@ def main() -> None:
     if new_rows:
         frame = pd.concat([frame, pd.DataFrame(new_rows)], ignore_index=True)
 
+    # Some rows were captured before the two-path columns were introduced. Refresh
+    # only still-future games; never reconstruct a finished pregame snapshot with
+    # postgame information because that would leak future data into calibration.
+    refreshed = fill_missing_pregame_paths(frame)
+
     # Normalize the schema so old logs remain compatible with the calibration module.
     for line in range(3, 11):
         for prefix in ("sim", "math"):
@@ -230,7 +285,7 @@ def main() -> None:
         if col not in frame.columns:
             frame[col] = np.nan if col == "actual_strikeouts" else ""
     frame.to_csv(LOG_PATH, index=False)
-    print(f"projection log rows={len(frame)} new={len(new_rows)}")
+    print(f"projection log rows={len(frame)} new={len(new_rows)} pregame_path_refreshes={refreshed}")
 
 
 if __name__ == "__main__":
