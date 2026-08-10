@@ -47,20 +47,28 @@ if st is not None:
 
     # Market Odds / Edge presentation guard.
     # The projection code already calculates edge correctly. This hook only
-    # ensures the sportsbook table puts playable positive-edge opportunities
-    # first instead of sorting by tiny alternate lines (1.5, 2.5, ...).
+    # changes display order. It understands the app's formatted percentage
+    # strings, keeps MAIN markets ahead of alternates, and then ranks by best
+    # available edge. It never changes model probabilities or sportsbook data.
     _original_dataframe=st.dataframe
     def _sok_dataframe(data=None,*args,**kwargs):
         if isinstance(data,__import__("pandas").DataFrame):
             cols=set(data.columns)
             if {"Market","Line","Best Edge"}.issubset(cols):
+                pd=__import__("pandas")
                 frame=data.copy()
-                if "Playable" not in frame.columns:
-                    frame["_playable"]=frame["Best Edge"].notna()
-                else:
-                    frame["_playable"]=frame["Playable"].fillna(False).astype(bool)
-                frame["_edge_rank"]=__import__("pandas").to_numeric(frame["Best Edge"],errors="coerce").fillna(-999.0)
-                frame=frame.sort_values(["_playable","_edge_rank"],ascending=[False,False],kind="mergesort").drop(columns=["_playable","_edge_rank"])
+                edge_numeric=pd.to_numeric(
+                    frame["Best Edge"].astype(str).str.replace("%","",regex=False).str.replace("—","",regex=False),
+                    errors="coerce"
+                )
+                frame["_edge_rank"]=edge_numeric.fillna(-999.0)
+                frame["_playable"]=(frame["_edge_rank"]>=0)
+                frame["_type_rank"]=frame["Type"].map({"MAIN":0,"ALT":1}).fillna(2) if "Type" in frame.columns else 0
+                frame=frame.sort_values(
+                    ["_playable","_type_rank","_edge_rank"],
+                    ascending=[False,True,False],
+                    kind="mergesort"
+                ).drop(columns=["_playable","_type_rank","_edge_rank"])
                 data=frame.reset_index(drop=True)
         return _original_dataframe(data,*args,**kwargs)
     st.dataframe=_sok_dataframe
