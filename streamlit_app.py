@@ -11,7 +11,7 @@ import streamlit as st
 from engine.calibration import calibrate_blend, calibration_summary
 from engine.projection_engine import ProjectionEngine, ProjectionResult
 
-APP_VERSION="3.1.0"
+APP_VERSION="3.2.0"
 EASTERN=ZoneInfo("America/New_York")
 MLB_API="https://statsapi.mlb.com/api/v1"
 ODDS_API="https://api.the-odds-api.com/v4"
@@ -94,77 +94,24 @@ def norm_probs(mean,sd,maxv=27):
     p=.5*(erf(hi)-erf(lo)); p[0]+=.5*(1+math.erf((-.5-mean)/(sd*math.sqrt(2)))); p[-1]+=.5*(1-math.erf((maxv+.5-mean)/(sd*math.sqrt(2)))); p=np.clip(p,0,None); return p/p.sum()
 
 def load_projection_history():
-    try:
-        return pd.read_csv(APP_DIR / "data" / "projection_log.csv")
-    except Exception:
-        return pd.DataFrame()
+    try:return pd.read_csv(APP_DIR / "data" / "projection_log.csv")
+    except Exception:return pd.DataFrame()
 
+def calibrated_weights(history):return {line: calibrate_blend(history,line) for line in range(3,11)}
 
-def calibrated_weights(history):
-    return {line: calibrate_blend(history, line) for line in range(3, 11)}
-
-
-def build_engine_features(log, game):
-    starts=log.tail(35).copy()
-    total_bf=float(starts.bf.sum())
-    raw_k=float(starts.k.sum()/max(total_bf,1))
-    pitcher_k=float(np.clip(shrink(raw_k,total_bf),.05,.45))
-    bf=weighted(starts.bf,5,22)
-    pitches=weighted(starts.pitches,5,88)
-    workload=float(np.clip(92/max(pitches,75),.78,1.12))
-    return {
-        "pitcher_k_pct":pitcher_k,
-        "opponent_k_pct":.224,
-        "handedness_factor":1.0,
-        "arsenal_factor":1.0,
-        "park_factor":PARK_K_FACTOR.get(game.venue,1.0),
-        "umpire_factor":1.0,
-        "weather_factor":1.0,
-        "expected_bf":float(np.clip(bf*workload,10,35)),
-        "bf_sd":float(np.clip(starts.bf.std(ddof=1) if len(starts)>2 else 3.5,1,7)),
-        "rest_factor":1.0,
-        "historical_k_sd":float(np.clip(starts.k.std(ddof=1) if len(starts)>2 else 2.0,.75,4.5)),
-        "historical_games":int(len(starts)),
-        "lineup_batters":0,
-        "arsenal_sample_size":0,
-        "weather_available":0,
-        "umpire_available":0,
-    }
-
+def build_engine_features(log,game):
+    starts=log.tail(35).copy(); total_bf=float(starts.bf.sum()); raw_k=float(starts.k.sum()/max(total_bf,1)); pitcher_k=float(np.clip(shrink(raw_k,total_bf),.05,.45)); bf=weighted(starts.bf,5,22); pitches=weighted(starts.pitches,5,88); workload=float(np.clip(92/max(pitches,75),.78,1.12))
+    return {"pitcher_k_pct":pitcher_k,"opponent_k_pct":.224,"handedness_factor":1.0,"arsenal_factor":1.0,"park_factor":PARK_K_FACTOR.get(game.venue,1.0),"umpire_factor":1.0,"weather_factor":1.0,"expected_bf":float(np.clip(bf*workload,10,35)),"bf_sd":float(np.clip(starts.bf.std(ddof=1) if len(starts)>2 else 3.5,1,7)),"rest_factor":1.0,"historical_k_sd":float(np.clip(starts.k.std(ddof=1) if len(starts)>2 else 2.0,.75,4.5)),"historical_games":int(len(starts)),"lineup_batters":0,"arsenal_sample_size":0,"weather_available":0,"umpire_available":0}
 
 def calculate_projection(log,game,simulations):
-    history=load_projection_history()
-    cal=calibrated_weights(history)
-    seed=int(hashlib.sha256(f"{game.key}|{game.game_time}|{APP_VERSION}".encode()).hexdigest()[:8],16)
-    features=build_engine_features(log,game)
-    engine=ProjectionEngine(simulation_weight=.5,seed=seed)
-    result=engine.project(features,draws=simulations,lines=tuple(float(x) for x in range(3,11)))
-    global_w=float(np.mean([r.weight_simulation for r in cal.values()])) if cal else .5
-    mean_k=global_w*result.simulation_mean+(1-global_w)*result.mathematical_mean
-    mean_outs=weighted(log.tail(35).outs,5,16)
-    osd=float(np.clip(log.tail(35).outs.std(ddof=1) if len(log)>2 else 4,2.5,6.5))
-    outs_seed=int(hashlib.sha256(f"outs|{game.key}|{APP_VERSION}".encode()).hexdigest()[:8],16)
-    outs_rng=np.random.default_rng(outs_seed)
-    outs_samples=np.clip(np.rint(outs_rng.normal(mean_outs,osd,simulations)),0,27).astype(int)
-    quality=int(round(result.data_quality))
-    confidence="High" if result.confidence>=.75 else "Medium" if result.confidence>=.60 else "Low"
-    return Projection(mean_k,mean_outs,result.ensemble_sd,osd,result.mathematical_pmf,result.mathematical_pmf,result.simulation_samples,outs_samples,confidence,quality,[(n,v) for n,v,_ in result.drivers],result)
+    history=load_projection_history(); cal=calibrated_weights(history); seed=int(hashlib.sha256(f"{game.key}|{game.game_time}|{APP_VERSION}".encode()).hexdigest()[:8],16); features=build_engine_features(log,game); engine=ProjectionEngine(simulation_weight=.5,seed=seed); result=engine.project(features,draws=simulations,lines=tuple(float(x) for x in range(3,11))); global_w=float(np.mean([r.weight_simulation for r in cal.values()])) if cal else .5; mean_k=global_w*result.simulation_mean+(1-global_w)*result.mathematical_mean; mean_outs=weighted(log.tail(35).outs,5,16); osd=float(np.clip(log.tail(35).outs.std(ddof=1) if len(log)>2 else 4,2.5,6.5)); outs_seed=int(hashlib.sha256(f"outs|{game.key}|{APP_VERSION}".encode()).hexdigest()[:8],16); outs_rng=np.random.default_rng(outs_seed); outs_samples=np.clip(np.rint(outs_rng.normal(mean_outs,osd,simulations)),0,27).astype(int); quality=int(round(result.data_quality)); confidence="High" if result.confidence>=.75 else "Medium" if result.confidence>=.60 else "Low"; return Projection(mean_k,mean_outs,result.ensemble_sd,osd,result.mathematical_pmf,result.mathematical_pmf,result.simulation_samples,outs_samples,confidence,quality,[(n,v) for n,v,_ in result.drivers],result)
 
 def american(p):
     p=float(np.clip(p,.001,.999)); o=-100*p/(1-p) if p>=.5 else 100*(1-p)/p; return f"{o:+.0f}"
-def sim_prob(samples,line):return float(np.mean(samples>=math.ceil(line))) if float(line).is_integer() else float(np.mean(samples>line))
-def math_prob_from_pmf(pmf,line):
-    cutoff=math.floor(line)+1; return float(pmf[cutoff:].sum()) if cutoff<len(pmf) else 0.0
 def ladder(proj,max_line=10):
-    history=load_projection_history()
-    rows=[]
+    history=load_projection_history(); rows=[]
     for line in range(3,max_line+1):
-        cal=calibrate_blend(history,line)
-        sim=proj.engine.simulation_probabilities.get(float(line),0.0)
-        analytic=proj.engine.mathematical_probabilities.get(float(line),0.0)
-        w=cal.weight_simulation
-        blended=w*sim+(1-w)*analytic
-        rows.append({"Line":f"{line}+","Probability":blended,"Fair Odds":american(blended),"Simulation":sim,"Math":analytic,"Sim Weight":w})
+        cal=calibrate_blend(history,line); sim=proj.engine.simulation_probabilities.get(float(line),0.0); analytic=proj.engine.mathematical_probabilities.get(float(line),0.0); w=cal.weight_simulation; blended=w*sim+(1-w)*analytic; rows.append({"Line":f"{line}+","Probability":blended,"Fair Odds":american(blended),"Simulation":sim,"Math":analytic,"Sim Weight":w})
     return pd.DataFrame(rows)
 
 def get_secret():
@@ -208,102 +155,66 @@ with st.sidebar:
     st.markdown("## StrikeOut King 9000"); st.caption("CLE-themed MLB starter projection engine")
     nav=st.radio("Navigation",["Projection","Distribution","Form & Workload","Model Card","Bet Tracker","Projection History","Daily Projection Run"],label_visibility="collapsed")
     st.divider(); selected_date=st.date_input("Slate date",value=datetime.now(EASTERN).date()); st.markdown("### PITCHER SEARCH")
-    locked_key=st.session_state.get("locked_pitcher")
-    search=st.text_input("Search pitcher...",placeholder="Search pitcher...",label_visibility="collapsed",disabled=bool(locked_key)); st.caption("Search and select a pitcher to lock the projection 🔒")
+    locked_key=st.session_state.get("locked_pitcher"); search=st.text_input("Search pitcher...",placeholder="Search pitcher...",label_visibility="collapsed",disabled=bool(locked_key)); st.caption("Search and select a pitcher to lock the projection 🔒")
 
 schedule,err=get_schedule(selected_date.isoformat())
 if err:st.error(err)
 if not schedule:st.warning("No announced probable pitchers are available for this date."); st.stop()
 locked_game=next((g for g in schedule if g.key==locked_key),None) if locked_key else None
-if locked_key and locked_game is None:
-    st.session_state["locked_pitcher"]=None; locked_key=None
+if locked_key and locked_game is None:st.session_state["locked_pitcher"]=None; locked_key=None
 matches=schedule if locked_game else [g for g in schedule if not search or search.lower() in g.pitcher_name.lower() or search.lower() in g.team.lower()]
 if not matches:st.info("No pitchers match that search."); st.stop()
 names=[f"{g.pitcher_name} · {g.team} vs {g.opponent}" for g in matches]
 with st.sidebar:
     default_index=names.index(f"{locked_game.pitcher_name} · {locked_game.team} vs {locked_game.opponent}") if locked_game else 0
     choice=st.selectbox("Matching pitchers",names,index=default_index,label_visibility="collapsed",key="pitcher_selector",disabled=bool(locked_game))
-game=matches[names.index(choice)]
-locked=st.session_state.get("locked_pitcher")==game.key
+game=matches[names.index(choice)]; locked=st.session_state.get("locked_pitcher")==game.key
 with st.sidebar:
-    if st.button("🔒 LOCK PITCHER" if not locked else "🔓 UNLOCK PITCHER",use_container_width=True):
-        st.session_state["locked_pitcher"]=None if locked else game.key
-        st.rerun()
+    if st.button("🔒 LOCK PITCHER" if not locked else "🔓 UNLOCK PITCHER",use_container_width=True):st.session_state["locked_pitcher"]=None if locked else game.key; st.rerun()
 
 log,herr=get_log(game.pitcher_id,selected_date.year)
 if log.empty:log,herr=get_log(game.pitcher_id,selected_date.year-1)
 if log.empty:st.error(herr or "Pitcher history unavailable."); st.stop()
 proj=calculate_projection(log,game,25000); kdf=ladder(proj,10)
 odds_events,odds_err=get_odds_events(); odds_event_id=find_odds_event(odds_events,game)
-if odds_event_id:
-    odds_payload,prop_err=get_event_props(odds_event_id)
-    if prop_err:odds_err=prop_err
-else:
-    odds_payload=[]
-    if odds_err is None:odds_err="No matching Odds API event found for this MLB game."
+if odds_event_id:odds_payload,prop_err=get_event_props(odds_event_id); odds_err=prop_err if prop_err else odds_err
+else:odds_payload=[]; odds_err=odds_err if odds_err else "No matching Odds API event found for this MLB game."
 odds_rows=extract_player_odds(odds_payload,game.pitcher_name)
 
 if nav=="Distribution":
-    st.markdown('<div class="section-head">DISTRIBUTION</div>',unsafe_allow_html=True)
-    st.caption(f"{game.pitcher_name} · {game.team} vs {game.opponent}")
-    a,b=st.columns(2)
+    st.markdown('<div class="section-head">DISTRIBUTION</div>',unsafe_allow_html=True); st.caption(f"{game.pitcher_name} · {game.team} vs {game.opponent}"); a,b=st.columns(2)
     with a:st.markdown("### Strikeout probability distribution"); st.bar_chart(pd.DataFrame({"Probability":proj.k_probs},index=np.arange(len(proj.k_probs))))
     with b:st.markdown("### Outs probability distribution"); st.bar_chart(pd.DataFrame({"Probability":proj.outs_probs},index=np.arange(len(proj.outs_probs))))
     st.stop()
 elif nav=="Form & Workload":
-    st.markdown('<div class="section-head">FORM & WORKLOAD</div>',unsafe_allow_html=True)
-    st.caption(f"{game.pitcher_name} · last 15 starts")
-    d=log.tail(15).copy(); st.line_chart(d.set_index("date")[["k","outs"]]); st.dataframe(d.sort_values("date",ascending=False),use_container_width=True,hide_index=True)
-    st.stop()
+    st.markdown('<div class="section-head">FORM & WORKLOAD</div>',unsafe_allow_html=True); st.caption(f"{game.pitcher_name} · last 15 starts"); d=log.tail(15).copy(); st.line_chart(d.set_index("date")[["k","outs"]]); st.dataframe(d.sort_values("date",ascending=False),use_container_width=True,hide_index=True); st.stop()
 elif nav=="Model Card":
-    st.markdown('<div class="section-head">MODEL CARD</div>',unsafe_allow_html=True)
-    st.write("Two independent paths: (1) plate-appearance Monte Carlo game simulation with workload uncertainty; (2) independent mathematical Negative-Binomial probability model. Milestone probabilities are calibrated from resolved historical projections when enough observations exist. Sportsbook prices are used only for edge display, never to create the baseball forecast.")
-    st.markdown("### Path comparison")
-    path_df=pd.DataFrame([{"Path":"Simulation","Mean K":proj.engine.simulation_mean,"SD":proj.engine.simulation_sd},{"Path":"Mathematical","Mean K":proj.engine.mathematical_mean,"SD":proj.engine.mathematical_sd},{"Path":"Ensemble","Mean K":proj.mean_k,"SD":proj.k_sd}])
-    path_df["Mean K"]=path_df["Mean K"].map(lambda v:f"{v:.2f}"); path_df["SD"]=path_df["SD"].map(lambda v:f"{v:.2f}")
-    st.dataframe(path_df,use_container_width=True,hide_index=True)
-    model_view=kdf[["Line","Probability","Simulation","Math","Sim Weight"]].copy()
+    st.markdown('<div class="section-head">MODEL CARD</div>',unsafe_allow_html=True); st.write("Two independent paths: (1) plate-appearance Monte Carlo game simulation with workload uncertainty; (2) independent mathematical Negative-Binomial probability model. Milestone probabilities are calibrated from resolved pregame projections when enough observations exist. Sportsbook prices are used only for edge display, never to create the baseball forecast."); st.markdown("### Path comparison"); path_df=pd.DataFrame([{"Path":"Simulation","Mean K":proj.engine.simulation_mean,"SD":proj.engine.simulation_sd},{"Path":"Mathematical","Mean K":proj.engine.mathematical_mean,"SD":proj.engine.mathematical_sd},{"Path":"Ensemble","Mean K":proj.mean_k,"SD":proj.k_sd}]); path_df["Mean K"]=path_df["Mean K"].map(lambda v:f"{v:.2f}"); path_df["SD"]=path_df["SD"].map(lambda v:f"{v:.2f}"); st.dataframe(path_df,use_container_width=True,hide_index=True); model_view=kdf[["Line","Probability","Simulation","Math","Sim Weight"]].copy();
     for c in ("Probability","Simulation","Math","Sim Weight"): model_view[c]=model_view[c].map(lambda v:f"{v:.1%}")
-    st.dataframe(model_view,use_container_width=True,hide_index=True)
-    st.markdown("### Calibration diagnostics")
-    st.dataframe(calibration_summary(load_projection_history()),use_container_width=True,hide_index=True)
-    st.stop()
+    st.dataframe(model_view,use_container_width=True,hide_index=True); st.markdown("### Calibration diagnostics"); st.dataframe(calibration_summary(load_projection_history()),use_container_width=True,hide_index=True); st.stop()
 elif nav=="Bet Tracker":
-    st.markdown('<div class="section-head">BET TRACKER</div>',unsafe_allow_html=True)
-    st.caption("Current pitcher markets available from the Odds API are shown here when posted.")
+    st.markdown('<div class="section-head">BET TRACKER</div>',unsafe_allow_html=True); st.caption("Current pitcher markets available from the Odds API are shown here when posted.");
     if odds_err:st.info(odds_err)
     if odds_rows:st.dataframe(pd.DataFrame(odds_rows),use_container_width=True,hide_index=True)
     else:st.info("No live player-prop markets are currently available for this game.")
     st.stop()
 elif nav=="Projection History":
-    st.markdown('<div class="section-head">PROJECTION HISTORY</div>',unsafe_allow_html=True)
-    history=st.session_state.get("projection_history",[])
-    current={"Date":selected_date.isoformat(),"Pitcher":game.pitcher_name,"Matchup":f"{game.team} vs {game.opponent}","Projected K":round(proj.mean_k,2),"3+":f"{kdf.iloc[0].Probability:.1%}","5+":f"{kdf.iloc[2].Probability:.1%}"}
-    if st.button("Save current projection"):
-        history.append(current); st.session_state["projection_history"]=history; st.rerun()
-    st.dataframe(pd.DataFrame(history) if history else pd.DataFrame([current]),use_container_width=True,hide_index=True)
-    st.stop()
+    st.markdown('<div class="section-head">PROJECTION HISTORY</div>',unsafe_allow_html=True); history=st.session_state.get("projection_history",[]); current={"Date":selected_date.isoformat(),"Pitcher":game.pitcher_name,"Matchup":f"{game.team} vs {game.opponent}","Projected K":round(proj.mean_k,2),"3+":f"{kdf.iloc[0].Probability:.1%}","5+":f"{kdf.iloc[2].Probability:.1%}"}
+    if st.button("Save current projection"):history.append(current); st.session_state["projection_history"]=history; st.rerun()
+    st.dataframe(pd.DataFrame(history) if history else pd.DataFrame([current]),use_container_width=True,hide_index=True); st.stop()
 elif nav=="Daily Projection Run":
-    st.markdown('<div class="section-head">DAILY PROJECTION RUN</div>',unsafe_allow_html=True)
-    st.write(f"Slate: {selected_date.isoformat()} · {len(matches)} probable pitcher entries loaded.")
-    st.dataframe(pd.DataFrame([{"Pitcher":g.pitcher_name,"Team":g.team,"Opponent":g.opponent,"Status":g.status} for g in matches]),use_container_width=True,hide_index=True)
-    st.info("Select a pitcher from the left-rail dropdown to run the full two-path projection for that pitcher.")
-    st.stop()
+    st.markdown('<div class="section-head">DAILY PROJECTION RUN</div>',unsafe_allow_html=True); st.write(f"Slate: {selected_date.isoformat()} · {len(matches)} probable pitcher entries loaded."); st.dataframe(pd.DataFrame([{"Pitcher":g.pitcher_name,"Team":g.team,"Opponent":g.opponent,"Status":g.status} for g in matches]),use_container_width=True,hide_index=True); st.info("Select a pitcher from the left-rail dropdown to run the full two-path projection for that pitcher."); st.stop()
 
 if not locked:st.info("Lock the pitcher in the left rail to freeze all projection outputs for this pitcher.")
 st.markdown('<div class="king-title">STRIKEOUT<br><span class="king-red">KING 9000</span></div><div class="subline">★ MLB PITCHER PROJECTION ENGINE ★ TWO-PATH ANALYTICS ★</div>',unsafe_allow_html=True)
 st.markdown(f'<div class="pitcher-card"><h2>{game.pitcher_name.upper()}</h2><b>{game.team} vs {game.opponent}</b><br><span class="search-note">{game.venue} · {game.side} · {game.status}</span></div>',unsafe_allow_html=True)
 st.markdown('<div class="section-head">PROJECTION SUMMARY</div>',unsafe_allow_html=True)
-
 c1,c2,c3,c4=st.columns(4)
 for col,label,value,sub in [(c1,"PROJECTED STRIKEOUTS",f"{proj.mean_k:.2f}",f"↑ 80% RANGE {int(np.quantile(proj.k_samples,.1))}-{int(np.quantile(proj.k_samples,.9))}"),(c2,"3+ STRIKEOUTS",f"{kdf.iloc[0].Probability:.1%}",f"FAIR {kdf.iloc[0]['Fair Odds']}"),(c3,"PROJECTED OUTS",f"{proj.mean_outs:.2f}",f"↑ 80% RANGE {int(np.quantile(proj.outs_samples,.1))}-{int(np.quantile(proj.outs_samples,.9))}"),(c4,"5+ STRIKEOUTS",f"{kdf.iloc[2].Probability:.1%}",f"FAIR {kdf.iloc[2]['Fair Odds']}")]:
     with col:st.markdown(f'<div class="metric-card"><div class="metric-label">{label}</div><div class="metric-value">{value}</div><span class="badge">{sub}</span></div>',unsafe_allow_html=True)
-
 left,right=st.columns([1.35,1])
 with left:
-    st.markdown('<div class="section-head">STRIKEOUT MILESTONE LADDER</div>',unsafe_allow_html=True)
-    view=kdf[["Line","Probability","Fair Odds","Simulation","Math","Sim Weight"]].copy(); view["Probability"]=view["Probability"].map(lambda x:f"{x:.1%}"); view["Simulation"]=view["Simulation"].map(lambda x:f"{x:.1%}"); view["Math"]=view["Math"].map(lambda x:f"{x:.1%}"); view["Sim Weight"]=view["Sim Weight"].map(lambda x:f"{x:.1%}")
-    st.dataframe(view,use_container_width=True,hide_index=True); st.caption("3+ through 10+ are calculated from independent plate-appearance simulation + mathematical paths, then calibrated from resolved history when enough observations exist.")
+    st.markdown('<div class="section-head">STRIKEOUT MILESTONE LADDER</div>',unsafe_allow_html=True); view=kdf[["Line","Probability","Fair Odds","Simulation","Math","Sim Weight"]].copy(); view["Probability"]=view["Probability"].map(lambda x:f"{x:.1%}"); view["Simulation"]=view["Simulation"].map(lambda x:f"{x:.1%}"); view["Math"]=view["Math"].map(lambda x:f"{x:.1%}"); view["Sim Weight"]=view["Sim Weight"].map(lambda x:f"{x:.1%}"); st.dataframe(view,use_container_width=True,hide_index=True); st.caption("3+ through 10+ are calculated from independent plate-appearance simulation + mathematical paths, then calibrated from resolved history when enough observations exist.")
 with right:
     st.markdown('<div class="section-head">MARKET ODDS / EDGE</div>',unsafe_allow_html=True)
     if odds_err:st.caption(odds_err)
@@ -311,15 +222,11 @@ with right:
         rows=[]
         for r in odds_rows:
             if r["market"]!="pitcher_strikeouts_alternate":continue
-            line=float(r["point"] or 0); match=kdf[kdf.Line==f"{int(line)}+"]
-            if match.empty:continue
-            p=float(match.iloc[0].Probability); price=float(r["price"]); implied=(100/(price+100)) if price>0 else (-price)/(-price+100)
-            rows.append({"Book":r["book"],"Line":r["point"],"Price":r["price"],"Model":p,"Implied":implied,"Edge":p-implied})
+            line=float(r["point"]); idx=min(max(int(line)-3,0),len(kdf)-1); model=float(kdf.iloc[idx].Probability); implied=100/(float(r["price"])+100) if float(r["price"])>0 else abs(float(r["price"]))/(abs(float(r["price"]))+100); rows.append({"Book":r["book"],"Line":f"{line:g}+","Model":model,"Implied":implied,"Edge":model-implied})
         if rows:
             mdf=pd.DataFrame(rows)
             for c in ("Model","Implied","Edge"):mdf[c]=mdf[c].map(lambda x:f"{x:.1%}")
             st.dataframe(mdf,use_container_width=True,hide_index=True)
         else:st.info("No matching alternate strikeout markets returned yet.")
     else:st.info("Live market data will populate here when the API returns the pitcher props.")
-
 st.markdown(f'<div class="search-note">Data status: {proj.confidence} confidence · quality {proj.quality}/100 · locked: {locked} · engine v{APP_VERSION}</div>',unsafe_allow_html=True)
