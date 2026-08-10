@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
-from engine.calibration import calibrate_blend, calibration_summary
+from engine.calibration import calibrate_blend, calibration_summary, milestone_calibration_report
 from engine.projection_engine import ProjectionEngine, ProjectionResult
 
 APP_VERSION="3.2.0"
@@ -108,6 +108,21 @@ def calculate_projection(log,game,simulations):
 
 def american(p):
     p=float(np.clip(p,.001,.999)); o=-100*p/(1-p) if p>=.5 else 100*(1-p)/p; return f"{o:+.0f}"
+def render_calibration_dashboard():
+    st.markdown("### Milestone Calibration Dashboard")
+    st.caption("Resolved pregame projections only. Sportsbook prices are excluded from training.")
+    history=load_projection_history()
+    report=milestone_calibration_report(history, range(3,11), min_observations=30)
+    display=report.copy()
+    for col in ["Simulation Brier","Math Brier","Calibrated Brier"]:
+        display[col]=display[col].map(lambda x:"—" if pd.isna(x) else f"{x:.4f}")
+    for col in ["Simulation Weight","Math Weight","Actual Hit Rate"]:
+        display[col]=display[col].map(lambda x:"—" if pd.isna(x) else f"{x:.1%}")
+    st.dataframe(display,use_container_width=True,hide_index=True)
+    resolved=int(pd.to_numeric(history.get("actual_strikeouts"),errors="coerce").notna().sum()) if not history.empty and "actual_strikeouts" in history.columns else 0
+    st.info(f"{resolved} resolved projections currently available. Each milestone learns independently after 30 valid observations; until then it stays at a 50/50 simulation/math baseline.")
+
+
 def ladder(proj,max_line=10):
     history=load_projection_history(); rows=[]
     for line in range(3,max_line+1):
@@ -191,7 +206,8 @@ elif nav=="Form & Workload":
 elif nav=="Model Card":
     st.markdown('<div class="section-head">MODEL CARD</div>',unsafe_allow_html=True); st.write("Two independent paths: (1) plate-appearance Monte Carlo game simulation with workload uncertainty; (2) independent mathematical Negative-Binomial probability model. Milestone probabilities are calibrated from resolved pregame projections when enough observations exist. Sportsbook prices are used only for edge display, never to create the baseball forecast."); st.markdown("### Path comparison"); path_df=pd.DataFrame([{"Path":"Simulation","Mean K":proj.engine.simulation_mean,"SD":proj.engine.simulation_sd},{"Path":"Mathematical","Mean K":proj.engine.mathematical_mean,"SD":proj.engine.mathematical_sd},{"Path":"Ensemble","Mean K":proj.mean_k,"SD":proj.k_sd}]); path_df["Mean K"]=path_df["Mean K"].map(lambda v:f"{v:.2f}"); path_df["SD"]=path_df["SD"].map(lambda v:f"{v:.2f}"); st.dataframe(path_df,use_container_width=True,hide_index=True); model_view=kdf[["Line","Probability","Simulation","Math","Sim Weight"]].copy();
     for c in ("Probability","Simulation","Math","Sim Weight"): model_view[c]=model_view[c].map(lambda v:f"{v:.1%}")
-    st.dataframe(model_view,use_container_width=True,hide_index=True); st.markdown("### Calibration diagnostics"); st.dataframe(calibration_summary(load_projection_history()),use_container_width=True,hide_index=True); st.stop()
+    st.dataframe(model_view,use_container_width=True,hide_index=True); st.markdown("### Calibration diagnostics")
+    render_calibration_dashboard(); st.dataframe(calibration_summary(load_projection_history()),use_container_width=True,hide_index=True); st.stop()
 elif nav=="Bet Tracker":
     st.markdown('<div class="section-head">BET TRACKER</div>',unsafe_allow_html=True); st.caption("Current pitcher markets available from the Odds API are shown here when posted.");
     if odds_err:st.info(odds_err)
