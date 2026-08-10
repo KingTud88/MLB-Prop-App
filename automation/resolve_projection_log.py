@@ -13,8 +13,8 @@ SESSION = requests.Session()
 SESSION.headers.update({"Accept": "application/json", "User-Agent": "StrikeOutKing9000/3.2.0"})
 
 
-def get_json(endpoint: str) -> dict:
-    response = SESSION.get(f"{BASE}/{endpoint}", timeout=30)
+def get_json(endpoint: str, params: dict | None = None) -> dict:
+    response = SESSION.get(f"{BASE}/{endpoint}", params=params or {}, timeout=30)
     response.raise_for_status()
     data = response.json()
     if not isinstance(data, dict):
@@ -31,6 +31,25 @@ def is_missing(value: object) -> bool:
     except (TypeError, ValueError):
         pass
     return str(value).strip() == ""
+
+
+def resolve_from_pitcher_game_log(row: pd.Series) -> int | None:
+    pitcher_id = int(float(row["pitcher_id"]))
+    game_date = str(row["game_date"])[:10]
+    season = game_date[:4]
+    data = get_json(
+        f"people/{pitcher_id}/stats",
+        {"stats": "gameLog", "group": "pitching", "season": season, "gameType": "R"},
+    )
+    for block in data.get("stats", []):
+        for split in block.get("splits", []):
+            if str(split.get("date", ""))[:10] != game_date:
+                continue
+            stat = split.get("stat", {})
+            strikeouts = stat.get("strikeOuts")
+            if strikeouts is not None:
+                return int(strikeouts)
+    return None
 
 
 def _pitcher_from_boxscore(data: dict, player_id: str) -> int | None:
@@ -51,6 +70,13 @@ def resolve_row(row: pd.Series) -> tuple[int | None, str | None, str | None]:
     game_pk = int(float(row["game_pk"]))
     player_id = f"ID{int(float(row['pitcher_id']))}"
     try:
+        # Primary source: the same official MLB pitcher game-log endpoint used
+        # by the projection engine. This avoids relying on a boxscore transition.
+        strikeouts = resolve_from_pitcher_game_log(row)
+        if strikeouts is not None:
+            return strikeouts, datetime.now(timezone.utc).isoformat(), None
+
+        # Secondary official path for unusual game-log cases/doubleheaders.
         boxscore = get_json(f"game/{game_pk}/boxscore")
         status = boxscore.get("gameData", {}).get("status", {})
         if status.get("abstractGameState") == "Final":
@@ -59,8 +85,6 @@ def resolve_row(row: pd.Series) -> tuple[int | None, str | None, str | None]:
                 return strikeouts, datetime.now(timezone.utc).isoformat(), None
             return None, None, "final game but pitcher was not found in boxscore"
 
-        # Feed/live is a second official MLB path and can expose the final state
-        # even when the boxscore response is in a transitional state.
         live = get_json(f"game/{game_pk}/feed/live")
         live_status = live.get("gameData", {}).get("status", {})
         if live_status.get("abstractGameState") != "Final":
