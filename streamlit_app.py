@@ -29,26 +29,49 @@ BRANDING_FIX_CSS = f"""
 [data-testid="stSidebar"]{{width:var(--sidebar-w)!important;min-width:var(--sidebar-w)!important}}
 [data-testid="stSidebar"]>div:first-child{{width:var(--sidebar-w)!important}}
 [data-testid="stSidebar"] .block-container{{padding:.9rem .72rem 1.2rem!important}}
+
+/* Sidebar: approved wordmark treatment, never the mascot. */
 .sok-sidebar-logo{{width:100%!important;height:104px!important;margin:0 0 .55rem!important;display:flex!important;align-items:center!important;justify-content:center!important;border:1px solid #35516d!important;border-radius:14px!important;background:linear-gradient(145deg,#0b203a,#07162b)!important;overflow:hidden!important;position:relative!important}}
 .sok-sidebar-logo>*{{display:none!important}}
 .sok-sidebar-title,.sok-sidebar-sub{{display:none!important}}
-.sok-sidebar-logo::after{{content:"StrikeOut\\A King 9000";white-space:pre;text-align:center;font-family:"Brush Script MT","Segoe Script",cursive!important;font-weight:900;font-size:27px;line-height:.9;color:#fff;text-shadow:2px 2px 0 #132a48}}
+.sok-sidebar-logo::after{{content:"StrikeOut\\A King 9000";white-space:pre;text-align:center;font-family:"Brush Script MT","Segoe Script",cursive!important;font-weight:900;font-size:29px;line-height:.9;color:#fff;text-shadow:2px 2px 0 #132a48}}
 .sok-sidebar-logo::before{{content:"♛";position:absolute;color:#e31837;font-size:18px;top:6px;left:50%;transform:translateX(-50%)}}
-.sok-hero{{grid-template-columns:190px 1fr 210px!important;gap:1rem!important;min-height:205px!important;align-items:center!important}}
-.sok-hero>div:first-child{{min-height:190px!important;display:flex!important;align-items:center!important;justify-content:center!important;background:url('{ASSET_BASE}/strikeout_king_9000.svg') center/contain no-repeat!important}}
-.sok-hero>div:first-child img{{width:175px!important;height:175px!important;object-fit:contain!important;visibility:hidden!important}}
+
+/* Hero is built as one deterministic flex row so Streamlit columns cannot squeeze it. */
+.sok-hero{{display:flex!important;align-items:center!important;gap:22px!important;min-height:205px!important;width:100%!important}}
+.sok-hero .sok-hero-mascot{{flex:0 0 205px!important;width:205px!important;height:190px!important;display:flex!important;align-items:center!important;justify-content:center!important}}
+.sok-hero .sok-hero-mascot img{{width:190px!important;height:190px!important;object-fit:contain!important;display:block!important}}
+.sok-hero .sok-hero-title{{flex:1 1 auto!important;min-width:0!important}}
 .sok-title{{font-size:5rem!important;line-height:.82!important}}
-.sok-status{{position:relative!important;margin-left:112px!important;z-index:5!important}}
-.sok-status::before{{content:"BUILT FOR\\A CLE\\A BASEBALL";white-space:pre;position:absolute;left:-108px;top:0;width:92px;height:112px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;text-align:center;padding:10px 6px;border:2px solid #dbe4ee;border-radius:15px;background:linear-gradient(145deg,#0b203a,#07172b);color:#fff;font-family:Impact,"Arial Narrow",sans-serif;font-size:14px;line-height:1.05;letter-spacing:.04em;text-shadow:0 1px 0 #000;box-shadow:0 8px 18px rgba(0,0,0,.2),inset 0 0 0 3px rgba(227,24,55,.10)}}
-.sok-status::after{{content:"★★★";position:absolute;left:-99px;top:80px;width:74px;text-align:center;color:#e31837;font-size:12px;letter-spacing:3px;z-index:6}}
+.sok-hero-right{{flex:0 0 335px!important;display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:18px!important}}
+.sok-built-badge{{width:105px;height:126px;box-sizing:border-box;border:2px solid #dbe4ee;border-radius:15px;background:linear-gradient(145deg,#0b203a,#07172b);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#fff;font-family:Impact,"Arial Narrow",sans-serif;font-size:15px;line-height:1.02;letter-spacing:.04em;box-shadow:0 8px 18px rgba(0,0,0,.2),inset 0 0 0 3px rgba(227,24,55,.10)}}
+.sok-built-badge .cle{{font-size:36px;color:#fff;text-shadow:2px 2px 0 #e31837;margin:4px 0}}
+.sok-built-badge .stars{{color:#e31837;font-size:13px;letter-spacing:3px}}
+.sok-status{{position:relative!important;margin-left:0!important;z-index:5!important;width:190px!important;box-sizing:border-box!important}}
 .proj-card{{min-height:205px!important}}
-@media(min-width:1200px){{.sok-hero{{grid-template-columns:190px 1fr 210px!important;min-height:205px!important}}.sok-title{{font-size:5rem!important}}}}
-@media(max-width:1000px){{[data-testid="stSidebar"]{{width:200px!important;min-width:200px!important}}[data-testid="stSidebar"]>div:first-child{{width:200px!important}}.sok-status{{margin-left:0!important}}.sok-status::before,.sok-status::after{{display:none!important}}}}
+@media(max-width:1150px){{
+  .sok-hero{{gap:12px!important}}
+  .sok-hero .sok-hero-mascot{{flex-basis:165px!important;width:165px!important}}
+  .sok-hero .sok-hero-mascot img{{width:155px!important;height:155px!important}}
+  .sok-title{{font-size:4.25rem!important}}
+  .sok-hero-right{{flex-basis:300px!important;gap:10px!important}}
+  .sok-built-badge{{width:90px;height:112px;font-size:13px}}
+  .sok-built-badge .cle{{font-size:30px}}
+  .sok-status{{width:180px!important}}
+}}
+@media(max-width:900px){{
+  .sok-hero{{display:block!important;min-height:0!important}}
+  .sok-hero .sok-hero-mascot{{width:180px!important;height:155px!important;margin:0 auto}}
+  .sok-hero .sok-hero-mascot img{{width:155px!important;height:155px!important}}
+  .sok-hero-title{{text-align:center!important}}
+  .sok-title{{font-size:3.6rem!important}}
+  .sok-hero-right{{justify-content:center!important;margin-top:16px!important}}
+}}
 </style>
 """
-source = source.replace("st.markdown(r\"\"\"", "st.markdown(BRANDING_FIX_CSS, unsafe_allow_html=True)\n\nst.markdown(r\"\"\"", 1)
+source = source.replace('st.markdown(r"""', 'st.markdown(BRANDING_FIX_CSS, unsafe_allow_html=True)\n\nst.markdown(r"""', 1)
 
-# Locked sidebar: Odds API is merged into Projection and is intentionally not a sidebar item.
+# Locked sidebar: Odds API is merged into Projection and intentionally absent from navigation.
 source = source.replace('<a href="/3_Odds_API">◎ &nbsp; Odds API</a>', '', 1)
 source = source.replace(
     '<div class="sok-nav"><a class="active" href="/">⌂ &nbsp; Projection</a><a href="/2_Bet_Tracker">♧ &nbsp; Bet Tracker</a><a href="/4_Projection_History">▣ &nbsp; Projection History</a><a href="/5_Daily_Projection_Run">▤ &nbsp; Daily Projection Run</a></div>',
@@ -61,6 +84,7 @@ source = source.replace(
     1,
 )
 
+# Replace the fragile Streamlit-column hero with a deterministic HTML hero matching the approved reference.
 old_hero = '''st.markdown('<div class="sok-hero">',unsafe_allow_html=True);h1,h2,h3=st.columns([1.15,4.1,1.25])
 with h1:
     if logo_path.exists():st.image(str(logo_path),width=175)
@@ -68,18 +92,21 @@ with h2:st.markdown('<div class="sok-title">STRIKEOUT<br><span class="red">KING 
 with h3:
     pct=projection.data_quality;st.markdown(f'<div class="sok-status"><div class="head">DATA STATUS</div><div class="live">● {projection.confidence.upper()}</div><div class="quality">High confidence<br>Data quality {pct}/100</div><div class="bar"><span style="width:{pct}%"></span></div></div>',unsafe_allow_html=True)
 st.markdown('</div>',unsafe_allow_html=True)'''
-new_hero = '''st.markdown('<div class="sok-hero">',unsafe_allow_html=True);h1,h2,h3=st.columns([1.15,4.1,1.25])
-with h1:
-    st.markdown('<div aria-label="StrikeOut King 9000 mascot"></div>',unsafe_allow_html=True)
-with h2:st.markdown('<div class="sok-title">STRIKEOUT<br><span class="red">KING 9000</span></div><div class="sok-ribbon">★ MLB PITCHER PROJECTION ENGINE ★ TWO-PATH ANALYTICS ★</div>',unsafe_allow_html=True)
-with h3:
-    pct=projection.data_quality;st.markdown(f'<div class="sok-status"><div class="head">DATA STATUS</div><div class="live">● {projection.confidence.upper()}</div><div class="quality">High confidence<br>Data quality {pct}/100</div><div class="bar"><span style="width:{pct}%"></span></div></div>',unsafe_allow_html=True)
-st.markdown('</div>',unsafe_allow_html=True)'''
+new_hero = """pct=projection.data_quality
+st.markdown(f'''<div class="sok-hero">
+  <div class="sok-hero-mascot"><img src="{ASSET_BASE}/strikeout_king_9000.png" alt="StrikeOut King 9000 mascot"></div>
+  <div class="sok-hero-title"><div class="sok-title">STRIKEOUT<br><span class="red">KING 9000</span></div><div class="sok-ribbon">★ MLB PITCHER PROJECTION ENGINE ★ TWO-PATH ANALYTICS ★</div></div>
+  <div class="sok-hero-right">
+    <div class="sok-built-badge"><div>BUILT FOR</div><div class="cle">CLE</div><div>BASEBALL</div><div class="stars">★★★</div></div>
+    <div class="sok-status"><div class="head">DATA STATUS</div><div class="live">● {projection.confidence.upper()}</div><div class="quality">High confidence<br>Data quality {pct}/100</div><div class="bar"><span style="width:{pct}%"></span></div></div>
+  </div>
+</div>''',unsafe_allow_html=True)"""
 if old_hero not in source:
     st.error("Target hero block was not found; refusing to render a partial redesign.")
     st.stop()
 source = source.replace(old_hero, new_hero, 1)
 
+# Keep the two-path projection architecture: mathematical path + 25,000+ simulated games + 50/50 ensemble.
 source = source.replace("def calculate_projection(", "def _sok_math_projection(", 1)
 TWO_PATH = r'''
 TWO_PATH_DETAILS = {}
@@ -141,5 +168,6 @@ def calculate_projection(log, game, manual, simulations):
 '''
 source = source.replace("def over_probability(", TWO_PATH + "\ndef over_probability(", 1)
 source = source.replace("use_container_width=True", "width=\"stretch\"")
+
 compile(source, LEGACY, "exec")
 exec(compile(source, LEGACY, "exec"), globals(), globals())
