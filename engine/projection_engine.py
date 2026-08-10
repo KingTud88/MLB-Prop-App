@@ -78,6 +78,17 @@ class ProjectionEngine:
         probs[-1] += max(0.0, 1.0 - probs.sum())
         return probs / probs.sum()
 
+    @staticmethod
+    def _line_cutoff(line: float) -> int:
+        """Convert a prop line into the integer outcome required to beat it.
+
+        Examples: 3.0 -> 4 for an over-3 push-aware prop representation,
+        3.5 -> 4, 5.5 -> 6. The engine stores milestone probabilities as
+        probabilities of reaching the next integer, so the same rule is used
+        everywhere the sportsbook supplies a half-line.
+        """
+        return int(math.floor(float(line))) + 1
+
     def mathematical_projection(self, features: Mapping[str, float]) -> tuple[float, float, dict[str, float]]:
         """Independent mathematical baseline from pregame rates and context."""
         pitcher_k = self._clip(self._safe_float(features.get("pitcher_k_pct"), 0.224), 0.05, 0.45)
@@ -158,15 +169,14 @@ class ProjectionEngine:
         math_probs: dict[float, float] = {}
         ensemble_probs: dict[float, float] = {}
 
-        # Always materialize the sportsbook half-lines we can receive from the
-        # Odds API. A 5.5 line means K >= 6, a 4.5 line means K >= 5, etc.
-        # This prevents the UI from accidentally reusing the neighboring
-        # integer milestone (for example 5+ = 52.4% being shown for 5.5).
+        # Materialize both integer milestones and sportsbook half-lines. A
+        # half-line is never allowed to reuse the lower integer milestone:
+        # P(over 5.5) is P(K >= 6), not P(K >= 5).
         probability_lines = {float(x) for x in lines}
         probability_lines.update(float(x) + 0.5 for x in range(0, 20))
 
         for line in sorted(probability_lines):
-            cutoff = int(math.floor(float(line))) + 1
+            cutoff = self._line_cutoff(line)
             sim_p = float(np.mean(sim_samples >= cutoff))
             math_p = float(math_pmf[cutoff:].sum()) if cutoff < len(math_pmf) else 0.0
             blended = float(w * sim_p + (1.0 - w) * math_p)
@@ -212,7 +222,7 @@ class ProjectionEngine:
             data_quality=float(quality),
             drivers=driver_rows,
             metadata={
-                "engine_version": "1.2.0",
+                "engine_version": "1.2.1",
                 "simulation_draws": draws,
                 "simulation_weight": w,
                 "paths_independent": True,
