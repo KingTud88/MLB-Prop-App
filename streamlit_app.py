@@ -7,7 +7,8 @@ import requests
 import streamlit as st
 
 LEGACY = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/f0b28d2a9f91cc145736eb2d3e0c1a72d3275f43/streamlit_app.py"
-ASSET_BASE = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/f0b28d2a9f91cc145736eb2d3e0c1a72d3275f43/assets"
+# Use the approved asset from the current repository so the hero mascot cannot disappear when the legacy engine is pinned.
+ASSET_BASE = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets"
 
 try:
     response = requests.get(LEGACY, timeout=20)
@@ -38,7 +39,7 @@ BRANDING_FIX_CSS = f"""
 .sok-sidebar-logo::before{{content:"♛";position:absolute;color:#e31837;font-size:18px;top:6px;left:50%;transform:translateX(-50%)}}
 
 /* Hero is built as one deterministic flex row so Streamlit columns cannot squeeze it. */
-.sok-hero{{display:flex!important;align-items:center!important;gap:22px!important;min-height:205px!important;width:100%!important}}
+.sok-hero{{display:flex!important;align-items:center!important;gap:22px!important;min-height:205px!important;width:100%!important;padding-top:4px!important}}
 .sok-hero .sok-hero-mascot{{flex:0 0 205px!important;width:205px!important;height:190px!important;display:flex!important;align-items:center!important;justify-content:center!important}}
 .sok-hero .sok-hero-mascot img{{width:190px!important;height:190px!important;object-fit:contain!important;display:block!important}}
 .sok-hero .sok-hero-title{{flex:1 1 auto!important;min-width:0!important}}
@@ -49,6 +50,11 @@ BRANDING_FIX_CSS = f"""
 .sok-built-badge .stars{{color:#e31837;font-size:13px;letter-spacing:3px}}
 .sok-status{{position:relative!important;margin-left:0!important;z-index:5!important;width:190px!important;box-sizing:border-box!important}}
 .proj-card{{min-height:205px!important}}
+
+/* Match the approved reference: the Projection Summary is a red tab, not a giant empty bordered box. */
+.section-frame{{border:0!important;border-radius:0!important;padding:0!important;margin-top:1.15rem!important;background:transparent!important;box-shadow:none!important}}
+.section-ribbon{{position:relative!important;z-index:5!important;margin:0 auto .72rem!important}}
+
 @media(max-width:1150px){{
   .sok-hero{{gap:12px!important}}
   .sok-hero .sok-hero-mascot{{flex-basis:165px!important;width:165px!important}}
