@@ -48,8 +48,9 @@ if st is not None:
     # Market Odds / Edge presentation guard.
     # The projection code already calculates edge correctly. This hook only
     # changes display order. It understands the app's formatted percentage
-    # strings, keeps MAIN markets ahead of alternates, and then ranks by best
-    # available edge. It never changes model probabilities or sportsbook data.
+    # strings, keeps MAIN markets ahead of alternates, and balances the visible
+    # table so both strikeout and total-outs markets are represented. It never
+    # changes model probabilities or sportsbook data.
     _original_dataframe=st.dataframe
     def _sok_dataframe(data=None,*args,**kwargs):
         if isinstance(data,__import__("pandas").DataFrame):
@@ -68,7 +69,21 @@ if st is not None:
                     ["_playable","_type_rank","_edge_rank"],
                     ascending=[False,True,False],
                     kind="mergesort"
-                ).drop(columns=["_playable","_type_rank","_edge_rank"])
+                )
+
+                # The market panel is compact, so reserve equal visual space
+                # for K and OUTS rather than allowing one market to consume the
+                # whole table. Keep the strongest opportunities in each group.
+                if "Market" in frame.columns:
+                    groups=[]
+                    for market in ("K","OUTS"):
+                        part=frame[frame["Market"]==market]
+                        if not part.empty:
+                            groups.append(part.head(5))
+                    if groups:
+                        frame=pd.concat(groups,ignore_index=True)
+
+                frame=frame.drop(columns=["_playable","_type_rank","_edge_rank"])
                 data=frame.reset_index(drop=True)
         return _original_dataframe(data,*args,**kwargs)
     st.dataframe=_sok_dataframe
