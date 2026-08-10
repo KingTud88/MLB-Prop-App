@@ -1,6 +1,8 @@
 name: Daily Projection Capture and Resolver
 
 on:
+  push:
+    branches: [main]
   schedule:
     - cron: "15 13 * * *"
     - cron: "15 20 * * *"
@@ -10,8 +12,13 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: daily-projection-resolver
+  cancel-in-progress: false
+
 jobs:
   projection-log:
+    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'Automate projection capture and game resolution')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
