@@ -5,6 +5,8 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from engine.starter_history import HISTORY_SEMANTICS
+
 
 @dataclass(frozen=True)
 class HitsCalibrationResult:
@@ -24,24 +26,26 @@ def _key(line: float) -> str:
     return str(float(line)).replace(".", "_")
 
 
+def _eligible_rows(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty or "history_semantics" not in frame.columns:
+        return frame.iloc[0:0].copy()
+    return frame.loc[frame["history_semantics"].astype(str).eq(HISTORY_SEMANTICS)].copy()
+
+
 def calibrate_hits_blend(
     frame: pd.DataFrame,
     line: float,
     min_observations: int = 30,
     grid_step: float = 0.02,
 ) -> HitsCalibrationResult:
-    """Learn the SIM/MATH blend for a hits-allowed over line from frozen resolved rows.
-
-    Only rows containing both independent pregame probabilities and a resolved
-    actual_hits_allowed value are eligible. Legacy rows without the hits-model
-    snapshot fields are therefore excluded automatically.
-    """
+    """Learn the SIM/MATH blend from starter-only frozen resolved hits rows."""
+    frame = _eligible_rows(frame)
     key = _key(line)
     sim_col = f"hits_sim_over_{key}"
     math_col = f"hits_math_over_{key}"
     actual_col = "actual_hits_allowed"
     if frame.empty or not {sim_col, math_col, actual_col}.issubset(frame.columns):
-        return HitsCalibrationResult(0.50, 0.50, 0, None, False, "Hits calibration fields are not populated yet.")
+        return HitsCalibrationResult(0.50, 0.50, 0, None, False, "Starter-only hits calibration fields are not populated yet.")
 
     data = frame[[sim_col, math_col, actual_col]].copy().dropna()
     sim = pd.to_numeric(data[sim_col], errors="coerce")
@@ -53,7 +57,7 @@ def calibrate_hits_blend(
     actual = actual.loc[good].to_numpy(float)
     n = len(actual)
     if n < min_observations:
-        return HitsCalibrationResult(0.50, 0.50, n, None, False, f"Need {min_observations} resolved hits observations; only {n} are available.")
+        return HitsCalibrationResult(0.50, 0.50, n, None, False, f"Need {min_observations} starter-only resolved hits observations; only {n} are available.")
 
     cutoff = int(np.floor(float(line)) + 1)
     y = (actual >= cutoff).astype(float)
@@ -65,7 +69,7 @@ def calibrate_hits_blend(
     shrink = min(1.0, (n - min_observations) / max(min_observations * 3.0, 1.0))
     final_w = 0.50 + shrink * (raw_w - 0.50)
     final_score = _brier(y, final_w * sim + (1.0 - final_w) * math)
-    return HitsCalibrationResult(final_w, 1.0 - final_w, n, final_score, True, "Weight learned from resolved frozen hits-allowed projections.")
+    return HitsCalibrationResult(final_w, 1.0 - final_w, n, final_score, True, "Weight learned from starter-only resolved frozen hits-allowed projections.")
 
 
 def hits_calibration_report(
@@ -73,6 +77,7 @@ def hits_calibration_report(
     lines: tuple[float, ...] = (3.5, 4.5, 5.5, 6.5, 7.5, 8.5),
     min_observations: int = 30,
 ) -> pd.DataFrame:
+    frame = _eligible_rows(frame)
     rows: list[dict[str, object]] = []
     for line in lines:
         key = _key(line)
