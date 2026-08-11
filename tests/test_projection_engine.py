@@ -3,17 +3,22 @@ import numpy as np
 from engine.projection_engine import ProjectionEngine
 
 
+def test_integer_milestone_cutoff_uses_its_own_value():
+    assert ProjectionEngine._line_cutoff(3.0) == 3
+    assert ProjectionEngine._line_cutoff(4.0) == 4
+    assert ProjectionEngine._line_cutoff(10.0) == 10
+
+
 def test_half_line_cutoff_matches_baseball_prop_rule():
     assert ProjectionEngine._line_cutoff(3.5) == 4
     assert ProjectionEngine._line_cutoff(4.5) == 5
     assert ProjectionEngine._line_cutoff(5.5) == 6
 
 
-def test_half_line_probability_is_not_lower_integer_milestone():
-    engine = ProjectionEngine(simulation_weight=0.5, seed=7)
+def test_integer_milestone_and_half_line_are_distinct():
     samples = np.array([3, 4, 5, 6, 7, 8], dtype=np.int16)
+    assert np.mean(samples >= ProjectionEngine._line_cutoff(5.0)) == 4 / 6
     assert np.mean(samples >= ProjectionEngine._line_cutoff(5.5)) == 0.5
-    assert np.mean(samples >= 5) == 4 / 6
 
 
 def test_projection_result_keeps_sim_math_and_ensemble_probabilities_separate(monkeypatch):
@@ -49,8 +54,6 @@ def test_projection_result_keeps_sim_math_and_ensemble_probabilities_separate(mo
     assert result.mathematical_probabilities == raw_math
     assert result.over_probabilities == calibrated
 
-    # The two analytical paths should remain independently observable, and the
-    # final ensemble should be their requested weighted blend at every test line.
     assert any(abs(raw_sim[line] - raw_math[line]) > 1e-6 for line in (3.0, 4.0, 5.0, 6.0, 7.0, 8.0))
     for line in (3.0, 4.0, 5.0, 6.0, 7.0, 8.0):
         expected = 0.37 * raw_sim[line] + 0.63 * raw_math[line]
