@@ -30,7 +30,7 @@ st.markdown(
 st.title("📊 Daily Projection Run")
 st.caption(
     "Run StrikeOut King 9000 across every announced MLB starter on the selected slate. "
-    "Each pitcher is captured as an immutable pregame SIM + MATH + ensemble snapshot for calibration."
+    "Each pitcher is captured as an immutable pregame strikeout + hits-allowed snapshot for calibration."
 )
 
 EASTERN = ZoneInfo("America/New_York")
@@ -56,8 +56,9 @@ def save_log(frame: pd.DataFrame) -> None:
                 frame[col] = np.nan
     if "probability_semantics" not in frame.columns:
         frame["probability_semantics"] = ""
-    if "actual_strikeouts" not in frame.columns:
-        frame["actual_strikeouts"] = np.nan
+    for col in ("actual_strikeouts", "actual_hits_allowed"):
+        if col not in frame.columns:
+            frame[col] = np.nan
     if "resolved_at_utc" not in frame.columns:
         frame["resolved_at_utc"] = ""
     frame.to_csv(LOG_PATH, index=False)
@@ -135,8 +136,10 @@ if isinstance(slate, pd.DataFrame):
     if not slate.empty:
         display_cols = [
             "player", "team", "opponent", "projection", "k_range_low", "k_range_high",
+            "hits_projection", "hits_range_low", "hits_range_high",
             "confidence", "data_quality", "opponent_k_pct", "sim_5p", "math_5p",
-            "probability_semantics", "actual_strikeouts",
+            "hits_sim_over_5_5", "hits_math_over_5_5", "probability_semantics",
+            "actual_strikeouts", "actual_hits_allowed",
         ]
         display_cols = [c for c in display_cols if c in slate.columns]
         display = slate[display_cols].copy().rename(
@@ -145,15 +148,21 @@ if isinstance(slate, pd.DataFrame):
                 "team": "Team",
                 "opponent": "Opp",
                 "projection": "Projection K",
-                "k_range_low": "80% Low",
-                "k_range_high": "80% High",
+                "k_range_low": "K 80% Low",
+                "k_range_high": "K 80% High",
+                "hits_projection": "Projection Hits Allowed",
+                "hits_range_low": "Hits 80% Low",
+                "hits_range_high": "Hits 80% High",
                 "confidence": "Confidence",
                 "data_quality": "Data Quality",
                 "opponent_k_pct": "Opp K%",
-                "sim_5p": "SIM 5+",
-                "math_5p": "MATH 5+",
+                "sim_5p": "SIM 5+ K",
+                "math_5p": "MATH 5+ K",
+                "hits_sim_over_5_5": "SIM O5.5 Hits",
+                "hits_math_over_5_5": "MATH O5.5 Hits",
                 "probability_semantics": "Semantics",
                 "actual_strikeouts": "Actual K",
+                "actual_hits_allowed": "Actual Hits Allowed",
             }
         )
         st.subheader(f"{slate_date:%B %d, %Y} starter slate")
@@ -172,11 +181,17 @@ if st.button("Resolve completed projection outcomes"):
     frame = load_log()
     updated = 0
     if not frame.empty:
-        with st.spinner("Checking MLB results and attaching actual strikeouts..."):
+        with st.spinner("Checking MLB results and attaching actual strikeouts + hits allowed..."):
             for idx in frame.index:
-                actual, resolved = resolve_row(frame.loc[idx])
-                if pd.notna(actual) and pd.isna(frame.loc[idx].get("actual_strikeouts")):
-                    frame.at[idx, "actual_strikeouts"] = actual
+                actual_k, actual_hits, resolved = resolve_row(frame.loc[idx])
+                changed = False
+                if pd.notna(actual_k) and pd.isna(frame.loc[idx].get("actual_strikeouts")):
+                    frame.at[idx, "actual_strikeouts"] = actual_k
+                    changed = True
+                if pd.notna(actual_hits) and pd.isna(frame.loc[idx].get("actual_hits_allowed")):
+                    frame.at[idx, "actual_hits_allowed"] = actual_hits
+                    changed = True
+                if changed:
                     frame.at[idx, "resolved_at_utc"] = resolved
                     updated += 1
             save_log(frame)
@@ -189,8 +204,10 @@ archive = load_log()
 if not archive.empty and "game_date" in archive.columns:
     day_rows = archive.loc[archive["game_date"].astype(str).eq(slate_date.isoformat())].copy()
     if not day_rows.empty:
-        actual = pd.to_numeric(day_rows.get("actual_strikeouts"), errors="coerce")
+        actual_k = pd.to_numeric(day_rows.get("actual_strikeouts"), errors="coerce")
+        actual_hits = pd.to_numeric(day_rows.get("actual_hits_allowed"), errors="coerce")
         st.caption(
             f"Projection log currently contains {len(day_rows)} snapshot(s) for this slate; "
-            f"{int(actual.notna().sum())} have resolved actual strikeouts."
+            f"{int(actual_k.notna().sum())} have resolved strikeouts and "
+            f"{int(actual_hits.notna().sum())} have resolved hits allowed."
         )
