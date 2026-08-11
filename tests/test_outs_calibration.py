@@ -3,6 +3,7 @@ from __future__ import annotations
 import pandas as pd
 
 from engine.outs_calibration import calibrate_outs_blend
+from engine.starter_history import HISTORY_SEMANTICS
 
 
 def _frame(n: int) -> pd.DataFrame:
@@ -13,6 +14,7 @@ def _frame(n: int) -> pd.DataFrame:
             "outs_sim_over_15_5": 0.72 if actual >= 16 else 0.28,
             "outs_math_over_15_5": 0.58 if actual >= 16 else 0.42,
             "actual_outs": actual,
+            "history_semantics": HISTORY_SEMANTICS,
         })
     return pd.DataFrame(rows)
 
@@ -39,3 +41,11 @@ def test_outs_calibration_ignores_legacy_rows_without_paths() -> None:
     frame = pd.concat([current, legacy], ignore_index=True)
     result = calibrate_outs_blend(frame, 15.5, min_observations=30)
     assert result.observations == 30
+
+
+def test_outs_calibration_excludes_mixed_appearance_history() -> None:
+    legacy = _frame(40)
+    legacy["history_semantics"] = "legacy-mixed-appearances"
+    result = calibrate_outs_blend(legacy, 15.5, min_observations=30)
+    assert result.observations == 0
+    assert not result.calibrated
