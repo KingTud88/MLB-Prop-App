@@ -8,7 +8,7 @@ def test_top_plays_page_compiles_and_has_quick_add_buttons():
     assert "make_bet_record" in source
     assert "append_bet(BET_LOG, record, st.secrets)" in source
     assert 'st.button("➕ Add as bet"' in source
-    assert 'st.number_input("Quick-add stake"' in source
+    assert 'st.number_input("Quick-add stake (units)"' in source
 
 
 def test_projection_page_has_actionable_quick_add_buttons():
