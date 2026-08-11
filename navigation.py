@@ -37,9 +37,9 @@ def render_sidebar(active: str = "projection") -> None:
         st.markdown('<div class="sk-nav-title">StrikeOut <span>King 9000</span></div>', unsafe_allow_html=True)
         st.markdown('<div class="sk-nav-sub">CLE-themed distributional MLB starter projections</div>', unsafe_allow_html=True)
 
-        # Projection is the master workspace. Live odds are surfaced inside it.
         links = [
             ("projection", "streamlit_app.py", "⌂", "Projection"),
+            ("top", "pages/6_Top_Plays.py", "👑", "Top Plays"),
             ("bets", "pages/2_Bet_Tracker.py", "♧", "Bet Tracker"),
             ("history", "pages/4_Projection_History.py", "▣", "Projection History"),
             ("daily", "pages/5_Daily_Projection_Run.py", "▤", "Daily Projection Run"),
