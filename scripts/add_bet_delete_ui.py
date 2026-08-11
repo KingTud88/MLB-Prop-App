@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# One-shot patch for persistent Bet Tracker deletion UI.
 path = Path("pages/2_Bet_Tracker.py")
 source = path.read_text(encoding="utf-8")
 
