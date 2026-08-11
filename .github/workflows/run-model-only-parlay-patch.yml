@@ -15,6 +15,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt pytest
       - run: python scripts/remove_sportsbook_gate_from_parlay.py
       - run: python -m compileall -q pages/6_Top_Plays.py engine tests
       - run: pytest -q
