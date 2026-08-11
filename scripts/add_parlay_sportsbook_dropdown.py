@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# One-shot patch: add a sportsbook dropdown for parlay recordkeeping only.
 page = Path("pages/6_Top_Plays.py")
 source = page.read_text(encoding="utf-8")
 
