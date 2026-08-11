@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import math
+from pathlib import Path
 from typing import Mapping
 
 import numpy as np
@@ -36,10 +37,12 @@ class ProjectionEngine:
     every plate appearance independently.
 
     Path 2: a transparent mathematical probability model using the same
-    pregame features but a separate Negative-Binomial distribution. It does
-    not reuse the simulation samples.
+    pregame features but a separate Negative-Binomial distribution.
+    It does not reuse the simulation samples.
 
-    The market line is never an input to either baseball forecast path.
+    Historical calibration is applied only after both independent paths have
+    produced their raw probabilities. Sportsbook lines/prices never enter
+    either baseball forecast path.
     """
 
     def __init__(self, simulation_weight: float = 0.50, seed: int | None = None) -> None:
@@ -88,6 +91,30 @@ class ProjectionEngine:
         everywhere the sportsbook supplies a half-line.
         """
         return int(math.floor(float(line))) + 1
+
+    @staticmethod
+    def _historical_calibration(lines: tuple[float, ...]) -> dict[int, object]:
+        """Load line-specific calibration without letting market data leak in.
+
+        Calibration is trained only from resolved pregame projection snapshots
+        in data/projection_log.csv. Missing/insufficient history deliberately
+        returns the existing 50/50 baseline through calibrate_blend().
+        """
+        try:
+            from engine.calibration import calibrate_blend
+            history_path = Path(__file__).resolve().parents[1] / "data" / "projection_log.csv"
+            history = pd.read_csv(history_path)
+        except Exception:
+            history = pd.DataFrame()
+            calibrate_blend = None
+
+        if calibrate_blend is None:
+            return {int(math.floor(line)): None for line in lines}
+        return {
+            int(math.floor(line)): calibrate_blend(history, int(math.floor(line)))
+            for line in lines
+            if float(line) >= 0
+        }
 
     def mathematical_projection(self, features: Mapping[str, float]) -> tuple[float, float, dict[str, float]]:
         """Independent mathematical baseline from pregame rates and context."""
@@ -161,17 +188,20 @@ class ProjectionEngine:
         math_mean, math_sd, factors = self.mathematical_projection(features)
         math_pmf = self._nb_pmf(math_mean, math_sd)
 
-        w = self.simulation_weight
-        ensemble_mean = w * sim_mean + (1.0 - w) * math_mean
-        ensemble_sd = math.sqrt(max(w * sim_sd**2 + (1.0 - w) * math_sd**2, 0.01))
+        calibration = self._historical_calibration(lines)
+        learned_weights = {
+            line: float(getattr(cal, "weight_simulation", self.simulation_weight) if cal is not None else self.simulation_weight)
+            for line, cal in calibration.items()
+        }
+        valid_weights = [w for w in learned_weights.values() if np.isfinite(w)]
+        mean_weight = float(np.mean(valid_weights)) if valid_weights else self.simulation_weight
+        ensemble_mean = mean_weight * sim_mean + (1.0 - mean_weight) * math_mean
+        ensemble_sd = math.sqrt(max(mean_weight * sim_sd**2 + (1.0 - mean_weight) * math_sd**2, 0.01))
 
         sim_probs: dict[float, float] = {}
         math_probs: dict[float, float] = {}
         ensemble_probs: dict[float, float] = {}
 
-        # Materialize both integer milestones and sportsbook half-lines. A
-        # half-line is never allowed to reuse the lower integer milestone:
-        # P(over 5.5) is P(K >= 6), not P(K >= 5).
         probability_lines = {float(x) for x in lines}
         probability_lines.update(float(x) + 0.5 for x in range(0, 20))
 
@@ -179,7 +209,8 @@ class ProjectionEngine:
             cutoff = self._line_cutoff(line)
             sim_p = float(np.mean(sim_samples >= cutoff))
             math_p = float(math_pmf[cutoff:].sum()) if cutoff < len(math_pmf) else 0.0
-            blended = float(w * sim_p + (1.0 - w) * math_p)
+            weight = learned_weights.get(int(math.floor(line)), mean_weight)
+            blended = float(weight * sim_p + (1.0 - weight) * math_p)
             sim_probs[float(line)] = sim_p
             math_probs[float(line)] = math_p
             ensemble_probs[float(line)] = blended
@@ -222,9 +253,11 @@ class ProjectionEngine:
             data_quality=float(quality),
             drivers=driver_rows,
             metadata={
-                "engine_version": "1.2.1",
+                "engine_version": "1.3.0",
                 "simulation_draws": draws,
-                "simulation_weight": w,
+                "simulation_weight": mean_weight,
+                "calibration_weights": learned_weights,
+                "calibration_source": "resolved pregame projection history only",
                 "paths_independent": True,
                 "market_used_for_forecast": False,
                 "half_line_definition": "P(over x.5) = P(stat >= floor(x.5)+1)",
