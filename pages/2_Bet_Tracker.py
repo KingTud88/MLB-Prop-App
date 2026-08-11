@@ -9,7 +9,15 @@ import pandas as pd
 import requests
 import streamlit as st
 
-from engine.bet_tracker import MARKETS, grade_bet, normalize_market, profit_for
+from automation.daily_projection_runner import LOG_PATH as PROJECTION_LOG, schedule as daily_schedule
+from engine.bet_tracker import (
+    MARKETS,
+    default_line_for_market,
+    grade_bet,
+    normalize_market,
+    profit_for,
+    projection_for_market,
+)
 from navigation import render_sidebar
 from training.bet_storage import append_bet, load_bet_log
 
@@ -171,6 +179,35 @@ def live_pitcher_prop(
         return None, f"{normalized} stat unavailable · {status}", final
 
 
+@st.cache_data(ttl=120, show_spinner=False)
+def todays_slate(day: str) -> tuple[list[dict], str | None]:
+    try:
+        return daily_schedule(day), None
+    except Exception as exc:
+        return [], f"Today's MLB slate could not be loaded: {exc}"
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def frozen_snapshot(day: str, pitcher_id: int, game_pk: int) -> dict | None:
+    if not PROJECTION_LOG.exists():
+        return None
+    try:
+        frame = pd.read_csv(PROJECTION_LOG)
+    except Exception:
+        return None
+    if frame.empty or not {"game_date", "pitcher_id", "game_pk"}.issubset(frame.columns):
+        return None
+    game_dates = frame["game_date"].astype(str).str[:10]
+    pitcher_ids = pd.to_numeric(frame["pitcher_id"], errors="coerce")
+    game_pks = pd.to_numeric(frame["game_pk"], errors="coerce")
+    matched = frame.loc[game_dates.eq(day) & pitcher_ids.eq(int(pitcher_id)) & game_pks.eq(int(game_pk))].copy()
+    if matched.empty:
+        return None
+    if "captured_at_utc" in matched.columns:
+        matched = matched.sort_values("captured_at_utc")
+    return matched.iloc[-1].to_dict()
+
+
 def _num(value: object) -> float | None:
     parsed = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
     return None if pd.isna(parsed) else float(parsed)
@@ -186,6 +223,15 @@ def _format_odds(value: object) -> str:
     return "—" if number is None else f"{int(number):+d}"
 
 
+def _clean_text(value: object) -> str:
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    return str(value or "").strip()
+
+
 def load_tracker() -> pd.DataFrame:
     try:
         return load_bet_log(BET_LOG, st.secrets)
@@ -195,47 +241,88 @@ def load_tracker() -> pd.DataFrame:
 
 
 with st.expander("➕ Add a bet", expanded=False):
-    with st.form("manual_bet_form", clear_on_submit=False):
-        a, b, c, d = st.columns(4)
-        player = a.text_input("Pitcher")
-        market = b.selectbox("Market", MARKETS)
-        side = c.selectbox("Side", ["Over", "Under"])
-        line = d.number_input("Line", min_value=0.0, max_value=30.0, value=5.5, step=0.5)
+    today = datetime.now(EASTERN).date()
+    today_text = today.isoformat()
+    slate, slate_error = todays_slate(today_text)
+    if slate_error:
+        st.warning(slate_error)
 
-        e, f, g, h = st.columns(4)
-        odds = e.number_input("American odds", min_value=-5000, max_value=5000, value=-110, step=5)
-        stake = f.number_input("Stake", min_value=0.0, value=1.0, step=0.5)
-        book = g.text_input("Sportsbook", value="")
-        game_date = h.date_input("Game date", value=datetime.now(EASTERN).date())
+    slate_by_key = {
+        f"{int(row['game_pk'])}:{int(row['pitcher_id'])}": row
+        for row in slate
+        if row.get("game_pk") and row.get("pitcher_id")
+    }
+    manual_key = "manual"
+    pitcher_options = list(slate_by_key) + [manual_key]
 
-        i, j, k = st.columns(3)
-        projection = i.number_input("Model projection (optional)", min_value=0.0, value=0.0, step=0.1)
-        game_pk_text = j.text_input("Game PK (optional)")
-        pitcher_id_text = k.text_input("Pitcher ID (optional)")
-        submitted = st.form_submit_button("💾 Save bet", type="primary", use_container_width=True)
+    def _pitcher_label(key: str) -> str:
+        if key == manual_key:
+            return "✍️ Manual entry / pitcher not listed"
+        row = slate_by_key[key]
+        return f"{row.get('player', 'Unknown')} · {row.get('team', 'UNK')} vs {row.get('opponent', 'UNK')}"
 
-    if submitted:
-        if not player.strip():
-            st.error("Enter a pitcher name before saving the bet.")
-        else:
+    pick_col, market_col = st.columns([1.65, 1])
+    pitcher_key = pick_col.selectbox(
+        "Pitcher",
+        pitcher_options,
+        format_func=_pitcher_label,
+        help="Today's announced probable starters from MLB. Use manual entry if a pitcher is missing or changes late.",
+    )
+    market = market_col.selectbox("Market", MARKETS)
+    selected_pitcher = slate_by_key.get(pitcher_key)
+
+    if selected_pitcher:
+        snapshot = frozen_snapshot(today_text, int(selected_pitcher["pitcher_id"]), int(selected_pitcher["game_pk"]))
+        auto_projection = projection_for_market(snapshot, market)
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Matchup", f"{selected_pitcher.get('team', 'UNK')} vs {selected_pitcher.get('opponent', 'UNK')}")
+        m2.metric("Game PK", int(selected_pitcher["game_pk"]))
+        m3.metric("Pitcher ID", int(selected_pitcher["pitcher_id"]))
+        m4.metric(f"{market} projection", "—" if auto_projection is None else f"{auto_projection:.2f}")
+        st.caption(
+            f"{selected_pitcher.get('venue', 'Unknown venue')} · {selected_pitcher.get('status', 'Scheduled')} · "
+            + ("frozen Daily Run projection loaded" if auto_projection is not None else "no frozen Daily Run projection found yet")
+        )
+
+        with st.form("slate_bet_form", clear_on_submit=False):
+            a, b, c, d = st.columns(4)
+            side = a.selectbox("Side", ["Over", "Under"])
+            line = b.number_input(
+                "Line",
+                min_value=0.0,
+                max_value=30.0,
+                value=default_line_for_market(market),
+                step=0.5,
+                key=f"slate_line_{normalize_market(market)}",
+            )
+            odds = c.number_input("American odds", min_value=-5000, max_value=5000, value=-110, step=5)
+            stake = d.number_input("Stake", min_value=0.0, value=1.0, step=0.5)
+            book = st.text_input("Sportsbook", value="")
+            submitted = st.form_submit_button("💾 Save bet", type="primary", use_container_width=True)
+
+        if submitted:
             record = {
-                "player": player.strip(),
+                "player": str(selected_pitcher["player"]),
                 "market": market,
-                "game_date": game_date.isoformat(),
+                "game_date": today_text,
                 "line": float(line),
                 "side": side,
                 "american_odds": int(odds),
                 "stake": float(stake),
                 "book": book.strip(),
                 "entered_at_utc": datetime.utcnow().isoformat() + "Z",
-                "projection": float(projection) if projection > 0 else "",
+                "projection": "" if auto_projection is None else float(auto_projection),
                 "model_probability": "",
                 "implied_probability": "",
                 "edge": "",
                 "confidence": "",
                 "actual_strikeouts": "",
-                "game_pk": game_pk_text.strip(),
-                "pitcher_id": pitcher_id_text.strip(),
+                "game_pk": int(selected_pitcher["game_pk"]),
+                "pitcher_id": int(selected_pitcher["pitcher_id"]),
+                "team": str(selected_pitcher.get("team", "")),
+                "opponent": str(selected_pitcher.get("opponent", "")),
+                "venue": str(selected_pitcher.get("venue", "")),
+                "game_time": str(selected_pitcher.get("game_time", "")),
             }
             try:
                 append_bet(BET_LOG, record, st.secrets)
@@ -244,6 +331,67 @@ with st.expander("➕ Add a bet", expanded=False):
                 st.rerun()
             except Exception as exc:
                 st.error(f"Could not save bet: {exc}")
+    else:
+        st.caption("Manual mode keeps the tracker usable for late pitcher changes or props not present on today's probable-starter slate.")
+        with st.form("manual_bet_form", clear_on_submit=False):
+            a, b, c, d = st.columns(4)
+            player = a.text_input("Pitcher")
+            side = b.selectbox("Side", ["Over", "Under"])
+            line = c.number_input(
+                "Line",
+                min_value=0.0,
+                max_value=30.0,
+                value=default_line_for_market(market),
+                step=0.5,
+                key=f"manual_line_{normalize_market(market)}",
+            )
+            odds = d.number_input("American odds", min_value=-5000, max_value=5000, value=-110, step=5)
+
+            e, f, g, h = st.columns(4)
+            stake = e.number_input("Stake", min_value=0.0, value=1.0, step=0.5)
+            book = f.text_input("Sportsbook", value="")
+            game_date = g.date_input("Game date", value=today)
+            projection = h.number_input("Model projection (optional)", min_value=0.0, value=0.0, step=0.1)
+
+            i, j = st.columns(2)
+            game_pk_text = i.text_input("Game PK (optional)")
+            pitcher_id_text = j.text_input("Pitcher ID (optional)")
+            submitted = st.form_submit_button("💾 Save bet", type="primary", use_container_width=True)
+
+        if submitted:
+            if not player.strip():
+                st.error("Enter a pitcher name before saving the bet.")
+            else:
+                record = {
+                    "player": player.strip(),
+                    "market": market,
+                    "game_date": game_date.isoformat(),
+                    "line": float(line),
+                    "side": side,
+                    "american_odds": int(odds),
+                    "stake": float(stake),
+                    "book": book.strip(),
+                    "entered_at_utc": datetime.utcnow().isoformat() + "Z",
+                    "projection": float(projection) if projection > 0 else "",
+                    "model_probability": "",
+                    "implied_probability": "",
+                    "edge": "",
+                    "confidence": "",
+                    "actual_strikeouts": "",
+                    "game_pk": game_pk_text.strip(),
+                    "pitcher_id": pitcher_id_text.strip(),
+                    "team": "",
+                    "opponent": "",
+                    "venue": "",
+                    "game_time": "",
+                }
+                try:
+                    append_bet(BET_LOG, record, st.secrets)
+                    st.success("Bet saved to the tracker.")
+                    st.cache_data.clear()
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Could not save bet: {exc}")
 
 tracker = load_tracker()
 if tracker.empty:
@@ -285,8 +433,12 @@ with st.spinner("Checking saved bets against MLB pitching stats..."):
         stake = _num(row.get("stake"))
         odds = _num(row.get("american_odds"))
         profit = profit_for(stake, odds, grade)
+        team = _clean_text(row.get("team"))
+        opponent = _clean_text(row.get("opponent"))
+        matchup = f"{team} vs {opponent}" if team and opponent else "—"
         resolved_rows.append({
             "Pitcher": player,
+            "Matchup": matchup,
             "Date": game_date,
             "Market": market,
             "Bet": f"{side} {line:g}",
