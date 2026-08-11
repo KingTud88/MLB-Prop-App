@@ -17,12 +17,15 @@ from engine.hits_calibration import calibrate_hits_blend
 from engine.outs_projection import project_total_outs, OutsProjection
 from engine.outs_calibration import calibrate_outs_blend
 from engine.bet_lean import aligned_bet_lean
+from engine.bet_tracker import make_bet_record
+from training.bet_storage import append_bet
 
 APP_VERSION = "3.4.0"
 EASTERN = ZoneInfo("America/New_York")
 MLB_API = "https://statsapi.mlb.com/api/v1"
 ODDS_API = "https://api.the-odds-api.com/v4"
 APP_DIR = Path(__file__).resolve().parent
+BET_LOG = APP_DIR / "data" / "bet_log.csv"
 TEAM_ABBR = {108:"LAA",109:"ARI",110:"BAL",111:"BOS",112:"CHC",113:"CIN",114:"CLE",115:"COL",116:"DET",117:"HOU",118:"KCR",119:"LAD",120:"WSH",121:"NYM",133:"ATH",134:"PIT",135:"SDP",136:"SEA",137:"SFG",138:"STL",139:"TBR",140:"TEX",141:"TOR",142:"MIN",143:"PHI",144:"ATL",145:"CHW",146:"MIA",147:"NYY",158:"MIL"}
 TEAM_NAMES = {"LAA":"Los Angeles Angels","ARI":"Arizona Diamondbacks","BAL":"Baltimore Orioles","BOS":"Boston Red Sox","CHC":"Chicago Cubs","CIN":"Cincinnati Reds","CLE":"Cleveland Guardians","COL":"Colorado Rockies","DET":"Detroit Tigers","HOU":"Houston Astros","KCR":"Kansas City Royals","LAD":"Los Angeles Dodgers","WSH":"Washington Nationals","NYM":"New York Mets","ATH":"Athletics","PIT":"Pittsburgh Pirates","SDP":"San Diego Padres","SEA":"Seattle Mariners","SFG":"San Francisco Giants","STL":"St. Louis Cardinals","TBR":"Tampa Bay Rays","TEX":"Texas Rangers","TOR":"Toronto Blue Jays","MIN":"Minnesota Twins","PHI":"Philadelphia Phillies","ATL":"Atlanta Braves","CHW":"Chicago White Sox","MIA":"Miami Marlins","NYY":"New York Yankees","MIL":"Milwaukee Brewers"}
 PARK_K_FACTOR = {"Coors Field":.94,"T-Mobile Park":1.05,"Petco Park":1.03,"Oracle Park":1.02,"Dodger Stadium":1.01,"Yankee Stadium":.99,"Fenway Park":.98,"Wrigley Field":1.00}
@@ -120,6 +123,52 @@ def implied_prob(price):
         p=float(price); return 100/(p+100) if p>0 else abs(p)/(abs(p)+100)
     except Exception:return None
 
+def best_market_offer(odds_rows, market_keys, line, side):
+    wanted=str(side).lower(); candidates=[]
+    for row in odds_rows:
+        if row.get("market") not in set(market_keys): continue
+        if str(row.get("name","")).lower()!=wanted: continue
+        try:
+            if abs(float(row.get("point"))-float(line))>1e-9: continue
+            float(row.get("price"))
+        except Exception: continue
+        candidates.append(row)
+    return max(candidates,key=lambda row:float(row.get("price"))) if candidates else None
+
+def render_add_bet_button(container,reco,market_label,market_keys,projection_mean,stake,game,game_date,odds_rows,confidence,key):
+    side=str(reco.get("side","PASS"))
+    offer=best_market_offer(odds_rows,market_keys,reco.get("line"),side) if side in {"OVER","UNDER"} else None
+    with container:
+        if offer is not None:
+            st.caption(f"Best posted: {offer.get('book','')} {float(offer.get('price')):+.0f}")
+        else:
+            st.caption("No actionable posted price" if side=="PASS" else "Matching sportsbook price unavailable")
+        clicked=st.button(f"➕ Add {market_label}",key=key,use_container_width=True,disabled=(side=="PASS" or offer is None))
+        if clicked:
+            try:
+                price=float(offer.get("price")); implied=implied_prob(price); model=float(reco.get("model"))
+                record=make_bet_record(
+                    player=game.pitcher_name,
+                    market=market_label,
+                    game_date=game_date,
+                    line=float(reco.get("line")),
+                    side=side,
+                    american_odds=price,
+                    stake=float(stake),
+                    book=str(offer.get("book","")),
+                    projection=float(projection_mean),
+                    model_probability=model,
+                    implied_probability=implied,
+                    edge=None if implied is None else model-implied,
+                    confidence=confidence,
+                    game_pk=game.game_pk,
+                    pitcher_id=game.pitcher_id,
+                )
+                append_bet(BET_LOG,record,st.secrets)
+                st.success("Added to Bet Tracker")
+            except Exception as exc:
+                st.error(f"Could not add bet: {exc}")
+
 def market_recommendation(proj,odds_rows,market_key,default_line,kind):
     base_key=market_key.replace("_alternate",""); allowed={market_key,base_key}; rows=[r for r in odds_rows if r.get("market") in allowed and r.get("point") is not None]
     line=default_line; over_price=under_price=None
@@ -130,10 +179,10 @@ def market_recommendation(proj,odds_rows,market_key,default_line,kind):
             except Exception: pass
         if points: line=min(points,key=lambda x:abs(x-default_line))
         chosen=[r for r in rows if abs(float(r.get("point"))-line)<1e-9]
-        for r in chosen:
-            name=str(r.get("name","")).lower()
-            if name=="over": over_price=r.get("price")
-            elif name=="under": under_price=r.get("price")
+        over_offers=[r for r in chosen if str(r.get("name","")).lower()=="over" and r.get("price") is not None]
+        under_offers=[r for r in chosen if str(r.get("name","")).lower()=="under" and r.get("price") is not None]
+        if over_offers: over_price=max(float(r.get("price")) for r in over_offers)
+        if under_offers: under_price=max(float(r.get("price")) for r in under_offers)
     history=load_projection_history(); cutoff=int(math.floor(line)+1)
     if kind=="k":
         sim=float(proj.engine.simulation_probabilities.get(float(cutoff),np.mean(proj.k_samples>=cutoff)))
@@ -297,8 +346,10 @@ hit_rows=[r for r in odds_rows if r.get("market") in {"pitcher_hits_allowed","pi
 hit_line=min([float(r["point"]) for r in hit_rows],key=lambda x:abs(x-5.5)) if hit_rows else 5.5
 hit_sim=float(hits_proj.simulation_probabilities.get(float(hit_line),0.0)); hit_math=float(hits_proj.mathematical_probabilities.get(float(hit_line),0.0))
 hit_cal=calibrate_hits_blend(load_projection_history(),float(hit_line)); hit_over=hit_cal.weight_simulation*hit_sim+hit_cal.weight_math*hit_math
-hit_over_price=next((r.get("price") for r in hit_rows if abs(float(r.get("point"))-hit_line)<1e-9 and str(r.get("name","")).lower()=="over"),None)
-hit_under_price=next((r.get("price") for r in hit_rows if abs(float(r.get("point"))-hit_line)<1e-9 and str(r.get("name","")).lower()=="under"),None)
+hit_over_offer=best_market_offer(odds_rows,{"pitcher_hits_allowed","pitcher_hits_allowed_alternate"},hit_line,"OVER")
+hit_under_offer=best_market_offer(odds_rows,{"pitcher_hits_allowed","pitcher_hits_allowed_alternate"},hit_line,"UNDER")
+hit_over_price=hit_over_offer.get("price") if hit_over_offer else None
+hit_under_price=hit_under_offer.get("price") if hit_under_offer else None
 hit_decision=aligned_bet_lean(hits_proj.ensemble_mean,hit_line,hit_over,over_implied=implied_prob(hit_over_price) if hit_over_price is not None else None,under_implied=implied_prob(hit_under_price) if hit_under_price is not None else None,has_market=bool(hit_rows))
 hit_reco={"side":hit_decision.side,"line":hit_line,"model":hit_decision.model_probability,"edge":hit_decision.edge,"confidence":abs(hit_decision.model_probability-.5)*2,"has_market":bool(hit_rows),"label":"HITS ALLOWED BET LEAN","reason":hit_decision.reason,"projection_mean":hits_proj.ensemble_mean,"over_model":hit_over}
 
@@ -338,6 +389,12 @@ render_reco(c4,out_reco)
 h1,h2=st.columns(2)
 with h1: st.markdown(f'<div class="metric-card"><div class="metric-label">PROJECTED HITS ALLOWED</div><div class="metric-value">{hits_proj.ensemble_mean:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(hits_proj.simulation_samples,.1))}-{int(np.quantile(hits_proj.simulation_samples,.9))}</span></div>',unsafe_allow_html=True)
 render_reco(h2,hit_reco)
+st.markdown("#### Add recommendation to Bet Tracker")
+quick_add_stake=st.number_input("Quick-add stake",min_value=0.0,value=1.0,step=0.5,key=f"projection_quick_stake_{game.key}")
+add1,add2,add3=st.columns(3)
+render_add_bet_button(add1,k_reco,"Strikeouts",{"pitcher_strikeouts","pitcher_strikeouts_alternate"},proj.mean_k,quick_add_stake,game,selected_date.isoformat(),odds_rows,proj.confidence,f"add_k_{game.key}")
+render_add_bet_button(add2,out_reco,"Total Outs",{"pitcher_outs","pitcher_outs_alternate"},proj.mean_outs,quick_add_stake,game,selected_date.isoformat(),odds_rows,proj.confidence,f"add_outs_{game.key}")
+render_add_bet_button(add3,hit_reco,"Hits Allowed",{"pitcher_hits_allowed","pitcher_hits_allowed_alternate"},hits_proj.ensemble_mean,quick_add_stake,game,selected_date.isoformat(),odds_rows,proj.confidence,f"add_hits_{game.key}")
 with st.expander(f"🔎 Why this projection? · {game.pitcher_name}", expanded=False):
     st.caption("Live single-pitcher rationale using the same model paths shown in the projection cards. Sportsbook prices are comparison inputs only; they do not create the forecast.")
     x1,x2,x3,x4=st.columns(4)

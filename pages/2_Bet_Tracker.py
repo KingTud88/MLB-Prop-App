@@ -17,6 +17,7 @@ from engine.bet_tracker import (
     normalize_market,
     profit_for,
     projection_for_market,
+    result_cell_css,
 )
 from navigation import render_sidebar
 from training.bet_storage import append_bet, load_bet_log
@@ -484,7 +485,8 @@ view["Profit/Loss"] = view["Profit/Loss"].map(lambda x: "—" if pd.isna(x) else
 view["Projection"] = view["Projection"].map(lambda x: "—" if pd.isna(x) else f"{x:.2f}")
 view["Model Probability"] = view["Model Probability"].map(lambda x: "—" if pd.isna(x) else f"{x:.1%}")
 view["Edge"] = view["Edge"].map(lambda x: "—" if pd.isna(x) else f"{x:+.1%}")
-st.dataframe(view, hide_index=True, use_container_width=True)
+styled_view = view.style.map(result_cell_css, subset=["Result"])
+st.dataframe(styled_view, hide_index=True, use_container_width=True)
 
 st.download_button(
     "Download bet tracker CSV",

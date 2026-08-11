@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import os
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import numpy as np
@@ -15,7 +16,9 @@ from engine.calibration import calibrate_blend
 from engine.hits_calibration import calibrate_hits_blend, hits_calibration_report
 from engine.outs_calibration import calibrate_outs_blend, outs_calibration_report
 from engine.bet_lean import projection_side
+from engine.bet_tracker import make_bet_record, projection_for_market
 from navigation import render_sidebar
+from training.bet_storage import append_bet
 
 st.set_page_config(page_title="Top Plays", page_icon="👑", layout="wide")
 render_sidebar("top")
@@ -36,6 +39,8 @@ TEAM_NAMES = {
     "NYY":"New York Yankees","MIL":"Milwaukee Brewers",
 }
 MARKETS = "pitcher_strikeouts,pitcher_strikeouts_alternate,pitcher_outs,pitcher_outs_alternate,pitcher_hits_allowed,pitcher_hits_allowed_alternate"
+ROOT = Path(__file__).resolve().parents[1]
+BET_LOG = ROOT / "data" / "bet_log.csv"
 
 
 def secret() -> str | None:
@@ -383,6 +388,41 @@ event = st.dataframe(
     selection_mode="single-row",
 )
 st.caption("Ranking requires positive no-vig edge and minimum model/data-quality thresholds. One best leg per pitcher/market is kept so duplicate alternate lines do not crowd out the board.")
+
+st.markdown("#### Add a Top Play to Bet Tracker")
+quick_stake = st.number_input("Quick-add stake", min_value=0.0, value=1.0, step=0.5, key="top_plays_quick_stake")
+button_cols = st.columns(len(plays))
+for button_idx, (_, play_row) in enumerate(plays.iterrows()):
+    snapshot = find_snapshot(history, play_row)
+    snapshot_dict = snapshot.to_dict() if snapshot is not None else None
+    projection_value = projection_for_market(snapshot_dict, play_row.get("Market")) if snapshot_dict else None
+    with button_cols[button_idx]:
+        st.caption(f"#{int(play_row['Rank'])} {play_row['Pitcher']} · {play_row['Side']} {float(play_row['Line']):g}")
+        if st.button("➕ Add as bet", key=f"add_top_play_{int(play_row['Rank'])}", use_container_width=True):
+            try:
+                game_pk = numeric(play_row.get("Game PK"))
+                pitcher_id = numeric(play_row.get("Pitcher ID"))
+                record = make_bet_record(
+                    player=str(play_row["Pitcher"]),
+                    market=play_row["Market"],
+                    game_date=str(snapshot.get("game_date", today) if snapshot is not None else today),
+                    line=float(play_row["Line"]),
+                    side=str(play_row["Side"]),
+                    american_odds=float(play_row["Odds"]),
+                    stake=float(quick_stake),
+                    book=str(play_row.get("Book", "")),
+                    projection=projection_value,
+                    model_probability=float(play_row["Model Probability"]),
+                    implied_probability=float(play_row["No-Vig Implied"]),
+                    edge=float(play_row["Edge"]),
+                    confidence=(snapshot.get("confidence", "") if snapshot is not None else ""),
+                    game_pk=None if game_pk is None else int(game_pk),
+                    pitcher_id=None if pitcher_id is None else int(pitcher_id),
+                )
+                append_bet(BET_LOG, record, st.secrets)
+                st.success("Added")
+            except Exception as exc:
+                st.error(f"Could not add bet: {exc}")
 
 try:
     selected_rows = list(event.selection.rows)
