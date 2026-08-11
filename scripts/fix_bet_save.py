@@ -3,82 +3,18 @@ from pathlib import Path
 path = Path("streamlit_app.py")
 text = path.read_text(encoding="utf-8")
 
-old = '''# Manual sportsbook line + tracking layer. This does not change the baseball forecast.
-from training.manual_lines import ManualLine, analyze_manual_line, append_bet_log
+old = '''    nav=st.radio("Navigation",["Projection","Distribution","Form & Workload","Model Card","Bet Tracker","Projection History","Daily Projection Run"],label_visibility="collapsed")
+    st.divider(); selected_date=st.date_input("Slate date",value=datetime.now(EASTERN).date()); st.markdown("### PITCHER SEARCH")'''
 
-st.divider()
-st.subheader("Manual sportsbook line")
-st.caption("Enter the line and price you see at your sportsbook. No sportsbook API or paid credits required.")
-manual_col1, manual_col2, manual_col3, manual_col4 = st.columns([1.2, 1, 1, 1])
-with manual_col1:
-    manual_side = st.selectbox("Side", ["Over", "Under"], key="manual_side")
-with manual_col2:
-    manual_line = st.number_input("K line", 0.5, 15.5, float(k_line), 0.5, key="manual_line")
-with manual_col3:
-    manual_odds = st.number_input("American odds", -500, 500, -110, 5, key="manual_odds")
-with manual_col4:
-    st.write("")
-    analyze_button = st.button("Analyze line", type="primary", use_container_width=True)
+new = '''    nav=st.radio("Navigation",["Projection","Distribution","Form & Workload","Model Card","Bet Tracker","Projection History","Daily Projection Run"],label_visibility="collapsed")
+    if nav == "Daily Projection Run":
+        st.switch_page("pages/5_Daily_Projection_Run.py")
+    st.divider(); selected_date=st.date_input("Slate date",value=datetime.now(EASTERN).date()); st.markdown("### PITCHER SEARCH")'''
 
-if analyze_button:
-    manual_over = over_probability(projection.k_samples, manual_line)
-    analysis = analyze_manual_line(projection.mean_k, manual_over, manual_line, manual_side, int(manual_odds))
-    confidence = __import__("training.manual_lines", fromlist=["confidence_tier"]).confidence_tier(analysis["model_probability"], analysis["edge"])
-    a1,a2,a3,a4 = st.columns(4)
-    a1.metric("Model probability", f"{analysis['model_probability']:.1%}")
-    a2.metric("Sportsbook implied", f"{analysis['implied_probability']:.1%}")
-    a3.metric("Model edge", f"{analysis['edge']:+.1%}")
-    a4.metric("Provisional confidence", confidence)
-    st.info("Confidence is provisional until historical sportsbook lines are available for calibration.")
-    if st.button("Save to bet tracker", key="save_bet"):
-        record = ManualLine(game.pitcher_name, selected_date.isoformat(), manual_line, manual_side, int(manual_odds))
-        append_bet_log(APP_DIR / "data" / "bet_log.csv", record, analysis)
-        st.success("Bet saved to the local tracker.")
-'''
-
-new = '''# Manual sportsbook line + tracking layer. This does not change the baseball forecast.
-from training.manual_lines import ManualLine, analyze_manual_line, append_bet_log, confidence_tier
-
-st.divider()
-st.subheader("Manual sportsbook line")
-st.caption("Enter the line and price you see at your sportsbook. No sportsbook API or paid credits required.")
-manual_col1, manual_col2, manual_col3, manual_col4 = st.columns([1.2, 1, 1, 1])
-with manual_col1:
-    manual_side = st.selectbox("Side", ["Over", "Under"], key="manual_side")
-with manual_col2:
-    manual_line = st.number_input("K line", 0.5, 15.5, float(k_line), 0.5, key="manual_line")
-with manual_col3:
-    manual_odds = st.number_input("American odds", -500, 500, -110, 5, key="manual_odds")
-with manual_col4:
-    st.write("")
-    analyze_button = st.button("Analyze line", type="primary", use_container_width=True)
-
-if analyze_button:
-    manual_over = over_probability(projection.k_samples, manual_line)
-    analysis = analyze_manual_line(projection.mean_k, manual_over, manual_line, manual_side, int(manual_odds))
-    st.session_state["pending_manual_bet"] = {
-        "analysis": analysis,
-        "record": ManualLine(game.pitcher_name, selected_date.isoformat(), manual_line, manual_side, int(manual_odds)),
-    }
-
-pending = st.session_state.get("pending_manual_bet")
-if pending:
-    analysis = pending["analysis"]
-    confidence = confidence_tier(analysis["model_probability"], analysis["edge"])
-    a1,a2,a3,a4 = st.columns(4)
-    a1.metric("Model probability", f"{analysis['model_probability']:.1%}")
-    a2.metric("Sportsbook implied", f"{analysis['implied_probability']:.1%}")
-    a3.metric("Model edge", f"{analysis['edge']:+.1%}")
-    a4.metric("Provisional confidence", confidence)
-    st.info("Confidence is provisional until historical sportsbook lines are available for calibration.")
-    if st.button("Save to bet tracker", key="save_bet"):
-        append_bet_log(APP_DIR / "data" / "bet_log.csv", pending["record"], analysis)
-        st.session_state.pop("pending_manual_bet", None)
-        st.success("Bet saved to the local tracker.")
-'''
-
-if old not in text:
-    raise SystemExit("Expected manual sportsbook block was not found")
-
-path.write_text(text.replace(old, new, 1), encoding="utf-8")
-print("Bet save flow patched.")
+if new in text:
+    print("Daily Projection Run navigation already routed.")
+elif old in text:
+    path.write_text(text.replace(old, new, 1), encoding="utf-8")
+    print("Daily Projection Run now routes to the batch page.")
+else:
+    raise SystemExit("Expected Daily Projection Run navigation block was not found; refusing unsafe patch")
