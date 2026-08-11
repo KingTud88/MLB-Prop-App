@@ -13,6 +13,7 @@ import requests
 from engine.projection_engine import ProjectionEngine
 from engine.opposing_batters import get_opposing_batters, matchup_summary
 from engine.hits_allowed import project_hits_allowed
+from engine.outs_projection import project_total_outs
 
 BASE = "https://statsapi.mlb.com/api/v1"
 APP_VERSION = "3.3.0"
@@ -177,6 +178,12 @@ def project(row: dict) -> dict | None:
         draws=25000,
         lines=(3.5, 4.5, 5.5, 6.5, 7.5, 8.5),
     )
+    outs = project_total_outs(
+        log,
+        seed=seed ^ 0x0A75,
+        draws=25000,
+        lines=(13.5, 14.5, 15.5, 16.5, 17.5, 18.5),
+    )
     now = datetime.now(timezone.utc).isoformat()
     raw_sim = result.metadata.get("raw_simulation_probabilities", result.simulation_probabilities)
     raw_math = result.metadata.get("raw_mathematical_probabilities", result.mathematical_probabilities)
@@ -191,12 +198,15 @@ def project(row: dict) -> dict | None:
         "hits_projection": hits.ensemble_mean, "hits_sd": hits.ensemble_sd,
         "hits_range_low": int(np.quantile(hits.simulation_samples, .10)),
         "hits_range_high": int(np.quantile(hits.simulation_samples, .90)),
+        "outs_projection": outs.ensemble_mean, "outs_sd": outs.ensemble_sd,
+        "outs_range_low": int(np.quantile(outs.simulation_samples, .10)),
+        "outs_range_high": int(np.quantile(outs.simulation_samples, .90)),
         "confidence": "High" if result.confidence >= .75 else "Medium" if result.confidence >= .60 else "Low",
         "data_quality": int(round(result.data_quality)), "simulation_draws": 25000,
         "opponent_k_pct": opponent_k_pct * 100.0, "matchup_pa": matchup_pa, "matchup_batters": matchup_batters,
         "pitch_limit": 92, "umpire_k_factor": 1.0,
         "weather_factor": 1.0, "rest_factor": 1.0,
-        "actual_strikeouts": np.nan, "actual_hits_allowed": np.nan, "resolved_at_utc": "",
+        "actual_strikeouts": np.nan, "actual_hits_allowed": np.nan, "actual_outs": np.nan, "resolved_at_utc": "",
     }
     for line in range(3, 11):
         out[f"sim_{line}p"] = raw_sim.get(float(line), np.nan)
@@ -206,6 +216,11 @@ def project(row: dict) -> dict | None:
         out[f"hits_sim_over_{key}"] = hits.simulation_probabilities.get(line, np.nan)
         out[f"hits_math_over_{key}"] = hits.mathematical_probabilities.get(line, np.nan)
         out[f"hits_over_{key}"] = hits.over_probabilities.get(line, np.nan)
+    for line in (13.5, 14.5, 15.5, 16.5, 17.5, 18.5):
+        key = str(line).replace(".", "_")
+        out[f"outs_sim_over_{key}"] = outs.simulation_probabilities.get(line, np.nan)
+        out[f"outs_math_over_{key}"] = outs.mathematical_probabilities.get(line, np.nan)
+        out[f"outs_over_{key}"] = outs.over_probabilities.get(line, np.nan)
     return out
 
 
@@ -233,7 +248,8 @@ def fill_missing_pregame_paths(frame: pd.DataFrame) -> int:
     for idx in frame.index:
         row = frame.loc[idx]
         needs_hits = pd.isna(row.get("hits_projection"))
-        if ((row_has_complete_paths(row) and row_has_current_semantics(row) and not needs_hits) or not row_is_pregame(row, now)):
+        needs_outs = pd.isna(row.get("outs_projection"))
+        if ((row_has_complete_paths(row) and row_has_current_semantics(row) and not needs_hits and not needs_outs) or not row_is_pregame(row, now)):
             continue
         try:
             projected = project({
@@ -254,33 +270,35 @@ def fill_missing_pregame_paths(frame: pd.DataFrame) -> int:
         if not projected:
             continue
         for key, value in projected.items():
-            if key.startswith("sim_") or key.startswith("math_") or key.startswith("hits_") or key in {"probability_semantics"}:
+            if key.startswith("sim_") or key.startswith("math_") or key.startswith("hits_") or key.startswith("outs_") or key in {"probability_semantics"}:
                 frame.at[idx, key] = value
         updated += 1
     return updated
 
 
-def resolve_row(row: pd.Series) -> tuple[object, object, str]:
-    if pd.notna(row.get("actual_strikeouts")) and pd.notna(row.get("actual_hits_allowed")):
-        return row.get("actual_strikeouts"), row.get("actual_hits_allowed"), str(row.get("resolved_at_utc") or "")
+def resolve_row(row: pd.Series) -> tuple[object, object, object, str]:
+    if pd.notna(row.get("actual_strikeouts")) and pd.notna(row.get("actual_hits_allowed")) and pd.notna(row.get("actual_outs")):
+        return row.get("actual_strikeouts"), row.get("actual_hits_allowed"), row.get("actual_outs"), str(row.get("resolved_at_utc") or "")
     if pd.isna(row.get("game_pk")) or pd.isna(row.get("pitcher_id")):
-        return np.nan, np.nan, ""
+        return np.nan, np.nan, np.nan, ""
     try:
         data = get_json(f"game/{int(row['game_pk'])}/boxscore", {})
         status = data.get("gameData", {}).get("status", {})
         if status.get("abstractGameState") != "Final":
-            return np.nan, np.nan, ""
+            return np.nan, np.nan, np.nan, ""
         player = data.get("teams", {}).get("away", {}).get("players", {}).get(f"ID{int(row['pitcher_id'])}")
         if not player:
             player = data.get("teams", {}).get("home", {}).get("players", {}).get(f"ID{int(row['pitcher_id'])}")
         pitching = (player or {}).get("stats", {}).get("pitching", {})
         ks = pitching.get("strikeOuts")
         hits = pitching.get("hits")
-        if ks is None and hits is None:
-            return np.nan, np.nan, ""
-        return (int(ks) if ks is not None else np.nan), (int(hits) if hits is not None else np.nan), datetime.now(timezone.utc).isoformat()
+        innings = pitching.get("inningsPitched")
+        outs = int(round(parse_ip(innings) * 3)) if innings is not None else np.nan
+        if ks is None and hits is None and pd.isna(outs):
+            return np.nan, np.nan, np.nan, ""
+        return (int(ks) if ks is not None else np.nan), (int(hits) if hits is not None else np.nan), outs, datetime.now(timezone.utc).isoformat()
     except (requests.RequestException, ValueError, TypeError):
-        return np.nan, np.nan, ""
+        return np.nan, np.nan, np.nan, ""
 
 
 def main() -> None:
@@ -289,11 +307,13 @@ def main() -> None:
 
     if not frame.empty:
         for idx in frame.index:
-            actual_k, actual_hits, resolved = resolve_row(frame.loc[idx])
+            actual_k, actual_hits, actual_outs, resolved = resolve_row(frame.loc[idx])
             if pd.notna(actual_k):
                 frame.at[idx, "actual_strikeouts"] = actual_k
             if pd.notna(actual_hits):
                 frame.at[idx, "actual_hits_allowed"] = actual_hits
+            if pd.notna(actual_outs):
+                frame.at[idx, "actual_outs"] = actual_outs
             if resolved:
                 frame.at[idx, "resolved_at_utc"] = resolved
 
