@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - scripts/patch_outs_ui.py
+      - .github/workflows/apply-outs-ui.yml
 
 permissions:
   contents: write
