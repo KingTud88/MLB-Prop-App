@@ -16,7 +16,12 @@ from engine.calibration import calibrate_blend
 from engine.hits_calibration import calibrate_hits_blend, hits_calibration_report
 from engine.outs_calibration import calibrate_outs_blend, outs_calibration_report
 from engine.bet_lean import projection_side
-from engine.bet_tracker import make_bet_record, projection_for_market
+from engine.bet_tracker import (
+    combined_parlay_odds,
+    make_bet_record,
+    make_parlay_record,
+    projection_for_market,
+)
 from navigation import render_sidebar
 from training.bet_storage import append_bet
 
@@ -219,14 +224,22 @@ def collect_legs(row: pd.Series, payload: dict, history: pd.DataFrame) -> list[d
             continue
         for side, model_p, fair_p, price in candidates:
             edge = model_p - fair_p
-            if model_p < 0.55 or edge < 0.02 or quality < 60:
-                continue
+            qualified = model_p >= 0.55 and edge >= 0.02 and quality >= 60
+            reasons = []
+            if model_p < 0.55:
+                reasons.append("probability")
+            if edge < 0.02:
+                reasons.append("edge")
+            if quality < 60:
+                reasons.append("quality")
+            status = "QUALIFIED" if qualified else "WATCH · " + "/".join(reasons)
             market_label = "Strikeouts" if "strikeouts" in market else "Total Outs" if "outs" in market else "Hits Allowed"
             score = model_p + 0.5 * edge + 0.001 * quality
             legs.append({
                 "Pitcher": row.get("player"), "Market": market_label, "Side": side, "Line": point,
                 "Model Probability": model_p, "No-Vig Implied": fair_p, "Edge": edge,
                 "Book": book, "Odds": int(price), "Data Quality": int(round(quality)), "Score": score,
+                "Qualified": qualified, "Status": status,
                 "Game PK": row.get("game_pk"), "Pitcher ID": row.get("pitcher_id"), "Team": row.get("team"),
                 "Opponent": row.get("opponent"), "Market Key": market,
             })
@@ -360,25 +373,30 @@ for i, (_, row) in enumerate(slate.iterrows(), start=1):
 progress.empty()
 
 if not all_legs:
-    st.info("No legs currently clear the minimum filters (55% model probability, +2% no-vig edge, data quality 60+), or the sportsbooks have not posted supported pitcher props yet.")
+    st.info("Sportsbooks have not posted enough two-sided supported pitcher props yet to calculate a no-vig Top Plays board. The daily model projections are still available on Daily Projection Run and the main Projection page.")
     st.stop()
 
-plays = pd.DataFrame(all_legs)
-plays = plays.sort_values(["Score", "Edge", "Model Probability"], ascending=False)
+candidate_pool = pd.DataFrame(all_legs)
+qualified_total = int(candidate_pool["Qualified"].fillna(False).sum())
+plays = candidate_pool.sort_values(["Qualified", "Score", "Edge", "Model Probability"], ascending=False)
 plays = plays.drop_duplicates(["Pitcher", "Market", "Side", "Line"], keep="first")
 plays = plays.drop_duplicates(["Pitcher", "Market"], keep="first").head(5).copy().reset_index(drop=True)
 plays.insert(0, "Rank", range(1, len(plays) + 1))
 
 c1, c2, c3 = st.columns(3)
-c1.metric("Qualified legs", len(all_legs))
+c1.metric("Qualified candidates", qualified_total)
 c2.metric("Pitchers scanned", len(slate))
 c3.metric("Top board edge", f"{plays['Edge'].max():.1%}")
 
-view = plays[["Rank", "Pitcher", "Market", "Side", "Line", "Odds", "Model Probability", "No-Vig Implied", "Edge", "Book", "Data Quality"]].copy()
+view = plays[["Rank", "Status", "Pitcher", "Market", "Side", "Line", "Odds", "Model Probability", "No-Vig Implied", "Edge", "Book", "Data Quality"]].copy()
 for col in ("Model Probability", "No-Vig Implied", "Edge"):
     view[col] = view[col].map(lambda x: f"{x:.1%}")
-st.subheader("Today's five strongest qualified legs")
-st.caption("Click a row to open its projection breakdown.")
+st.subheader("Today's five strongest available legs")
+if qualified_total == 0:
+    st.warning("No current leg clears all betting thresholds. These are the five closest available candidates, shown for review only — not official model bets.")
+else:
+    st.caption("QUALIFIED legs clear 55% model probability, +2% no-vig edge, and data quality 60+. WATCH legs are shown so the board never goes blank when the slate is thin.")
+st.caption("Click a row or use View details to open its projection breakdown.")
 event = st.dataframe(
     view,
     hide_index=True,
@@ -390,19 +408,20 @@ event = st.dataframe(
 st.caption("Ranking requires positive no-vig edge and minimum model/data-quality thresholds. One best leg per pitcher/market is kept so duplicate alternate lines do not crowd out the board.")
 
 st.markdown("#### Top Play actions")
-st.caption("Quick-add stake is the amount recorded in Bet Tracker for P/L and ROI. It does not place a sportsbook wager and it does not affect the projection model.")
-quick_stake = st.number_input("Quick-add stake (units)", min_value=0.0, value=1.0, step=0.5, key="top_plays_quick_stake")
+st.caption("Straight-bet stake is the amount recorded for one individual leg. It does not place a sportsbook wager and it does not affect the projection model.")
+quick_stake = st.number_input("Straight-bet stake (units)", min_value=0.0, value=1.0, step=0.5, key="top_plays_quick_stake")
 button_cols = st.columns(len(plays))
 for button_idx, (_, play_row) in enumerate(plays.iterrows()):
     snapshot = find_snapshot(history, play_row)
     snapshot_dict = snapshot.to_dict() if snapshot is not None else None
     projection_value = projection_for_market(snapshot_dict, play_row.get("Market")) if snapshot_dict else None
+    qualified = bool(play_row.get("Qualified", False))
     with button_cols[button_idx]:
         rank = int(play_row["Rank"])
         st.caption(f"#{rank} {play_row['Pitcher']} · {play_row['Side']} {float(play_row['Line']):g}")
         if st.button("🔎 View details", key=f"view_top_play_{rank}", use_container_width=True):
             st.session_state["top_play_detail_rank"] = rank
-        if st.button("➕ Add as bet", key=f"add_top_play_{rank}", use_container_width=True):
+        if st.button("➕ Add as bet", key=f"add_top_play_{rank}", use_container_width=True, disabled=not qualified):
             try:
                 game_pk = numeric(play_row.get("Game PK"))
                 pitcher_id = numeric(play_row.get("Pitcher ID"))
@@ -427,6 +446,52 @@ for button_idx, (_, play_row) in enumerate(plays.iterrows()):
                 st.success("Added to Bet Tracker")
             except Exception as exc:
                 st.error(f"Could not add bet: {exc}")
+        if not qualified:
+            st.caption("WATCH only")
+
+st.markdown("---")
+st.subheader("🎟️ Parlay Builder")
+st.caption("A parlay uses one stake for the entire ticket. Legs must come from the same sportsbook. The estimated combined odds are only a starting point; enter the actual price quoted by your sportsbook before saving, especially for same-game or correlated props.")
+qualified_pool = candidate_pool.loc[candidate_pool["Qualified"].fillna(False)].copy()
+qualified_pool = qualified_pool.sort_values(["Score", "Edge", "Model Probability"], ascending=False)
+qualified_pool = qualified_pool.drop_duplicates(["Book", "Pitcher", "Market"], keep="first")
+book_counts = qualified_pool.groupby("Book").size() if not qualified_pool.empty else pd.Series(dtype=int)
+parlay_books = [str(book) for book, count in book_counts.items() if int(count) >= 2]
+if not parlay_books:
+    st.info("No sportsbook currently has at least two qualified legs available for a model-backed parlay. WATCH candidates are intentionally excluded from the parlay builder.")
+else:
+    parlay_book = st.selectbox("Parlay sportsbook", parlay_books, key="top_plays_parlay_book")
+    same_book = qualified_pool.loc[qualified_pool["Book"].astype(str).eq(parlay_book)].head(5).copy().reset_index(drop=True)
+    option_map = {}
+    for idx, leg in same_book.iterrows():
+        label = f"{leg['Pitcher']} · {leg['Market']} · {leg['Side']} {float(leg['Line']):g} · {int(leg['Odds']):+d}"
+        option_map[label] = idx
+    selected_labels = st.multiselect("Parlay legs (2–5)", list(option_map), default=list(option_map), max_selections=5, key="top_plays_parlay_legs")
+    selected = same_book.iloc[[option_map[label] for label in selected_labels]].copy() if selected_labels else same_book.iloc[0:0].copy()
+    parlay_stake = st.number_input("Parlay stake (units)", min_value=0.0, value=1.0, step=0.5, key="top_plays_parlay_stake")
+    if len(selected) >= 2:
+        estimated_odds = combined_parlay_odds(selected["Odds"].astype(float).tolist())
+        st.caption(f"Estimated standard combined price: {estimated_odds:+d}. Use the actual sportsbook quote if it differs.")
+        quoted_odds = st.number_input("Sportsbook quoted parlay odds", min_value=-5000, max_value=100000, value=int(estimated_odds), step=5, key="top_plays_parlay_odds")
+        save_parlay = st.button(f"🎟️ Add {len(selected)}-leg parlay to Bet Tracker", type="primary", use_container_width=True, key="save_top_plays_parlay")
+        if save_parlay:
+            legs = []
+            for _, leg in selected.iterrows():
+                game_pk = numeric(leg.get("Game PK")); pitcher_id = numeric(leg.get("Pitcher ID"))
+                legs.append({
+                    "player": str(leg["Pitcher"]), "market": str(leg["Market"]), "game_date": today,
+                    "line": float(leg["Line"]), "side": str(leg["Side"]), "american_odds": float(leg["Odds"]),
+                    "game_pk": None if game_pk is None else int(game_pk),
+                    "pitcher_id": None if pitcher_id is None else int(pitcher_id),
+                })
+            try:
+                record = make_parlay_record(legs=legs, stake=float(parlay_stake), book=parlay_book, american_odds=int(quoted_odds), game_date=today)
+                append_bet(BET_LOG, record, st.secrets)
+                st.success(f"Saved {len(legs)}-leg {parlay_book} parlay to Bet Tracker")
+            except Exception as exc:
+                st.error(f"Could not save parlay: {exc}")
+    else:
+        st.info("Select at least two qualified legs from the same sportsbook to build a parlay.")
 
 selected_rank = st.session_state.get("top_play_detail_rank")
 try:

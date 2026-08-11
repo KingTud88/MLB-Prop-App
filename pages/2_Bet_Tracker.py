@@ -14,7 +14,9 @@ from engine.bet_tracker import (
     MARKETS,
     default_line_for_market,
     grade_bet,
+    grade_parlay,
     normalize_market,
+    parse_parlay_legs,
     profit_for,
     projection_for_market,
     result_cell_css,
@@ -404,7 +406,14 @@ for col in ["line", "american_odds", "stake", "projection", "model_probability",
         tracker[col] = pd.to_numeric(tracker[col], errors="coerce")
 if "market" not in tracker.columns:
     tracker["market"] = "Strikeouts"
-tracker["market"] = tracker["market"].map(normalize_market)
+if "bet_type" not in tracker.columns:
+    tracker["bet_type"] = "Straight"
+tracker["bet_type"] = tracker["bet_type"].fillna("Straight").astype(str)
+straight_mask = ~tracker["bet_type"].str.lower().eq("parlay")
+tracker.loc[straight_mask, "market"] = tracker.loc[straight_mask, "market"].map(normalize_market)
+tracker.loc[~straight_mask, "market"] = "Parlay"
+if "parlay_legs" not in tracker.columns:
+    tracker["parlay_legs"] = ""
 if "stake" not in tracker.columns:
     tracker["stake"] = pd.NA
 if "book" not in tracker.columns:
@@ -418,11 +427,57 @@ resolved_rows: list[dict] = []
 ordered = tracker.sort_values("entered_at_utc", ascending=False, na_position="last") if "entered_at_utc" in tracker.columns else tracker.iloc[::-1]
 with st.spinner("Checking saved bets against MLB pitching stats..."):
     for _, row in ordered.iterrows():
+        bet_type = str(row.get("bet_type", "Straight") or "Straight").title()
+        game_date = str(row.get("game_date", ""))[:10]
+        stake = _num(row.get("stake"))
+        odds = _num(row.get("american_odds"))
+        if bet_type == "Parlay":
+            legs = parse_parlay_legs(row.get("parlay_legs"))
+            leg_grades = []
+            leg_summaries = []
+            statuses = []
+            for leg in legs:
+                leg_player = str(leg.get("player", "Unknown"))
+                leg_market = normalize_market(leg.get("market"))
+                leg_line = _num(leg.get("line")) or 0.0
+                leg_side = str(leg.get("side", "Over")).title()
+                actual, status, final = live_pitcher_prop(
+                    leg_player,
+                    leg_market,
+                    str(leg.get("game_date", game_date))[:10],
+                    _int_or_none(leg.get("game_pk")),
+                    _int_or_none(leg.get("pitcher_id")),
+                )
+                leg_grade = grade_bet(leg_side, leg_line, actual, final)
+                leg_grades.append(leg_grade)
+                statuses.append(status)
+                actual_text = "—" if actual is None else f"{actual:g}"
+                leg_summaries.append(f"{leg_player} {leg_side} {leg_line:g} {leg_market} [{actual_text} · {leg_grade.result}]")
+            grade = grade_parlay(leg_grades)
+            profit = profit_for(stake, odds, grade)
+            resolved_rows.append({
+                "Pitcher": f"{len(legs)}-leg parlay",
+                "Matchup": "Multiple",
+                "Date": game_date,
+                "Market": "Parlay",
+                "Bet": " | ".join(leg_summaries),
+                "Odds": _format_odds(odds),
+                "Book": str(row.get("book", "") or "—"),
+                "Stake": stake,
+                "Actual": "—",
+                "Game Status": " / ".join(sorted(set(statuses))) if statuses else "Pending",
+                "Result": grade.result,
+                "Profit/Loss": profit,
+                "Projection": None,
+                "Model Probability": None,
+                "Edge": None,
+            })
+            continue
+
         player = str(row.get("player", "Unknown"))
         market = normalize_market(row.get("market"))
         line = _num(row.get("line")) or 0.0
         side = str(row.get("side", "Over")).title()
-        game_date = str(row.get("game_date", ""))[:10]
         actual, status, final = live_pitcher_prop(
             player,
             market,
@@ -431,8 +486,6 @@ with st.spinner("Checking saved bets against MLB pitching stats..."):
             _int_or_none(row.get("pitcher_id")),
         )
         grade = grade_bet(side, line, actual, final)
-        stake = _num(row.get("stake"))
-        odds = _num(row.get("american_odds"))
         profit = profit_for(stake, odds, grade)
         team = _clean_text(row.get("team"))
         opponent = _clean_text(row.get("opponent"))
@@ -458,8 +511,8 @@ with st.spinner("Checking saved bets against MLB pitching stats..."):
 results = pd.DataFrame(resolved_rows)
 wins = int((results["Result"] == "WIN").sum())
 losses = int((results["Result"] == "LOSS").sum())
-pushes = int((results["Result"] == "PUSH").sum())
-pending = int((~results["Result"].isin(["WIN", "LOSS", "PUSH"])).sum())
+pushes = int(results["Result"].isin(["PUSH", "PUSH LEG"]).sum())
+pending = int((~results["Result"].isin(["WIN", "LOSS", "PUSH", "PUSH LEG"])).sum())
 profit_series = pd.to_numeric(results["Profit/Loss"], errors="coerce")
 stake_series = pd.to_numeric(results["Stake"], errors="coerce")
 graded_mask = results["Result"].isin(["WIN", "LOSS", "PUSH"]) & stake_series.notna()
@@ -480,7 +533,7 @@ if stake_series.isna().any():
 st.subheader("Tracked bets")
 view = results.copy()
 view["Stake"] = view["Stake"].map(lambda x: "—" if pd.isna(x) else f"{x:.2f}")
-view["Actual"] = view["Actual"].map(lambda x: "—" if pd.isna(x) else f"{x:g}")
+view["Actual"] = view["Actual"].map(lambda x: "—" if pd.isna(x) else (f"{x:g}" if isinstance(x, (int, float)) else str(x)))
 view["Profit/Loss"] = view["Profit/Loss"].map(lambda x: "—" if pd.isna(x) else f"{x:+.2f}")
 view["Projection"] = view["Projection"].map(lambda x: "—" if pd.isna(x) else f"{x:.2f}")
 view["Model Probability"] = view["Model Probability"].map(lambda x: "—" if pd.isna(x) else f"{x:.1%}")
