@@ -24,6 +24,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -48,7 +50,25 @@ jobs:
           git add data/projection_log.csv
           if git diff --cached --quiet; then
             echo "No projection-log changes to commit."
-          else
-            git commit -m "Automate projection capture and game resolution"
-            git push
+            exit 0
           fi
+
+          git commit -m "Automate projection capture and game resolution"
+
+          for attempt in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main; then
+              if git push origin HEAD:main; then
+                exit 0
+              fi
+            else
+              git rebase --abort || true
+              echo "Rebase conflict while updating projection log; refusing to overwrite main."
+              exit 1
+            fi
+            echo "Push race on attempt ${attempt}; retrying against latest main."
+            sleep $((attempt * 2))
+          done
+
+          echo "Projection-log push failed after 3 attempts."
+          exit 1
