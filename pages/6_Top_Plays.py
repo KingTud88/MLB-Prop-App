@@ -475,8 +475,8 @@ for button_idx, (_, play_row) in enumerate(plays.iterrows()):
 st.markdown("---")
 st.subheader("🎟️ Parlay Builder")
 st.caption(
-    "Build a parlay directly from our model Top 5. No sportsbook, live-price, or book-matching data is used here. "
-    "Select any 2–5 model legs and choose one stake for the entire tracked model ticket."
+    "Build a parlay directly from our model Top 5. Sportsbook data never filters, ranks, or selects the legs. "
+    "Select any 2–5 model legs and choose one stake for the entire tracked model ticket; the sportsbook dropdown is recordkeeping only."
 )
 
 option_map = {}
@@ -497,6 +497,25 @@ selected_labels = st.multiselect(
 )
 selected = plays.iloc[[option_map[label] for label in selected_labels]].copy() if selected_labels else plays.iloc[0:0].copy()
 parlay_stake = st.number_input("Parlay stake (units)", min_value=0.0, value=1.0, step=0.5, key="top_plays_parlay_stake")
+parlay_book = st.selectbox(
+    "Sportsbook (recordkeeping only)",
+    [
+        "Not tracked",
+        "FanDuel",
+        "DraftKings",
+        "BetMGM",
+        "Caesars Sportsbook",
+        "Fanatics Sportsbook",
+        "bet365",
+        "ESPN BET",
+        "Hard Rock Bet",
+        "BetRivers",
+        "Other / Not listed",
+    ],
+    key="top_plays_parlay_book",
+    help="This only labels the saved Bet Tracker ticket. It never changes the Top 5, available legs, model probability, or parlay selection.",
+)
+parlay_book_value = "" if parlay_book == "Not tracked" else parlay_book
 
 if len(selected) >= 2:
     watch_count = int((selected["Status"].astype(str) == "WATCH").sum())
@@ -525,6 +544,7 @@ if len(selected) >= 2:
                 legs=legs,
                 stake=float(parlay_stake),
                 game_date=today,
+                book=parlay_book_value,
                 source="Top Plays Model Parlay",
             )
             append_bet(BET_LOG, record, st.secrets)

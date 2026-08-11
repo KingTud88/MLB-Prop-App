@@ -17,6 +17,11 @@ def test_top_plays_page_compiles_and_has_straight_and_parlay_actions():
     assert 'Sportsbook used (optional)' not in source
     assert 'Actual parlay American odds (optional)' not in source
     assert 'book=book_note' not in source
+    assert '"Sportsbook (recordkeeping only)"' in source
+    assert 'book=parlay_book_value' in source
+    parlay_block = source[source.index('st.subheader("🎟️ Parlay Builder")'):]
+    assert 'candidate_pool' not in parlay_block
+    assert 'parlay_book_value' in parlay_block
 
 
 def test_top_plays_is_model_first_and_odds_are_optional_overlay():
