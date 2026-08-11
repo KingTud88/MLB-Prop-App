@@ -11,6 +11,14 @@ MLB_LIVE_API = "https://statsapi.mlb.com/api/v1.1"
 MLB_HEADERS = {"Cache-Control": "no-cache", "Pragma": "no-cache", "Accept": "application/json"}
 
 st.set_page_config(page_title="Bet Tracker", page_icon="📊", layout="wide")
+st.markdown(
+    """
+    <style>
+    .block-container { padding-top: 3.25rem !important; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 st.title("📊 Bet Tracker")
 st.caption("Persistent bets with live strikeout progress from MLB game data.")
 
@@ -170,8 +178,6 @@ def live_strikeouts(player_name: str, game_date: str, game_pk: int | None = None
             if ks is not None:
                 return ks, stats_status
 
-            # MLB's live game feed is served from the v1.1 endpoint. The old v1
-            # path can return a stale/scheduled response or 404 for live games.
             response = requests.get(
                 f"{MLB_LIVE_API}/game/{candidate_game_pk}/feed/live",
                 params=_fresh_params(),
