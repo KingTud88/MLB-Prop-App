@@ -1,9 +1,11 @@
 from engine.bet_tracker import (
     default_line_for_market,
     grade_bet,
+    make_bet_record,
     normalize_market,
     profit_for,
     projection_for_market,
+    result_cell_css,
 )
 
 
@@ -55,3 +57,36 @@ def test_profit_math_american_odds():
     assert round(profit_for(10, 150, win), 2) == 15.00
     assert round(profit_for(10, -200, win), 2) == 5.00
     assert profit_for(10, -110, loss) == -10.0
+
+
+def test_shared_quick_add_record_preserves_bet_metadata():
+    record = make_bet_record(
+        player="Tanner Bibee",
+        market="pitcher_strikeouts",
+        game_date="2026-08-11",
+        line=4.5,
+        side="UNDER",
+        american_odds=-115,
+        stake=2.0,
+        book="FanDuel",
+        projection=4.12,
+        model_probability=0.58,
+        implied_probability=0.535,
+        edge=0.045,
+        confidence="High",
+        game_pk=123,
+        pitcher_id=456,
+        entered_at_utc="2026-08-11T16:00:00+00:00",
+    )
+    assert record["market"] == "Strikeouts"
+    assert record["side"] == "Under"
+    assert record["american_odds"] == -115
+    assert record["stake"] == 2.0
+    assert record["projection"] == 4.12
+    assert record["game_pk"] == 123
+    assert record["pitcher_id"] == 456
+
+
+def test_result_colors_are_green_for_win_and_red_for_loss():
+    assert "#49efb0" in result_cell_css("WIN")
+    assert "#ff4b4b" in result_cell_css("LOSS")
