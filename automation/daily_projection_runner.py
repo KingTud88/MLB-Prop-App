@@ -144,6 +144,8 @@ def project(row: dict) -> dict | None:
     seed = int(hashlib.sha256(f"{row['game_pk']}:{row['pitcher_id']}|{row['game_time']}|{APP_VERSION}".encode()).hexdigest()[:8], 16)
     result = ProjectionEngine(seed=seed).project(f, draws=25000, lines=tuple(float(x) for x in range(3, 11)))
     now = datetime.now(timezone.utc).isoformat()
+    raw_sim = result.metadata.get("raw_simulation_probabilities", result.simulation_probabilities)
+    raw_math = result.metadata.get("raw_mathematical_probabilities", result.mathematical_probabilities)
     out = {
         "game_pk": row["game_pk"], "game_date": row["game_date"], "pitcher_id": row["pitcher_id"],
         "player": row["player"], "team": row["team"], "opponent": row["opponent"], "venue": row["venue"],
@@ -153,12 +155,12 @@ def project(row: dict) -> dict | None:
         "k_range_high": int(np.quantile(result.simulation_samples, .90)),
         "confidence": "High" if result.confidence >= .75 else "Medium" if result.confidence >= .60 else "Low",
         "data_quality": int(round(result.data_quality)), "simulation_draws": 25000,
-        "opponent_k_pct": 22.4, "pitch_limit": 92, "umpire_k_factor": 1.0,
+        "opponent_k_pct": float(f.get("opponent_k_pct", .224)) * 100.0, "pitch_limit": 92, "umpire_k_factor": 1.0,
         "weather_factor": 1.0, "rest_factor": 1.0, "actual_strikeouts": np.nan, "resolved_at_utc": "",
     }
     for line in range(3, 11):
-        out[f"sim_{line}p"] = result.simulation_probabilities.get(float(line), np.nan)
-        out[f"math_{line}p"] = result.mathematical_probabilities.get(float(line), np.nan)
+        out[f"sim_{line}p"] = raw_sim.get(float(line), np.nan)
+        out[f"math_{line}p"] = raw_math.get(float(line), np.nan)
     return out
 
 
