@@ -15,6 +15,8 @@ from automation.daily_projection_runner import (
     resolve_row,
     schedule,
 )
+from engine.calibration import calibrate_blend
+from engine.hits_calibration import calibrate_hits_blend
 from navigation import render_sidebar
 
 st.set_page_config(page_title="Daily Projection Run", page_icon="📊", layout="wide")
@@ -104,6 +106,80 @@ def run_full_slate(day: str) -> tuple[pd.DataFrame, int, int, list[str]]:
     return slate, len(new_rows), skipped + refreshed, errors
 
 
+def _num(row: pd.Series, key: str) -> float | None:
+    value = pd.to_numeric(pd.Series([row.get(key)]), errors="coerce").iloc[0]
+    return None if pd.isna(value) else float(value)
+
+
+def render_projection_rationale(row: pd.Series, history: pd.DataFrame) -> None:
+    pitcher = str(row.get("player", "Unknown"))
+    st.markdown(f"### 🔎 Why we projected {pitcher} this way")
+    st.caption(
+        "This explanation uses the frozen pregame snapshot. Later game results do not change the inputs or probabilities shown here."
+    )
+
+    k_mean = _num(row, "projection")
+    hits_mean = _num(row, "hits_projection")
+    quality = _num(row, "data_quality")
+    opp_k = _num(row, "opponent_k_pct")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Projected Ks", "—" if k_mean is None else f"{k_mean:.2f}")
+    c2.metric("Projected hits allowed", "—" if hits_mean is None else f"{hits_mean:.2f}")
+    c3.metric("Data quality", "—" if quality is None else f"{quality:.0f}/100")
+    c4.metric("Opponent K%", "—" if opp_k is None else f"{opp_k:.1f}%")
+
+    left, right = st.columns(2)
+    with left:
+        st.markdown("#### Strikeout path · 5+")
+        sim = _num(row, "sim_5p")
+        math_p = _num(row, "math_5p")
+        cal = calibrate_blend(history, 5)
+        blended = None if sim is None or math_p is None else cal.weight_simulation * sim + cal.weight_math * math_p
+        detail = pd.DataFrame([
+            {"Component": "Simulation", "Probability": sim, "Weight": cal.weight_simulation},
+            {"Component": "Mathematical", "Probability": math_p, "Weight": cal.weight_math},
+        ])
+        for col in ("Probability", "Weight"):
+            detail[col] = detail[col].map(lambda x: "—" if pd.isna(x) else f"{x:.1%}")
+        st.dataframe(detail, hide_index=True, use_container_width=True)
+        st.write("**Blended 5+ probability:**", "—" if blended is None else f"{blended:.1%}")
+        st.caption(
+            f"Calibration: {'learned' if cal.calibrated else '50/50 baseline'} · {cal.observations} compatible resolved observations."
+        )
+
+    with right:
+        st.markdown("#### Hits allowed path · Over 5.5")
+        hit_sim = _num(row, "hits_sim_over_5_5")
+        hit_math = _num(row, "hits_math_over_5_5")
+        hit_cal = calibrate_hits_blend(history, 5.5)
+        hit_blended = None if hit_sim is None or hit_math is None else hit_cal.weight_simulation * hit_sim + hit_cal.weight_math * hit_math
+        detail = pd.DataFrame([
+            {"Component": "Simulation", "Probability": hit_sim, "Weight": hit_cal.weight_simulation},
+            {"Component": "Mathematical", "Probability": hit_math, "Weight": hit_cal.weight_math},
+        ])
+        for col in ("Probability", "Weight"):
+            detail[col] = detail[col].map(lambda x: "—" if pd.isna(x) else f"{x:.1%}")
+        st.dataframe(detail, hide_index=True, use_container_width=True)
+        st.write("**Blended O5.5 probability:**", "—" if hit_blended is None else f"{hit_blended:.1%}")
+        st.caption(
+            f"Calibration: {'learned' if hit_cal.calibrated else '50/50 baseline'} · {hit_cal.observations} resolved hit observations."
+        )
+
+    facts = {
+        "Matchup": f"{row.get('team', '—')} vs {row.get('opponent', '—')}",
+        "Confidence": row.get("confidence", "—"),
+        "Matchup PA sample": int(_num(row, "matchup_pa") or 0),
+        "Matchup batters": int(_num(row, "matchup_batters") or 0),
+        "K 80% range": f"{row.get('k_range_low', '—')}–{row.get('k_range_high', '—')}",
+        "Hits 80% range": f"{row.get('hits_range_low', '—')}–{row.get('hits_range_high', '—')}",
+        "Probability semantics": row.get("probability_semantics", "—"),
+    }
+    st.dataframe(pd.DataFrame([facts]), hide_index=True, use_container_width=True)
+    st.caption(
+        "Strikeouts and hits allowed use independent simulation + mathematical paths. Total outs is currently workload/distribution based and is not presented here as a calibrated two-path model."
+    )
+
+
 st.info(
     "This page is for batch data capture. The normal Projection page remains the single-pitcher deep-dive workflow. "
     "Existing game/pitcher snapshots are not overwritten after capture."
@@ -166,7 +242,21 @@ if isinstance(slate, pd.DataFrame):
             }
         )
         st.subheader(f"{slate_date:%B %d, %Y} starter slate")
-        st.dataframe(display, hide_index=True, use_container_width=True)
+        st.caption("Click any pitcher row to inspect why the model produced that frozen projection.")
+        event = st.dataframe(
+            display,
+            hide_index=True,
+            use_container_width=True,
+            on_select="rerun",
+            selection_mode="single-row",
+            key="daily_projection_selection",
+        )
+        selected_rows = list(event.selection.rows) if event is not None else []
+        if selected_rows:
+            selected_pos = int(selected_rows[0])
+            selected_row = slate.iloc[selected_pos]
+            render_projection_rationale(selected_row, load_log())
+
         compatible = int(slate.get("probability_semantics", pd.Series(dtype=str)).astype(str).eq(PROBABILITY_SEMANTICS).sum())
         st.caption(f"{compatible}/{len(slate)} rows use the current calibration probability semantics: {PROBABILITY_SEMANTICS}.")
 
