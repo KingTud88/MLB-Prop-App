@@ -1,0 +1,35 @@
+name: Run parlay sportsbook dropdown patch
+
+on:
+  push:
+    paths:
+      - scripts/add_parlay_sportsbook_dropdown.py
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt pytest
+      - run: python scripts/add_parlay_sportsbook_dropdown.py
+      - run: python -m compileall -q pages/6_Top_Plays.py engine tests
+      - run: pytest -q
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pages/6_Top_Plays.py tests/test_bet_add_buttons_contract.py
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Add sportsbook dropdown to model parlay"
+          git pull --rebase origin main
+          git push origin HEAD:main
