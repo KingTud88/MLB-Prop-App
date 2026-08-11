@@ -68,7 +68,7 @@ def append_bet(local_path: str | Path, record: dict[str, Any], secrets: Any = No
         tracker = pd.concat([tracker, pd.DataFrame([record])], ignore_index=True)
         content = tracker.to_csv(index=False)
         encoded = base64.b64encode(content.encode("utf-8")).decode("ascii")
-        body = {"message": "Record manual sportsbook bet", "content": encoded, "branch": "main"}
+        body = {"message": "Record sportsbook bet", "content": encoded, "branch": "main"}
         if sha:
             body["sha"] = sha
         write = requests.put(url, headers=headers, json=body, timeout=15)

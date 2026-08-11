@@ -79,6 +79,11 @@ def make_bet_record(
     game_pk: int | None = None,
     pitcher_id: int | None = None,
     entered_at_utc: str | None = None,
+    source: str = "",
+    data_quality: float | None = None,
+    app_version: str = "",
+    probability_semantics: str = "",
+    snapshot_captured_at_utc: str = "",
 ) -> dict[str, object]:
     """Build the canonical persistent Bet Tracker record used by every app surface."""
     side_text = str(side or "").strip().title()
@@ -104,6 +109,11 @@ def make_bet_record(
         "actual_strikeouts": "",
         "game_pk": "" if game_pk is None else int(game_pk),
         "pitcher_id": "" if pitcher_id is None else int(pitcher_id),
+        "source": str(source or "").strip(),
+        "data_quality": "" if data_quality is None else float(data_quality),
+        "app_version": str(app_version or ""),
+        "probability_semantics": str(probability_semantics or ""),
+        "snapshot_captured_at_utc": str(snapshot_captured_at_utc or ""),
     }
 
 
@@ -144,6 +154,7 @@ def make_parlay_record(
     american_odds: int | float,
     game_date: str,
     entered_at_utc: str | None = None,
+    source: str = "",
 ) -> dict[str, object]:
     """Build one tracker row representing an entire parlay ticket."""
     cleaned: list[dict[str, object]] = []
@@ -160,6 +171,12 @@ def make_parlay_record(
             "american_odds": int(round(float(leg.get("american_odds")))),
             "game_pk": "" if leg.get("game_pk") in {None, ""} else int(float(leg.get("game_pk"))),
             "pitcher_id": "" if leg.get("pitcher_id") in {None, ""} else int(float(leg.get("pitcher_id"))),
+            "projection": leg.get("projection", ""),
+            "model_probability": leg.get("model_probability", ""),
+            "data_quality": leg.get("data_quality", ""),
+            "app_version": leg.get("app_version", ""),
+            "probability_semantics": leg.get("probability_semantics", ""),
+            "snapshot_captured_at_utc": leg.get("snapshot_captured_at_utc", ""),
         })
     if len(cleaned) < 2:
         raise ValueError("A parlay needs at least two legs")
@@ -183,6 +200,11 @@ def make_parlay_record(
         "actual_strikeouts": "",
         "game_pk": "",
         "pitcher_id": "",
+        "source": str(source or "").strip(),
+        "data_quality": "",
+        "app_version": "",
+        "probability_semantics": "",
+        "snapshot_captured_at_utc": "",
     }
 
 

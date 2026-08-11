@@ -45,9 +45,17 @@ def load_log() -> pd.DataFrame:
     if not LOG_PATH.exists():
         return pd.DataFrame()
     try:
-        return pd.read_csv(LOG_PATH)
+        frame = pd.read_csv(LOG_PATH)
     except Exception:
         return pd.DataFrame()
+    # Legacy projection logs may predate hits/outs resolution columns. Always
+    # materialize them as Series so summary counts never call .notna() on a scalar.
+    for col in ("actual_strikeouts", "actual_hits_allowed", "actual_outs"):
+        if col not in frame.columns:
+            frame[col] = np.nan
+    if "resolved_at_utc" not in frame.columns:
+        frame["resolved_at_utc"] = ""
+    return frame
 
 
 def save_log(frame: pd.DataFrame) -> None:

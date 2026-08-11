@@ -347,7 +347,7 @@ def main() -> None:
             col = f"{prefix}_{line}p"
             if col not in frame.columns:
                 frame[col] = np.nan
-    for col in ["actual_strikeouts", "actual_hits_allowed", "resolved_at_utc"]:
+    for col in ["actual_strikeouts", "actual_hits_allowed", "actual_outs", "resolved_at_utc"]:
         if col not in frame.columns:
             frame[col] = np.nan if col != "resolved_at_utc" else ""
     frame.to_csv(LOG_PATH, index=False)

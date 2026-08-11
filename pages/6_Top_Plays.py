@@ -16,6 +16,7 @@ from engine.calibration import calibrate_blend
 from engine.hits_calibration import calibrate_hits_blend, hits_calibration_report
 from engine.outs_calibration import calibrate_outs_blend, outs_calibration_report
 from engine.bet_lean import projection_side
+from engine.model_top_plays import build_model_board
 from engine.bet_tracker import (
     combined_parlay_odds,
     make_bet_record,
@@ -29,7 +30,7 @@ st.set_page_config(page_title="Top Plays", page_icon="👑", layout="wide")
 render_sidebar("top")
 st.markdown("<style>.block-container{padding-top:3.25rem!important}</style>", unsafe_allow_html=True)
 st.title("👑 Top Plays")
-st.caption("Best current pitcher-prop legs across strikeouts, total outs, and hits allowed. Click any ranked row to see exactly why the model likes that projection. Sportsbook prices never feed the forecast itself.")
+st.caption("The five pitcher-prop legs our calibrated projections rate most likely to hit across strikeouts, total outs, and hits allowed. Sportsbook lines/odds are execution info only and never rank the board or feed the forecast.")
 
 EASTERN = ZoneInfo("America/New_York")
 ODDS_API = "https://api.the-odds-api.com/v4"
@@ -173,6 +174,7 @@ def model_over_probability(row: pd.Series, market: str, line: float, history: pd
 
 
 def collect_legs(row: pd.Series, payload: dict, history: pd.DataFrame) -> list[dict]:
+    """Collect live offers for a pitcher without letting price determine the model ranking."""
     player = " ".join(str(row.get("player", "")).lower().split())
     groups: dict[tuple, dict] = {}
     for book in payload.get("bookmakers", []):
@@ -195,18 +197,9 @@ def collect_legs(row: pd.Series, payload: dict, history: pd.DataFrame) -> list[d
     legs = []
     quality = float(pd.to_numeric(pd.Series([row.get("data_quality")]), errors="coerce").fillna(0).iloc[0])
     for (book, market, point), prices in groups.items():
-        if "over" not in prices or "under" not in prices:
-            continue
         over_model = model_over_probability(row, market, point, history)
         if over_model is None:
             continue
-        po = implied(prices["over"])
-        pu = implied(prices["under"])
-        total = po + pu
-        if total <= 0:
-            continue
-        fair_over = po / total
-        fair_under = pu / total
         if market.startswith("pitcher_strikeouts"):
             projection_mean = numeric(row.get("projection"))
         elif market.startswith("pitcher_hits_allowed"):
@@ -216,35 +209,32 @@ def collect_legs(row: pd.Series, payload: dict, history: pd.DataFrame) -> list[d
         if projection_mean is None:
             continue
         direction = projection_side(projection_mean, point)
-        if direction == "OVER":
-            candidates = [("OVER", over_model, fair_over, prices["over"])]
-        elif direction == "UNDER":
-            candidates = [("UNDER", 1.0 - over_model, fair_under, prices["under"])]
-        else:
+        if direction == "PASS":
             continue
-        for side, model_p, fair_p, price in candidates:
-            edge = model_p - fair_p
-            qualified = model_p >= 0.55 and edge >= 0.02 and quality >= 60
-            reasons = []
-            if model_p < 0.55:
-                reasons.append("probability")
-            if edge < 0.02:
-                reasons.append("edge")
-            if quality < 60:
-                reasons.append("quality")
-            status = "QUALIFIED" if qualified else "WATCH · " + "/".join(reasons)
-            market_label = "Strikeouts" if "strikeouts" in market else "Total Outs" if "outs" in market else "Hits Allowed"
-            score = model_p + 0.5 * edge + 0.001 * quality
-            legs.append({
-                "Pitcher": row.get("player"), "Market": market_label, "Side": side, "Line": point,
-                "Model Probability": model_p, "No-Vig Implied": fair_p, "Edge": edge,
-                "Book": book, "Odds": int(price), "Data Quality": int(round(quality)), "Score": score,
-                "Qualified": qualified, "Status": status,
-                "Game PK": row.get("game_pk"), "Pitcher ID": row.get("pitcher_id"), "Team": row.get("team"),
-                "Opponent": row.get("opponent"), "Market Key": market,
-            })
+        side_key = direction.lower()
+        if side_key not in prices:
+            continue
+        model_p = over_model if direction == "OVER" else 1.0 - over_model
+        fair_p = np.nan
+        edge = np.nan
+        if "over" in prices and "under" in prices:
+            po = implied(prices["over"]); pu = implied(prices["under"]); total = po + pu
+            if total > 0:
+                fair_over = po / total
+                fair_p = fair_over if direction == "OVER" else 1.0 - fair_over
+                edge = model_p - fair_p
+        qualified = model_p >= 0.55 and quality >= 60
+        status = "MODEL PLAY" if qualified else "WATCH"
+        market_label = "Strikeouts" if "strikeouts" in market else "Total Outs" if "outs" in market else "Hits Allowed"
+        legs.append({
+            "Pitcher": row.get("player"), "Market": market_label, "Side": direction, "Line": point,
+            "Model Probability": model_p, "No-Vig Implied": fair_p, "Edge": edge,
+            "Book": book, "Odds": int(prices[side_key]), "Data Quality": int(round(quality)), "Score": model_p,
+            "Qualified": qualified, "Status": status,
+            "Game PK": row.get("game_pk"), "Pitcher ID": row.get("pitcher_id"), "Team": row.get("team"),
+            "Opponent": row.get("opponent"), "Market Key": market,
+        })
     return legs
-
 
 def find_snapshot(history: pd.DataFrame, play: pd.Series) -> pd.Series | None:
     if history.empty:
@@ -262,13 +252,20 @@ def find_snapshot(history: pd.DataFrame, play: pd.Series) -> pd.Series | None:
 def render_projection_rationale(play: pd.Series, snapshot: pd.Series, history: pd.DataFrame) -> None:
     st.markdown("---")
     st.subheader(f"Why this projection? · {play['Pitcher']}")
-    st.caption(f"{play.get('Team', '')} vs {play.get('Opponent', '')} · {play['Market']} · {play['Side']} {float(play['Line']):g} · {play['Book']} {int(play['Odds']):+d}")
+    book = str(play.get("Book", "") or "").strip()
+    odds = numeric(play.get("Odds"))
+    live_text = f"{book} {int(odds):+d}" if book and odds is not None else "no exact live sportsbook price yet"
+    st.caption(f"{play.get('Team', '')} vs {play.get('Opponent', '')} · {play['Market']} · {play['Side']} {float(play['Line']):g} · {live_text}")
 
     a, b, c, d = st.columns(4)
     a.metric("Model probability", f"{float(play['Model Probability']):.1%}")
-    b.metric("No-vig market", f"{float(play['No-Vig Implied']):.1%}")
-    c.metric("Model edge", f"{float(play['Edge']):+.1%}")
+    b.metric("Frozen projection", f"{float(play['Projection']):.2f}")
+    c.metric("Live price", "—" if odds is None else f"{int(odds):+d}")
     d.metric("Data quality", f"{int(play['Data Quality'])}/100")
+    live_edge = numeric(play.get("Edge"))
+    live_implied = numeric(play.get("No-Vig Implied"))
+    if live_edge is not None and live_implied is not None:
+        st.caption(f"Market comparison only: no-vig implied {live_implied:.1%} · model edge {live_edge:+.1%}. These values do not affect Top 5 ranking.")
 
     market = str(play.get("Market", ""))
     line = float(play["Line"])
@@ -328,13 +325,10 @@ def render_projection_rationale(play: pd.Series, snapshot: pd.Series, history: p
     confidence = str(snapshot.get("confidence", ""))
     captured = str(snapshot.get("captured_at_utc", ""))
     side_text = "over" if side == "OVER" else "under"
-    st.caption(f"Why it ranked: the model gives this {side_text} a {float(play['Model Probability']):.1%} chance versus a {float(play['No-Vig Implied']):.1%} no-vig market probability, a {float(play['Edge']):+.1%} edge. Frozen snapshot confidence: {confidence or '—'}. Captured: {captured or '—'}.")
+    st.caption(f"Why it ranked: the calibrated model gives this {side_text} a {float(play['Model Probability']):.1%} chance. Top 5 order is based on model hit probability first and data quality second; sportsbook price and edge never enter the ranking. Frozen snapshot confidence: {confidence or '—'}. Captured: {captured or '—'}.")
 
 
 api_key = secret()
-if not api_key:
-    st.error("Odds API key not found in Streamlit secrets. Top Plays needs live sportsbook lines to rank actionable legs.")
-    st.stop()
 
 if not LOG_PATH.exists():
     st.info("No projection log exists yet. Run the Daily Projection page first.")
@@ -359,44 +353,77 @@ with st.expander("Total Outs calibration status", expanded=False):
     outs_ready = int((outs_report["Status"] == "Calibrated").sum()) if not outs_report.empty else 0
     st.caption(f"{outs_ready}/{len(outs_report)} tracked outs lines currently have learned SIM/MATH weights. Until a line reaches 30 resolved frozen observations, Top Plays uses the protected 50/50 baseline.")
 
-events = odds_events(api_key)
-all_legs: list[dict] = []
-progress = st.progress(0.0, text="Matching sportsbook markets to today's pitcher projections...")
-for i, (_, row) in enumerate(slate.iterrows(), start=1):
-    event = match_event(events, str(row.get("team", "")), str(row.get("opponent", "")))
-    if event:
-        try:
-            all_legs.extend(collect_legs(row, event_props(api_key, str(event.get("id"))), history))
-        except requests.RequestException:
-            pass
-    progress.progress(i / max(len(slate), 1), text=f"Scanned {i}/{len(slate)} pitchers")
-progress.empty()
-
-if not all_legs:
-    st.info("Sportsbooks have not posted enough two-sided supported pitcher props yet to calculate a no-vig Top Plays board. The daily model projections are still available on Daily Projection Run and the main Projection page.")
+plays = build_model_board(slate, history, limit=5)
+if plays.empty:
+    st.warning("Today's frozen snapshots do not yet contain enough current two-path probability data to build the model Top 5. Re-run Daily Projection Run while the games are still pregame so missing paths can be backfilled safely.")
     st.stop()
 
-candidate_pool = pd.DataFrame(all_legs)
-qualified_total = int(candidate_pool["Qualified"].fillna(False).sum())
-plays = candidate_pool.sort_values(["Qualified", "Score", "Edge", "Model Probability"], ascending=False)
-plays = plays.drop_duplicates(["Pitcher", "Market", "Side", "Line"], keep="first")
-plays = plays.drop_duplicates(["Pitcher", "Market"], keep="first").head(5).copy().reset_index(drop=True)
-plays.insert(0, "Rank", range(1, len(plays) + 1))
+# The board exists before any sportsbook request. Live prices are attached afterward
+# only when an exact matching line is available; they never affect rank.
+plays["Book"] = ""
+plays["Odds"] = np.nan
+plays["No-Vig Implied"] = np.nan
+plays["Edge"] = np.nan
+plays["Live Offer"] = False
+candidate_pool = pd.DataFrame()
 
-c1, c2, c3 = st.columns(3)
-c1.metric("Qualified candidates", qualified_total)
-c2.metric("Pitchers scanned", len(slate))
-c3.metric("Top board edge", f"{plays['Edge'].max():.1%}")
-
-view = plays[["Rank", "Status", "Pitcher", "Market", "Side", "Line", "Odds", "Model Probability", "No-Vig Implied", "Edge", "Book", "Data Quality"]].copy()
-for col in ("Model Probability", "No-Vig Implied", "Edge"):
-    view[col] = view[col].map(lambda x: f"{x:.1%}")
-st.subheader("Today's five strongest available legs")
-if qualified_total == 0:
-    st.warning("No current leg clears all betting thresholds. These are the five closest available candidates, shown for review only — not official model bets.")
+if api_key:
+    try:
+        events = odds_events(api_key)
+        all_legs: list[dict] = []
+        scanned = set()
+        for _, play in plays.iterrows():
+            key = (numeric(play.get("Game PK")), numeric(play.get("Pitcher ID")))
+            if key in scanned:
+                continue
+            scanned.add(key)
+            snapshot = find_snapshot(history, play)
+            if snapshot is None:
+                continue
+            event_match = match_event(events, str(snapshot.get("team", "")), str(snapshot.get("opponent", "")))
+            if not event_match:
+                continue
+            try:
+                all_legs.extend(collect_legs(snapshot, event_props(api_key, str(event_match.get("id"))), history))
+            except requests.RequestException:
+                continue
+        if all_legs:
+            candidate_pool = pd.DataFrame(all_legs)
+            for idx, play in plays.iterrows():
+                matches = candidate_pool.loc[
+                    candidate_pool["Pitcher"].astype(str).eq(str(play["Pitcher"]))
+                    & candidate_pool["Market"].astype(str).eq(str(play["Market"]))
+                    & candidate_pool["Side"].astype(str).eq(str(play["Side"]))
+                    & pd.to_numeric(candidate_pool["Line"], errors="coerce").eq(float(play["Line"]))
+                ]
+                if matches.empty:
+                    continue
+                best = matches.sort_values("Odds", ascending=False).iloc[0]
+                plays.at[idx, "Book"] = best.get("Book", "")
+                plays.at[idx, "Odds"] = best.get("Odds", np.nan)
+                plays.at[idx, "No-Vig Implied"] = best.get("No-Vig Implied", np.nan)
+                plays.at[idx, "Edge"] = best.get("Edge", np.nan)
+                plays.at[idx, "Live Offer"] = True
+    except requests.RequestException as exc:
+        st.caption(f"Live sportsbook overlay unavailable right now ({type(exc).__name__}). The model Top 5 is still valid because odds do not rank it.")
 else:
-    st.caption("QUALIFIED legs clear 55% model probability, +2% no-vig edge, and data quality 60+. WATCH legs are shown so the board never goes blank when the slate is thin.")
-st.caption("Click a row or use View details to open its projection breakdown.")
+    st.caption("Odds API key is not available, so the model Top 5 is shown without live execution prices. Ranking is unaffected.")
+
+model_plays = int(((plays["Model Probability"] >= 0.55) & (plays["Data Quality"] >= 60)).sum())
+live_offers = int(plays["Live Offer"].fillna(False).sum())
+c1, c2, c3 = st.columns(3)
+c1.metric("Highest model hit probability", f"{plays['Model Probability'].max():.1%}")
+c2.metric("Model-qualified Top 5", model_plays)
+c3.metric("Exact live prices found", f"{live_offers}/{len(plays)}")
+
+view = plays[["Rank", "Status", "Pitcher", "Market", "Side", "Line", "Projection", "Model Probability", "Data Quality", "Book", "Odds"]].copy()
+view["Model Probability"] = view["Model Probability"].map(lambda x: f"{float(x):.1%}")
+view["Projection"] = view["Projection"].map(lambda x: f"{float(x):.2f}")
+view["Book"] = view["Book"].map(lambda x: x if str(x).strip() else "—")
+view["Odds"] = view["Odds"].map(lambda x: "—" if pd.isna(x) else f"{int(float(x)):+d}")
+st.subheader("Today's five highest-probability model legs")
+st.caption("Ranked only by our calibrated hit probability, with data quality as the tie-breaker. Sportsbook odds and market edge do not decide the Top 5.")
+st.caption("Click a row or use View details to open its frozen projection breakdown.")
 event = st.dataframe(
     view,
     hide_index=True,
@@ -405,7 +432,6 @@ event = st.dataframe(
     on_select="rerun",
     selection_mode="single-row",
 )
-st.caption("Ranking requires positive no-vig edge and minimum model/data-quality thresholds. One best leg per pitcher/market is kept so duplicate alternate lines do not crowd out the board.")
 
 st.markdown("#### Top Play actions")
 st.caption("Straight-bet stake is the amount recorded for one individual leg. It does not place a sportsbook wager and it does not affect the projection model.")
@@ -414,84 +440,102 @@ button_cols = st.columns(len(plays))
 for button_idx, (_, play_row) in enumerate(plays.iterrows()):
     snapshot = find_snapshot(history, play_row)
     snapshot_dict = snapshot.to_dict() if snapshot is not None else None
-    projection_value = projection_for_market(snapshot_dict, play_row.get("Market")) if snapshot_dict else None
-    qualified = bool(play_row.get("Qualified", False))
+    projection_value = projection_for_market(snapshot_dict, play_row.get("Market")) if snapshot_dict else numeric(play_row.get("Projection"))
+    model_ok = float(play_row["Model Probability"]) >= 0.55 and int(play_row["Data Quality"]) >= 60
+    live_offer = bool(play_row.get("Live Offer", False)) and numeric(play_row.get("Odds")) is not None
     with button_cols[button_idx]:
         rank = int(play_row["Rank"])
         st.caption(f"#{rank} {play_row['Pitcher']} · {play_row['Side']} {float(play_row['Line']):g}")
         if st.button("🔎 View details", key=f"view_top_play_{rank}", use_container_width=True):
             st.session_state["top_play_detail_rank"] = rank
-        if st.button("➕ Add as bet", key=f"add_top_play_{rank}", use_container_width=True, disabled=not qualified):
+        if st.button("➕ Add as bet", key=f"add_top_play_{rank}", use_container_width=True, disabled=not (model_ok and live_offer)):
             try:
-                game_pk = numeric(play_row.get("Game PK"))
-                pitcher_id = numeric(play_row.get("Pitcher ID"))
+                game_pk = numeric(play_row.get("Game PK")); pitcher_id = numeric(play_row.get("Pitcher ID"))
+                implied_p = numeric(play_row.get("No-Vig Implied")); live_edge = numeric(play_row.get("Edge"))
                 record = make_bet_record(
-                    player=str(play_row["Pitcher"]),
-                    market=play_row["Market"],
-                    game_date=str(snapshot.get("game_date", today) if snapshot is not None else today),
-                    line=float(play_row["Line"]),
-                    side=str(play_row["Side"]),
-                    american_odds=float(play_row["Odds"]),
-                    stake=float(quick_stake),
-                    book=str(play_row.get("Book", "")),
-                    projection=projection_value,
-                    model_probability=float(play_row["Model Probability"]),
-                    implied_probability=float(play_row["No-Vig Implied"]),
-                    edge=float(play_row["Edge"]),
+                    player=str(play_row["Pitcher"]), market=play_row["Market"],
+                    game_date=str(play_row.get("Game Date", today))[:10], line=float(play_row["Line"]),
+                    side=str(play_row["Side"]), american_odds=float(play_row["Odds"]), stake=float(quick_stake),
+                    book=str(play_row.get("Book", "")), projection=projection_value,
+                    model_probability=float(play_row["Model Probability"]), implied_probability=implied_p, edge=live_edge,
                     confidence=(snapshot.get("confidence", "") if snapshot is not None else ""),
-                    game_pk=None if game_pk is None else int(game_pk),
-                    pitcher_id=None if pitcher_id is None else int(pitcher_id),
+                    game_pk=None if game_pk is None else int(game_pk), pitcher_id=None if pitcher_id is None else int(pitcher_id),
+                    source="Top Plays", data_quality=float(play_row["Data Quality"]),
+                    app_version=str(play_row.get("App Version", "")), probability_semantics=str(play_row.get("Probability Semantics", "")),
+                    snapshot_captured_at_utc=str(play_row.get("Captured At UTC", "")),
                 )
                 append_bet(BET_LOG, record, st.secrets)
                 st.success("Added to Bet Tracker")
             except Exception as exc:
                 st.error(f"Could not add bet: {exc}")
-        if not qualified:
-            st.caption("WATCH only")
+        if not model_ok:
+            st.caption("WATCH · model/data quality below action threshold")
+        elif not live_offer:
+            st.caption("Model play · waiting for exact live line/price")
 
 st.markdown("---")
 st.subheader("🎟️ Parlay Builder")
-st.caption("A parlay uses one stake for the entire ticket. Legs must come from the same sportsbook. The estimated combined odds are only a starting point; enter the actual price quoted by your sportsbook before saving, especially for same-game or correlated props.")
-qualified_pool = candidate_pool.loc[candidate_pool["Qualified"].fillna(False)].copy()
-qualified_pool = qualified_pool.sort_values(["Score", "Edge", "Model Probability"], ascending=False)
-qualified_pool = qualified_pool.drop_duplicates(["Book", "Pitcher", "Market"], keep="first")
-book_counts = qualified_pool.groupby("Book").size() if not qualified_pool.empty else pd.Series(dtype=int)
-parlay_books = [str(book) for book, count in book_counts.items() if int(count) >= 2]
-if not parlay_books:
-    st.info("No sportsbook currently has at least two qualified legs available for a model-backed parlay. WATCH candidates are intentionally excluded from the parlay builder.")
+st.caption("A parlay uses one stake for the whole ticket. It only combines Top 5 model plays that have the exact same target line available at the same sportsbook. Use the sportsbook's actual quoted parlay price before saving.")
+if candidate_pool.empty:
+    st.info("The model Top 5 is available, but there are not enough matching live sportsbook offers yet to build a tracked parlay.")
 else:
-    parlay_book = st.selectbox("Parlay sportsbook", parlay_books, key="top_plays_parlay_book")
-    same_book = qualified_pool.loc[qualified_pool["Book"].astype(str).eq(parlay_book)].head(5).copy().reset_index(drop=True)
-    option_map = {}
-    for idx, leg in same_book.iterrows():
-        label = f"{leg['Pitcher']} · {leg['Market']} · {leg['Side']} {float(leg['Line']):g} · {int(leg['Odds']):+d}"
-        option_map[label] = idx
-    selected_labels = st.multiselect("Parlay legs (2–5)", list(option_map), default=list(option_map), max_selections=5, key="top_plays_parlay_legs")
-    selected = same_book.iloc[[option_map[label] for label in selected_labels]].copy() if selected_labels else same_book.iloc[0:0].copy()
-    parlay_stake = st.number_input("Parlay stake (units)", min_value=0.0, value=1.0, step=0.5, key="top_plays_parlay_stake")
-    if len(selected) >= 2:
-        estimated_odds = combined_parlay_odds(selected["Odds"].astype(float).tolist())
-        st.caption(f"Estimated standard combined price: {estimated_odds:+d}. Use the actual sportsbook quote if it differs.")
-        quoted_odds = st.number_input("Sportsbook quoted parlay odds", min_value=-5000, max_value=100000, value=int(estimated_odds), step=5, key="top_plays_parlay_odds")
-        save_parlay = st.button(f"🎟️ Add {len(selected)}-leg parlay to Bet Tracker", type="primary", use_container_width=True, key="save_top_plays_parlay")
-        if save_parlay:
-            legs = []
-            for _, leg in selected.iterrows():
-                game_pk = numeric(leg.get("Game PK")); pitcher_id = numeric(leg.get("Pitcher ID"))
-                legs.append({
-                    "player": str(leg["Pitcher"]), "market": str(leg["Market"]), "game_date": today,
-                    "line": float(leg["Line"]), "side": str(leg["Side"]), "american_odds": float(leg["Odds"]),
-                    "game_pk": None if game_pk is None else int(game_pk),
-                    "pitcher_id": None if pitcher_id is None else int(pitcher_id),
-                })
-            try:
-                record = make_parlay_record(legs=legs, stake=float(parlay_stake), book=parlay_book, american_odds=int(quoted_odds), game_date=today)
-                append_bet(BET_LOG, record, st.secrets)
-                st.success(f"Saved {len(legs)}-leg {parlay_book} parlay to Bet Tracker")
-            except Exception as exc:
-                st.error(f"Could not save parlay: {exc}")
+    top_keys = {
+        (str(r["Pitcher"]), str(r["Market"]), str(r["Side"]), float(r["Line"]))
+        for _, r in plays.iterrows()
+        if float(r["Model Probability"]) >= 0.55 and int(r["Data Quality"]) >= 60
+    }
+    parlay_pool = candidate_pool.loc[
+        candidate_pool.apply(lambda r: (str(r["Pitcher"]), str(r["Market"]), str(r["Side"]), float(r["Line"])) in top_keys, axis=1)
+    ].copy()
+    parlay_pool = parlay_pool.loc[parlay_pool["Qualified"].fillna(False)] if not parlay_pool.empty else parlay_pool
+    parlay_pool = parlay_pool.sort_values(["Model Probability", "Odds"], ascending=[False, False]) if not parlay_pool.empty else parlay_pool
+    parlay_pool = parlay_pool.drop_duplicates(["Book", "Pitcher", "Market", "Side", "Line"], keep="first") if not parlay_pool.empty else parlay_pool
+    book_counts = parlay_pool.groupby("Book").size() if not parlay_pool.empty else pd.Series(dtype=int)
+    parlay_books = [str(book) for book, count in book_counts.items() if int(count) >= 2]
+    if not parlay_books:
+        st.info("No single sportsbook currently has at least two exact Top 5 model legs posted, so there is not a real same-book parlay to record yet.")
     else:
-        st.info("Select at least two qualified legs from the same sportsbook to build a parlay.")
+        parlay_book = st.selectbox("Parlay sportsbook", parlay_books, key="top_plays_parlay_book")
+        same_book = parlay_pool.loc[parlay_pool["Book"].astype(str).eq(parlay_book)].head(5).copy().reset_index(drop=True)
+        option_map = {}
+        for idx, leg in same_book.iterrows():
+            label = f"{leg['Pitcher']} · {leg['Market']} · {leg['Side']} {float(leg['Line']):g} · {int(leg['Odds']):+d}"
+            option_map[label] = idx
+        selected_labels = st.multiselect("Parlay legs (2–5)", list(option_map), default=list(option_map), max_selections=5, key="top_plays_parlay_legs")
+        selected = same_book.iloc[[option_map[label] for label in selected_labels]].copy() if selected_labels else same_book.iloc[0:0].copy()
+        parlay_stake = st.number_input("Parlay stake (units)", min_value=0.0, value=1.0, step=0.5, key="top_plays_parlay_stake")
+        if len(selected) >= 2:
+            estimated_odds = combined_parlay_odds(selected["Odds"].astype(float).tolist())
+            st.caption(f"Estimated standard combined price: {estimated_odds:+d}. Use the actual sportsbook quote if it differs.")
+            quoted_odds = st.number_input("Sportsbook quoted parlay odds", min_value=-5000, max_value=100000, value=int(estimated_odds), step=5, key="top_plays_parlay_odds")
+            if st.button(f"🎟️ Add {len(selected)}-leg parlay to Bet Tracker", type="primary", use_container_width=True, key="save_top_plays_parlay"):
+                legs = []
+                for _, leg in selected.iterrows():
+                    game_pk = numeric(leg.get("Game PK")); pitcher_id = numeric(leg.get("Pitcher ID"))
+                    matching_model = plays.loc[
+                        plays["Pitcher"].astype(str).eq(str(leg["Pitcher"]))
+                        & plays["Market"].astype(str).eq(str(leg["Market"]))
+                        & plays["Side"].astype(str).eq(str(leg["Side"]))
+                        & pd.to_numeric(plays["Line"], errors="coerce").eq(float(leg["Line"]))
+                    ]
+                    model_row = matching_model.iloc[0] if not matching_model.empty else leg
+                    legs.append({
+                        "player": str(leg["Pitcher"]), "market": str(leg["Market"]), "game_date": today,
+                        "line": float(leg["Line"]), "side": str(leg["Side"]), "american_odds": float(leg["Odds"]),
+                        "game_pk": None if game_pk is None else int(game_pk), "pitcher_id": None if pitcher_id is None else int(pitcher_id),
+                        "projection": numeric(model_row.get("Projection")), "model_probability": float(model_row.get("Model Probability")),
+                        "data_quality": int(model_row.get("Data Quality", 0)), "app_version": str(model_row.get("App Version", "")),
+                        "probability_semantics": str(model_row.get("Probability Semantics", "")),
+                        "snapshot_captured_at_utc": str(model_row.get("Captured At UTC", "")),
+                    })
+                try:
+                    record = make_parlay_record(legs=legs, stake=float(parlay_stake), book=parlay_book, american_odds=int(quoted_odds), game_date=today, source="Top Plays Parlay")
+                    append_bet(BET_LOG, record, st.secrets)
+                    st.success(f"Saved {len(legs)}-leg {parlay_book} parlay to Bet Tracker")
+                except Exception as exc:
+                    st.error(f"Could not save parlay: {exc}")
+        else:
+            st.info("Select at least two Top 5 model legs from the same sportsbook to build a parlay.")
 
 selected_rank = st.session_state.get("top_play_detail_rank")
 try:

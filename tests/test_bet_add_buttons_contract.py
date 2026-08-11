@@ -16,12 +16,14 @@ def test_top_plays_page_compiles_and_has_straight_and_parlay_actions():
     assert 'st.multiselect("Parlay legs (2–5)"' in source
 
 
-def test_top_plays_keeps_watch_candidates_when_nothing_qualifies():
+def test_top_plays_is_model_first_and_odds_are_optional_overlay():
     path = Path(__file__).resolve().parents[1] / "pages" / "6_Top_Plays.py"
     source = path.read_text(encoding="utf-8")
-    assert 'status = "QUALIFIED" if qualified else "WATCH · "' in source
-    assert 'st.subheader("Today\'s five strongest available legs")' in source
-    assert 'WATCH candidates are intentionally excluded from the parlay builder.' in source
+    assert "build_model_board" in source
+    assert 'st.subheader("Today\'s five highest-probability model legs")' in source
+    assert "Sportsbook odds and market edge do not decide the Top 5" in source
+    assert 'plays["Live Offer"] = False' in source
+    assert "if api_key:" in source
 
 
 def test_projection_page_has_actionable_quick_add_buttons():
