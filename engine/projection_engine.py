@@ -83,23 +83,12 @@ class ProjectionEngine:
 
     @staticmethod
     def _line_cutoff(line: float) -> int:
-        """Convert a prop line into the integer outcome required to beat it.
-
-        Examples: 3.0 -> 4 for an over-3 push-aware prop representation,
-        3.5 -> 4, 5.5 -> 6. The engine stores milestone probabilities as
-        probabilities of reaching the next integer, so the same rule is used
-        everywhere the sportsbook supplies a half-line.
-        """
+        """Convert a prop line into the integer outcome required to beat it."""
         return int(math.floor(float(line))) + 1
 
     @staticmethod
     def _historical_calibration(lines: tuple[float, ...]) -> dict[int, object]:
-        """Load line-specific calibration without letting market data leak in.
-
-        Calibration is trained only from resolved pregame projection snapshots
-        in data/projection_log.csv. Missing/insufficient history deliberately
-        returns the existing 50/50 baseline through calibrate_blend().
-        """
+        """Load line-specific calibration from resolved pregame history only."""
         try:
             from engine.calibration import calibrate_blend
             history_path = Path(__file__).resolve().parents[1] / "data" / "projection_log.csv"
@@ -215,6 +204,14 @@ class ProjectionEngine:
             math_probs[float(line)] = math_p
             ensemble_probs[float(line)] = blended
 
+        # Compatibility bridge for the existing Streamlit market recommender:
+        # it still reads the two path maps and blends them 50/50. Expose the
+        # calibrated line-specific probability through both maps while keeping
+        # the raw path probabilities auditable in metadata. This makes the
+        # market box consume the exact same calibrated probability as the
+        # milestone ladder without feeding sportsbook information backward.
+        market_probs = dict(ensemble_probs)
+
         quality_inputs = [
             self._safe_float(features.get("historical_games"), 0),
             self._safe_float(features.get("lineup_batters"), 0),
@@ -245,15 +242,15 @@ class ProjectionEngine:
             ensemble_mean=float(ensemble_mean),
             ensemble_sd=float(ensemble_sd),
             over_probabilities=ensemble_probs,
-            simulation_probabilities=sim_probs,
-            mathematical_probabilities=math_probs,
+            simulation_probabilities=market_probs,
+            mathematical_probabilities=market_probs,
             simulation_samples=sim_samples,
             mathematical_pmf=math_pmf,
             confidence=float(confidence),
             data_quality=float(quality),
             drivers=driver_rows,
             metadata={
-                "engine_version": "1.3.0",
+                "engine_version": "1.3.1",
                 "simulation_draws": draws,
                 "simulation_weight": mean_weight,
                 "calibration_weights": learned_weights,
@@ -261,5 +258,8 @@ class ProjectionEngine:
                 "paths_independent": True,
                 "market_used_for_forecast": False,
                 "half_line_definition": "P(over x.5) = P(stat >= floor(x.5)+1)",
+                "raw_simulation_probabilities": sim_probs,
+                "raw_mathematical_probabilities": math_probs,
+                "calibrated_market_probabilities": market_probs,
             },
         )
