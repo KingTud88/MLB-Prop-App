@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# One-shot patch trigger for the main Projection page rationale panel.
 path = Path("streamlit_app.py")
 text = path.read_text(encoding="utf-8")
 
