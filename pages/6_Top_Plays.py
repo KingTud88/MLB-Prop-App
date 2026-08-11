@@ -12,6 +12,7 @@ import streamlit as st
 
 from automation.daily_projection_runner import LOG_PATH, game_log
 from engine.calibration import calibrate_blend
+from engine.hits_calibration import calibrate_hits_blend, hits_calibration_report
 from navigation import render_sidebar
 
 st.set_page_config(page_title="Top Plays", page_icon="👑", layout="wide")
@@ -105,13 +106,17 @@ def strikeout_over_probability(row: pd.Series, line: float, history: pd.DataFram
     if pd.isna(sim) or pd.isna(math_p):
         return None
     cal = calibrate_blend(history, cutoff)
-    return float(cal.weight_simulation * sim + (1.0 - cal.weight_simulation) * math_p)
+    return float(cal.weight_simulation * sim + cal.weight_math * math_p)
 
 
-def hits_over_probability(row: pd.Series, line: float) -> float | None:
+def hits_over_probability(row: pd.Series, line: float, history: pd.DataFrame) -> float | None:
     key = str(float(line)).replace(".", "_")
-    value = pd.to_numeric(pd.Series([row.get(f"hits_over_{key}")]), errors="coerce").iloc[0]
-    return None if pd.isna(value) else float(value)
+    sim = pd.to_numeric(pd.Series([row.get(f"hits_sim_over_{key}")]), errors="coerce").iloc[0]
+    math_p = pd.to_numeric(pd.Series([row.get(f"hits_math_over_{key}")]), errors="coerce").iloc[0]
+    if pd.isna(sim) or pd.isna(math_p):
+        return None
+    cal = calibrate_hits_blend(history, float(line))
+    return float(cal.weight_simulation * sim + cal.weight_math * math_p)
 
 
 def outs_over_probability(row: pd.Series, line: float) -> float | None:
@@ -135,7 +140,7 @@ def model_over_probability(row: pd.Series, market: str, line: float, history: pd
     if market.startswith("pitcher_strikeouts"):
         return strikeout_over_probability(row, line, history)
     if market.startswith("pitcher_hits_allowed"):
-        return hits_over_probability(row, line)
+        return hits_over_probability(row, line, history)
     if market.startswith("pitcher_outs"):
         return outs_over_probability(row, line)
     return None
@@ -209,6 +214,12 @@ slate = history.loc[history.get("game_date", pd.Series(dtype=str)).astype(str).e
 if slate.empty:
     st.info("No pregame projection snapshots are available for today's slate yet. Run Daily Projection Run first.")
     st.stop()
+
+with st.expander("Hits Allowed calibration status", expanded=False):
+    report = hits_calibration_report(history)
+    st.dataframe(report, hide_index=True, use_container_width=True)
+    ready = int((report["Status"] == "Calibrated").sum()) if not report.empty else 0
+    st.caption(f"{ready}/{len(report)} tracked hit lines currently have learned SIM/MATH weights. Until a line reaches 30 resolved frozen observations, Top Plays uses the protected 50/50 baseline for that line.")
 
 events = odds_events(api_key)
 all_legs: list[dict] = []
