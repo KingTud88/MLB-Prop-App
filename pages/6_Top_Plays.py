@@ -14,6 +14,7 @@ from automation.daily_projection_runner import LOG_PATH, game_log
 from engine.calibration import calibrate_blend
 from engine.hits_calibration import calibrate_hits_blend, hits_calibration_report
 from engine.outs_calibration import calibrate_outs_blend, outs_calibration_report
+from engine.bet_lean import projection_side
 from navigation import render_sidebar
 
 st.set_page_config(page_title="Top Plays", page_icon="👑", layout="wide")
@@ -196,10 +197,21 @@ def collect_legs(row: pd.Series, payload: dict, history: pd.DataFrame) -> list[d
             continue
         fair_over = po / total
         fair_under = pu / total
-        candidates = [
-            ("OVER", over_model, fair_over, prices["over"]),
-            ("UNDER", 1.0 - over_model, fair_under, prices["under"]),
-        ]
+        if market.startswith("pitcher_strikeouts"):
+            projection_mean = numeric(row.get("projection"))
+        elif market.startswith("pitcher_hits_allowed"):
+            projection_mean = numeric(row.get("hits_projection"))
+        else:
+            projection_mean = numeric(row.get("outs_projection"))
+        if projection_mean is None:
+            continue
+        direction = projection_side(projection_mean, point)
+        if direction == "OVER":
+            candidates = [("OVER", over_model, fair_over, prices["over"])]
+        elif direction == "UNDER":
+            candidates = [("UNDER", 1.0 - over_model, fair_under, prices["under"])]
+        else:
+            continue
         for side, model_p, fair_p, price in candidates:
             edge = model_p - fair_p
             if model_p < 0.55 or edge < 0.02 or quality < 60:

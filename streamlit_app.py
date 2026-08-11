@@ -16,6 +16,7 @@ from engine.hits_allowed import project_hits_allowed
 from engine.hits_calibration import calibrate_hits_blend
 from engine.outs_projection import project_total_outs, OutsProjection
 from engine.outs_calibration import calibrate_outs_blend
+from engine.bet_lean import aligned_bet_lean
 
 APP_VERSION = "3.4.0"
 EASTERN = ZoneInfo("America/New_York")
@@ -133,23 +134,39 @@ def market_recommendation(proj,odds_rows,market_key,default_line,kind):
             name=str(r.get("name","")).lower()
             if name=="over": over_price=r.get("price")
             elif name=="under": under_price=r.get("price")
-    cutoff=int(math.floor(line)+1)
+    history=load_projection_history(); cutoff=int(math.floor(line)+1)
     if kind=="k":
-        sim=float(proj.engine.simulation_probabilities.get(float(line),np.mean(proj.k_samples>=cutoff))); math_p=float(proj.engine.mathematical_probabilities.get(float(line),0.0)); model=.5*sim+.5*math_p
+        sim=float(proj.engine.simulation_probabilities.get(float(cutoff),np.mean(proj.k_samples>=cutoff)))
+        math_p=float(proj.engine.mathematical_probabilities.get(float(cutoff),0.0))
+        cal=calibrate_blend(history,cutoff)
+        over_model=cal.weight_simulation*sim+cal.weight_math*math_p
+        projection_mean=proj.mean_k
     else:
-        sim=float(proj.outs_engine.simulation_probabilities.get(float(line),np.mean(proj.outs_samples>=cutoff))); math_p=float(proj.outs_engine.mathematical_probabilities.get(float(line),0.0)); cal=calibrate_outs_blend(load_projection_history(),float(line)); model=cal.weight_simulation*sim+cal.weight_math*math_p
-    over_edge=None; under_edge=None
-    if over_price is not None: over_edge=model-(implied_prob(over_price) or 0)
-    if under_price is not None: under_edge=(1-model)-(implied_prob(under_price) or 0)
-    if over_edge is not None or under_edge is not None:
-        if (over_edge if over_edge is not None else -999) >= (under_edge if under_edge is not None else -999): side="OVER"; edge=over_edge
-        else: side="UNDER"; edge=under_edge
-    else: side="OVER" if model>=.5 else "UNDER"; edge=None
-    confidence=abs(model-.5)*2
-    return {"side":side,"line":line,"model":model,"edge":edge,"confidence":confidence,"has_market":bool(rows)}
+        sim=float(proj.outs_engine.simulation_probabilities.get(float(line),np.mean(proj.outs_samples>=cutoff)))
+        math_p=float(proj.outs_engine.mathematical_probabilities.get(float(line),0.0))
+        cal=calibrate_outs_blend(history,float(line))
+        over_model=cal.weight_simulation*sim+cal.weight_math*math_p
+        projection_mean=proj.mean_outs
+    decision=aligned_bet_lean(
+        projection_mean,
+        line,
+        over_model,
+        over_implied=implied_prob(over_price) if over_price is not None else None,
+        under_implied=implied_prob(under_price) if under_price is not None else None,
+        has_market=bool(rows),
+    )
+    confidence=abs(decision.model_probability-.5)*2
+    return {"side":decision.side,"line":line,"model":decision.model_probability,"edge":decision.edge,"confidence":confidence,"has_market":bool(rows),"reason":decision.reason,"projection_mean":projection_mean,"over_model":over_model}
 
 def render_reco(card,reco):
-    side=reco["side"]; cls="reco-good" if side=="OVER" and reco["model"]>=.5 or side=="UNDER" and reco["model"]<.5 else "reco-neutral"; edge=f"EDGE {reco['edge']:+.1%}" if reco["edge"] is not None else "MODEL LEAN"; meta=f"Model {reco['model']:.1%} · {edge}"
+    side=reco["side"]
+    cls="reco-warn" if side=="PASS" else "reco-good"
+    reason_labels={"no_positive_aligned_edge":"NO POSITIVE ALIGNED EDGE","probability_conflicts_with_projection":"PROJECTION / PROBABILITY DISAGREE","projection_on_line":"PROJECTION ON LINE","model_direction":"MODEL LEAN","aligned_positive_edge":"POSITIVE ALIGNED EDGE"}
+    if side=="PASS":
+        meta=f"Proj {reco.get('projection_mean',float('nan')):.2f} vs {reco['line']:g} · {reason_labels.get(reco.get('reason'),'NO BET')}"
+    else:
+        edge=f"EDGE {reco['edge']:+.1%}" if reco["edge"] is not None else "MODEL LEAN"
+        meta=f"Model {reco['model']:.1%} · {edge}"
     with card: st.markdown(f'<div class="reco-card"><div class="reco-label">{reco["label"]}</div><div class="reco-side {cls}">{side}</div><div class="reco-line">{reco["line"]:g} LINE</div><div class="reco-meta">{meta}</div></div>',unsafe_allow_html=True)
 
 def render_calibration_dashboard():
@@ -215,12 +232,12 @@ def extract_player_odds(payload,pitcher_name):
     return rows
 
 def market_model_probability(proj,market,line,hits_proj=None):
-    cutoff=int(math.floor(float(line))+1)
+    line=float(line); cutoff=int(math.floor(line)+1); history=load_projection_history()
     if market in ("pitcher_strikeouts","pitcher_strikeouts_alternate"):
-        sim=proj.engine.simulation_probabilities.get(float(line),float(np.mean(proj.k_samples>=cutoff))); math_p=proj.engine.mathematical_probabilities.get(float(line),0.0); return .5*sim+.5*math_p
+        sim=float(proj.engine.simulation_probabilities.get(float(cutoff),np.mean(proj.k_samples>=cutoff))); math_p=float(proj.engine.mathematical_probabilities.get(float(cutoff),0.0)); cal=calibrate_blend(history,cutoff); return cal.weight_simulation*sim+cal.weight_math*math_p
     if market in ("pitcher_hits_allowed","pitcher_hits_allowed_alternate") and hits_proj is not None:
-        return float(hits_proj.over_probabilities.get(float(line),np.mean(hits_proj.simulation_samples>=cutoff)))
-    return float(np.mean(proj.outs_samples>=cutoff))
+        sim=float(hits_proj.simulation_probabilities.get(line,np.mean(hits_proj.simulation_samples>=cutoff))); math_p=float(hits_proj.mathematical_probabilities.get(line,0.0)); cal=calibrate_hits_blend(history,line); return cal.weight_simulation*sim+cal.weight_math*math_p
+    sim=float(proj.outs_engine.simulation_probabilities.get(line,np.mean(proj.outs_samples>=cutoff))); math_p=float(proj.outs_engine.mathematical_probabilities.get(line,0.0)); cal=calibrate_outs_blend(history,line); return cal.weight_simulation*sim+cal.weight_math*math_p
 
 def build_market_table(proj,odds_rows,hits_proj=None):
     grouped={}
@@ -276,14 +293,12 @@ k_reco=market_recommendation(proj,odds_rows,"pitcher_strikeouts_alternate",5.5,"
 out_reco=market_recommendation(proj,odds_rows,"pitcher_outs_alternate",15.5,"outs"); out_reco["label"]="TOTAL OUTS BET LEAN"
 hit_rows=[r for r in odds_rows if r.get("market") in {"pitcher_hits_allowed","pitcher_hits_allowed_alternate"} and r.get("point") is not None]
 hit_line=min([float(r["point"]) for r in hit_rows],key=lambda x:abs(x-5.5)) if hit_rows else 5.5
-hit_over=float(hits_proj.over_probabilities.get(float(hit_line),0.5))
+hit_sim=float(hits_proj.simulation_probabilities.get(float(hit_line),0.0)); hit_math=float(hits_proj.mathematical_probabilities.get(float(hit_line),0.0))
+hit_cal=calibrate_hits_blend(load_projection_history(),float(hit_line)); hit_over=hit_cal.weight_simulation*hit_sim+hit_cal.weight_math*hit_math
 hit_over_price=next((r.get("price") for r in hit_rows if abs(float(r.get("point"))-hit_line)<1e-9 and str(r.get("name","")).lower()=="over"),None)
 hit_under_price=next((r.get("price") for r in hit_rows if abs(float(r.get("point"))-hit_line)<1e-9 and str(r.get("name","")).lower()=="under"),None)
-hit_over_edge=hit_over-(implied_prob(hit_over_price) or 0) if hit_over_price is not None else None
-hit_under_edge=(1-hit_over)-(implied_prob(hit_under_price) or 0) if hit_under_price is not None else None
-if (hit_over_edge if hit_over_edge is not None else -999) >= (hit_under_edge if hit_under_edge is not None else -999): hit_side="OVER"; hit_edge=hit_over_edge; hit_model=hit_over
-else: hit_side="UNDER"; hit_edge=hit_under_edge; hit_model=1-hit_over
-hit_reco={"side":hit_side,"line":hit_line,"model":hit_model,"edge":hit_edge,"confidence":abs(hit_model-.5)*2,"has_market":bool(hit_rows),"label":"HITS ALLOWED BET LEAN"}
+hit_decision=aligned_bet_lean(hits_proj.ensemble_mean,hit_line,hit_over,over_implied=implied_prob(hit_over_price) if hit_over_price is not None else None,under_implied=implied_prob(hit_under_price) if hit_under_price is not None else None,has_market=bool(hit_rows))
+hit_reco={"side":hit_decision.side,"line":hit_line,"model":hit_decision.model_probability,"edge":hit_decision.edge,"confidence":abs(hit_decision.model_probability-.5)*2,"has_market":bool(hit_rows),"label":"HITS ALLOWED BET LEAN","reason":hit_decision.reason,"projection_mean":hits_proj.ensemble_mean,"over_model":hit_over}
 
 if nav=="Distribution":
     st.markdown('<div class="section-head">DISTRIBUTION</div>',unsafe_allow_html=True); st.caption(f"{game.pitcher_name} · {game.team} vs {game.opponent}"); a,b=st.columns(2)
