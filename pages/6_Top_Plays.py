@@ -415,7 +415,7 @@ c1.metric("Highest model hit probability", f"{plays['Model Probability'].max():.
 c2.metric("Model-qualified Top 5", model_plays)
 c3.metric("Exact live prices found", f"{live_offers}/{len(plays)}")
 
-view = plays[["Rank", "Status", "Pitcher", "Market", "Side", "Line", "Projection", "Model Probability", "Data Quality", "Book", "Odds"]].copy()
+view = plays[["Rank", "Status", "Pitcher", "Market", "Side", "Line", "Projection", "Model Probability", "Data Quality", "Starter History", "Book", "Odds"]].copy()
 view["Model Probability"] = view["Model Probability"].map(lambda x: f"{float(x):.1%}")
 view["Projection"] = view["Projection"].map(lambda x: f"{float(x):.2f}")
 view["Book"] = view["Book"].map(lambda x: x if str(x).strip() else "—")
@@ -519,6 +519,10 @@ parlay_book_value = "" if parlay_book == "Not tracked" else parlay_book
 
 if len(selected) >= 2:
     watch_count = int((selected["Status"].astype(str) == "WATCH").sum())
+    duplicate_pitchers = selected["Pitcher"].astype(str).value_counts()
+    correlated = duplicate_pitchers[duplicate_pitchers > 1]
+    if not correlated.empty:
+        st.warning("This parlay contains multiple props for the same pitcher (" + ", ".join(correlated.index.tolist()) + "). Those legs can be correlated; the app does not treat the parlay probability as independent.")
     if watch_count:
         st.warning(f"This parlay includes {watch_count} WATCH leg(s). They are still in our Top 5, but they fall below the straight-bet model/data-quality action threshold.")
     if st.button(f"🎟️ Add {len(selected)}-leg model parlay to Bet Tracker", type="primary", use_container_width=True, key="save_top_plays_parlay"):

@@ -67,6 +67,10 @@ def save_log(frame: pd.DataFrame) -> None:
                 frame[col] = np.nan
     if "probability_semantics" not in frame.columns:
         frame["probability_semantics"] = ""
+    if "history_semantics" not in frame.columns:
+        frame["history_semantics"] = ""
+    if "starter_history_games" not in frame.columns:
+        frame["starter_history_games"] = np.nan
     for col in ("actual_strikeouts", "actual_hits_allowed", "actual_outs"):
         if col not in frame.columns:
             frame[col] = np.nan
@@ -200,6 +204,8 @@ def render_projection_rationale(row: pd.Series, history: pd.DataFrame) -> None:
         "Hits 80% range": f"{row.get('hits_range_low', '—')}–{row.get('hits_range_high', '—')}",
         "Outs 80% range": f"{row.get('outs_range_low', '—')}–{row.get('outs_range_high', '—')}",
         "Probability semantics": row.get("probability_semantics", "—"),
+        "History semantics": row.get("history_semantics", "—"),
+        "Starter appearances used": int(_num(row, "starter_history_games") or 0),
     }
     st.dataframe(pd.DataFrame([facts]), hide_index=True, use_container_width=True)
     st.caption(

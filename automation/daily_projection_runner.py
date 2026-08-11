@@ -14,9 +14,10 @@ from engine.projection_engine import ProjectionEngine
 from engine.opposing_batters import get_opposing_batters, matchup_summary
 from engine.hits_allowed import project_hits_allowed
 from engine.outs_projection import project_total_outs
+from engine.starter_history import HISTORY_SEMANTICS, TARGET_STARTER_HISTORY, combine_starter_history, starter_only
 
 BASE = "https://statsapi.mlb.com/api/v1"
-APP_VERSION = "3.3.0"
+APP_VERSION = "3.5.0"
 PROBABILITY_SEMANTICS = "milestone-ceil-v1"
 EASTERN = ZoneInfo("America/New_York")
 ROOT = Path(__file__).resolve().parents[1]
@@ -76,11 +77,12 @@ def game_log(pitcher_id: int, season: int) -> pd.DataFrame:
                 "hits": float(s.get("hits", 0) or 0),
                 "pitches": float(s.get("numberOfPitches", 0) or 0),
                 "outs": parse_ip(s.get("inningsPitched", "0.0")) * 3,
+                "games_started": int(float(s.get("gamesStarted", 0) or 0)),
             })
     frame = pd.DataFrame(rows)
     if frame.empty:
         return frame
-    return frame.sort_values("date")
+    return starter_only(frame)
 
 
 def pitcher_hand(pitcher_id: int) -> str:
@@ -159,12 +161,14 @@ def schedule(day: str) -> list[dict]:
 
 
 def project(row: dict) -> dict | None:
-    log = game_log(row["pitcher_id"], datetime.fromisoformat(row["game_date"]).year)
-    if log.empty:
-        log = game_log(row["pitcher_id"], datetime.fromisoformat(row["game_date"]).year - 1)
+    season = datetime.fromisoformat(row["game_date"]).year
+    current_log = game_log(row["pitcher_id"], season)
+    prior_log = pd.DataFrame()
+    if len(current_log) < TARGET_STARTER_HISTORY:
+        prior_log = game_log(row["pitcher_id"], season - 1)
+    log = combine_starter_history(current_log, prior_log)
     if log.empty:
         return None
-    season = datetime.fromisoformat(row["game_date"]).year
     opponent_k_pct, matchup_pa, matchup_batters = matchup_k_rate(
         row["opponent"], row["pitcher_id"], season, row.get("opponent_team_id")
     )
@@ -192,6 +196,7 @@ def project(row: dict) -> dict | None:
         "player": row["player"], "team": row["team"], "opponent": row["opponent"], "venue": row["venue"],
         "game_time": row["game_time"], "captured_at_utc": now, "app_version": APP_VERSION,
         "probability_semantics": PROBABILITY_SEMANTICS,
+        "history_semantics": HISTORY_SEMANTICS, "starter_history_games": int(len(log)),
         "projection": result.ensemble_mean, "k_sd": result.ensemble_sd,
         "k_range_low": int(np.quantile(result.simulation_samples, .10)),
         "k_range_high": int(np.quantile(result.simulation_samples, .90)),
@@ -229,7 +234,10 @@ def row_has_complete_paths(row: pd.Series) -> bool:
 
 
 def row_has_current_semantics(row: pd.Series) -> bool:
-    return str(row.get("probability_semantics", "")) == PROBABILITY_SEMANTICS
+    return (
+        str(row.get("probability_semantics", "")) == PROBABILITY_SEMANTICS
+        and str(row.get("history_semantics", "")) == HISTORY_SEMANTICS
+    )
 
 
 def row_is_pregame(row: pd.Series, now: datetime) -> bool:

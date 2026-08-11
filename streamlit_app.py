@@ -16,11 +16,12 @@ from engine.hits_allowed import project_hits_allowed
 from engine.hits_calibration import calibrate_hits_blend
 from engine.outs_projection import project_total_outs, OutsProjection
 from engine.outs_calibration import calibrate_outs_blend
+from engine.starter_history import TARGET_STARTER_HISTORY, combine_starter_history, starter_only
 from engine.bet_lean import aligned_bet_lean
 from engine.bet_tracker import make_bet_record
 from training.bet_storage import append_bet
 
-APP_VERSION = "3.4.0"
+APP_VERSION = "3.5.0"
 EASTERN = ZoneInfo("America/New_York")
 MLB_API = "https://statsapi.mlb.com/api/v1"
 ODDS_API = "https://api.the-odds-api.com/v4"
@@ -92,8 +93,8 @@ def get_log(pid,season):
     for sb in p.get("stats",[]):
         for sp in sb.get("splits",[]):
             s=sp.get("stat",{}); bf=float(s.get("battersFaced",0) or 0)
-            rec.append({"date":pd.to_datetime(sp.get("date"),errors="coerce"),"opponent":sp.get("opponent",{}).get("name",""),"bf":bf,"k":float(s.get("strikeOuts",0) or 0),"hits":float(s.get("hits",0) or 0),"pitches":float(s.get("numberOfPitches",0) or 0),"outs":parse_ip(s.get("inningsPitched","0.0"))*3})
-    df=pd.DataFrame(rec); return (df.sort_values("date"),None) if not df.empty else (df,"No regular-season game log returned.")
+            rec.append({"date":pd.to_datetime(sp.get("date"),errors="coerce"),"opponent":sp.get("opponent",{}).get("name",""),"bf":bf,"k":float(s.get("strikeOuts",0) or 0),"hits":float(s.get("hits",0) or 0),"pitches":float(s.get("numberOfPitches",0) or 0),"outs":parse_ip(s.get("inningsPitched","0.0"))*3,"games_started":int(float(s.get("gamesStarted",0) or 0))})
+    df=pd.DataFrame(rec); starts=starter_only(df); return (starts,None) if not starts.empty else (starts,"No regular-season starter game log returned.")
 
 def weighted(s,half,fallback):
     x=pd.to_numeric(s,errors="coerce").dropna().to_numpy(float)
@@ -330,8 +331,11 @@ with st.sidebar:
     if st.button("🔒 LOCK PITCHER" if not locked else "🔓 UNLOCK PITCHER",use_container_width=True): st.session_state["locked_pitcher"]=None if locked else game.key; st.rerun()
 
 log,herr=get_log(game.pitcher_id,selected_date.year)
-if log.empty: log,herr=get_log(game.pitcher_id,selected_date.year-1)
-if log.empty: st.error(herr or "Pitcher history unavailable."); st.stop()
+if len(log) < TARGET_STARTER_HISTORY:
+    prior,prior_err=get_log(game.pitcher_id,selected_date.year-1)
+    log=combine_starter_history(log,prior)
+    herr=herr or prior_err
+if log.empty: st.error(herr or "Pitcher starter history unavailable."); st.stop()
 proj=calculate_projection(log,game,25000); kdf=ladder(proj,10)
 features_for_hits=build_engine_features(log,game)
 hits_seed=int(hashlib.sha256(f"hits|{game.key}|{game.game_time}|{APP_VERSION}".encode()).hexdigest()[:8],16)
