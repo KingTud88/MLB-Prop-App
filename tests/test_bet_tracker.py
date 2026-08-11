@@ -1,8 +1,12 @@
 from engine.bet_tracker import (
+    combined_parlay_odds,
     default_line_for_market,
     grade_bet,
+    grade_parlay,
     make_bet_record,
+    make_parlay_record,
     normalize_market,
+    parse_parlay_legs,
     profit_for,
     projection_for_market,
     result_cell_css,
@@ -78,6 +82,7 @@ def test_shared_quick_add_record_preserves_bet_metadata():
         pitcher_id=456,
         entered_at_utc="2026-08-11T16:00:00+00:00",
     )
+    assert record["bet_type"] == "Straight"
     assert record["market"] == "Strikeouts"
     assert record["side"] == "Under"
     assert record["american_odds"] == -115
@@ -85,6 +90,30 @@ def test_shared_quick_add_record_preserves_bet_metadata():
     assert record["projection"] == 4.12
     assert record["game_pk"] == 123
     assert record["pitcher_id"] == 456
+
+
+def test_parlay_combined_odds_and_ticket_record():
+    estimated = combined_parlay_odds([-110, -110])
+    assert 260 <= estimated <= 265
+    legs = [
+        {"player":"A","market":"Strikeouts","game_date":"2026-08-11","line":5.5,"side":"Over","american_odds":-110,"game_pk":1,"pitcher_id":11},
+        {"player":"B","market":"Total Outs","game_date":"2026-08-11","line":17.5,"side":"Under","american_odds":-110,"game_pk":2,"pitcher_id":22},
+    ]
+    record = make_parlay_record(legs=legs, stake=1.0, book="FanDuel", american_odds=estimated, game_date="2026-08-11")
+    assert record["bet_type"] == "Parlay"
+    assert record["player"] == "2-leg parlay"
+    parsed = parse_parlay_legs(record["parlay_legs"])
+    assert len(parsed) == 2
+    assert parsed[1]["market"] == "Total Outs"
+
+
+def test_parlay_grade_requires_every_leg_to_win():
+    win = grade_bet("over", 5.5, 6, True)
+    loss = grade_bet("under", 17.5, 18, True)
+    pending = grade_bet("over", 4.5, None, False)
+    assert grade_parlay([win, win]).result == "WIN"
+    assert grade_parlay([win, loss]).result == "LOSS"
+    assert grade_parlay([win, pending]).result == "PENDING"
 
 
 def test_result_colors_are_green_for_win_and_red_for_loss():
