@@ -62,6 +62,7 @@ try:
 
     _original_markdown = _st.markdown
     _original_selectbox = _st.selectbox
+    _original_sidebar_selectbox = _st.sidebar.selectbox
     _opponent_slot = None
     _slot_reserved = False
     _last_pitcher_key = None
@@ -122,12 +123,10 @@ try:
             teams = game.get("teams", {}) or {}
             opponent = None
             opponent_team_id = None
-            pitcher_team = None
             for side, other in (("away", "home"), ("home", "away")):
                 node = teams.get(side, {}) or {}
                 probable = node.get("probablePitcher", {}) or {}
                 if int(probable.get("id", -1)) == pitcher_id:
-                    pitcher_team = node.get("team", {}).get("name", "")
                     other_node = teams.get(other, {}) or {}
                     opponent = other_node.get("team", {}).get("abbreviation") or other_node.get("team", {}).get("name")
                     opponent_team_id = other_node.get("team", {}).get("id")
@@ -189,8 +188,19 @@ try:
                 _render_opponent_profile(key)
         return result
 
+    def _sidebar_selectbox_with_opponent_profile(label, options, *args, **kwargs):
+        result = _original_sidebar_selectbox(label, options, *args, **kwargs)
+        global _last_pitcher_key
+        if str(label).strip().lower() == "pitcher" and result is not None:
+            key = str(result)
+            if key != _last_pitcher_key:
+                _last_pitcher_key = key
+                _render_opponent_profile(key)
+        return result
+
     _st.markdown = _reserve_opponent_slot
     _st.selectbox = _selectbox_with_opponent_profile
+    _st.sidebar.selectbox = _sidebar_selectbox_with_opponent_profile
 except Exception:
     pass
 
