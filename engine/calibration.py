@@ -4,7 +4,8 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-CALIBRATION_VERSION = "1.1"
+CALIBRATION_VERSION = "1.2"
+PROBABILITY_SEMANTICS = "milestone-ceil-v1"
 __all__ = ["CalibrationResult", "calibrate_blend", "milestone_calibration_report", "calibration_summary"]
 
 
@@ -22,22 +23,31 @@ def _brier(y: np.ndarray, p: np.ndarray) -> float:
     return float(np.mean((np.clip(p, 0.0, 1.0) - y) ** 2))
 
 
+def _eligible_probability_rows(frame: pd.DataFrame) -> pd.DataFrame:
+    """Use only rows captured under the current milestone probability definition."""
+    if frame.empty or "probability_semantics" not in frame.columns:
+        return frame.iloc[0:0].copy()
+    mask = frame["probability_semantics"].astype(str).eq(PROBABILITY_SEMANTICS)
+    return frame.loc[mask].copy()
+
+
 def calibrate_blend(
     frame: pd.DataFrame,
     line: int,
     min_observations: int = 30,
     grid_step: float = 0.02,
 ) -> CalibrationResult:
-    """Choose the simulation/math blend from resolved pregame projections only."""
+    """Choose the simulation/math blend from compatible resolved pregame projections only."""
     sim_col = f"sim_{line}p"
     math_col = f"math_{line}p"
     actual_col = "actual_strikeouts"
+    frame = _eligible_probability_rows(frame)
     if not {sim_col, math_col, actual_col}.issubset(frame.columns):
         return CalibrationResult(0.50, 0.50, 0, None, False, "Calibration fields are not populated yet.")
 
     data = frame[[sim_col, math_col, actual_col]].copy().dropna()
     if len(data) < min_observations:
-        return CalibrationResult(0.50, 0.50, len(data), None, False, f"Need {min_observations} resolved observations; only {len(data)} are available.")
+        return CalibrationResult(0.50, 0.50, len(data), None, False, f"Need {min_observations} compatible resolved observations; only {len(data)} are available.")
 
     y = (pd.to_numeric(data[actual_col], errors="coerce") >= int(line)).astype(float).to_numpy()
     sim = np.clip(pd.to_numeric(data[sim_col], errors="coerce").to_numpy(float), 0.001, 0.999)
@@ -45,7 +55,7 @@ def calibrate_blend(
     good = np.isfinite(y) & np.isfinite(sim) & np.isfinite(math)
     y, sim, math = y[good], sim[good], math[good]
     if len(y) < min_observations:
-        return CalibrationResult(0.50, 0.50, len(y), None, False, "Not enough valid resolved observations.")
+        return CalibrationResult(0.50, 0.50, len(y), None, False, "Not enough valid compatible resolved observations.")
 
     weights = np.arange(0.0, 1.0 + grid_step / 2.0, grid_step)
     scores = [_brier(y, w * sim + (1.0 - w) * math) for w in weights]
@@ -53,7 +63,7 @@ def calibrate_blend(
     shrink = min(1.0, (len(y) - min_observations) / max(min_observations * 3.0, 1.0))
     final_w = 0.50 + shrink * (raw_w - 0.50)
     final_score = _brier(y, final_w * sim + (1.0 - final_w) * math)
-    return CalibrationResult(final_w, 1.0 - final_w, len(y), final_score, True, "Weight learned from resolved historical projections.")
+    return CalibrationResult(final_w, 1.0 - final_w, len(y), final_score, True, "Weight learned from compatible resolved historical projections.")
 
 
 def milestone_calibration_report(
@@ -66,6 +76,7 @@ def milestone_calibration_report(
         "Line", "Observations", "Status", "Simulation Brier", "Math Brier",
         "Calibrated Brier", "Simulation Weight", "Math Weight", "Actual Hit Rate",
     ]
+    frame = _eligible_probability_rows(frame)
     rows: list[dict[str, object]] = []
     for line in lines:
         sim_col = f"sim_{line}p"
