@@ -8,6 +8,7 @@ from engine.bet_lean import aligned_bet_lean
 from engine.calibration import calibrate_blend
 from engine.hits_calibration import calibrate_hits_blend
 from engine.outs_calibration import calibrate_outs_blend
+from engine.starter_history import HISTORY_SEMANTICS, MIN_STARTS_FOR_TOP_PLAY
 
 MARKET_STRIKEOUTS = "Strikeouts"
 MARKET_OUTS = "Total Outs"
@@ -24,6 +25,14 @@ LINE_GRIDS = {
     MARKET_STRIKEOUTS: tuple(x + 0.5 for x in range(2, 10)),
     MARKET_OUTS: tuple(x + 0.5 for x in range(13, 19)),
     MARKET_HITS: tuple(x + 0.5 for x in range(3, 9)),
+}
+
+# Do not manufacture extreme probabilities by snapping a wildly out-of-domain
+# point projection to the nearest supported prop line.
+MAX_TARGET_DISTANCE = {
+    MARKET_STRIKEOUTS: 1.5,
+    MARKET_OUTS: 2.5,
+    MARKET_HITS: 1.5,
 }
 
 
@@ -74,10 +83,18 @@ def over_probability(row: Mapping[str, object], market: str, line: float, histor
 
 def build_model_candidate(row: Mapping[str, object], market: str, history: pd.DataFrame) -> dict[str, object] | None:
     """Build one model-first betting candidate without using sportsbook prices."""
+    if str(row.get("history_semantics", "")) != HISTORY_SEMANTICS:
+        return None
+    starter_games = _num(row.get("starter_history_games"))
+    if starter_games is None or starter_games < MIN_STARTS_FOR_TOP_PLAY:
+        return None
+
     projection = _num(row.get(PROJECTION_COLUMNS[market]))
     if projection is None:
         return None
     line = target_line(market, projection)
+    if abs(float(projection) - float(line)) > MAX_TARGET_DISTANCE[market]:
+        return None
     over_p = over_probability(row, market, line, history)
     if over_p is None:
         return None
@@ -103,6 +120,7 @@ def build_model_candidate(row: Mapping[str, object], market: str, history: pd.Da
         "Projection": projection,
         "Model Probability": probability,
         "Data Quality": int(round(quality)),
+        "Starter History": int(starter_games),
         "Status": status,
         "Game PK": row.get("game_pk"),
         "Pitcher ID": row.get("pitcher_id"),
@@ -111,6 +129,7 @@ def build_model_candidate(row: Mapping[str, object], market: str, history: pd.Da
         "Game Date": row.get("game_date", ""),
         "App Version": row.get("app_version", ""),
         "Probability Semantics": row.get("probability_semantics", ""),
+        "History Semantics": row.get("history_semantics", ""),
         "Captured At UTC": row.get("captured_at_utc", ""),
     }
 
