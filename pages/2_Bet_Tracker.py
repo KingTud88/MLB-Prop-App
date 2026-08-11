@@ -22,7 +22,7 @@ from engine.bet_tracker import (
     result_cell_css,
 )
 from navigation import render_sidebar
-from training.bet_storage import append_bet, load_bet_log
+from training.bet_storage import append_bet, bet_row_key, delete_bet, load_bet_log
 
 MLB_API = "https://statsapi.mlb.com/api/v1"
 MLB_LIVE_API = "https://statsapi.mlb.com/api/v1.1"
@@ -456,6 +456,7 @@ with st.spinner("Checking saved bets against MLB pitching stats..."):
             grade = grade_parlay(leg_grades)
             profit = profit_for(stake, odds, grade)
             resolved_rows.append({
+                "_BetKey": bet_row_key(row),
                 "Pitcher": f"{len(legs)}-leg parlay",
                 "Matchup": "Multiple",
                 "Date": game_date,
@@ -491,6 +492,7 @@ with st.spinner("Checking saved bets against MLB pitching stats..."):
         opponent = _clean_text(row.get("opponent"))
         matchup = f"{team} vs {opponent}" if team and opponent else "—"
         resolved_rows.append({
+            "_BetKey": bet_row_key(row),
             "Pitcher": player,
             "Matchup": matchup,
             "Date": game_date,
@@ -531,7 +533,52 @@ if stake_series.isna().any():
     st.caption("Older saved bets without a stake are still graded, but they are excluded from P/L and ROI calculations.")
 
 st.subheader("Tracked bets")
-view = results.copy()
+
+ticket_labels: dict[str, str] = {}
+for _, ticket in results.iterrows():
+    key = str(ticket.get("_BetKey", ""))
+    if not key:
+        continue
+    date = str(ticket.get("Date", ""))
+    pitcher = str(ticket.get("Pitcher", "Unknown"))
+    market = str(ticket.get("Market", ""))
+    bet = str(ticket.get("Bet", ""))
+    book = str(ticket.get("Book", "") or "—")
+    ticket_labels[key] = f"{date} · {pitcher} · {market} · {bet} · {book}"
+
+with st.expander("🗑️ Delete a saved bet", expanded=False):
+    if ticket_labels:
+        delete_key = st.selectbox(
+            "Saved ticket",
+            options=list(ticket_labels),
+            format_func=lambda key: ticket_labels[key],
+            key="bet_tracker_delete_key",
+        )
+        confirm_delete = st.checkbox(
+            "Confirm deletion of this saved ticket",
+            value=False,
+            key="bet_tracker_delete_confirm",
+            help="Deletion permanently removes this tracked ticket from the persistent bet ledger.",
+        )
+        if st.button(
+            "🗑️ Delete selected bet",
+            disabled=not confirm_delete,
+            use_container_width=True,
+            key="bet_tracker_delete_button",
+        ):
+            try:
+                if delete_bet(BET_LOG, delete_key, st.secrets):
+                    st.success("Deleted the selected bet from Bet Tracker.")
+                    st.cache_data.clear()
+                    st.rerun()
+                else:
+                    st.warning("That saved bet could not be found. Refresh the tracker and try again.")
+            except Exception as exc:
+                st.error(f"Could not delete bet: {exc}")
+    else:
+        st.caption("No saved tickets are available to delete.")
+
+view = results.drop(columns=["_BetKey"], errors="ignore").copy()
 view["Stake"] = view["Stake"].map(lambda x: "—" if pd.isna(x) else f"{x:.2f}")
 view["Actual"] = view["Actual"].map(lambda x: "—" if pd.isna(x) else (f"{x:g}" if isinstance(x, (int, float)) else str(x)))
 view["Profit/Loss"] = view["Profit/Loss"].map(lambda x: "—" if pd.isna(x) else f"{x:+.2f}")
@@ -543,7 +590,7 @@ st.dataframe(styled_view, hide_index=True, use_container_width=True)
 
 st.download_button(
     "Download bet tracker CSV",
-    results.to_csv(index=False),
+    results.drop(columns=["_BetKey"], errors="ignore").to_csv(index=False),
     file_name="bet_tracker.csv",
     mime="text/csv",
 )

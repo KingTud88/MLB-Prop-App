@@ -53,3 +53,7 @@ def test_tracker_page_applies_result_status_styling_and_grades_parlays():
     assert "parse_parlay_legs" in source
     assert "grade_parlay" in source
     assert 'if bet_type == "Parlay":' in source
+    assert "delete_bet" in source
+    assert 'st.expander("🗑️ Delete a saved bet"' in source
+    assert '"Confirm deletion of this saved ticket"' in source
+    assert '"🗑️ Delete selected bet"' in source
