@@ -19,6 +19,14 @@ from navigation import render_sidebar
 
 st.set_page_config(page_title="Daily Projection Run", page_icon="📊", layout="wide")
 render_sidebar("daily")
+st.markdown(
+    """
+    <style>
+    .block-container { padding-top: 3.25rem !important; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 st.title("📊 Daily Projection Run")
 st.caption(
     "Run StrikeOut King 9000 across every announced MLB starter on the selected slate. "
