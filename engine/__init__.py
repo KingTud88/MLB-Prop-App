@@ -53,10 +53,6 @@ _requests.get = _requests_get_with_odds_event_normalization
 # ---------------------------------------------------------------------------
 # Opposing-batter profile UI hook
 # ---------------------------------------------------------------------------
-# The dedicated data layer already exists in engine/opposing_batters.py. We
-# wire it into the existing pitcher selector here so streamlit_app.py does not
-# need another risky large-file edit. The first CSS markdown call reserves a
-# main-page slot; after a pitcher is selected, that slot is filled in place.
 try:
     import streamlit as _st
 
@@ -104,9 +100,12 @@ try:
                 return
             game_pk, pitcher_id = int(parts[0]), int(parts[1])
 
+            # Include probablePitcher so the selected pitcher can be matched to
+            # the opposing team. Without this hydrate, the prior implementation
+            # could never identify the opponent from this game-level lookup.
             schedule = _original_requests_get(
                 "https://statsapi.mlb.com/api/v1/schedule",
-                params={"sportId": 1, "gamePk": game_pk, "hydrate": "team"},
+                params={"sportId": 1, "gamePk": game_pk, "hydrate": "probablePitcher,team"},
                 timeout=12,
                 headers={"Accept": "application/json", "User-Agent": "StrikeOutKing9000/3.5"},
             )
@@ -128,13 +127,20 @@ try:
                 probable = node.get("probablePitcher", {}) or {}
                 if int(probable.get("id", -1)) == pitcher_id:
                     other_node = teams.get(other, {}) or {}
-                    opponent = other_node.get("team", {}).get("abbreviation") or other_node.get("team", {}).get("name")
-                    opponent_team_id = other_node.get("team", {}).get("id")
+                    opponent_team = other_node.get("team", {}) or {}
+                    opponent = opponent_team.get("abbreviation") or opponent_team.get("name")
+                    opponent_team_id = opponent_team.get("id")
                     break
 
+            if not opponent_team_id:
+                return
+
             hand = _pitcher_hand(pitcher_id)
+            if hand not in {"R", "L"}:
+                return
+
             season = int(str(game.get("gameDate", ""))[:4] or 2026)
-            batters = get_opposing_batters(str(opponent or ""), hand, season, opponent_team_id)
+            batters = get_opposing_batters(str(opponent or ""), hand, season, int(opponent_team_id))
             summary = matchup_summary(batters)
 
             with _opponent_slot.container():
@@ -181,7 +187,9 @@ try:
     def _selectbox_with_opponent_profile(label, options, *args, **kwargs):
         result = _original_selectbox(label, options, *args, **kwargs)
         global _last_pitcher_key
-        if str(label).strip().lower() == "pitcher" and result is not None:
+        label_text = str(label).strip().lower()
+        widget_key = str(kwargs.get("key", "")).strip().lower()
+        if (label_text in {"pitcher", "matching pitchers"} or widget_key == "pitcher_selector") and result is not None:
             key = str(result)
             if key != _last_pitcher_key:
                 _last_pitcher_key = key
@@ -191,7 +199,9 @@ try:
     def _sidebar_selectbox_with_opponent_profile(label, options, *args, **kwargs):
         result = _original_sidebar_selectbox(label, options, *args, **kwargs)
         global _last_pitcher_key
-        if str(label).strip().lower() == "pitcher" and result is not None:
+        label_text = str(label).strip().lower()
+        widget_key = str(kwargs.get("key", "")).strip().lower()
+        if (label_text in {"pitcher", "matching pitchers"} or widget_key == "pitcher_selector") and result is not None:
             key = str(result)
             if key != _last_pitcher_key:
                 _last_pitcher_key = key
