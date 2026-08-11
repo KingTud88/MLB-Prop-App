@@ -2,8 +2,6 @@ name: Run model-only parlay patch
 
 on:
   push:
-    paths:
-      - scripts/remove_sportsbook_gate_from_parlay.py
   workflow_dispatch:
 
 permissions:
