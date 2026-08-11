@@ -18,7 +18,6 @@ from engine.outs_calibration import calibrate_outs_blend, outs_calibration_repor
 from engine.bet_lean import projection_side
 from engine.model_top_plays import build_model_board
 from engine.bet_tracker import (
-    combined_parlay_odds,
     make_bet_record,
     make_parlay_record,
     projection_for_market,
@@ -475,67 +474,95 @@ for button_idx, (_, play_row) in enumerate(plays.iterrows()):
 
 st.markdown("---")
 st.subheader("🎟️ Parlay Builder")
-st.caption("A parlay uses one stake for the whole ticket. It only combines Top 5 model plays that have the exact same target line available at the same sportsbook. Use the sportsbook's actual quoted parlay price before saving.")
-if candidate_pool.empty:
-    st.info("The model Top 5 is available, but there are not enough matching live sportsbook offers yet to build a tracked parlay.")
-else:
-    top_keys = {
-        (str(r["Pitcher"]), str(r["Market"]), str(r["Side"]), float(r["Line"]))
-        for _, r in plays.iterrows()
-        if float(r["Model Probability"]) >= 0.55 and int(r["Data Quality"]) >= 60
-    }
-    parlay_pool = candidate_pool.loc[
-        candidate_pool.apply(lambda r: (str(r["Pitcher"]), str(r["Market"]), str(r["Side"]), float(r["Line"])) in top_keys, axis=1)
-    ].copy()
-    parlay_pool = parlay_pool.loc[parlay_pool["Qualified"].fillna(False)] if not parlay_pool.empty else parlay_pool
-    parlay_pool = parlay_pool.sort_values(["Model Probability", "Odds"], ascending=[False, False]) if not parlay_pool.empty else parlay_pool
-    parlay_pool = parlay_pool.drop_duplicates(["Book", "Pitcher", "Market", "Side", "Line"], keep="first") if not parlay_pool.empty else parlay_pool
-    book_counts = parlay_pool.groupby("Book").size() if not parlay_pool.empty else pd.Series(dtype=int)
-    parlay_books = [str(book) for book, count in book_counts.items() if int(count) >= 2]
-    if not parlay_books:
-        st.info("No single sportsbook currently has at least two exact Top 5 model legs posted, so there is not a real same-book parlay to record yet.")
-    else:
-        parlay_book = st.selectbox("Parlay sportsbook", parlay_books, key="top_plays_parlay_book")
-        same_book = parlay_pool.loc[parlay_pool["Book"].astype(str).eq(parlay_book)].head(5).copy().reset_index(drop=True)
-        option_map = {}
-        for idx, leg in same_book.iterrows():
-            label = f"{leg['Pitcher']} · {leg['Market']} · {leg['Side']} {float(leg['Line']):g} · {int(leg['Odds']):+d}"
-            option_map[label] = idx
-        selected_labels = st.multiselect("Parlay legs (2–5)", list(option_map), default=list(option_map), max_selections=5, key="top_plays_parlay_legs")
-        selected = same_book.iloc[[option_map[label] for label in selected_labels]].copy() if selected_labels else same_book.iloc[0:0].copy()
-        parlay_stake = st.number_input("Parlay stake (units)", min_value=0.0, value=1.0, step=0.5, key="top_plays_parlay_stake")
-        if len(selected) >= 2:
-            estimated_odds = combined_parlay_odds(selected["Odds"].astype(float).tolist())
-            st.caption(f"Estimated standard combined price: {estimated_odds:+d}. Use the actual sportsbook quote if it differs.")
-            quoted_odds = st.number_input("Sportsbook quoted parlay odds", min_value=-5000, max_value=100000, value=int(estimated_odds), step=5, key="top_plays_parlay_odds")
-            if st.button(f"🎟️ Add {len(selected)}-leg parlay to Bet Tracker", type="primary", use_container_width=True, key="save_top_plays_parlay"):
-                legs = []
-                for _, leg in selected.iterrows():
-                    game_pk = numeric(leg.get("Game PK")); pitcher_id = numeric(leg.get("Pitcher ID"))
-                    matching_model = plays.loc[
-                        plays["Pitcher"].astype(str).eq(str(leg["Pitcher"]))
-                        & plays["Market"].astype(str).eq(str(leg["Market"]))
-                        & plays["Side"].astype(str).eq(str(leg["Side"]))
-                        & pd.to_numeric(plays["Line"], errors="coerce").eq(float(leg["Line"]))
-                    ]
-                    model_row = matching_model.iloc[0] if not matching_model.empty else leg
-                    legs.append({
-                        "player": str(leg["Pitcher"]), "market": str(leg["Market"]), "game_date": today,
-                        "line": float(leg["Line"]), "side": str(leg["Side"]), "american_odds": float(leg["Odds"]),
-                        "game_pk": None if game_pk is None else int(game_pk), "pitcher_id": None if pitcher_id is None else int(pitcher_id),
-                        "projection": numeric(model_row.get("Projection")), "model_probability": float(model_row.get("Model Probability")),
-                        "data_quality": int(model_row.get("Data Quality", 0)), "app_version": str(model_row.get("App Version", "")),
-                        "probability_semantics": str(model_row.get("Probability Semantics", "")),
-                        "snapshot_captured_at_utc": str(model_row.get("Captured At UTC", "")),
-                    })
-                try:
-                    record = make_parlay_record(legs=legs, stake=float(parlay_stake), book=parlay_book, american_odds=int(quoted_odds), game_date=today, source="Top Plays Parlay")
-                    append_bet(BET_LOG, record, st.secrets)
-                    st.success(f"Saved {len(legs)}-leg {parlay_book} parlay to Bet Tracker")
-                except Exception as exc:
-                    st.error(f"Could not save parlay: {exc}")
+st.caption(
+    "Build a parlay directly from our model Top 5. Sportsbook data does not decide which legs can be combined. "
+    "Select any 2–5 model legs and use one stake for the entire ticket. Book name and final quoted odds are optional bookkeeping only."
+)
+
+option_map = {}
+for idx, leg in plays.iterrows():
+    label = (
+        f"#{int(leg['Rank'])} {leg['Pitcher']} · {leg['Market']} · {leg['Side']} {float(leg['Line']):g} · "
+        f"{float(leg['Model Probability']):.1%} · {leg['Status']}"
+    )
+    option_map[label] = idx
+
+selected_labels = st.multiselect(
+    "Parlay legs (2–5)",
+    list(option_map),
+    default=list(option_map),
+    max_selections=5,
+    key="top_plays_parlay_legs",
+    help="These choices come only from our model Top 5. No sportsbook availability filter is applied.",
+)
+selected = plays.iloc[[option_map[label] for label in selected_labels]].copy() if selected_labels else plays.iloc[0:0].copy()
+parlay_stake = st.number_input("Parlay stake (units)", min_value=0.0, value=1.0, step=0.5, key="top_plays_parlay_stake")
+
+book_note = st.text_input(
+    "Sportsbook used (optional)",
+    value="",
+    key="top_plays_parlay_book_note",
+    help="Optional recordkeeping only. This field never changes the model parlay or its ranking.",
+)
+quoted_odds_text = st.text_input(
+    "Actual parlay American odds (optional)",
+    value="",
+    placeholder="Example: +450",
+    key="top_plays_parlay_odds_text",
+    help="Leave blank if you only want to track whether the model parlay hits. Add the actual quoted ticket price if you want P/L and ROI calculated.",
+)
+
+if len(selected) >= 2:
+    watch_count = int((selected["Status"].astype(str) == "WATCH").sum())
+    if watch_count:
+        st.warning(f"This parlay includes {watch_count} WATCH leg(s). They are in our Top 5 but fall below the straight-bet model/data-quality action threshold.")
+    if st.button(f"🎟️ Add {len(selected)}-leg model parlay to Bet Tracker", type="primary", use_container_width=True, key="save_top_plays_parlay"):
+        raw_odds = quoted_odds_text.strip().replace(" ", "")
+        quoted_odds = None
+        odds_error = None
+        if raw_odds:
+            try:
+                quoted_odds = int(round(float(raw_odds)))
+                if quoted_odds == 0:
+                    raise ValueError("American odds cannot be zero")
+            except (TypeError, ValueError):
+                odds_error = "Enter valid American odds such as +450 or -110, or leave the field blank."
+        if odds_error:
+            st.error(odds_error)
         else:
-            st.info("Select at least two Top 5 model legs from the same sportsbook to build a parlay.")
+            legs = []
+            for _, leg in selected.iterrows():
+                game_pk = numeric(leg.get("Game PK")); pitcher_id = numeric(leg.get("Pitcher ID"))
+                legs.append({
+                    "player": str(leg["Pitcher"]), "market": str(leg["Market"]),
+                    "game_date": str(leg.get("Game Date", today))[:10],
+                    "line": float(leg["Line"]), "side": str(leg["Side"]), "american_odds": None,
+                    "game_pk": None if game_pk is None else int(game_pk),
+                    "pitcher_id": None if pitcher_id is None else int(pitcher_id),
+                    "projection": numeric(leg.get("Projection")),
+                    "model_probability": float(leg.get("Model Probability")),
+                    "data_quality": int(leg.get("Data Quality", 0)),
+                    "app_version": str(leg.get("App Version", "")),
+                    "probability_semantics": str(leg.get("Probability Semantics", "")),
+                    "snapshot_captured_at_utc": str(leg.get("Captured At UTC", "")),
+                    "status": str(leg.get("Status", "")),
+                })
+            try:
+                record = make_parlay_record(
+                    legs=legs,
+                    stake=float(parlay_stake),
+                    book=book_note.strip(),
+                    american_odds=quoted_odds,
+                    game_date=today,
+                    source="Top Plays Model Parlay",
+                )
+                append_bet(BET_LOG, record, st.secrets)
+                suffix = "" if quoted_odds is not None else " (hit-rate tracking only; no ticket odds saved)"
+                st.success(f"Saved {len(legs)}-leg model parlay to Bet Tracker{suffix}")
+            except Exception as exc:
+                st.error(f"Could not save parlay: {exc}")
+else:
+    st.info("Select at least two of our Top 5 model legs to build a parlay.")
 
 selected_rank = st.session_state.get("top_play_detail_rank")
 try:

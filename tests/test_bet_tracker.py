@@ -107,6 +107,19 @@ def test_parlay_combined_odds_and_ticket_record():
     assert parsed[1]["market"] == "Total Outs"
 
 
+def test_model_parlay_can_be_saved_without_sportsbook_or_odds():
+    legs = [
+        {"player":"A","market":"Strikeouts","game_date":"2026-08-11","line":5.5,"side":"Over","american_odds":None,"game_pk":1,"pitcher_id":11},
+        {"player":"B","market":"Total Outs","game_date":"2026-08-11","line":17.5,"side":"Under","american_odds":None,"game_pk":2,"pitcher_id":22},
+    ]
+    record = make_parlay_record(legs=legs, stake=1.0, game_date="2026-08-11", source="Top Plays Model Parlay")
+    assert record["book"] == ""
+    assert record["american_odds"] == ""
+    parsed = parse_parlay_legs(record["parlay_legs"])
+    assert parsed[0]["american_odds"] == ""
+    assert record["source"] == "Top Plays Model Parlay"
+
+
 def test_parlay_grade_requires_every_leg_to_win():
     win = grade_bet("over", 5.5, 6, True)
     loss = grade_bet("under", 17.5, 18, True)

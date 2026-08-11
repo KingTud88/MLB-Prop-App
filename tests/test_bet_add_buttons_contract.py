@@ -7,13 +7,15 @@ def test_top_plays_page_compiles_and_has_straight_and_parlay_actions():
     compile(source, str(path), "exec")
     assert "make_bet_record" in source
     assert "make_parlay_record" in source
-    assert "combined_parlay_odds" in source
     assert "append_bet(BET_LOG, record, st.secrets)" in source
     assert 'st.button("➕ Add as bet"' in source
     assert 'st.number_input("Straight-bet stake (units)"' in source
     assert 'st.number_input("Parlay stake (units)"' in source
-    assert 'st.selectbox("Parlay sportsbook"' in source
-    assert 'st.multiselect("Parlay legs (2–5)"' in source
+    assert 'st.multiselect(\n    "Parlay legs (2–5)"' in source
+    assert 'st.text_input(\n    "Sportsbook used (optional)"' in source
+    assert 'st.text_input(\n    "Actual parlay American odds (optional)"' in source
+    assert "candidate_pool.empty" not in source[source.index('st.subheader("🎟️ Parlay Builder")'):]
+    assert "same sportsbook" not in source[source.index('st.subheader("🎟️ Parlay Builder")'):]
 
 
 def test_top_plays_is_model_first_and_odds_are_optional_overlay():
