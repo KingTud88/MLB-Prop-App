@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect as _inspect
 import requests as _requests
 
 _TEAM_NAMES_TO_ABBR = {
@@ -17,6 +18,7 @@ _TEAM_NAMES_TO_ABBR = {
     "Chicago White Sox": "CHW", "Miami Marlins": "MIA", "New York Yankees": "NYY",
     "Milwaukee Brewers": "MIL",
 }
+_TEAM_IDS = {"LAA":108,"ARI":109,"BAL":110,"BOS":111,"CHC":112,"CIN":113,"CLE":114,"COL":115,"DET":116,"HOU":117,"KCR":118,"LAD":119,"WSH":120,"NYM":121,"ATH":133,"PIT":134,"SDP":135,"SEA":136,"SFG":137,"STL":138,"TBR":139,"TEX":140,"TOR":141,"MIN":142,"PHI":143,"ATL":144,"CHW":145,"MIA":146,"NYY":147,"MIL":158}
 
 _original_requests_get = _requests.get
 
@@ -30,8 +32,7 @@ def _normalize_odds_events_response(response):
             if not isinstance(event, dict):
                 continue
             for field in ("home_team", "away_team"):
-                name = str(event.get(field, "")).strip()
-                abbr = _TEAM_NAMES_TO_ABBR.get(name)
+                abbr = _TEAM_NAMES_TO_ABBR.get(str(event.get(field, "")).strip())
                 if abbr:
                     event[field] = abbr
         response._strikeout_king_normalized_json = payload
@@ -50,106 +51,62 @@ def _requests_get_with_odds_event_normalization(url, *args, **kwargs):
 
 _requests.get = _requests_get_with_odds_event_normalization
 
-# ---------------------------------------------------------------------------
-# Opposing-batter profile UI hook
-# ---------------------------------------------------------------------------
 try:
     import streamlit as _st
 
     _original_markdown = _st.markdown
-    _original_selectbox = _st.selectbox
-    _original_sidebar_selectbox = _st.sidebar.selectbox
     _opponent_slot = None
     _slot_reserved = False
-    _last_pitcher_key = None
-
-    def _reserve_opponent_slot(*args, **kwargs):
-        global _opponent_slot, _slot_reserved
-        result = _original_markdown(*args, **kwargs)
-        if not _slot_reserved:
-            try:
-                _opponent_slot = _st.empty()
-                _slot_reserved = True
-            except Exception:
-                _opponent_slot = None
-        return result
+    _profile_rendering = False
+    _last_profile_key = None
 
     def _pitcher_hand(pitcher_id):
         try:
-            response = _requests.get(
+            response = _original_requests_get(
                 f"https://statsapi.mlb.com/api/v1/people/{int(pitcher_id)}",
-                params={},
                 timeout=10,
                 headers={"Accept": "application/json", "User-Agent": "StrikeOutKing9000/3.5"},
             )
             response.raise_for_status()
-            return str(
-                ((response.json().get("people") or [{}])[0].get("pitchingHand") or {}).get("code", "")
-            ).upper()
+            person = (response.json().get("people") or [{}])[0]
+            return str((person.get("pitchingHand") or {}).get("code", "")).upper()
         except Exception:
             return ""
 
-    def _render_opponent_profile(game_key):
-        if _opponent_slot is None:
+    def _find_game_from_call_stack():
+        for frame_info in _inspect.stack(context=0):
+            frame = frame_info.frame
+            game = frame.f_locals.get("game")
+            if game is not None and all(hasattr(game, attr) for attr in ("pitcher_id", "opponent", "team", "game_time")):
+                return game
+        return None
+
+    def _render_opponent_profile(game):
+        global _profile_rendering, _last_profile_key
+        if _opponent_slot is None or game is None or _profile_rendering:
             return
+        key = getattr(game, "key", "")
+        if key == _last_profile_key:
+            return
+        _profile_rendering = True
         try:
             from .opposing_batters import get_opposing_batters, matchup_summary
 
-            parts = str(game_key).split(":", 1)
-            if len(parts) != 2:
-                return
-            game_pk, pitcher_id = int(parts[0]), int(parts[1])
-
-            # Include probablePitcher so the selected pitcher can be matched to
-            # the opposing team. Without this hydrate, the prior implementation
-            # could never identify the opponent from this game-level lookup.
-            schedule = _original_requests_get(
-                "https://statsapi.mlb.com/api/v1/schedule",
-                params={"sportId": 1, "gamePk": game_pk, "hydrate": "probablePitcher,team"},
-                timeout=12,
-                headers={"Accept": "application/json", "User-Agent": "StrikeOutKing9000/3.5"},
-            )
-            schedule.raise_for_status()
-            games = [
-                game
-                for day in schedule.json().get("dates", [])
-                for game in day.get("games", [])
-            ]
-            if not games:
+            opponent = str(game.opponent or "").upper()
+            team_id = _TEAM_IDS.get(opponent)
+            hand = _pitcher_hand(game.pitcher_id)
+            if not team_id or hand not in {"R", "L"}:
                 return
 
-            game = games[0]
-            teams = game.get("teams", {}) or {}
-            opponent = None
-            opponent_team_id = None
-            for side, other in (("away", "home"), ("home", "away")):
-                node = teams.get(side, {}) or {}
-                probable = node.get("probablePitcher", {}) or {}
-                if int(probable.get("id", -1)) == pitcher_id:
-                    other_node = teams.get(other, {}) or {}
-                    opponent_team = other_node.get("team", {}) or {}
-                    opponent = opponent_team.get("abbreviation") or opponent_team.get("name")
-                    opponent_team_id = opponent_team.get("id")
-                    break
-
-            if not opponent_team_id:
-                return
-
-            hand = _pitcher_hand(pitcher_id)
-            if hand not in {"R", "L"}:
-                return
-
-            season = int(str(game.get("gameDate", ""))[:4] or 2026)
-            batters = get_opposing_batters(str(opponent or ""), hand, season, int(opponent_team_id))
+            season = int(str(game.game_time or "")[:4] or 2026)
+            batters = get_opposing_batters(opponent, hand, season, team_id)
             summary = matchup_summary(batters)
 
             with _opponent_slot.container():
-                _st.markdown(
-                    '<div class="section-head">OPPOSING BATTER K-PROFILE</div>',
-                    unsafe_allow_html=True,
-                )
+                _original_markdown('<div class="section-head">OPPOSING BATTER K-PROFILE</div>', unsafe_allow_html=True)
                 if batters.empty:
                     _st.caption("No active-roster hitter split data is available yet for this matchup.")
+                    _last_profile_key = key
                     return
 
                 _st.caption(
@@ -157,15 +114,13 @@ try:
                     f"weighted K% {summary['k_rate']:.1%} · {summary['high']} high-K bats · "
                     "active-roster profile; confirmed lineup may differ"
                 )
-
                 display = batters.head(9).copy()
                 display["K% vs Pitcher"] = display["K% vs Pitcher"].map(lambda x: f"{x:.1%}")
                 display["PA"] = display["PA"].map(lambda x: f"{x:.0f}")
 
                 def _highlight(row):
-                    text = str(row.get("K% vs Pitcher", "0%")).replace("%", "")
                     try:
-                        rate = float(text)
+                        rate = float(str(row.get("K% vs Pitcher", "0%")).replace("%", ""))
                     except ValueError:
                         rate = 0.0
                     if rate >= 30.0:
@@ -180,37 +135,30 @@ try:
                     hide_index=True,
                 )
                 _st.caption("🔥 HIGH = 30%+ K rate · ⚠️ ELEVATED = 25–29.9% · Risk is based on pitcher-hand split.")
+                _last_profile_key = key
         except Exception:
-            # Scouting information is supplemental; never let it break the core projection.
+            # Supplemental scouting data must never break the core projection.
             pass
+        finally:
+            _profile_rendering = False
 
-    def _selectbox_with_opponent_profile(label, options, *args, **kwargs):
-        result = _original_selectbox(label, options, *args, **kwargs)
-        global _last_pitcher_key
-        label_text = str(label).strip().lower()
-        widget_key = str(kwargs.get("key", "")).strip().lower()
-        if (label_text in {"pitcher", "matching pitchers"} or widget_key == "pitcher_selector") and result is not None:
-            key = str(result)
-            if key != _last_pitcher_key:
-                _last_pitcher_key = key
-                _render_opponent_profile(key)
-        return result
-
-    def _sidebar_selectbox_with_opponent_profile(label, options, *args, **kwargs):
-        result = _original_sidebar_selectbox(label, options, *args, **kwargs)
-        global _last_pitcher_key
-        label_text = str(label).strip().lower()
-        widget_key = str(kwargs.get("key", "")).strip().lower()
-        if (label_text in {"pitcher", "matching pitchers"} or widget_key == "pitcher_selector") and result is not None:
-            key = str(result)
-            if key != _last_pitcher_key:
-                _last_pitcher_key = key
-                _render_opponent_profile(key)
+    def _reserve_opponent_slot(*args, **kwargs):
+        global _opponent_slot, _slot_reserved
+        result = _original_markdown(*args, **kwargs)
+        if not _slot_reserved:
+            try:
+                _opponent_slot = _st.empty()
+                _slot_reserved = True
+            except Exception:
+                _opponent_slot = None
+        if not _profile_rendering:
+            try:
+                _render_opponent_profile(_find_game_from_call_stack())
+            except Exception:
+                pass
         return result
 
     _st.markdown = _reserve_opponent_slot
-    _st.selectbox = _selectbox_with_opponent_profile
-    _st.sidebar.selectbox = _sidebar_selectbox_with_opponent_profile
 except Exception:
     pass
 
