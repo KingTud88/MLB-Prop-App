@@ -22,6 +22,8 @@ def normalize_market(value: object) -> str:
         return MARKET_STRIKEOUTS
     if "hit" in text:
         return MARKET_HITS
+    if "strikeout" in text or "strike out" in text:
+        return MARKET_STRIKEOUTS
     if "out" in text:
         return MARKET_OUTS
     return MARKET_STRIKEOUTS
