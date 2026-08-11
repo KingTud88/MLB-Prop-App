@@ -12,10 +12,11 @@ def test_top_plays_page_compiles_and_has_straight_and_parlay_actions():
     assert 'st.number_input("Straight-bet stake (units)"' in source
     assert 'st.number_input("Parlay stake (units)"' in source
     assert 'st.multiselect(\n    "Parlay legs (2–5)"' in source
-    assert 'st.text_input(\n    "Sportsbook used (optional)"' in source
-    assert 'st.text_input(\n    "Actual parlay American odds (optional)"' in source
     assert "candidate_pool.empty" not in source[source.index('st.subheader("🎟️ Parlay Builder")'):]
     assert "same sportsbook" not in source[source.index('st.subheader("🎟️ Parlay Builder")'):]
+    assert 'Sportsbook used (optional)' not in source
+    assert 'Actual parlay American odds (optional)' not in source
+    assert 'book=book_note' not in source
 
 
 def test_top_plays_is_model_first_and_odds_are_optional_overlay():

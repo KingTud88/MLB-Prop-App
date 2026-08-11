@@ -475,8 +475,8 @@ for button_idx, (_, play_row) in enumerate(plays.iterrows()):
 st.markdown("---")
 st.subheader("🎟️ Parlay Builder")
 st.caption(
-    "Build a parlay directly from our model Top 5. Sportsbook data does not decide which legs can be combined. "
-    "Select any 2–5 model legs and use one stake for the entire ticket. Book name and final quoted odds are optional bookkeeping only."
+    "Build a parlay directly from our model Top 5. No sportsbook, live-price, or book-matching data is used here. "
+    "Select any 2–5 model legs and choose one stake for the entire tracked model ticket."
 )
 
 option_map = {}
@@ -493,74 +493,44 @@ selected_labels = st.multiselect(
     default=list(option_map),
     max_selections=5,
     key="top_plays_parlay_legs",
-    help="These choices come only from our model Top 5. No sportsbook availability filter is applied.",
+    help="These choices come only from our model Top 5. Sportsbook availability does not filter the list.",
 )
 selected = plays.iloc[[option_map[label] for label in selected_labels]].copy() if selected_labels else plays.iloc[0:0].copy()
 parlay_stake = st.number_input("Parlay stake (units)", min_value=0.0, value=1.0, step=0.5, key="top_plays_parlay_stake")
 
-book_note = st.text_input(
-    "Sportsbook used (optional)",
-    value="",
-    key="top_plays_parlay_book_note",
-    help="Optional recordkeeping only. This field never changes the model parlay or its ranking.",
-)
-quoted_odds_text = st.text_input(
-    "Actual parlay American odds (optional)",
-    value="",
-    placeholder="Example: +450",
-    key="top_plays_parlay_odds_text",
-    help="Leave blank if you only want to track whether the model parlay hits. Add the actual quoted ticket price if you want P/L and ROI calculated.",
-)
-
 if len(selected) >= 2:
     watch_count = int((selected["Status"].astype(str) == "WATCH").sum())
     if watch_count:
-        st.warning(f"This parlay includes {watch_count} WATCH leg(s). They are in our Top 5 but fall below the straight-bet model/data-quality action threshold.")
+        st.warning(f"This parlay includes {watch_count} WATCH leg(s). They are still in our Top 5, but they fall below the straight-bet model/data-quality action threshold.")
     if st.button(f"🎟️ Add {len(selected)}-leg model parlay to Bet Tracker", type="primary", use_container_width=True, key="save_top_plays_parlay"):
-        raw_odds = quoted_odds_text.strip().replace(" ", "")
-        quoted_odds = None
-        odds_error = None
-        if raw_odds:
-            try:
-                quoted_odds = int(round(float(raw_odds)))
-                if quoted_odds == 0:
-                    raise ValueError("American odds cannot be zero")
-            except (TypeError, ValueError):
-                odds_error = "Enter valid American odds such as +450 or -110, or leave the field blank."
-        if odds_error:
-            st.error(odds_error)
-        else:
-            legs = []
-            for _, leg in selected.iterrows():
-                game_pk = numeric(leg.get("Game PK")); pitcher_id = numeric(leg.get("Pitcher ID"))
-                legs.append({
-                    "player": str(leg["Pitcher"]), "market": str(leg["Market"]),
-                    "game_date": str(leg.get("Game Date", today))[:10],
-                    "line": float(leg["Line"]), "side": str(leg["Side"]), "american_odds": None,
-                    "game_pk": None if game_pk is None else int(game_pk),
-                    "pitcher_id": None if pitcher_id is None else int(pitcher_id),
-                    "projection": numeric(leg.get("Projection")),
-                    "model_probability": float(leg.get("Model Probability")),
-                    "data_quality": int(leg.get("Data Quality", 0)),
-                    "app_version": str(leg.get("App Version", "")),
-                    "probability_semantics": str(leg.get("Probability Semantics", "")),
-                    "snapshot_captured_at_utc": str(leg.get("Captured At UTC", "")),
-                    "status": str(leg.get("Status", "")),
-                })
-            try:
-                record = make_parlay_record(
-                    legs=legs,
-                    stake=float(parlay_stake),
-                    book=book_note.strip(),
-                    american_odds=quoted_odds,
-                    game_date=today,
-                    source="Top Plays Model Parlay",
-                )
-                append_bet(BET_LOG, record, st.secrets)
-                suffix = "" if quoted_odds is not None else " (hit-rate tracking only; no ticket odds saved)"
-                st.success(f"Saved {len(legs)}-leg model parlay to Bet Tracker{suffix}")
-            except Exception as exc:
-                st.error(f"Could not save parlay: {exc}")
+        legs = []
+        for _, leg in selected.iterrows():
+            game_pk = numeric(leg.get("Game PK")); pitcher_id = numeric(leg.get("Pitcher ID"))
+            legs.append({
+                "player": str(leg["Pitcher"]), "market": str(leg["Market"]),
+                "game_date": str(leg.get("Game Date", today))[:10],
+                "line": float(leg["Line"]), "side": str(leg["Side"]), "american_odds": None,
+                "game_pk": None if game_pk is None else int(game_pk),
+                "pitcher_id": None if pitcher_id is None else int(pitcher_id),
+                "projection": numeric(leg.get("Projection")),
+                "model_probability": float(leg.get("Model Probability")),
+                "data_quality": int(leg.get("Data Quality", 0)),
+                "app_version": str(leg.get("App Version", "")),
+                "probability_semantics": str(leg.get("Probability Semantics", "")),
+                "snapshot_captured_at_utc": str(leg.get("Captured At UTC", "")),
+                "status": str(leg.get("Status", "")),
+            })
+        try:
+            record = make_parlay_record(
+                legs=legs,
+                stake=float(parlay_stake),
+                game_date=today,
+                source="Top Plays Model Parlay",
+            )
+            append_bet(BET_LOG, record, st.secrets)
+            st.success(f"Saved {len(legs)}-leg model parlay to Bet Tracker. This tracks hit/loss results only; no sportsbook price was assumed.")
+        except Exception as exc:
+            st.error(f"Could not save parlay: {exc}")
 else:
     st.info("Select at least two of our Top 5 model legs to build a parlay.")
 
