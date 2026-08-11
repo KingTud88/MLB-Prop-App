@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import io
+import json
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
+from uuid import uuid4
 
 import pandas as pd
 import requests
@@ -32,6 +35,38 @@ def github_storage_configured(secrets: Any = None) -> bool:
     return bool(token)
 
 
+def _clean_identity_value(value: object) -> str:
+    try:
+        if pd.isna(value):
+            return ""
+    except Exception:
+        pass
+    return str(value or "").strip()
+
+
+def bet_row_key(row: Mapping[str, object] | pd.Series) -> str:
+    """Stable key for one saved ticket, including legacy rows without bet_id."""
+    data = row.to_dict() if isinstance(row, pd.Series) else dict(row)
+    bet_id = _clean_identity_value(data.get("bet_id"))
+    if bet_id:
+        return f"id:{bet_id}"
+    fields = (
+        "entered_at_utc",
+        "player",
+        "bet_type",
+        "market",
+        "game_date",
+        "line",
+        "side",
+        "parlay_legs",
+        "source",
+        "book",
+    )
+    payload = {field: _clean_identity_value(data.get(field)) for field in fields}
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return "legacy:" + hashlib.sha256(encoded).hexdigest()[:24]
+
+
 def load_bet_log(local_path: str | Path, secrets: Any = None) -> pd.DataFrame:
     token, repo, path = _config(secrets)
     if token:
@@ -51,6 +86,8 @@ def load_bet_log(local_path: str | Path, secrets: Any = None) -> pd.DataFrame:
 
 def append_bet(local_path: str | Path, record: dict[str, Any], secrets: Any = None) -> None:
     token, repo, path = _config(secrets)
+    record = dict(record)
+    record.setdefault("bet_id", uuid4().hex)
     if token:
         url = f"https://api.github.com/repos/{repo}/contents/{path}"
         headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
@@ -79,3 +116,43 @@ def append_bet(local_path: str | Path, record: dict[str, Any], secrets: Any = No
     local.parent.mkdir(parents=True, exist_ok=True)
     exists = local.exists()
     pd.DataFrame([record]).to_csv(local, mode="a", header=not exists, index=False)
+
+
+def delete_bet(local_path: str | Path, key: str, secrets: Any = None) -> bool:
+    """Delete exactly one persisted ticket matching bet_row_key()."""
+    token, repo, path = _config(secrets)
+    if token:
+        url = f"https://api.github.com/repos/{repo}/contents/{path}"
+        headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
+        response = requests.get(url, headers=headers, timeout=15)
+        if response.status_code == 404:
+            return False
+        response.raise_for_status()
+        payload = response.json()
+        raw = base64.b64decode(payload["content"]).decode("utf-8")
+        tracker = pd.read_csv(io.StringIO(raw))
+        matches = [idx for idx, row in tracker.iterrows() if bet_row_key(row) == key]
+        if not matches:
+            return False
+        tracker = tracker.drop(index=matches[0]).reset_index(drop=True)
+        encoded = base64.b64encode(tracker.to_csv(index=False).encode("utf-8")).decode("ascii")
+        body = {
+            "message": "Delete tracked bet",
+            "content": encoded,
+            "branch": "main",
+            "sha": payload["sha"],
+        }
+        write = requests.put(url, headers=headers, json=body, timeout=15)
+        write.raise_for_status()
+        return True
+
+    local = Path(local_path)
+    if not local.exists():
+        return False
+    tracker = pd.read_csv(local)
+    matches = [idx for idx, row in tracker.iterrows() if bet_row_key(row) == key]
+    if not matches:
+        return False
+    tracker = tracker.drop(index=matches[0]).reset_index(drop=True)
+    tracker.to_csv(local, index=False)
+    return True
