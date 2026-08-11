@@ -19,15 +19,15 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r requirements.txt pytest
-      - run: python scripts/remove_sportsbook_gate_from_parlay.py
+      - run: python scripts/strict_model_parlay.py
       - run: python -m compileall -q pages/6_Top_Plays.py engine tests
       - run: pytest -q
       - name: Commit patch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pages/6_Top_Plays.py engine/bet_tracker.py tests/test_bet_add_buttons_contract.py tests/test_bet_tracker.py
+          git add pages/6_Top_Plays.py tests/test_bet_add_buttons_contract.py
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "Make parlay builder sportsbook independent"
+          git commit -m "Remove sportsbook inputs from parlay builder"
           git pull --rebase origin main
           git push origin HEAD:main
