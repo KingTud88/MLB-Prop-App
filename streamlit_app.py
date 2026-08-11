@@ -230,6 +230,8 @@ def build_market_table(proj,odds_rows):
 with st.sidebar:
     st.markdown("## StrikeOut King 9000"); st.caption("CLE-themed MLB starter projection engine")
     nav=st.radio("Navigation",["Projection","Distribution","Form & Workload","Model Card","Bet Tracker","Projection History","Daily Projection Run"],label_visibility="collapsed")
+    if nav == "Daily Projection Run":
+        st.switch_page("pages/5_Daily_Projection_Run.py")
     st.divider(); selected_date=st.date_input("Slate date",value=datetime.now(EASTERN).date()); st.markdown("### PITCHER SEARCH")
     locked_key=st.session_state.get("locked_pitcher"); search=st.text_input("Search pitcher...",placeholder="Search pitcher...",label_visibility="collapsed",disabled=bool(locked_key)); st.caption("Search and select a pitcher to lock the projection 🔒")
 
