@@ -1,6 +1,7 @@
 from pathlib import Path
 
 # One-shot patch: enforce starter-only history across daily and live projection paths.
+# Retry after starter-history regression contracts were updated.
 # Daily runner
 path = Path("automation/daily_projection_runner.py")
 s = path.read_text(encoding="utf-8")
