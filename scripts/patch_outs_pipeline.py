@@ -1,3 +1,4 @@
+# One-shot trigger for the total-outs daily pipeline.
 from pathlib import Path
 import re
 
