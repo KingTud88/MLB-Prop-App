@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "streamlit_app.py"
 NAV = ROOT / "navigation.py"
 ENGINE = ROOT / "engine" / "projection_engine.py"
+CURRENT_SEMANTICS = "milestone_ge_v2"
 
 
 def test_streamlit_source_compiles():
@@ -23,8 +24,8 @@ def test_projection_contains_two_path_engine_contract():
     assert "range(3,11)" in source
     assert "simulate_game" in engine
     assert "mathematical_projection" in engine
-    assert '"paths_independent": True' in engine
-    assert '"market_used_for_forecast": False' in engine
+    assert '"paths_independent":True' in engine.replace(" ", "")
+    assert '"market_used_for_forecast":False' in engine.replace(" ", "")
 
 
 def test_projection_owns_odds_workflow():
@@ -46,6 +47,7 @@ def test_calibration_stays_50_50_until_minimum_sample():
         "sim_5p": [0.70] * 10,
         "math_5p": [0.55] * 10,
         "actual_strikeouts": [5, 4, 6, 3, 5, 4, 7, 2, 6, 5],
+        "probability_semantics": [CURRENT_SEMANTICS] * 10,
     })
     result = calibrate_blend(frame, 5, min_observations=30)
     assert result.observations == 10
@@ -57,7 +59,7 @@ def test_calibration_stays_50_50_until_minimum_sample():
 def test_milestone_report_covers_3_plus_through_10_plus():
     rows = []
     for actual in range(2, 12):
-        row = {"actual_strikeouts": actual}
+        row = {"actual_strikeouts": actual, "probability_semantics": CURRENT_SEMANTICS}
         for line in range(3, 11):
             row[f"sim_{line}p"] = 0.60
             row[f"math_{line}p"] = 0.50
