@@ -164,4 +164,36 @@ except Exception:
 
 from .projection_engine import ProjectionEngine, ProjectionResult
 
+# Keep the two paths auditable at the public result boundary. The projection
+# engine stores the raw independent probabilities in metadata; expose those
+# exact arrays through the dedicated result fields instead of accidentally
+# returning the blended ensemble probabilities for both paths.
+_original_project = ProjectionEngine.project
+
+def _project_with_independent_probability_fields(*args, **kwargs):
+    result = _original_project(*args, **kwargs)
+    raw_sim = result.metadata.get("raw_simulation_probabilities")
+    raw_math = result.metadata.get("raw_mathematical_probabilities")
+    if isinstance(raw_sim, dict) and isinstance(raw_math, dict):
+        result = ProjectionResult(
+            simulation_mean=result.simulation_mean,
+            simulation_sd=result.simulation_sd,
+            mathematical_mean=result.mathematical_mean,
+            mathematical_sd=result.mathematical_sd,
+            ensemble_mean=result.ensemble_mean,
+            ensemble_sd=result.ensemble_sd,
+            over_probabilities=result.over_probabilities,
+            simulation_probabilities={float(k): float(v) for k, v in raw_sim.items()},
+            mathematical_probabilities={float(k): float(v) for k, v in raw_math.items()},
+            simulation_samples=result.simulation_samples,
+            mathematical_pmf=result.mathematical_pmf,
+            confidence=result.confidence,
+            data_quality=result.data_quality,
+            drivers=result.drivers,
+            metadata=result.metadata,
+        )
+    return result
+
+ProjectionEngine.project = _project_with_independent_probability_fields
+
 __all__ = ["ProjectionEngine", "ProjectionResult"]
