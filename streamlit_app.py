@@ -254,6 +254,8 @@ def build_market_table(proj,odds_rows,hits_proj=None):
 with st.sidebar:
     st.markdown("## StrikeOut King 9000"); st.caption("CLE-themed MLB starter projection engine")
     nav=st.radio("Navigation",["Projection","Distribution","Form & Workload","Model Card","Bet Tracker","Projection History","Daily Projection Run","Top Plays"],label_visibility="collapsed")
+    if nav == "Bet Tracker":
+        st.switch_page("pages/2_Bet_Tracker.py")
     if nav == "Daily Projection Run":
         st.switch_page("pages/5_Daily_Projection_Run.py")
     if nav == "Projection History":
