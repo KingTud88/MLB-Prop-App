@@ -11,6 +11,7 @@ import pandas as pd
 import requests
 
 from engine.projection_engine import ProjectionEngine
+from engine.opposing_batters import get_opposing_batters, matchup_summary
 
 BASE = "https://statsapi.mlb.com/api/v1"
 APP_VERSION = "3.2.0"
@@ -78,7 +79,26 @@ def game_log(pitcher_id: int, season: int) -> pd.DataFrame:
     return frame.sort_values("date")
 
 
-def features(log: pd.DataFrame, venue: str) -> dict[str, float]:
+def pitcher_hand(pitcher_id: int) -> str:
+    try:
+        data = get_json(f"people/{int(pitcher_id)}", {})
+        people = data.get("people") or []
+        return str(((people[0].get("pitchingHand") or {}).get("code")) or "").upper() if people else ""
+    except (requests.RequestException, ValueError, TypeError, IndexError):
+        return ""
+
+
+def matchup_k_rate(opponent: str, pitcher_id: int, season: int, opponent_team_id: int | None = None) -> tuple[float, int, int]:
+    """Return the PA-weighted active-roster K rate for the actual pitcher-hand matchup."""
+    hand = pitcher_hand(pitcher_id)
+    if hand not in {"R", "L"}:
+        return .224, 0, 0
+    batters = get_opposing_batters(opponent, hand, season, opponent_team_id)
+    summary = matchup_summary(batters)
+    return float(summary["k_rate"]), int(summary["pa"]), int(len(batters))
+
+
+def features(log: pd.DataFrame, venue: str, opponent_k_pct: float = .224) -> dict[str, float]:
     starts = log.tail(35).copy()
     total_bf = float(starts.bf.sum())
     raw_k = float(starts.k.sum() / max(total_bf, 1))
@@ -88,7 +108,7 @@ def features(log: pd.DataFrame, venue: str) -> dict[str, float]:
     workload = float(np.clip(92 / max(pitches, 75), .78, 1.12))
     return {
         "pitcher_k_pct": pitcher_k,
-        "opponent_k_pct": .224,
+        "opponent_k_pct": float(np.clip(opponent_k_pct, .08, .45)),
         "handedness_factor": 1.0,
         "arsenal_factor": 1.0,
         "park_factor": PARK_K_FACTOR.get(venue, 1.0),
@@ -127,6 +147,7 @@ def schedule(day: str) -> list[dict]:
                     "player": pitcher.get("fullName", "Unknown"),
                     "team": TEAM_ABBR.get(tn.get("id"), tn.get("abbreviation", "UNK")),
                     "opponent": TEAM_ABBR.get(on.get("id"), on.get("abbreviation", "UNK")),
+                    "opponent_team_id": int(on.get("id")) if on.get("id") else None,
                     "venue": game.get("venue", {}).get("name", "Unknown"),
                     "game_time": game.get("gameDate", ""),
                     "status": game.get("status", {}).get("detailedState", "Scheduled"),
@@ -140,7 +161,11 @@ def project(row: dict) -> dict | None:
         log = game_log(row["pitcher_id"], datetime.fromisoformat(row["game_date"]).year - 1)
     if log.empty:
         return None
-    f = features(log, row["venue"])
+    season = datetime.fromisoformat(row["game_date"]).year
+    opponent_k_pct, matchup_pa, matchup_batters = matchup_k_rate(
+        row["opponent"], row["pitcher_id"], season, row.get("opponent_team_id")
+    )
+    f = features(log, row["venue"], opponent_k_pct=opponent_k_pct)
     seed = int(hashlib.sha256(f"{row['game_pk']}:{row['pitcher_id']}|{row['game_time']}|{APP_VERSION}".encode()).hexdigest()[:8], 16)
     result = ProjectionEngine(seed=seed).project(f, draws=25000, lines=tuple(float(x) for x in range(3, 11)))
     now = datetime.now(timezone.utc).isoformat()
@@ -155,7 +180,8 @@ def project(row: dict) -> dict | None:
         "k_range_high": int(np.quantile(result.simulation_samples, .90)),
         "confidence": "High" if result.confidence >= .75 else "Medium" if result.confidence >= .60 else "Low",
         "data_quality": int(round(result.data_quality)), "simulation_draws": 25000,
-        "opponent_k_pct": float(f.get("opponent_k_pct", .224)) * 100.0, "pitch_limit": 92, "umpire_k_factor": 1.0,
+        "opponent_k_pct": opponent_k_pct * 100.0, "matchup_pa": matchup_pa, "matchup_batters": matchup_batters,
+        "pitch_limit": 92, "umpire_k_factor": 1.0,
         "weather_factor": 1.0, "rest_factor": 1.0, "actual_strikeouts": np.nan, "resolved_at_utc": "",
     }
     for line in range(3, 11):
@@ -198,6 +224,7 @@ def fill_missing_pregame_paths(frame: pd.DataFrame) -> int:
                 "player": row.get("player", "Unknown"),
                 "team": row.get("team", "UNK"),
                 "opponent": row.get("opponent", "UNK"),
+                "opponent_team_id": int(row["opponent_team_id"]) if pd.notna(row.get("opponent_team_id")) else None,
                 "venue": row.get("venue", "Unknown"),
                 "game_time": row.get("game_time", ""),
                 "status": row.get("status", "Scheduled"),
