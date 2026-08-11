@@ -14,7 +14,8 @@ from engine.projection_engine import ProjectionEngine
 from engine.opposing_batters import get_opposing_batters, matchup_summary
 
 BASE = "https://statsapi.mlb.com/api/v1"
-APP_VERSION = "3.2.0"
+APP_VERSION = "3.3.0"
+PROBABILITY_SEMANTICS = "milestone-ceil-v1"
 EASTERN = ZoneInfo("America/New_York")
 ROOT = Path(__file__).resolve().parents[1]
 LOG_PATH = ROOT / "data" / "projection_log.csv"
@@ -175,6 +176,7 @@ def project(row: dict) -> dict | None:
         "game_pk": row["game_pk"], "game_date": row["game_date"], "pitcher_id": row["pitcher_id"],
         "player": row["player"], "team": row["team"], "opponent": row["opponent"], "venue": row["venue"],
         "game_time": row["game_time"], "captured_at_utc": now, "app_version": APP_VERSION,
+        "probability_semantics": PROBABILITY_SEMANTICS,
         "projection": result.ensemble_mean, "k_sd": result.ensemble_sd,
         "k_range_low": int(np.quantile(result.simulation_samples, .10)),
         "k_range_high": int(np.quantile(result.simulation_samples, .90)),
@@ -194,6 +196,10 @@ def row_has_complete_paths(row: pd.Series) -> bool:
     return all(pd.notna(row.get(f"sim_{line}p")) and pd.notna(row.get(f"math_{line}p")) for line in range(3, 11))
 
 
+def row_has_current_semantics(row: pd.Series) -> bool:
+    return str(row.get("probability_semantics", "")) == PROBABILITY_SEMANTICS
+
+
 def row_is_pregame(row: pd.Series, now: datetime) -> bool:
     try:
         game_time = pd.to_datetime(row.get("game_time"), utc=True, errors="coerce")
@@ -203,10 +209,10 @@ def row_is_pregame(row: pd.Series, now: datetime) -> bool:
 
 
 def fill_missing_pregame_paths(frame: pd.DataFrame) -> int:
-    """Complete two-path probabilities only for games that have not started.
+    """Refresh incomplete or legacy-semantics probabilities only before first pitch.
 
-    We deliberately do not reconstruct missing probabilities for finished games:
-    using today's/postgame data would contaminate the historical calibration set.
+    Finished historical rows are never reconstructed because current/postgame data
+    would contaminate the immutable pregame calibration set.
     """
     if frame.empty:
         return 0
@@ -214,7 +220,7 @@ def fill_missing_pregame_paths(frame: pd.DataFrame) -> int:
     updated = 0
     for idx in frame.index:
         row = frame.loc[idx]
-        if row_has_complete_paths(row) or not row_is_pregame(row, now):
+        if (row_has_complete_paths(row) and row_has_current_semantics(row)) or not row_is_pregame(row, now):
             continue
         try:
             projected = project({
@@ -237,6 +243,7 @@ def fill_missing_pregame_paths(frame: pd.DataFrame) -> int:
         for line in range(3, 11):
             frame.at[idx, f"sim_{line}p"] = projected[f"sim_{line}p"]
             frame.at[idx, f"math_{line}p"] = projected[f"math_{line}p"]
+        frame.at[idx, "probability_semantics"] = PROBABILITY_SEMANTICS
         updated += 1
     return updated
 
@@ -269,7 +276,6 @@ def main() -> None:
     else:
         frame = pd.DataFrame()
 
-    # Resolve completed games first so calibration sees only genuinely finished outcomes.
     if not frame.empty:
         for idx in frame.index:
             actual, resolved = resolve_row(frame.loc[idx])
@@ -277,7 +283,6 @@ def main() -> None:
                 frame.at[idx, "actual_strikeouts"] = actual
                 frame.at[idx, "resolved_at_utc"] = resolved
 
-    # Capture the current Eastern slate. Deduplication is by game + pitcher so reruns are safe.
     today = datetime.now(EASTERN).date()
     rows = schedule(today.isoformat())
     existing = set()
@@ -299,12 +304,10 @@ def main() -> None:
     if new_rows:
         frame = pd.concat([frame, pd.DataFrame(new_rows)], ignore_index=True)
 
-    # Some rows were captured before the two-path columns were introduced. Refresh
-    # only still-future games; never reconstruct a finished pregame snapshot with
-    # postgame information because that would leak future data into calibration.
+    if "probability_semantics" not in frame.columns:
+        frame["probability_semantics"] = ""
     refreshed = fill_missing_pregame_paths(frame)
 
-    # Normalize the schema so old logs remain compatible with the calibration module.
     for line in range(3, 11):
         for prefix in ("sim", "math"):
             col = f"{prefix}_{line}p"
