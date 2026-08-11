@@ -1,12 +1,26 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
+from typing import Mapping
 
 
 MARKET_STRIKEOUTS = "Strikeouts"
 MARKET_OUTS = "Total Outs"
 MARKET_HITS = "Hits Allowed"
 MARKETS = (MARKET_STRIKEOUTS, MARKET_OUTS, MARKET_HITS)
+
+PROJECTION_COLUMNS = {
+    MARKET_STRIKEOUTS: "projection",
+    MARKET_OUTS: "outs_projection",
+    MARKET_HITS: "hits_projection",
+}
+
+DEFAULT_LINES = {
+    MARKET_STRIKEOUTS: 5.5,
+    MARKET_OUTS: 15.5,
+    MARKET_HITS: 5.5,
+}
 
 
 @dataclass(frozen=True)
@@ -27,6 +41,22 @@ def normalize_market(value: object) -> str:
     if "out" in text:
         return MARKET_OUTS
     return MARKET_STRIKEOUTS
+
+
+def projection_for_market(snapshot: Mapping[str, object] | None, market: object) -> float | None:
+    """Return the frozen point projection that matches a Bet Tracker market."""
+    if not snapshot:
+        return None
+    column = PROJECTION_COLUMNS[normalize_market(market)]
+    try:
+        value = float(snapshot.get(column))
+    except (TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) else None
+
+
+def default_line_for_market(market: object) -> float:
+    return DEFAULT_LINES[normalize_market(market)]
 
 
 def grade_bet(side: object, line: float, actual: float | None, final: bool) -> BetGrade:
