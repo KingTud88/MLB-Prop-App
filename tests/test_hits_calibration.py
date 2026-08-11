@@ -1,6 +1,7 @@
 import pandas as pd
 
 from engine.hits_calibration import calibrate_hits_blend, hits_calibration_report
+from engine.starter_history import HISTORY_SEMANTICS
 
 
 def make_rows(n: int) -> pd.DataFrame:
@@ -11,6 +12,7 @@ def make_rows(n: int) -> pd.DataFrame:
             "hits_sim_over_5_5": 0.80 if hit else 0.20,
             "hits_math_over_5_5": 0.60 if hit else 0.40,
             "actual_hits_allowed": 6 if hit else 4,
+            "history_semantics": HISTORY_SEMANTICS,
         })
     return pd.DataFrame(rows)
 
@@ -37,3 +39,11 @@ def test_hits_report_excludes_legacy_rows_without_hit_paths():
     report = hits_calibration_report(frame, lines=(5.5,), min_observations=30)
     assert int(report.loc[0, "Observations"]) == 30
     assert report.loc[0, "Status"] == "Calibrated"
+
+
+def test_hits_calibration_excludes_mixed_appearance_history():
+    legacy = make_rows(40)
+    legacy["history_semantics"] = "legacy-mixed-appearances"
+    cal = calibrate_hits_blend(legacy, 5.5, min_observations=30)
+    assert cal.observations == 0
+    assert not cal.calibrated
