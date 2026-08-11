@@ -13,6 +13,7 @@ import streamlit as st
 from engine.calibration import calibrate_blend, calibration_summary, milestone_calibration_report
 from engine.projection_engine import ProjectionEngine, ProjectionResult
 from engine.hits_allowed import project_hits_allowed
+from engine.hits_calibration import calibrate_hits_blend
 
 APP_VERSION = "3.4.0"
 EASTERN = ZoneInfo("America/New_York")
@@ -317,6 +318,48 @@ render_reco(c4,out_reco)
 h1,h2=st.columns(2)
 with h1: st.markdown(f'<div class="metric-card"><div class="metric-label">PROJECTED HITS ALLOWED</div><div class="metric-value">{hits_proj.ensemble_mean:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(hits_proj.simulation_samples,.1))}-{int(np.quantile(hits_proj.simulation_samples,.9))}</span></div>',unsafe_allow_html=True)
 render_reco(h2,hit_reco)
+with st.expander(f"🔎 Why this projection? · {game.pitcher_name}", expanded=False):
+    st.caption("Live single-pitcher rationale using the same model paths shown in the projection cards. Sportsbook prices are comparison inputs only; they do not create the forecast.")
+    x1,x2,x3,x4=st.columns(4)
+    x1.metric("Projected Ks",f"{proj.mean_k:.2f}")
+    x2.metric("Projected outs",f"{proj.mean_outs:.2f}")
+    x3.metric("Projected hits allowed",f"{hits_proj.ensemble_mean:.2f}")
+    x4.metric("Data quality",f"{proj.quality}/100")
+    why_left,why_right=st.columns(2)
+    with why_left:
+        st.markdown("#### Strikeouts · 5+")
+        k_cal=calibrate_blend(load_projection_history(),5)
+        k_sim=float(proj.engine.simulation_probabilities.get(5.0,np.mean(proj.k_samples>=5)))
+        k_math=float(proj.engine.mathematical_probabilities.get(5.0,0.0))
+        k_blend=k_cal.weight_simulation*k_sim+k_cal.weight_math*k_math
+        k_paths=pd.DataFrame([{"Path":"Simulation","Probability":k_sim,"Weight":k_cal.weight_simulation},{"Path":"Mathematical","Probability":k_math,"Weight":k_cal.weight_math}])
+        for c in ("Probability","Weight"): k_paths[c]=k_paths[c].map(lambda v:f"{v:.1%}")
+        st.dataframe(k_paths,use_container_width=True,hide_index=True)
+        st.write(f"**Blended 5+ probability:** {k_blend:.1%}")
+        st.caption(f"Calibration: {'learned' if k_cal.calibrated else '50/50 baseline'} · {k_cal.observations} compatible resolved observations.")
+        st.write(f"Opponent K input: **{features_for_hits['opponent_k_pct']:.1%}**")
+        st.write(f"Expected batters faced: **{features_for_hits['expected_bf']:.1f}**")
+        st.write(f"Park K factor: **{features_for_hits['park_factor']:.3f}**")
+    with why_right:
+        st.markdown("#### Hits Allowed · Over 5.5")
+        h_cal=calibrate_hits_blend(load_projection_history(),5.5)
+        h_sim=float(hits_proj.simulation_probabilities.get(5.5,0.0))
+        h_math=float(hits_proj.mathematical_probabilities.get(5.5,0.0))
+        h_blend=h_cal.weight_simulation*h_sim+h_cal.weight_math*h_math
+        h_paths=pd.DataFrame([{"Path":"Simulation","Probability":h_sim,"Weight":h_cal.weight_simulation},{"Path":"Mathematical","Probability":h_math,"Weight":h_cal.weight_math}])
+        for c in ("Probability","Weight"): h_paths[c]=h_paths[c].map(lambda v:f"{v:.1%}")
+        st.dataframe(h_paths,use_container_width=True,hide_index=True)
+        st.write(f"**Blended O5.5 probability:** {h_blend:.1%}")
+        st.caption(f"Calibration: {'learned' if h_cal.calibrated else '50/50 baseline'} · {h_cal.observations} resolved hit observations.")
+        st.write(f"Pitcher hit rate: **{hits_proj.pitcher_hit_rate:.1%}**")
+        st.write(f"Opponent hit-rate input: **{hits_proj.opponent_hit_rate:.1%}**")
+        st.write(f"Matchup hit rate: **{hits_proj.matchup_hit_rate:.1%}**")
+    st.markdown("#### Total Outs transparency")
+    st.caption(f"Projected outs {proj.mean_outs:.2f} with SD {proj.outs_sd:.2f}. Outs is currently workload/distribution based; it does not yet use an independently calibrated SIM/MATH blend like strikeouts and hits allowed.")
+    drivers=pd.DataFrame(proj.factors,columns=["Driver","Impact"]) if proj.factors else pd.DataFrame()
+    if not drivers.empty:
+        st.markdown("#### Leading model drivers")
+        st.dataframe(drivers,use_container_width=True,hide_index=True)
 left,right=st.columns([1.35,1])
 with left:
     st.markdown('<div class="section-head">STRIKEOUT MILESTONE LADDER</div>',unsafe_allow_html=True); view=kdf[["Line","Probability","Fair Odds","Simulation","Math","Sim Weight"]].copy(); view["Probability"]=view["Probability"].map(lambda x:f"{x:.1%}"); view["Simulation"]=view["Simulation"].map(lambda x:f"{x:.1%}"); view["Math"]=view["Math"].map(lambda x:f"{x:.1%}"); view["Sim Weight"]=view["Sim Weight"].map(lambda x:f"{x:.1%}"); st.dataframe(view,use_container_width=True,hide_index=True); st.caption("3+ through 10+ are calculated from independent plate-appearance simulation + mathematical paths, then calibrated from resolved history when enough observations exist.")
