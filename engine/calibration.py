@@ -4,7 +4,9 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-CALIBRATION_VERSION = "1.2"
+from engine.starter_history import HISTORY_SEMANTICS
+
+CALIBRATION_VERSION = "1.3"
 PROBABILITY_SEMANTICS = "milestone-ceil-v1"
 __all__ = ["CalibrationResult", "calibrate_blend", "milestone_calibration_report", "calibration_summary"]
 
@@ -24,10 +26,14 @@ def _brier(y: np.ndarray, p: np.ndarray) -> float:
 
 
 def _eligible_probability_rows(frame: pd.DataFrame) -> pd.DataFrame:
-    """Use only rows captured under the current milestone probability definition."""
-    if frame.empty or "probability_semantics" not in frame.columns:
+    """Use only rows captured under current probability and starter-history semantics."""
+    required = {"probability_semantics", "history_semantics"}
+    if frame.empty or not required.issubset(frame.columns):
         return frame.iloc[0:0].copy()
-    mask = frame["probability_semantics"].astype(str).eq(PROBABILITY_SEMANTICS)
+    mask = (
+        frame["probability_semantics"].astype(str).eq(PROBABILITY_SEMANTICS)
+        & frame["history_semantics"].astype(str).eq(HISTORY_SEMANTICS)
+    )
     return frame.loc[mask].copy()
 
 
@@ -63,7 +69,7 @@ def calibrate_blend(
     shrink = min(1.0, (len(y) - min_observations) / max(min_observations * 3.0, 1.0))
     final_w = 0.50 + shrink * (raw_w - 0.50)
     final_score = _brier(y, final_w * sim + (1.0 - final_w) * math)
-    return CalibrationResult(final_w, 1.0 - final_w, len(y), final_score, True, "Weight learned from compatible resolved historical projections.")
+    return CalibrationResult(final_w, 1.0 - final_w, len(y), final_score, True, "Weight learned from compatible starter-only resolved historical projections.")
 
 
 def milestone_calibration_report(
@@ -126,7 +132,8 @@ def milestone_calibration_report(
 
 
 def calibration_summary(frame: pd.DataFrame) -> pd.DataFrame:
-    """Return compact resolved-sample diagnostics for the Model Card."""
+    """Return compact resolved-sample diagnostics for the current starter-only model."""
+    frame = _eligible_probability_rows(frame)
     if frame.empty or "actual_strikeouts" not in frame.columns:
         return pd.DataFrame(columns=["Metric", "Value"])
     data = frame.copy()
@@ -136,7 +143,7 @@ def calibration_summary(frame: pd.DataFrame) -> pd.DataFrame:
     if not mask.any():
         return pd.DataFrame([
             {"Metric": "Resolved projections", "Value": 0},
-            {"Metric": "Status", "Value": "Waiting for completed games to resolve"},
+            {"Metric": "Status", "Value": "Waiting for completed starter-only games to resolve"},
         ])
     err = projected[mask] - actual[mask]
     return pd.DataFrame([
