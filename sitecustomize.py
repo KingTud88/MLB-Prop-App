@@ -6,6 +6,8 @@ it never changes model probabilities or sportsbook inputs.
 """
 from __future__ import annotations
 
+import re
+
 try:
     import streamlit as st
 except Exception:
@@ -33,16 +35,39 @@ if st is not None:
     .section-frame{border:2px solid var(--sok-red)!important;border-radius:17px!important;background:linear-gradient(160deg,rgba(8,28,51,.97),rgba(4,15,29,.97))!important;box-shadow:0 18px 32px rgba(0,0,0,.24)!important}.section-ribbon{background:linear-gradient(180deg,#ed193a,#c60c2a)!important;border-color:#ff4d67!important;box-shadow:0 8px 16px rgba(227,24,55,.2)!important}
     .proj-card{min-height:225px!important;border:2px solid #405970!important;border-radius:16px!important;background:radial-gradient(circle at 15% 12%,rgba(255,255,255,.08),transparent 25%),linear-gradient(145deg,#102d4b,#07182d)!important;box-shadow:0 15px 28px rgba(0,0,0,.24)!important}.proj-card:hover{transform:translateY(-3px)!important;box-shadow:0 20px 34px rgba(0,0,0,.32)!important}.proj-value{font-family:Impact,"Arial Narrow",sans-serif!important;font-size:3.7rem!important}.proj-pill{background:#083a2a!important;border-color:#0d8150!important;color:#4bf092!important}
     .table-panel{border:2px solid #35536f!important;border-radius:16px!important;background:linear-gradient(145deg,#0a203b,#06162a)!important}.table-title{background:linear-gradient(180deg,#ed193a,#c60c2a)!important}.sok-table th{background:#0b1d34!important}.sok-table th,.sok-table td{border-bottom-color:#223d58!important}.footer-sok{border-top:2px solid #294866!important;background:linear-gradient(180deg,rgba(4,16,31,.35),rgba(4,16,31,.85))!important}.footer-sok:before,.footer-sok:after{color:var(--sok-red)!important}
+    .sok-confidence{display:inline-block;margin-top:7px;padding:3px 8px;border-radius:999px;font-size:.72rem;font-weight:900;letter-spacing:.04em}.sok-confidence.high{color:#4bf092;background:#073d2c;border:1px solid #0d8150}.sok-confidence.medium{color:#ffd166;background:#3b3011;border:1px solid #8a6b18}.sok-confidence.low{color:#ffb0ba;background:#3b1018;border:1px solid #8c2637}
     @media(max-width:1000px){.sok-hero{grid-template-columns:135px 1fr!important}.sok-title{font-size:3.8rem!important}.sok-status{display:none!important}}
     </style>
     """
     _original_markdown=st.markdown
     _theme_injected=False
+    def _confidence_markup(body):
+        """Add an explicit confidence tier to the two bet-lean cards.
+
+        The tier is derived from the displayed model probability only; it does
+        not alter the underlying recommendation, probability, edge, or model.
+        """
+        if not isinstance(body,str) or 'class="reco-card"' not in body:
+            return body
+        m=re.search(r'Model\s+([0-9]+(?:\.[0-9]+)?)%',body)
+        if not m or 'sok-confidence' in body:
+            return body
+        model=float(m.group(1))/100.0
+        confidence=max(model,1.0-model)
+        if confidence>=.70:
+            tier="HIGH CONFIDENCE"; cls="high"
+        elif confidence>=.55:
+            tier="MEDIUM CONFIDENCE"; cls="medium"
+        else:
+            tier="LOW CONFIDENCE LEAN"; cls="low"
+        marker=f'<div class="sok-confidence {cls}">{tier}</div>'
+        return body.replace('</div></div>',marker+'</div></div>',1)
+
     def _sok_markdown(body=None,*args,**kwargs):
         global _theme_injected
         if not _theme_injected and isinstance(body,str):
             _original_markdown(_CSS,unsafe_allow_html=True);_theme_injected=True
-        return _original_markdown(body,*args,**kwargs)
+        return _original_markdown(_confidence_markup(body),*args,**kwargs)
     st.markdown=_sok_markdown
 
     # Market Odds / Edge presentation guard.
@@ -70,10 +95,6 @@ if st is not None:
                     ascending=[False,True,False],
                     kind="mergesort"
                 )
-
-                # The market panel is compact, so reserve equal visual space
-                # for K and OUTS rather than allowing one market to consume the
-                # whole table. Keep the strongest opportunities in each group.
                 if "Market" in frame.columns:
                     groups=[]
                     for market in ("K","OUTS"):
@@ -82,7 +103,6 @@ if st is not None:
                             groups.append(part.head(5))
                     if groups:
                         frame=pd.concat(groups,ignore_index=True)
-
                 frame=frame.drop(columns=["_playable","_type_rank","_edge_rank"])
                 data=frame.reset_index(drop=True)
         return _original_dataframe(data,*args,**kwargs)
