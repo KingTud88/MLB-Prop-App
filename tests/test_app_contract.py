@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 from engine.calibration import PROBABILITY_SEMANTICS, calibrate_blend, milestone_calibration_report
+from engine.starter_history import HISTORY_SEMANTICS
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -47,6 +48,7 @@ def test_calibration_stays_50_50_until_minimum_sample():
         "math_5p": [0.55] * 10,
         "actual_strikeouts": [5, 4, 6, 3, 5, 4, 7, 2, 6, 5],
         "probability_semantics": [PROBABILITY_SEMANTICS] * 10,
+        "history_semantics": [HISTORY_SEMANTICS] * 10,
     })
     result = calibrate_blend(frame, 5, min_observations=30)
     assert result.observations == 10
@@ -55,10 +57,29 @@ def test_calibration_stays_50_50_until_minimum_sample():
     assert result.weight_math == 0.50
 
 
+def test_strikeout_calibration_excludes_mixed_appearance_history():
+    frame = pd.DataFrame({
+        "sim_5p": [0.70] * 40,
+        "math_5p": [0.55] * 40,
+        "actual_strikeouts": [5] * 40,
+        "probability_semantics": [PROBABILITY_SEMANTICS] * 40,
+        "history_semantics": ["legacy-mixed-appearances"] * 40,
+    })
+    result = calibrate_blend(frame, 5, min_observations=30)
+    assert result.observations == 0
+    assert result.calibrated is False
+    assert result.weight_simulation == 0.50
+    assert result.weight_math == 0.50
+
+
 def test_milestone_report_covers_3_plus_through_10_plus():
     rows = []
     for actual in range(2, 12):
-        row = {"actual_strikeouts": actual, "probability_semantics": PROBABILITY_SEMANTICS}
+        row = {
+            "actual_strikeouts": actual,
+            "probability_semantics": PROBABILITY_SEMANTICS,
+            "history_semantics": HISTORY_SEMANTICS,
+        }
         for line in range(3, 11):
             row[f"sim_{line}p"] = 0.60
             row[f"math_{line}p"] = 0.50
