@@ -1,0 +1,35 @@
+name: Apply Daily and model-first Top Plays fix
+
+on:
+  push:
+    paths:
+      - scripts/fix_daily_and_model_first_top_plays.py
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply fix
+        run: python scripts/fix_daily_and_model_first_top_plays.py
+      - name: Compile changed Python
+        run: python -m compileall -q pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py engine automation tests
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py automation/daily_projection_runner.py engine/bet_tracker.py training/bet_storage.py tests/test_bet_add_buttons_contract.py tests/test_daily_projection_page_contract.py
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git commit -m "Fix Daily results and make Top Plays model-first"
+          git pull --rebase origin main
+          git push origin HEAD:main
