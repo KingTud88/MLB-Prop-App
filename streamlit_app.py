@@ -14,6 +14,8 @@ from engine.calibration import calibrate_blend, calibration_summary, milestone_c
 from engine.projection_engine import ProjectionEngine, ProjectionResult
 from engine.hits_allowed import project_hits_allowed
 from engine.hits_calibration import calibrate_hits_blend
+from engine.outs_projection import project_total_outs, OutsProjection
+from engine.outs_calibration import calibrate_outs_blend
 
 APP_VERSION = "3.4.0"
 EASTERN = ZoneInfo("America/New_York")
@@ -48,7 +50,7 @@ class GamePitcher:
 
 @dataclass
 class Projection:
-    mean_k:float; mean_outs:float; k_sd:float; outs_sd:float; k_probs:np.ndarray; outs_probs:np.ndarray; k_samples:np.ndarray; outs_samples:np.ndarray; confidence:str; quality:int; factors:list[tuple[str,float]]; engine:ProjectionResult
+    mean_k:float; mean_outs:float; k_sd:float; outs_sd:float; k_probs:np.ndarray; outs_probs:np.ndarray; k_samples:np.ndarray; outs_samples:np.ndarray; confidence:str; quality:int; factors:list[tuple[str,float]]; engine:ProjectionResult; outs_engine:OutsProjection
 
 class MLBClient:
     def __init__(self):
@@ -107,7 +109,7 @@ def build_engine_features(log,game):
     return {"pitcher_k_pct":pitcher_k,"opponent_k_pct":.224,"handedness_factor":1.0,"arsenal_factor":1.0,"park_factor":PARK_K_FACTOR.get(game.venue,1.0),"umpire_factor":1.0,"weather_factor":1.0,"expected_bf":float(np.clip(bf*workload,10,35)),"bf_sd":float(np.clip(starts.bf.std(ddof=1) if len(starts)>2 else 3.5,1,7)),"rest_factor":1.0,"historical_k_sd":float(np.clip(starts.k.std(ddof=1) if len(starts)>2 else 2.0,.75,4.5)),"historical_games":int(len(starts)),"lineup_batters":0,"arsenal_sample_size":0,"weather_available":0,"umpire_available":0}
 
 def calculate_projection(log,game,simulations):
-    history=load_projection_history(); cal=calibrated_weights(history); seed=int(hashlib.sha256(f"{game.key}|{game.game_time}|{APP_VERSION}".encode()).hexdigest()[:8],16); features=build_engine_features(log,game); engine=ProjectionEngine(simulation_weight=.5,seed=seed); result=engine.project(features,draws=simulations,lines=tuple(float(x) for x in range(3,11))); global_w=float(np.mean([r.weight_simulation for r in cal.values()])) if cal else .5; mean_k=global_w*result.simulation_mean+(1-global_w)*result.mathematical_mean; mean_outs=weighted(log.tail(35).outs,5,16); osd=float(np.clip(log.tail(35).outs.std(ddof=1) if len(log)>2 else 4,2.5,6.5)); outs_seed=int(hashlib.sha256(f"outs|{game.key}|{APP_VERSION}".encode()).hexdigest()[:8],16); outs_rng=np.random.default_rng(outs_seed); outs_samples=np.clip(np.rint(outs_rng.normal(mean_outs,osd,simulations)),0,27).astype(int); outs_probs=np.array([float(np.mean(outs_samples==i)) for i in range(28)]); quality=int(round(result.data_quality)); confidence="High" if result.confidence>=.75 else "Medium" if result.confidence>=.60 else "Low"; return Projection(mean_k,mean_outs,result.ensemble_sd,osd,result.mathematical_pmf,outs_probs,result.simulation_samples,outs_samples,confidence,quality,[(n,v) for n,v,_ in result.drivers],result)
+    history=load_projection_history(); cal=calibrated_weights(history); seed=int(hashlib.sha256(f"{game.key}|{game.game_time}|{APP_VERSION}".encode()).hexdigest()[:8],16); features=build_engine_features(log,game); engine=ProjectionEngine(simulation_weight=.5,seed=seed); result=engine.project(features,draws=simulations,lines=tuple(float(x) for x in range(3,11))); global_w=float(np.mean([r.weight_simulation for r in cal.values()])) if cal else .5; mean_k=global_w*result.simulation_mean+(1-global_w)*result.mathematical_mean; outs_seed=int(hashlib.sha256(f"outs|{game.key}|{APP_VERSION}".encode()).hexdigest()[:8],16); outs_model=project_total_outs(log,seed=outs_seed,draws=simulations,lines=(13.5,14.5,15.5,16.5,17.5,18.5)); mean_outs=outs_model.ensemble_mean; osd=outs_model.ensemble_sd; outs_samples=outs_model.simulation_samples; outs_probs=np.array([float(np.mean(outs_samples==i)) for i in range(28)]); quality=int(round(result.data_quality)); confidence="High" if result.confidence>=.75 else "Medium" if result.confidence>=.60 else "Low"; return Projection(mean_k,mean_outs,result.ensemble_sd,osd,result.mathematical_pmf,outs_probs,result.simulation_samples,outs_samples,confidence,quality,[(n,v) for n,v,_ in result.drivers],result,outs_model)
 
 def american(p):
     p=float(np.clip(p,.001,.999)); o=-100*p/(1-p) if p>=.5 else 100*(1-p)/p; return f"{o:+.0f}"
@@ -134,7 +136,8 @@ def market_recommendation(proj,odds_rows,market_key,default_line,kind):
     cutoff=int(math.floor(line)+1)
     if kind=="k":
         sim=float(proj.engine.simulation_probabilities.get(float(line),np.mean(proj.k_samples>=cutoff))); math_p=float(proj.engine.mathematical_probabilities.get(float(line),0.0)); model=.5*sim+.5*math_p
-    else: model=float(np.mean(proj.outs_samples>=cutoff))
+    else:
+        sim=float(proj.outs_engine.simulation_probabilities.get(float(line),np.mean(proj.outs_samples>=cutoff))); math_p=float(proj.outs_engine.mathematical_probabilities.get(float(line),0.0)); cal=calibrate_outs_blend(load_projection_history(),float(line)); model=cal.weight_simulation*sim+cal.weight_math*math_p
     over_edge=None; under_edge=None
     if over_price is not None: over_edge=model-(implied_prob(over_price) or 0)
     if under_price is not None: under_edge=(1-model)-(implied_prob(under_price) or 0)
@@ -354,8 +357,15 @@ with st.expander(f"🔎 Why this projection? · {game.pitcher_name}", expanded=F
         st.write(f"Pitcher hit rate: **{hits_proj.pitcher_hit_rate:.1%}**")
         st.write(f"Opponent hit-rate input: **{hits_proj.opponent_hit_rate:.1%}**")
         st.write(f"Matchup hit rate: **{hits_proj.matchup_hit_rate:.1%}**")
-    st.markdown("#### Total Outs transparency")
-    st.caption(f"Projected outs {proj.mean_outs:.2f} with SD {proj.outs_sd:.2f}. Outs is currently workload/distribution based; it does not yet use an independently calibrated SIM/MATH blend like strikeouts and hits allowed.")
+    st.markdown("#### Total Outs · Over 15.5")
+    o_cal=calibrate_outs_blend(load_projection_history(),15.5)
+    o_sim=float(proj.outs_engine.simulation_probabilities.get(15.5,0.0)); o_math=float(proj.outs_engine.mathematical_probabilities.get(15.5,0.0))
+    o_blend=o_cal.weight_simulation*o_sim+o_cal.weight_math*o_math
+    o_paths=pd.DataFrame([{"Path":"Simulation","Probability":o_sim,"Weight":o_cal.weight_simulation},{"Path":"Mathematical","Probability":o_math,"Weight":o_cal.weight_math}])
+    for c in ("Probability","Weight"): o_paths[c]=o_paths[c].map(lambda v:f"{v:.1%}")
+    st.dataframe(o_paths,use_container_width=True,hide_index=True)
+    st.write(f"**Blended O15.5 probability:** {o_blend:.1%}")
+    st.caption(f"Projected outs {proj.mean_outs:.2f} · SD {proj.outs_sd:.2f} · calibration {'learned' if o_cal.calibrated else '50/50 baseline'} · {o_cal.observations} resolved outs observations.")
     drivers=pd.DataFrame(proj.factors,columns=["Driver","Impact"]) if proj.factors else pd.DataFrame()
     if not drivers.empty:
         st.markdown("#### Leading model drivers")

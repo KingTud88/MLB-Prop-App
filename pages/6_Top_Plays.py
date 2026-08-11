@@ -13,6 +13,7 @@ import streamlit as st
 from automation.daily_projection_runner import LOG_PATH, game_log
 from engine.calibration import calibrate_blend
 from engine.hits_calibration import calibrate_hits_blend, hits_calibration_report
+from engine.outs_calibration import calibrate_outs_blend, outs_calibration_report
 from navigation import render_sidebar
 
 st.set_page_config(page_title="Top Plays", page_icon="👑", layout="wide")
@@ -124,32 +125,29 @@ def hits_over_probability(row: pd.Series, line: float, history: pd.DataFrame) ->
     return float(cal.weight_simulation * sim + cal.weight_math * math_p)
 
 
-def outs_projection_details(row: pd.Series, line: float) -> dict[str, float] | None:
-    try:
-        log = game_log(int(row["pitcher_id"]), int(str(row["game_date"])[:4]))
-        if log.empty:
-            return None
-        starts = log.tail(35)
-        mean = weighted(starts["outs"], 5.0, 16.0)
-        sd = float(np.clip(starts["outs"].std(ddof=1) if len(starts) > 2 else 4.0, 2.5, 6.5))
-        seed = (int(row["game_pk"]) * 1000003 + int(row["pitcher_id"])) & 0xFFFFFFFF
-        rng = np.random.default_rng(seed)
-        samples = np.clip(np.rint(rng.normal(mean, sd, 25000)), 0, 27).astype(int)
-        cutoff = int(math.floor(float(line)) + 1)
-        last5 = pd.to_numeric(starts.tail(5)["outs"], errors="coerce").dropna()
-        return {
-            "probability": float(np.mean(samples >= cutoff)),
-            "mean": mean,
-            "sd": sd,
-            "last5": float(last5.mean()) if len(last5) else mean,
-            "starts": float(len(starts)),
-        }
-    except Exception:
+def outs_projection_details(row: pd.Series, line: float, history: pd.DataFrame) -> dict[str, float] | None:
+    key = str(float(line)).replace(".", "_")
+    sim = numeric(row.get(f"outs_sim_over_{key}"))
+    math_p = numeric(row.get(f"outs_math_over_{key}"))
+    if sim is None or math_p is None:
         return None
+    cal = calibrate_outs_blend(history, float(line))
+    return {
+        "probability": float(cal.weight_simulation * sim + cal.weight_math * math_p),
+        "sim": sim,
+        "math": math_p,
+        "sim_weight": cal.weight_simulation,
+        "observations": float(cal.observations),
+        "calibrated": float(cal.calibrated),
+        "mean": numeric(row.get("outs_projection")) or 0.0,
+        "sd": numeric(row.get("outs_sd")) or 0.0,
+        "low": numeric(row.get("outs_range_low")) or 0.0,
+        "high": numeric(row.get("outs_range_high")) or 0.0,
+    }
 
 
-def outs_over_probability(row: pd.Series, line: float) -> float | None:
-    details = outs_projection_details(row, line)
+def outs_over_probability(row: pd.Series, line: float, history: pd.DataFrame) -> float | None:
+    details = outs_projection_details(row, line, history)
     return None if details is None else details["probability"]
 
 
@@ -159,7 +157,7 @@ def model_over_probability(row: pd.Series, market: str, line: float, history: pd
     if market.startswith("pitcher_hits_allowed"):
         return hits_over_probability(row, line, history)
     if market.startswith("pitcher_outs"):
-        return outs_over_probability(row, line)
+        return outs_over_probability(row, line, history)
     return None
 
 
@@ -287,14 +285,15 @@ def render_projection_rationale(play: pd.Series, snapshot: pd.Series, history: p
         st.info("Projection basis: recent pitcher hits allowed per batter faced · workload uncertainty · independent simulation and Negative-Binomial math paths · " + ("learned calibration" if cal.calibrated else "protected 50/50 calibration baseline"))
 
     else:
-        details = outs_projection_details(snapshot, line)
+        details = outs_projection_details(snapshot, line, history)
         if details is not None:
             p1, p2, p3, p4 = st.columns(4)
-            p1.metric("Projected outs", f"{details['mean']:.2f}")
-            p2.metric("Workload SD", f"{details['sd']:.2f}")
-            p3.metric("Last 5 avg outs", f"{details['last5']:.2f}")
-            p4.metric("Starts used", int(details["starts"]))
-        st.info("Projection basis: recency-weighted pitcher workload and recent outs distribution. Total Outs does **not** yet have the same independent SIM/MATH calibration layer as Strikeouts and Hits Allowed, so the app labels it separately instead of overstating model depth.")
+            p1.metric("SIM over", f"{details['sim']:.1%}")
+            p2.metric("MATH over", f"{details['math']:.1%}")
+            p3.metric("SIM weight", f"{details['sim_weight']:.0%}")
+            p4.metric("Calibration sample", int(details["observations"]))
+            st.write(f"Frozen pregame outs forecast: **{details['mean']:.2f} outs**, 80% simulation range **{int(details['low'])}–{int(details['high'])}**.")
+            st.info("Projection basis: recency-weighted empirical workload simulation · independent bounded Beta-Binomial mathematical path · " + ("learned calibration" if details["calibrated"] else "protected 50/50 calibration baseline"))
 
     confidence = str(snapshot.get("confidence", ""))
     captured = str(snapshot.get("captured_at_utc", ""))
@@ -323,6 +322,12 @@ with st.expander("Hits Allowed calibration status", expanded=False):
     st.dataframe(report, hide_index=True, use_container_width=True)
     ready = int((report["Status"] == "Calibrated").sum()) if not report.empty else 0
     st.caption(f"{ready}/{len(report)} tracked hit lines currently have learned SIM/MATH weights. Until a line reaches 30 resolved frozen observations, Top Plays uses the protected 50/50 baseline for that line.")
+
+with st.expander("Total Outs calibration status", expanded=False):
+    outs_report = outs_calibration_report(history)
+    st.dataframe(outs_report, hide_index=True, use_container_width=True)
+    outs_ready = int((outs_report["Status"] == "Calibrated").sum()) if not outs_report.empty else 0
+    st.caption(f"{outs_ready}/{len(outs_report)} tracked outs lines currently have learned SIM/MATH weights. Until a line reaches 30 resolved frozen observations, Top Plays uses the protected 50/50 baseline.")
 
 events = odds_events(api_key)
 all_legs: list[dict] = []
