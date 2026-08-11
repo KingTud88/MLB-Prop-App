@@ -27,7 +27,7 @@ st.markdown("""<style>
 :root{--bg:#06111d;--panel:#0b1c2e;--line:#1b3851;--red:#f0193c;--green:#24e69b;--ink:#f2f6fa;--muted:#8fa5b7}
 .stApp{background:linear-gradient(145deg,#04101b,#091a2a);color:var(--ink)}
 [data-testid="stSidebar"]{background:#071727;border-right:1px solid #18334b}
-.block-container{padding-top:1.25rem;max-width:1500px}
+.block-container{padding-top:3.25rem;max-width:1500px}
 h1,h2,h3{letter-spacing:-.02em}
 .king-title{font-size:4rem;font-weight:900;line-height:.9;text-align:center}.king-red{color:var(--red)}
 .subline{text-align:center;color:#fff;border-bottom:2px solid var(--red);padding-bottom:10px;font-weight:800;letter-spacing:.12em}
