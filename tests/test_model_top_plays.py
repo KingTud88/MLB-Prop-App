@@ -8,6 +8,7 @@ from engine.model_top_plays import (
     build_model_candidate,
     target_line,
 )
+from engine.starter_history import HISTORY_SEMANTICS
 
 
 def snapshot():
@@ -23,6 +24,8 @@ def snapshot():
         "outs_projection": 17.80,
         "data_quality": 90,
         "probability_semantics": "milestone-ceil-v1",
+        "history_semantics": HISTORY_SEMANTICS,
+        "starter_history_games": 12,
     }
     for cutoff in range(3, 11):
         row[f"sim_{cutoff}p"] = 0.40 if cutoff == 6 else 0.50
@@ -59,6 +62,7 @@ def test_candidates_are_projection_aligned_and_price_independent():
     assert round(hits["Model Probability"], 3) == 0.650
     assert outs["Side"] == "OVER"
     assert round(outs["Model Probability"], 3) == 0.620
+    assert k["Starter History"] == 12
     assert "Odds" not in k
     assert "Edge" not in k
 
@@ -68,3 +72,19 @@ def test_board_ranks_by_model_probability_then_quality():
     board = build_model_board(pd.DataFrame([row]), pd.DataFrame(), limit=5)
     assert list(board["Market"])[:3] == [MARKET_HITS, MARKET_OUTS, MARKET_STRIKEOUTS]
     assert list(board["Model Probability"]) == sorted(board["Model Probability"], reverse=True)
+
+
+def test_stale_or_too_small_starter_history_is_rejected():
+    row = snapshot()
+    row["history_semantics"] = "legacy-mixed-appearances"
+    assert build_model_candidate(row, MARKET_OUTS, pd.DataFrame()) is None
+
+    row = snapshot()
+    row["starter_history_games"] = 2
+    assert build_model_candidate(row, MARKET_OUTS, pd.DataFrame()) is None
+
+
+def test_extreme_out_of_domain_projection_is_not_promoted():
+    row = snapshot()
+    row["outs_projection"] = 4.89
+    assert build_model_candidate(row, MARKET_OUTS, pd.DataFrame()) is None
