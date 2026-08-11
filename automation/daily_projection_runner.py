@@ -12,6 +12,7 @@ import requests
 
 from engine.projection_engine import ProjectionEngine
 from engine.opposing_batters import get_opposing_batters, matchup_summary
+from engine.hits_allowed import project_hits_allowed
 
 BASE = "https://statsapi.mlb.com/api/v1"
 APP_VERSION = "3.3.0"
@@ -71,6 +72,7 @@ def game_log(pitcher_id: int, season: int) -> pd.DataFrame:
                 "date": pd.to_datetime(split.get("date"), errors="coerce"),
                 "bf": float(s.get("battersFaced", 0) or 0),
                 "k": float(s.get("strikeOuts", 0) or 0),
+                "hits": float(s.get("hits", 0) or 0),
                 "pitches": float(s.get("numberOfPitches", 0) or 0),
                 "outs": parse_ip(s.get("inningsPitched", "0.0")) * 3,
             })
@@ -90,7 +92,6 @@ def pitcher_hand(pitcher_id: int) -> str:
 
 
 def matchup_k_rate(opponent: str, pitcher_id: int, season: int, opponent_team_id: int | None = None) -> tuple[float, int, int]:
-    """Return the PA-weighted active-roster K rate for the actual pitcher-hand matchup."""
     hand = pitcher_hand(pitcher_id)
     if hand not in {"R", "L"}:
         return .224, 0, 0
@@ -169,6 +170,13 @@ def project(row: dict) -> dict | None:
     f = features(log, row["venue"], opponent_k_pct=opponent_k_pct)
     seed = int(hashlib.sha256(f"{row['game_pk']}:{row['pitcher_id']}|{row['game_time']}|{APP_VERSION}".encode()).hexdigest()[:8], 16)
     result = ProjectionEngine(seed=seed).project(f, draws=25000, lines=tuple(float(x) for x in range(3, 11)))
+    hits = project_hits_allowed(
+        log,
+        expected_bf=f["expected_bf"],
+        seed=seed ^ 0x5A17,
+        draws=25000,
+        lines=(3.5, 4.5, 5.5, 6.5, 7.5, 8.5),
+    )
     now = datetime.now(timezone.utc).isoformat()
     raw_sim = result.metadata.get("raw_simulation_probabilities", result.simulation_probabilities)
     raw_math = result.metadata.get("raw_mathematical_probabilities", result.mathematical_probabilities)
@@ -180,15 +188,24 @@ def project(row: dict) -> dict | None:
         "projection": result.ensemble_mean, "k_sd": result.ensemble_sd,
         "k_range_low": int(np.quantile(result.simulation_samples, .10)),
         "k_range_high": int(np.quantile(result.simulation_samples, .90)),
+        "hits_projection": hits.ensemble_mean, "hits_sd": hits.ensemble_sd,
+        "hits_range_low": int(np.quantile(hits.simulation_samples, .10)),
+        "hits_range_high": int(np.quantile(hits.simulation_samples, .90)),
         "confidence": "High" if result.confidence >= .75 else "Medium" if result.confidence >= .60 else "Low",
         "data_quality": int(round(result.data_quality)), "simulation_draws": 25000,
         "opponent_k_pct": opponent_k_pct * 100.0, "matchup_pa": matchup_pa, "matchup_batters": matchup_batters,
         "pitch_limit": 92, "umpire_k_factor": 1.0,
-        "weather_factor": 1.0, "rest_factor": 1.0, "actual_strikeouts": np.nan, "resolved_at_utc": "",
+        "weather_factor": 1.0, "rest_factor": 1.0,
+        "actual_strikeouts": np.nan, "actual_hits_allowed": np.nan, "resolved_at_utc": "",
     }
     for line in range(3, 11):
         out[f"sim_{line}p"] = raw_sim.get(float(line), np.nan)
         out[f"math_{line}p"] = raw_math.get(float(line), np.nan)
+    for line in (3.5, 4.5, 5.5, 6.5, 7.5, 8.5):
+        key = str(line).replace(".", "_")
+        out[f"hits_sim_over_{key}"] = hits.simulation_probabilities.get(line, np.nan)
+        out[f"hits_math_over_{key}"] = hits.mathematical_probabilities.get(line, np.nan)
+        out[f"hits_over_{key}"] = hits.over_probabilities.get(line, np.nan)
     return out
 
 
@@ -209,18 +226,14 @@ def row_is_pregame(row: pd.Series, now: datetime) -> bool:
 
 
 def fill_missing_pregame_paths(frame: pd.DataFrame) -> int:
-    """Refresh incomplete or legacy-semantics probabilities only before first pitch.
-
-    Finished historical rows are never reconstructed because current/postgame data
-    would contaminate the immutable pregame calibration set.
-    """
     if frame.empty:
         return 0
     now = datetime.now(timezone.utc)
     updated = 0
     for idx in frame.index:
         row = frame.loc[idx]
-        if (row_has_complete_paths(row) and row_has_current_semantics(row)) or not row_is_pregame(row, now):
+        needs_hits = pd.isna(row.get("hits_projection"))
+        if ((row_has_complete_paths(row) and row_has_current_semantics(row) and not needs_hits) or not row_is_pregame(row, now)):
             continue
         try:
             projected = project({
@@ -240,47 +253,48 @@ def fill_missing_pregame_paths(frame: pd.DataFrame) -> int:
             continue
         if not projected:
             continue
-        for line in range(3, 11):
-            frame.at[idx, f"sim_{line}p"] = projected[f"sim_{line}p"]
-            frame.at[idx, f"math_{line}p"] = projected[f"math_{line}p"]
-        frame.at[idx, "probability_semantics"] = PROBABILITY_SEMANTICS
+        for key, value in projected.items():
+            if key.startswith("sim_") or key.startswith("math_") or key.startswith("hits_") or key in {"probability_semantics"}:
+                frame.at[idx, key] = value
         updated += 1
     return updated
 
 
-def resolve_row(row: pd.Series) -> tuple[object, str]:
-    if pd.notna(row.get("actual_strikeouts")):
-        return row.get("actual_strikeouts"), str(row.get("resolved_at_utc") or "")
+def resolve_row(row: pd.Series) -> tuple[object, object, str]:
+    if pd.notna(row.get("actual_strikeouts")) and pd.notna(row.get("actual_hits_allowed")):
+        return row.get("actual_strikeouts"), row.get("actual_hits_allowed"), str(row.get("resolved_at_utc") or "")
     if pd.isna(row.get("game_pk")) or pd.isna(row.get("pitcher_id")):
-        return np.nan, ""
+        return np.nan, np.nan, ""
     try:
         data = get_json(f"game/{int(row['game_pk'])}/boxscore", {})
         status = data.get("gameData", {}).get("status", {})
         if status.get("abstractGameState") != "Final":
-            return np.nan, ""
+            return np.nan, np.nan, ""
         player = data.get("teams", {}).get("away", {}).get("players", {}).get(f"ID{int(row['pitcher_id'])}")
         if not player:
             player = data.get("teams", {}).get("home", {}).get("players", {}).get(f"ID{int(row['pitcher_id'])}")
-        ks = (player or {}).get("stats", {}).get("pitching", {}).get("strikeOuts")
-        if ks is None:
-            return np.nan, ""
-        return int(ks), datetime.now(timezone.utc).isoformat()
+        pitching = (player or {}).get("stats", {}).get("pitching", {})
+        ks = pitching.get("strikeOuts")
+        hits = pitching.get("hits")
+        if ks is None and hits is None:
+            return np.nan, np.nan, ""
+        return (int(ks) if ks is not None else np.nan), (int(hits) if hits is not None else np.nan), datetime.now(timezone.utc).isoformat()
     except (requests.RequestException, ValueError, TypeError):
-        return np.nan, ""
+        return np.nan, np.nan, ""
 
 
 def main() -> None:
     LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    if LOG_PATH.exists():
-        frame = pd.read_csv(LOG_PATH)
-    else:
-        frame = pd.DataFrame()
+    frame = pd.read_csv(LOG_PATH) if LOG_PATH.exists() else pd.DataFrame()
 
     if not frame.empty:
         for idx in frame.index:
-            actual, resolved = resolve_row(frame.loc[idx])
-            if pd.notna(actual):
-                frame.at[idx, "actual_strikeouts"] = actual
+            actual_k, actual_hits, resolved = resolve_row(frame.loc[idx])
+            if pd.notna(actual_k):
+                frame.at[idx, "actual_strikeouts"] = actual_k
+            if pd.notna(actual_hits):
+                frame.at[idx, "actual_hits_allowed"] = actual_hits
+            if resolved:
                 frame.at[idx, "resolved_at_utc"] = resolved
 
     today = datetime.now(EASTERN).date()
@@ -313,9 +327,9 @@ def main() -> None:
             col = f"{prefix}_{line}p"
             if col not in frame.columns:
                 frame[col] = np.nan
-    for col in ["actual_strikeouts", "resolved_at_utc"]:
+    for col in ["actual_strikeouts", "actual_hits_allowed", "resolved_at_utc"]:
         if col not in frame.columns:
-            frame[col] = np.nan if col == "actual_strikeouts" else ""
+            frame[col] = np.nan if col != "resolved_at_utc" else ""
     frame.to_csv(LOG_PATH, index=False)
     print(f"projection log rows={len(frame)} new={len(new_rows)} pregame_path_refreshes={refreshed}")
 
