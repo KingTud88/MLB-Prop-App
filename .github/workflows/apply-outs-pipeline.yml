@@ -1,0 +1,38 @@
+name: Apply total outs pipeline patch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/patch_outs_pipeline.py
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply outs pipeline patch
+        run: python scripts/patch_outs_pipeline.py
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add automation/daily_projection_runner.py
+          if git diff --cached --quiet; then
+            echo "No changes needed."
+          else
+            git commit -m "Wire total outs into daily projection pipeline"
+            for attempt in 1 2 3; do
+              git fetch origin main
+              git rebase origin/main
+              if git push origin HEAD:main; then exit 0; fi
+              sleep $((attempt * 2))
+            done
+            exit 1
+          fi
