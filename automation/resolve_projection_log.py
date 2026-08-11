@@ -10,7 +10,7 @@ BASE = "https://statsapi.mlb.com/api/v1"
 ROOT = Path(__file__).resolve().parents[1]
 LOG_PATH = ROOT / "data" / "projection_log.csv"
 SESSION = requests.Session()
-SESSION.headers.update({"Accept": "application/json", "User-Agent": "StrikeOutKing9000/3.2.0"})
+SESSION.headers.update({"Accept": "application/json", "User-Agent": "StrikeOutKing9000/3.5.0"})
 
 
 def get_json(endpoint: str, params: dict | None = None) -> dict:
@@ -33,65 +33,66 @@ def is_missing(value: object) -> bool:
     return str(value).strip() == ""
 
 
-def resolve_from_pitcher_game_log(row: pd.Series) -> int | None:
-    pitcher_id = int(float(row["pitcher_id"]))
-    game_date = str(row["game_date"])[:10]
-    season = game_date[:4]
-    data = get_json(
-        f"people/{pitcher_id}/stats",
-        {"stats": "gameLog", "group": "pitching", "season": season, "gameType": "R"},
-    )
-    for block in data.get("stats", []):
-        for split in block.get("splits", []):
-            if str(split.get("date", ""))[:10] != game_date:
-                continue
-            strikeouts = split.get("stat", {}).get("strikeOuts")
-            if strikeouts is not None:
-                return int(strikeouts)
-    return None
+def parse_outs(innings_pitched: object) -> int | None:
+    try:
+        whole, frac = str(innings_pitched).split(".")
+        frac_i = int(frac)
+        if frac_i not in (0, 1, 2):
+            return None
+        return int(whole) * 3 + frac_i
+    except (TypeError, ValueError):
+        return None
 
 
-def _pitcher_from_boxscore(data: dict, player_id: str) -> int | None:
+def _pitcher_stats_from_boxscore(data: dict, player_id: str) -> tuple[int | None, int | None, int | None]:
     for side in ("away", "home"):
         player = data.get("teams", {}).get(side, {}).get("players", {}).get(player_id)
-        strikeouts = (player or {}).get("stats", {}).get("pitching", {}).get("strikeOuts")
-        if strikeouts is not None:
-            return int(strikeouts)
-    return None
+        pitching = (player or {}).get("stats", {}).get("pitching", {})
+        if pitching:
+            strikeouts = pitching.get("strikeOuts")
+            hits = pitching.get("hits")
+            outs = parse_outs(pitching.get("inningsPitched"))
+            return (
+                int(strikeouts) if strikeouts is not None else None,
+                int(hits) if hits is not None else None,
+                outs,
+            )
+    return None, None, None
 
 
-def resolve_row(row: pd.Series) -> tuple[int | None, str | None, str | None]:
-    if not is_missing(row.get("actual_strikeouts")):
-        return int(float(row["actual_strikeouts"])), str(row.get("resolved_at_utc") or ""), None
+def resolve_row(row: pd.Series) -> tuple[int | None, int | None, int | None, str | None, str | None]:
+    have_k = not is_missing(row.get("actual_strikeouts"))
+    have_hits = not is_missing(row.get("actual_hits_allowed"))
+    have_outs = not is_missing(row.get("actual_outs"))
+    if have_k and have_hits and have_outs:
+        return (
+            int(float(row["actual_strikeouts"])),
+            int(float(row["actual_hits_allowed"])),
+            int(float(row["actual_outs"])),
+            str(row.get("resolved_at_utc") or ""),
+            None,
+        )
     if is_missing(row.get("game_pk")) or is_missing(row.get("pitcher_id")):
-        return None, None, "missing game/pitcher id"
+        return None, None, None, None, "missing game/pitcher id"
 
     game_pk = int(float(row["game_pk"]))
     player_id = f"ID{int(float(row['pitcher_id']))}"
     try:
-        strikeouts = resolve_from_pitcher_game_log(row)
-        if strikeouts is not None:
-            return strikeouts, datetime.now(timezone.utc).isoformat(), None
-
         boxscore = get_json(f"game/{game_pk}/boxscore")
         status = boxscore.get("gameData", {}).get("status", {})
-        if status.get("abstractGameState") == "Final":
-            strikeouts = _pitcher_from_boxscore(boxscore, player_id)
-            if strikeouts is not None:
-                return strikeouts, datetime.now(timezone.utc).isoformat(), None
-            return None, None, "final game but pitcher was not found in boxscore"
+        if status.get("abstractGameState") != "Final":
+            live = get_json(f"game/{game_pk}/feed/live")
+            live_status = live.get("gameData", {}).get("status", {})
+            if live_status.get("abstractGameState") != "Final":
+                return None, None, None, None, f"game not final ({live_status.get('abstractGameState', 'unknown')})"
+            boxscore = live.get("liveData", {}).get("boxscore", {})
 
-        live = get_json(f"game/{game_pk}/feed/live")
-        live_status = live.get("gameData", {}).get("status", {})
-        if live_status.get("abstractGameState") != "Final":
-            return None, None, f"game not final ({live_status.get('abstractGameState', 'unknown')})"
-        live_boxscore = live.get("liveData", {}).get("boxscore", {})
-        strikeouts = _pitcher_from_boxscore(live_boxscore, player_id)
-        if strikeouts is None:
-            return None, None, "final live feed but pitcher was not found"
-        return strikeouts, datetime.now(timezone.utc).isoformat(), None
+        strikeouts, hits, outs = _pitcher_stats_from_boxscore(boxscore, player_id)
+        if strikeouts is None and hits is None and outs is None:
+            return None, None, None, None, "final game but pitcher was not found in boxscore"
+        return strikeouts, hits, outs, datetime.now(timezone.utc).isoformat(), None
     except (requests.RequestException, ValueError, TypeError, KeyError) as exc:
-        return None, None, f"MLB API error: {type(exc).__name__}"
+        return None, None, None, None, f"MLB API error: {type(exc).__name__}"
 
 
 def main() -> None:
@@ -104,8 +105,9 @@ def main() -> None:
         print("projection log is empty; nothing to resolve")
         return
 
-    # Old CSV rows may have an all-blank resolved_at_utc column that pandas reads
-    # as float64. Normalize it before writing ISO timestamps into the column.
+    for col in ("actual_strikeouts", "actual_hits_allowed", "actual_outs"):
+        if col not in frame.columns:
+            frame[col] = pd.NA
     if "resolved_at_utc" not in frame.columns:
         frame["resolved_at_utc"] = ""
     else:
@@ -114,9 +116,18 @@ def main() -> None:
     resolved = 0
     unresolved_reasons: dict[str, int] = {}
     for idx in frame.index:
-        actual, timestamp, reason = resolve_row(frame.loc[idx])
-        if actual is not None:
-            frame.at[idx, "actual_strikeouts"] = actual
+        strikeouts, hits, outs, timestamp, reason = resolve_row(frame.loc[idx])
+        changed = False
+        if strikeouts is not None:
+            frame.at[idx, "actual_strikeouts"] = strikeouts
+            changed = True
+        if hits is not None:
+            frame.at[idx, "actual_hits_allowed"] = hits
+            changed = True
+        if outs is not None:
+            frame.at[idx, "actual_outs"] = outs
+            changed = True
+        if changed:
             frame.at[idx, "resolved_at_utc"] = timestamp or ""
             resolved += 1
         elif reason:
