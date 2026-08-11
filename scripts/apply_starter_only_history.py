@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# One-shot patch: enforce starter-only history across daily and live projection paths.
 # Daily runner
 path = Path("automation/daily_projection_runner.py")
 s = path.read_text(encoding="utf-8")
