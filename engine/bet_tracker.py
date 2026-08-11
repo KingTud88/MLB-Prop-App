@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import math
 from typing import Mapping
 
@@ -57,6 +58,66 @@ def projection_for_market(snapshot: Mapping[str, object] | None, market: object)
 
 def default_line_for_market(market: object) -> float:
     return DEFAULT_LINES[normalize_market(market)]
+
+
+def make_bet_record(
+    *,
+    player: str,
+    market: object,
+    game_date: str,
+    line: float,
+    side: str,
+    american_odds: int | float,
+    stake: float = 1.0,
+    book: str = "",
+    projection: float | None = None,
+    model_probability: float | None = None,
+    implied_probability: float | None = None,
+    edge: float | None = None,
+    confidence: object = "",
+    game_pk: int | None = None,
+    pitcher_id: int | None = None,
+    entered_at_utc: str | None = None,
+) -> dict[str, object]:
+    """Build the canonical persistent Bet Tracker record used by every app surface."""
+    side_text = str(side or "").strip().title()
+    if side_text not in {"Over", "Under"}:
+        raise ValueError("side must be Over or Under")
+    return {
+        "player": str(player).strip(),
+        "market": normalize_market(market),
+        "game_date": str(game_date)[:10],
+        "line": float(line),
+        "side": side_text,
+        "american_odds": int(round(float(american_odds))),
+        "stake": float(stake),
+        "book": str(book or "").strip(),
+        "entered_at_utc": entered_at_utc or datetime.now(timezone.utc).isoformat(),
+        "projection": "" if projection is None else float(projection),
+        "model_probability": "" if model_probability is None else float(model_probability),
+        "implied_probability": "" if implied_probability is None else float(implied_probability),
+        "edge": "" if edge is None else float(edge),
+        "confidence": "" if confidence is None else confidence,
+        "actual_strikeouts": "",
+        "game_pk": "" if game_pk is None else int(game_pk),
+        "pitcher_id": "" if pitcher_id is None else int(pitcher_id),
+    }
+
+
+def result_cell_css(value: object) -> str:
+    """Readable status colors for the tracker result column."""
+    text = str(value or "").strip().upper()
+    if text == "WIN":
+        return "color:#49efb0;font-weight:900"
+    if text == "LOSS":
+        return "color:#ff4b4b;font-weight:900"
+    if text == "PUSH":
+        return "color:#ffd166;font-weight:900"
+    if text == "LIVE AHEAD":
+        return "color:#49efb0;font-weight:800"
+    if text == "LIVE BEHIND":
+        return "color:#ff9f43;font-weight:800"
+    return "color:#8fa5b7;font-weight:800"
 
 
 def grade_bet(side: object, line: float, actual: float | None, final: bool) -> BetGrade:
