@@ -20,7 +20,7 @@ text = replace_once(
     '''st.caption(
     "Leakage-safe MLB replay over pitchers already tracked by the app. Each 2026 target start is rebuilt from only earlier starter games, with 2025 allowed as prior-season carry. "
     "workload-v1 is compared against rolling-5 and season-to-date baselines, while workload-v2-bias-candidate learns a tightly capped correction from strictly earlier workload-v1 errors. "
-    "Sportsbook data is excluded. workload-v2 is REPORT ONLY / NOT LIVE and cannot change Ks, Hits, Outs, or Top Plays."
+    "Sportsbook data is excluded, and this report does not modify live projections. workload-v2 is REPORT ONLY / NOT LIVE and cannot change Ks, Hits, Outs, or Top Plays."
 )
 ''',
     "historical workload caption",
