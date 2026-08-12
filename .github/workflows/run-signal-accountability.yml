@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - scripts/patch_signal_accountability.py
+      - scripts/fix_signal_contract.py
       - .github/workflows/run-signal-accountability.yml
   workflow_dispatch:
 
@@ -23,7 +24,9 @@ jobs:
           python-version: '3.12'
       - run: pip install -r requirements.txt pytest
       - name: Apply signal accountability patch
-        run: python scripts/patch_signal_accountability.py
+        run: |
+          python scripts/patch_signal_accountability.py
+          python scripts/fix_signal_contract.py
       - name: Compile
         run: python -m compileall -q streamlit_app.py navigation.py pages engine automation tests
       - name: Test
