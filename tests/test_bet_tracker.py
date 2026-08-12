@@ -92,6 +92,19 @@ def test_shared_quick_add_record_preserves_bet_metadata():
     assert record["pitcher_id"] == 456
 
 
+def test_model_straight_can_be_saved_without_sportsbook_odds():
+    record = make_bet_record(
+        player="Model Pitcher", market="Strikeouts", game_date="2026-08-12",
+        line=4.5, side="Over", american_odds=None, stake=1.0,
+        projection=5.2, model_probability=0.61, source="Projection Strikeout Ladder",
+    )
+    assert record["bet_type"] == "Straight"
+    assert record["american_odds"] == ""
+    assert record["line"] == 4.5
+    assert record["side"] == "Over"
+    assert profit_for(1.0, None, grade_bet("Over", 4.5, 5, True)) is None
+
+
 def test_parlay_combined_odds_and_ticket_record():
     estimated = combined_parlay_odds([-110, -110])
     assert 260 <= estimated <= 265

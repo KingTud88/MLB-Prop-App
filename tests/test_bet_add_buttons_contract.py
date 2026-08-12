@@ -36,14 +36,28 @@ def test_top_plays_is_model_first_and_odds_are_optional_overlay():
     assert "if api_key:" in source
 
 
-def test_projection_page_has_actionable_quick_add_buttons():
+def test_projection_page_has_unpriced_straight_and_parlay_actions():
     path = Path(__file__).resolve().parents[1] / "streamlit_app.py"
     source = path.read_text(encoding="utf-8")
     compile(source, str(path), "exec")
     assert "render_add_bet_button" in source
-    assert '"➕ Add {market_label}"' in source
-    assert "best_market_offer" in source
+    assert 'button("➕ Straight"' in source
+    assert 'button("🎟️ Parlay"' in source
+    assert 'disabled=(side=="PASS")' in source
+    assert "render_projection_parlay_builder" in source
+    assert "make_parlay_record" in source
+    assert "Projection Page Model Parlay" in source
     assert "append_bet(BET_LOG,record,st.secrets)" in source
+
+
+def test_projection_strikeout_ladder_is_clickable_and_actionable():
+    source = (Path(__file__).resolve().parents[1] / "streamlit_app.py").read_text(encoding="utf-8")
+    assert 'key=f"projection_k_ladder_{game.key}"' in source
+    assert 'selection_mode="single-row"' in source
+    assert '"➕ Add selected as straight"' in source
+    assert '"🎟️ Add selected to parlay"' in source
+    assert 'tracker_line=float(milestone)-0.5' in source
+    assert "Fair Odds are model-only and are never saved as a sportsbook price" in source
 
 
 def test_tracker_page_applies_result_status_styling_and_grades_parlays():
