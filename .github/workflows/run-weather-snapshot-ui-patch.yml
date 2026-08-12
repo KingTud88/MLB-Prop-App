@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - scripts/patch_weather_snapshot_ui.py
+      - .github/weather-snapshot-trigger
   workflow_dispatch:
 
 permissions:
