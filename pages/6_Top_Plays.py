@@ -17,6 +17,7 @@ from engine.hits_calibration import calibrate_hits_blend, hits_calibration_repor
 from engine.outs_calibration import calibrate_outs_blend, outs_calibration_report
 from engine.bet_lean import projection_side
 from engine.model_top_plays import build_model_board
+from engine.model_health import market_health_map, market_health_report
 from engine.bet_tracker import (
     make_bet_record,
     make_parlay_record,
@@ -374,9 +375,22 @@ with st.expander("Total Outs calibration status", expanded=False):
     outs_ready = int((outs_report["Status"] == "Calibrated").sum()) if not outs_report.empty else 0
     st.caption(f"{outs_ready}/{len(outs_report)} tracked outs lines currently have learned SIM/MATH weights. Until a line reaches 30 resolved frozen observations, Top Plays uses the protected 50/50 baseline.")
 
-plays = build_model_board(slate, history, limit=5)
+health_report = market_health_report(history)
+health_map = market_health_map(health_report)
+with st.expander("🚦 Walk-forward model health", expanded=False):
+    health_view = health_report.loc[health_report["Market"].ne("ALL TOP 5")].copy()
+    if health_view.empty:
+        st.info("Model health is still waiting for starter-only walk-forward results.")
+    else:
+        for col in ["Hit Rate", "Avg Model Probability", "Calibration Gap", "Recent Hit Rate", "Recent Avg Probability", "Recent Calibration Gap"]:
+            health_view[col] = health_view[col].map(lambda x: "—" if pd.isna(x) else f"{float(x):.1%}")
+        health_view["Brier Score"] = health_view["Brier Score"].map(lambda x: "—" if pd.isna(x) else f"{float(x):.3f}")
+        st.dataframe(health_view, hide_index=True, width="stretch")
+    st.caption("LEARNING and WATCH markets stay eligible. After 30 settled walk-forward Top 5 legs, a market that falls outside the safety guardrails becomes BLOCKED and is removed before today's Top 5 is ranked.")
+
+plays = build_model_board(slate, history, limit=5, market_health=health_map)
 if plays.empty:
-    st.warning("Today's frozen snapshots do not yet contain enough current two-path probability data to build the model Top 5. Re-run Daily Projection Run while the games are still pregame so missing paths can be backfilled safely.")
+    st.warning("No current market passed the starter-history, probability-path, and model-health eligibility guards. The app will not manufacture a Top Play when the validated board is empty.")
     st.stop()
 
 # The board exists before any paid sportsbook request. Credit Saver keeps paid
@@ -487,7 +501,7 @@ c1.metric("Highest model hit probability", f"{plays['Model Probability'].max():.
 c2.metric("Model-qualified Top 5", model_plays)
 c3.metric("Exact live prices found", f"{live_offers}/{len(plays)}")
 
-view = plays[["Rank", "Status", "Pitcher", "Weather Icon", "Weather Risk", "Market", "Side", "Line", "Projection", "Model Probability", "Data Quality", "Starter History", "Book", "Odds"]].copy()
+view = plays[["Rank", "Status", "Model Health", "Pitcher", "Weather Icon", "Weather Risk", "Market", "Side", "Line", "Projection", "Model Probability", "Data Quality", "Starter History", "Book", "Odds"]].copy()
 view["Pitcher"] = view.apply(lambda r: f"{r['Pitcher']} {str(r.get('Weather Icon', '') or '')}".strip(), axis=1)
 view = view.drop(columns=["Weather Icon"])
 view["Model Probability"] = view["Model Probability"].map(lambda x: f"{float(x):.1%}")
@@ -495,7 +509,7 @@ view["Projection"] = view["Projection"].map(lambda x: f"{float(x):.2f}")
 view["Book"] = view["Book"].map(lambda x: x if str(x).strip() else "—")
 view["Odds"] = view["Odds"].map(lambda x: "—" if pd.isna(x) else f"{int(float(x)):+d}")
 st.subheader("Today's five highest-probability model legs")
-st.caption("Ranked only by our calibrated hit probability, with data quality as the tie-breaker. Sportsbook odds and market edge do not decide the Top 5.")
+st.caption("Eligible markets are ranked only by our calibrated hit probability, with data quality as the tie-breaker. Walk-forward model health can block a proven-unhealthy market; sportsbook odds and market edge never decide the Top 5.")
 st.caption("Click a row or use View details to open its frozen projection breakdown.")
 event = st.dataframe(
     view,

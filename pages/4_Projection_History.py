@@ -11,6 +11,12 @@ from engine.calibration import milestone_calibration_report
 from engine.hits_calibration import hits_calibration_report
 from engine.outs_calibration import outs_calibration_report
 from engine.starter_history import HISTORY_SEMANTICS
+from engine.model_health import (
+    daily_top5_summary,
+    health_from_walk_forward,
+    reliability_table,
+    walk_forward_top5,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 LOG_PATH = ROOT / "data" / "projection_log.csv"
@@ -217,6 +223,54 @@ else:
     if not chart_hit.empty:
         st.caption("Rolling frozen 80% range hit rate. A healthy 80% interval should eventually land near its nominal coverage, not necessarily 100%.")
         st.line_chart(chart_hit)
+
+st.divider()
+st.subheader("🚦 Walk-forward Top 5 model health")
+st.caption(
+    "Leakage-safe replay: each historical slate is rebuilt from its frozen pregame snapshots while calibration can only use earlier game dates. "
+    "Same-day/future results and sportsbook prices are excluded. LEARNING and WATCH markets remain eligible; only BLOCKED markets are removed from Top Plays."
+)
+walk_forward = walk_forward_top5(df)
+health_report = health_from_walk_forward(walk_forward)
+settled_walk = walk_forward.loc[walk_forward.get("Hit", pd.Series(index=walk_forward.index, dtype=object)).notna()].copy() if not walk_forward.empty else pd.DataFrame()
+all_health = health_report.loc[health_report["Market"].eq("ALL TOP 5")].iloc[0] if not health_report.empty and health_report["Market"].eq("ALL TOP 5").any() else None
+blocked_count = int((health_report.loc[health_report["Market"].ne("ALL TOP 5"), "Status"] == "BLOCKED").sum()) if not health_report.empty else 0
+
+wf1, wf2, wf3, wf4 = st.columns(4)
+wf1.metric("Settled walk-forward Top 5 legs", len(settled_walk))
+wf2.metric("Historical Top 5 hit rate", "—" if all_health is None or pd.isna(all_health["Hit Rate"]) else f"{float(all_health['Hit Rate']):.1%}")
+wf3.metric("Avg predicted probability", "—" if all_health is None or pd.isna(all_health["Avg Model Probability"]) else f"{float(all_health['Avg Model Probability']):.1%}")
+wf4.metric("Markets currently blocked", blocked_count)
+
+health_view = health_report.copy()
+if not health_view.empty:
+    for col in ["Hit Rate", "Avg Model Probability", "Calibration Gap", "Recent Hit Rate", "Recent Avg Probability", "Recent Calibration Gap"]:
+        health_view[col] = health_view[col].map(lambda x: "—" if pd.isna(x) else f"{float(x):.1%}")
+    health_view["Brier Score"] = health_view["Brier Score"].map(lambda x: "—" if pd.isna(x) else f"{float(x):.3f}")
+    st.dataframe(health_view, hide_index=True, width="stretch")
+    st.caption("Health guard activates after 30 settled walk-forward Top 5 legs for that market. Until then the status is LEARNING and the market remains eligible.")
+
+with st.expander("Probability reliability — walk-forward Top 5"):
+    reliability = reliability_table(walk_forward)
+    if reliability.empty:
+        st.info("Reliability buckets will populate as starter-only Top 5 legs resolve.")
+    else:
+        reliability_view = reliability.copy()
+        for col in ["Avg Model Probability", "Observed Hit Rate", "Calibration Gap"]:
+            reliability_view[col] = reliability_view[col].map(lambda x: f"{float(x):.1%}")
+        st.dataframe(reliability_view, hide_index=True, width="stretch")
+
+with st.expander("Daily historical Top 5 replay"):
+    daily = daily_top5_summary(walk_forward)
+    if daily.empty:
+        st.info("Daily Top 5 replay will populate after current starter-only recommendations resolve.")
+    else:
+        daily_view = daily.sort_values("Date", ascending=False).head(60).copy()
+        daily_view["Hit Rate"] = daily_view["Hit Rate"].map(lambda x: f"{float(x):.1%}")
+        daily_view["Avg Model Probability"] = daily_view["Avg Model Probability"].map(lambda x: f"{float(x):.1%}")
+        daily_view["Brier Score"] = daily_view["Brier Score"].map(lambda x: f"{float(x):.3f}")
+        daily_view["5/5 Sweep"] = daily_view["5/5 Sweep"].map(lambda x: "👑 YES" if bool(x) else "—")
+        st.dataframe(daily_view, hide_index=True, width="stretch")
 
 st.divider()
 st.subheader("📋 Projection archive")
