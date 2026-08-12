@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - scripts/patch_confirmed_lineups.py
+      - .github/workflows/run-confirmed-lineup-patch.yml
   workflow_dispatch:
 
 permissions:
