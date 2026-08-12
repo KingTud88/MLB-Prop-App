@@ -51,3 +51,12 @@ def test_lineup_refresh_preserves_workload_upgrade_audit():
     assert '"workload_preupgrade_projection"' in source
     assert '"workload_projection_delta_outs"' in source
     assert '"workload_upgraded_at_utc"' in source
+
+
+def test_history_surfaces_historical_workload_backtest():
+    source = Path("pages/4_Projection_History.py").read_text(encoding="utf-8")
+    assert "Historical workload validation" in source
+    assert "workload_backtest_summary.csv" in source
+    assert "MAE Improvement vs Rolling-5" in source
+    assert "Status stays LEARNING below 30 evaluated starts" in source
+    assert "does not modify live projections" in source
