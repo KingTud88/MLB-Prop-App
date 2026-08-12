@@ -1,0 +1,39 @@
+name: Run ladder and parlay extension
+
+on:
+  push:
+    paths:
+      - scripts/extend_ladder_unlimited_parlay.py
+      - .github/workflows/run-ladder-parlay-extension.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt pytest
+      - name: Apply 12+ ladder and unlimited parlay patch
+        run: python scripts/extend_ladder_unlimited_parlay.py
+      - name: Compile
+        run: python -m compileall -q streamlit_app.py navigation.py engine automation tests
+      - name: Test
+        run: pytest -q
+      - name: Commit feature
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add streamlit_app.py automation/daily_projection_runner.py tests/test_bet_add_buttons_contract.py tests/test_bet_tracker.py tests/test_extended_strikeout_ladder.py
+          if git diff --cached --quiet; then
+            echo "No feature changes to commit"
+          else
+            git commit -m "Extend K ladder and unlock Projection parlays"
+            git push
+          fi
