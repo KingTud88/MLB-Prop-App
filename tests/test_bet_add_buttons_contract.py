@@ -29,7 +29,8 @@ def test_top_plays_is_model_first_and_odds_are_optional_overlay():
     source = path.read_text(encoding="utf-8")
     assert "build_model_board" in source
     assert 'st.subheader("Today\'s five highest-probability model legs")' in source
-    assert "Sportsbook odds and market edge do not decide the Top 5" in source
+    assert "sportsbook odds and market edge never decide the Top 5" in source
+    assert "market_health=health_map" in source
     assert 'plays["Live Offer"] = False' in source
     assert "if api_key:" in source
 
