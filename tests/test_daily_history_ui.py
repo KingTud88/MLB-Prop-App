@@ -23,14 +23,14 @@ def test_daily_page_has_persistent_history_only_tracker_and_starts_used():
     assert "history_only_for_day" in source
     assert "📚 Persistent history-only starter tracker" in source
     assert "Resolved into history" in source
-    assert '"starter_history_games": "Starts Used"' in source
+    assert '"starter_history_games": "Starts"' in source
     assert 'observation_updates = resolve_observation_log()' in source
     assert "It never becomes a fake historical projection or calibration row." in source
 
 
 def test_daily_page_surfaces_starter_history_provenance():
     source = Path("pages/5_Daily_Projection_Run.py").read_text(encoding="utf-8")
-    assert '"starter_history_source": "History Source"' in source
+    assert '"starter_history_source": "History"' in source
     assert '"starter_history_mlb_games": "MLB Starts"' in source
     assert '"starter_history_observation_games": "Observed Starts"' in source
     assert '"Observed starts used"' in source

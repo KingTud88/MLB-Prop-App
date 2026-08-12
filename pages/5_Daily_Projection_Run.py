@@ -163,6 +163,21 @@ def _num(row: pd.Series, key: str) -> float | None:
     return None if pd.isna(value) else float(value)
 
 
+def _range_text(low: object, high: object) -> str:
+    """Render a central outcome interval as one compact human-readable value."""
+    lo = pd.to_numeric(pd.Series([low]), errors="coerce").iloc[0]
+    hi = pd.to_numeric(pd.Series([high]), errors="coerce").iloc[0]
+    if pd.isna(lo) or pd.isna(hi):
+        return "—"
+
+    def _endpoint(value: float) -> str:
+        value = float(value)
+        rounded = round(value)
+        return str(int(rounded)) if abs(value - rounded) < 1e-9 else f"{value:.1f}"
+
+    return f"{_endpoint(float(lo))}–{_endpoint(float(hi))}"
+
+
 def render_projection_rationale(row: pd.Series, history: pd.DataFrame) -> None:
     pitcher = str(row.get("player", "Unknown"))
     st.markdown(f"### 🔎 Why we projected {pitcher} this way")
@@ -330,11 +345,30 @@ if isinstance(slate, pd.DataFrame):
         if "weather_icon" in display.columns:
             display["player"] = display.apply(lambda r: f"{r.get('player', 'Unknown')} {str(r.get('weather_icon', '') or '')}".strip(), axis=1)
             display = display.drop(columns=["weather_icon"])
+
+        # Low/high columns are endpoints of ONE central 80% interval. Collapse
+        # them into a single value so nobody reads either endpoint as an 80%
+        # milestone probability. Keep the new range exactly where the old pair
+        # lived so each market scans projection -> range -> SIM -> MATH.
+        for low_col, high_col, label in (
+            ("k_range_low", "k_range_high", "80% K Range"),
+            ("hits_range_low", "hits_range_high", "80% Hits Range"),
+            ("outs_range_low", "outs_range_high", "80% Outs Range"),
+        ):
+            if low_col in display.columns and high_col in display.columns:
+                insert_at = display.columns.get_loc(low_col)
+                values = [
+                    _range_text(low, high)
+                    for low, high in zip(display[low_col], display[high_col])
+                ]
+                display.insert(insert_at, label, values)
+                display = display.drop(columns=[low_col, high_col])
+
         display = display.rename(
             columns={
                 "player": "Pitcher",
-                "starter_history_games": "Starts Used",
-                "starter_history_source": "History Source",
+                "starter_history_games": "Starts",
+                "starter_history_source": "History",
                 "starter_history_mlb_games": "MLB Starts",
                 "starter_history_observation_games": "Observed Starts",
                 "workload_version": "Workload",
@@ -342,35 +376,29 @@ if isinstance(slate, pd.DataFrame):
                 "expected_bf": "Exp BF",
                 "expected_outs": "Exp Outs",
                 "pitches_per_bf": "Pitches/BF",
-                "days_since_last_start": "Days Since Start",
+                "days_since_last_start": "Rest Days",
                 "leash_label": "Leash",
                 "pitch_trend": "Pitch Trend",
                 "team_leash_label": "Team Leash",
                 "team_leash_status": "Team Leash Status",
                 "team_leash_starts": "Team Starts",
                 "team_leash_avg_pitches": "Team Avg Pitches",
-                "team_leash_tto_reach_rate": "TTO Reach Rate",
-                "team_leash_90_pitch_rate": "90+ Pitch Rate",
-                "team_leash_pitch_multiplier_candidate": "Pitch Adj Candidate",
+                "team_leash_tto_reach_rate": "TTO %",
+                "team_leash_90_pitch_rate": "90+ %",
+                "team_leash_pitch_multiplier_candidate": "Pitch Adj",
                 "team_leash_role": "Team Leash Role",
-                "weather_delay_risk": "Weather Risk",
+                "weather_delay_risk": "Weather",
                 "weather_precip_probability": "Rain %",
-                "lineup_source": "Lineup Source",
-                "lineup_batters": "Lineup Hitters",
-                "lineup_projection_delta": "K Δ from Lineup",
+                "lineup_source": "Lineup",
+                "lineup_batters": "Hitters",
+                "lineup_projection_delta": "Lineup K Δ",
                 "team": "Team",
                 "opponent": "Opp",
                 "projection": "Projection K",
-                "k_range_low": "K 80% Low",
-                "k_range_high": "K 80% High",
-                "hits_projection": "Projection Hits Allowed",
-                "hits_range_low": "Hits 80% Low",
-                "hits_range_high": "Hits 80% High",
+                "hits_projection": "Projection Hits",
                 "outs_projection": "Projection Outs",
-                "outs_range_low": "Outs 80% Low",
-                "outs_range_high": "Outs 80% High",
                 "confidence": "Confidence",
-                "data_quality": "Data Quality",
+                "data_quality": "Quality",
                 "opponent_k_pct": "Opp K%",
                 "sim_5p": "SIM 5+ K",
                 "math_5p": "MATH 5+ K",
@@ -385,10 +413,46 @@ if isinstance(slate, pd.DataFrame):
             }
         )
         projection_highlight_cols = [
-            col for col in ("Projection K", "Projection Hits Allowed", "Projection Outs")
+            col for col in ("Projection K", "Projection Hits", "Projection Outs")
             if col in display.columns
         ]
-        styled_display = display.style
+        probability_cols = [
+            col for col in (
+                "SIM 5+ K", "MATH 5+ K", "SIM O5.5 Hits", "MATH O5.5 Hits",
+                "SIM O15.5 Outs", "MATH O15.5 Outs",
+            )
+            if col in display.columns
+        ]
+        formatters: dict[str, str] = {}
+        for col in projection_highlight_cols:
+            formatters[col] = "{:.2f}"
+        for col in probability_cols:
+            formatters[col] = "{:.1%}"
+        for col in ("Exp Pitches", "Exp BF", "Exp Outs", "Team Avg Pitches"):
+            if col in display.columns:
+                formatters[col] = "{:.1f}"
+        for col in ("Pitches/BF",):
+            if col in display.columns:
+                formatters[col] = "{:.2f}"
+        for col in ("Quality", "Starts", "MLB Starts", "Observed Starts", "Rest Days", "Team Starts"):
+            if col in display.columns:
+                formatters[col] = "{:.0f}"
+        if "Opp K%" in display.columns:
+            formatters["Opp K%"] = "{:.1f}%"
+        if "Rain %" in display.columns:
+            formatters["Rain %"] = "{:.0f}%"
+        if "Lineup K Δ" in display.columns:
+            formatters["Lineup K Δ"] = "{:+.2f}"
+        for col in ("Pitch Trend", "TTO %", "90+ %"):
+            if col in display.columns:
+                formatters[col] = "{:.1%}"
+        if "Pitch Adj" in display.columns:
+            formatters["Pitch Adj"] = "{:.3f}"
+        for col in ("Actual K", "Actual Hits Allowed", "Actual Outs"):
+            if col in display.columns:
+                formatters[col] = "{:.0f}"
+
+        styled_display = display.style.format(formatters, na_rep="—")
         if projection_highlight_cols:
             styled_display = styled_display.map(
                 lambda value: "color: #22c55e; font-weight: 700;" if pd.notna(value) else "",
@@ -396,7 +460,10 @@ if isinstance(slate, pd.DataFrame):
             )
 
         st.subheader(f"{slate_date:%B %d, %Y} starter slate")
-        st.caption("Click any pitcher row to inspect why the model produced that frozen projection. Headline projection numbers are highlighted in green for faster scanning.")
+        st.caption(
+            "How to read: Projection = expected average outcome · 80% Range = one central simulated interval (10th–90th percentile), not an 80% chance at each endpoint · "
+            "SIM/MATH = the probability from each independent model path. Click a pitcher row for the full breakdown. Headline projections are green."
+        )
         event = st.dataframe(
             styled_display,
             hide_index=True,

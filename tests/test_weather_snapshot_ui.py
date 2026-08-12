@@ -13,7 +13,7 @@ def test_daily_runner_captures_weather_without_model_factor_change():
 def test_daily_and_top_plays_surface_weather_icons():
     daily=Path("pages/5_Daily_Projection_Run.py").read_text(encoding="utf-8")
     top=Path("pages/6_Top_Plays.py").read_text(encoding="utf-8")
-    assert '"Weather Risk"' in daily
+    assert '"weather_delay_risk": "Weather"' in daily
     assert 'weather_icon' in daily
     assert '"Weather Icon"' in top
     assert "Weather is informational and does not affect Top 5 ranking" in top
