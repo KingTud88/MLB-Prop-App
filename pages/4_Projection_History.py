@@ -20,6 +20,7 @@ from engine.model_health import (
 from engine.decision_learning import decision_tier_report
 from engine.signal_validation import context_performance_report, paired_signal_report
 from engine.team_leash import team_leash_walk_forward_report
+from engine.projection_crushers import crusher_report, directional_k_result
 
 ROOT = Path(__file__).resolve().parents[1]
 LOG_PATH = ROOT / "data" / "projection_log.csv"
@@ -184,7 +185,53 @@ if o_resolved.any() and df.loc[o_resolved, "outs_projection"].notna().any():
 else:
     mae3.metric("Total Outs MAE", "—")
 
-st.caption("HIT means the final result landed inside that market's frozen pregame 80% range. MISS means it finished outside the archived range.")
+st.caption("80% range HIT means the final result landed inside that market's frozen pregame interval. Range coverage is calibration evidence, not directional win/loss grading.")
+
+st.divider()
+st.subheader("🔥 K Projection Wins & Crushers")
+st.caption(
+    "Directional K grading uses one strict rule: actual strikeouts > the frozen projected K mean = ✅ WIN; otherwise = ❌ MISS. "
+    "This is separate from 80% range coverage and does not feed the baseball forecast, calibration, or Top Plays ranking."
+)
+_directional_ready = df["projection"].notna() & df["actual_strikeouts"].notna()
+_directional = df.loc[_directional_ready].copy()
+if _directional.empty:
+    st.info("Directional K wins will appear as frozen projections resolve.")
+else:
+    _directional["K Margin"] = pd.to_numeric(_directional["actual_strikeouts"], errors="coerce") - pd.to_numeric(_directional["projection"], errors="coerce")
+    _directional["Directional K Result"] = _directional.apply(lambda r: directional_k_result(r.get("projection"), r.get("actual_strikeouts")), axis=1)
+    _wins = int(_directional["Directional K Result"].eq("✅ WIN").sum())
+    _win_rate = float(_wins / len(_directional)) if len(_directional) else float("nan")
+    _crushers = crusher_report(df)
+    _crusher_count = int(_crushers["Crusher Status"].eq("🔥 CRUSHER").sum()) if not _crushers.empty else 0
+    kw1, kw2, kw3, kw4 = st.columns(4)
+    kw1.metric("Resolved K calls", len(_directional))
+    kw2.metric("Projection wins", _wins)
+    kw3.metric("Directional win rate", f"{_win_rate:.1%}")
+    kw4.metric("Consistent crushers", _crusher_count)
+
+    high_calls = _directional.loc[_directional.get("confidence", pd.Series(index=_directional.index, dtype=str)).astype(str).str.upper().eq("HIGH")].copy()
+    if not high_calls.empty:
+        st.markdown("#### High-confidence calls")
+        high_calls = high_calls.sort_values(["game_date", "captured_at_utc"], ascending=[False, False]).head(30)
+        high_view = high_calls[["player", "projection", "actual_strikeouts", "K Margin", "Directional K Result"]].copy()
+        high_view = high_view.rename(columns={"player":"Pitcher", "projection":"Projection", "actual_strikeouts":"Actual", "Directional K Result":"Result"})
+        high_styled = high_view.style.format({"Projection":"{:.2f}", "Actual":"{:.0f}", "K Margin":"{:+.2f}"}, na_rep="—")
+        high_styled = high_styled.map(lambda _: "color:#22c55e;font-weight:800;", subset=["Projection"])
+        high_styled = high_styled.map(lambda _: "color:#facc15;font-weight:800;", subset=["Actual"])
+        st.dataframe(high_styled, hide_index=True, width="stretch")
+
+    st.markdown("#### Projection Crushers")
+    if _crushers.empty:
+        st.info("Crusher tracking will populate as current starter-only K projections resolve.")
+    else:
+        crusher_view = _crushers.copy()
+        for col in ["Win Rate", "Recent 5 Win Rate"]:
+            crusher_view[col] = crusher_view[col].map(lambda x: "—" if pd.isna(x) else f"{float(x):.1%}")
+        for col in ["Avg K Margin", "Avg Win Margin", "Total K Above Projection"]:
+            crusher_view[col] = crusher_view[col].map(lambda x: "—" if pd.isna(x) else f"{float(x):+.2f}")
+        st.dataframe(crusher_view, hide_index=True, width="stretch")
+        st.caption("🔥 CRUSHER requires at least 3 resolved current-model starts, a win rate of at least 66.7%, and average actual Ks more than 0.5 above projection. This board is descriptive tracking only.")
 
 st.divider()
 st.subheader("🧠 Current model learning status")
@@ -465,21 +512,50 @@ display["outs_error"] = display.apply(
     lambda r: r["actual_outs"] - r["outs_projection"] if pd.notna(r.get("actual_outs")) and pd.notna(r.get("outs_projection")) else None,
     axis=1,
 )
-display["k_result"] = display.apply(lambda r: range_result(r, "actual_strikeouts", "k_range_low", "k_range_high"), axis=1)
+display["k_directional_result"] = display.apply(lambda r: directional_k_result(r.get("projection"), r.get("actual_strikeouts")), axis=1)
+display["k_range_result"] = display.apply(lambda r: range_result(r, "actual_strikeouts", "k_range_low", "k_range_high"), axis=1)
 display["hits_result"] = display.apply(lambda r: range_result(r, "actual_hits_allowed", "hits_range_low", "hits_range_high"), axis=1)
 display["outs_result"] = display.apply(lambda r: range_result(r, "actual_outs", "outs_range_low", "outs_range_high"), axis=1)
 
 display_columns = [
-    "game_date", "player", "team", "opponent", "starter_history_games", "starter_history_source", "starter_history_mlb_games", "starter_history_observation_games",
-    "projection", "k_range_low", "k_range_high", "actual_strikeouts", "k_result", "k_error",
-    "hits_projection", "hits_range_low", "hits_range_high", "actual_hits_allowed", "hits_result", "hits_error",
-    "outs_projection", "outs_range_low", "outs_range_high", "actual_outs", "outs_result", "outs_error",
-    "status", "confidence", "data_quality", "history_semantics",
+    "game_date", "player", "team", "opponent",
+    "projection", "actual_strikeouts", "k_directional_result", "k_error", "k_range_low", "k_range_high", "k_range_result",
+    "hits_projection", "actual_hits_allowed", "hits_error", "hits_range_low", "hits_range_high", "hits_result",
+    "outs_projection", "actual_outs", "outs_error", "outs_range_low", "outs_range_high", "outs_result",
+    "confidence", "data_quality", "starter_history_games", "starter_history_source", "starter_history_mlb_games", "starter_history_observation_games",
+    "status", "history_semantics",
 ]
 display_columns = [col for col in display_columns if col in display.columns]
+archive_view = display[display_columns].copy()
+# Remove dead archive columns instead of rendering blank visual tracks/cells.
+archive_populated = []
+for col in archive_view.columns:
+    series = archive_view[col]
+    populated = series.notna()
+    if series.dtype == object:
+        populated = populated & series.astype(str).str.strip().ne("") & series.astype(str).str.lower().ne("nan")
+    if bool(populated.any()):
+        archive_populated.append(col)
+archive_view = archive_view[archive_populated]
 
+archive_formats = {}
+for col in ["projection", "hits_projection", "outs_projection", "k_error", "hits_error", "outs_error"]:
+    if col in archive_view.columns:
+        archive_formats[col] = "{:+.2f}" if col.endswith("_error") else "{:.2f}"
+for col in ["actual_strikeouts", "actual_hits_allowed", "actual_outs", "k_range_low", "k_range_high", "hits_range_low", "hits_range_high", "outs_range_low", "outs_range_high", "starter_history_games", "starter_history_mlb_games", "starter_history_observation_games"]:
+    if col in archive_view.columns:
+        archive_formats[col] = "{:.0f}"
+archive_styled = archive_view.style.format(archive_formats, na_rep="—")
+projected_cols = [c for c in ["projection", "hits_projection", "outs_projection"] if c in archive_view.columns]
+actual_cols = [c for c in ["actual_strikeouts", "actual_hits_allowed", "actual_outs"] if c in archive_view.columns]
+if projected_cols:
+    archive_styled = archive_styled.map(lambda _: "color:#22c55e;font-weight:800;", subset=projected_cols)
+if actual_cols:
+    archive_styled = archive_styled.map(lambda _: "color:#facc15;font-weight:800;", subset=actual_cols)
+
+st.caption("Archive scan order: matchup → projected vs actual → directional result/margin → 80% range context → supporting audit fields. Completely empty columns are hidden automatically.")
 st.dataframe(
-    display[display_columns],
+    archive_styled,
     hide_index=True,
     width="stretch",
     column_config={
@@ -495,7 +571,8 @@ st.dataframe(
         "k_range_low": st.column_config.NumberColumn("80% K Low", format="%.0f"),
         "k_range_high": st.column_config.NumberColumn("80% K High", format="%.0f"),
         "actual_strikeouts": st.column_config.NumberColumn("Actual Ks", format="%.0f"),
-        "k_result": st.column_config.TextColumn("K Result"),
+        "k_directional_result": st.column_config.TextColumn("Directional K Result"),
+        "k_range_result": st.column_config.TextColumn("80% Range Result"),
         "k_error": st.column_config.NumberColumn("K Error", format="%+.2f"),
         "hits_projection": st.column_config.NumberColumn("Projected Hits", format="%.2f"),
         "hits_range_low": st.column_config.NumberColumn("80% H Low", format="%.0f"),

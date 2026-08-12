@@ -29,3 +29,16 @@ def test_projection_history_has_rolling_accuracy_and_starts_used():
     assert "Rolling Range Hit Rate" in text
     assert '"starter_history_games"' in text
     assert 'NumberColumn("Starts Used"' in text
+
+
+def test_projection_history_directional_wins_and_clean_archive():
+    text = _page_text()
+    assert "K Projection Wins & Crushers" in text
+    assert "actual strikeouts > the frozen projected K mean" in text
+    assert "Projection Crushers" in text
+    assert "Directional K Result" in text
+    assert "80% Range Result" in text
+    assert "archive_populated" in text
+    assert "Completely empty columns are hidden automatically" in text
+    assert "#22c55e" in text
+    assert "#facc15" in text
