@@ -3,8 +3,7 @@ name: Run workload intelligence patch
 on:
   push:
     paths:
-      - scripts/patch_workload_intelligence.py
-      - scripts/patch_workload_contracts.py
+      - scripts/patch_workload_audit_integrity.py
       - .github/workflows/run-workload-intelligence.yml
   workflow_dispatch:
 
@@ -23,20 +22,18 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r requirements.txt pytest
-      - name: Apply workload intelligence patch
-        run: |
-          python scripts/patch_workload_intelligence.py
-          python scripts/patch_workload_contracts.py
+      - name: Apply workload audit integrity patch
+        run: python scripts/patch_workload_audit_integrity.py
       - name: Compile
         run: python -m compileall -q streamlit_app.py navigation.py pages engine automation tests
       - name: Test
         run: pytest -q
-      - name: Commit feature
+      - name: Commit fixes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add automation/daily_projection_runner.py automation/resolve_projection_log.py streamlit_app.py pages/4_Projection_History.py pages/5_Daily_Projection_Run.py tests/test_workload_integration.py tests/test_workload_ui_contract.py tests/test_daily_projection_page_contract.py tests/test_matchup_weather_integrity.py
+          git add engine/workload_context.py automation/daily_projection_runner.py tests/test_workload_context.py tests/test_workload_ui_contract.py tests/test_matchup_weather_integrity.py
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "Integrate workload intelligence across pitcher projections"
+          git commit -m "Harden workload audit and live date handling"
           git pull --rebase origin main
           git push origin HEAD:main
