@@ -19,6 +19,7 @@ from engine.bet_lean import projection_side
 from engine.model_top_plays import build_model_board
 from engine.model_health import health_from_walk_forward, market_health_map, walk_forward_top5
 from engine.decision_learning import attach_decision_profiles, decision_tier_report
+from engine.signal_validation import attach_signal_profiles, paired_signal_report
 from engine.bet_tracker import (
     make_bet_record,
     make_parlay_record,
@@ -300,6 +301,10 @@ def render_projection_rationale(play: pd.Series, snapshot: pd.Series, history: p
         f"Decision evidence: {decision_evidence} · exact segment {decision_band} model probability / quality {decision_quality} · "
         f"{decision_sample} settled walk-forward legs · historical hit rate {tier_text}. This evidence does not change the projection itself."
     )
+    st.caption(
+        f"Signal evidence: {play.get('Signal Evidence', 'LEARNING')} · {play.get('Signal Detail', 'No mature paired signal evidence yet.')} "
+        "Paired signal evidence is attached after ranking and does not change the baseball projection or Top 5 order."
+    )
 
     market = str(play.get("Market", ""))
     line = float(play["Line"])
@@ -417,11 +422,28 @@ with st.expander("🎯 Decision-learning evidence", expanded=False):
         st.dataframe(decision_view, hide_index=True, width="stretch")
     st.caption("Exact segments stay LEARNING below 20 settled legs. Strong or underperforming labels require at least 30 settled legs.")
 
+
+signal_report = paired_signal_report(history)
+with st.expander("🧪 Signal accountability", expanded=False):
+    st.caption(
+        "Paired pregame upgrade evidence measures whether workload-v1 and confirmed-lineup changes reduced same-game prediction error after the final result. "
+        "This evidence is attached after ranking and cannot reorder or remove today's legs."
+    )
+    if signal_report.empty:
+        st.info("Signal evidence is still waiting for resolved paired upgrades.")
+    else:
+        signal_view = signal_report.copy()
+        for col in ["Relative MAE Improvement", "Improved Share"]:
+            signal_view[col] = signal_view[col].map(lambda x: "—" if pd.isna(x) else f"{float(x):+.1%}" if col == "Relative MAE Improvement" else f"{float(x):.1%}")
+        st.dataframe(signal_view[["Signal", "Market", "Resolved Pairs", "Pre MAE", "Post MAE", "Relative MAE Improvement", "Improved Share", "Status", "Reason"]], hide_index=True, width="stretch")
+    st.caption("Signals remain LEARNING below 20 resolved pairs. HELPING/MIXED/HURTING are evidence labels only; sportsbook data is excluded.")
+
 plays = build_model_board(slate, history, limit=5, market_health=health_map)
 if plays.empty:
     st.warning("No current market passed the starter-history, probability-path, and model-health eligibility guards. The app will not manufacture a Top Play when the validated board is empty.")
     st.stop()
 plays = attach_decision_profiles(plays, decision_report)
+plays = attach_signal_profiles(plays, history, signal_report)
 
 # The board exists before any paid sportsbook request. Credit Saver keeps paid
 # odds OFF by default and only asks for main markets represented in the Top 5.
@@ -527,13 +549,15 @@ if not candidate_pool.empty:
 model_plays = int(((plays["Model Probability"] >= 0.55) & (plays["Data Quality"] >= 60)).sum())
 live_offers = int(plays["Live Offer"].fillna(False).sum())
 decision_supported = int(plays["Decision Evidence"].isin(["SUPPORTED", "STRONG EVIDENCE"]).sum())
-c1, c2, c3, c4 = st.columns(4)
+signal_supported = int(plays["Signal Evidence"].eq("SUPPORTED").sum())
+c1, c2, c3, c4, c5 = st.columns(5)
 c1.metric("Highest model hit probability", f"{plays['Model Probability'].max():.1%}")
 c2.metric("Model-qualified Top 5", model_plays)
 c3.metric("Decision-supported legs", decision_supported)
-c4.metric("Exact live prices found", f"{live_offers}/{len(plays)}")
+c4.metric("Signal-supported legs", signal_supported)
+c5.metric("Exact live prices found", f"{live_offers}/{len(plays)}")
 
-view = plays[["Rank", "Status", "Model Health", "Decision Evidence", "Decision Sample", "Tier Hit Rate", "Pitcher", "Weather Icon", "Weather Risk", "Market", "Side", "Line", "Projection", "Model Probability", "Data Quality", "Starter History", "Book", "Odds"]].copy()
+view = plays[["Rank", "Status", "Model Health", "Decision Evidence", "Decision Sample", "Signal Evidence", "Signal Sample", "Tier Hit Rate", "Pitcher", "Weather Icon", "Weather Risk", "Market", "Side", "Line", "Projection", "Model Probability", "Data Quality", "Starter History", "Book", "Odds"]].copy()
 view["Pitcher"] = view.apply(lambda r: f"{r['Pitcher']} {str(r.get('Weather Icon', '') or '')}".strip(), axis=1)
 view = view.drop(columns=["Weather Icon"])
 view["Model Probability"] = view["Model Probability"].map(lambda x: f"{float(x):.1%}")
@@ -542,7 +566,7 @@ view["Projection"] = view["Projection"].map(lambda x: f"{float(x):.2f}")
 view["Book"] = view["Book"].map(lambda x: x if str(x).strip() else "—")
 view["Odds"] = view["Odds"].map(lambda x: "—" if pd.isna(x) else f"{int(float(x)):+d}")
 st.subheader("Today's five highest-probability model legs")
-st.caption("Eligible markets are ranked only by our calibrated hit probability, with data quality as the tie-breaker. Walk-forward model health can block a proven-unhealthy market; decision evidence is descriptive only; sportsbook odds and market edge never decide the Top 5.")
+st.caption("Eligible markets are ranked only by our calibrated hit probability, with data quality as the tie-breaker. Walk-forward model health can block a proven-unhealthy market; decision evidence is descriptive only; signal evidence is descriptive only; sportsbook odds and market edge never decide the Top 5.")
 st.caption("Click a row or use View details to open its frozen projection breakdown.")
 event = st.dataframe(
     view,
@@ -568,6 +592,7 @@ for button_idx, (_, play_row) in enumerate(plays.iterrows()):
         weather_icon = str(play_row.get("Weather Icon", "") or "")
         st.caption(f"#{rank} {play_row['Pitcher']} {weather_icon} · {play_row['Side']} {float(play_row['Line']):g}".replace("  ·", " ·"))
         st.caption(f"Decision evidence: {play_row.get('Decision Evidence', 'LEARNING')} · n={int(play_row.get('Decision Sample', 0) or 0)}")
+        st.caption(f"Signal evidence: {play_row.get('Signal Evidence', 'LEARNING')} · {play_row.get('Signal Detail', 'No mature paired signal evidence yet.')}")
         if st.button("🔎 View details", key=f"view_top_play_{rank}", use_container_width=True):
             st.session_state["top_play_detail_rank"] = rank
         if st.button("➕ Add as bet", key=f"add_top_play_{rank}", use_container_width=True, disabled=not (model_ok and live_offer)):

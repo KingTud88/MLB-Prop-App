@@ -18,6 +18,7 @@ from engine.model_health import (
     walk_forward_top5,
 )
 from engine.decision_learning import decision_tier_report
+from engine.signal_validation import context_performance_report, paired_signal_report
 
 ROOT = Path(__file__).resolve().parents[1]
 LOG_PATH = ROOT / "data" / "projection_log.csv"
@@ -300,6 +301,45 @@ else:
         })
     audit = pd.DataFrame(audit_rows)
     st.dataframe(audit, hide_index=True, width="stretch")
+
+st.divider()
+st.subheader("🧪 Signal accountability")
+st.caption(
+    "Paired upgrade evidence compares the same pitcher/game before and after a pregame feature upgrade, then grades both predictions against the same final result. "
+    "That is stronger evidence than comparing unrelated pitcher groups. Sportsbook odds, saved bets, and market prices are excluded. Signals stay LEARNING below 20 resolved pairs."
+)
+paired_signals = paired_signal_report(df)
+if paired_signals.empty:
+    st.info("Signal accountability will populate as paired pregame upgrades resolve.")
+else:
+    helping = int(paired_signals["Status"].eq("HELPING").sum())
+    hurting = int(paired_signals["Status"].eq("HURTING").sum())
+    learning = int(paired_signals["Status"].eq("LEARNING").sum())
+    paired_outcomes = int(pd.to_numeric(paired_signals["Resolved Pairs"], errors="coerce").fillna(0).sum())
+    s1,s2,s3,s4 = st.columns(4)
+    s1.metric("Paired market outcomes", paired_outcomes)
+    s2.metric("Helping signals", helping)
+    s3.metric("Hurting signals", hurting)
+    s4.metric("Still learning", learning)
+    signal_view = paired_signals.copy()
+    for col in ["Relative MAE Improvement", "Improved Share"]:
+        signal_view[col] = signal_view[col].map(lambda x: "—" if pd.isna(x) else f"{float(x):+.1%}" if col == "Relative MAE Improvement" else f"{float(x):.1%}")
+    for col in ["Pre MAE", "Post MAE", "MAE Improvement", "Pre Bias", "Post Bias"]:
+        signal_view[col] = signal_view[col].map(lambda x: "—" if pd.isna(x) else f"{float(x):+.3f}" if col in {"MAE Improvement", "Pre Bias", "Post Bias"} else f"{float(x):.3f}")
+    st.dataframe(signal_view, hide_index=True, width="stretch")
+    st.caption("HELPING requires at least 20 resolved pairs, at least 5% lower post-upgrade MAE, and improvement in at least 55% of paired starts. HURTING uses the symmetric downside guardrail. These labels do not alter Top Plays yet.")
+
+with st.expander("Context performance — descriptive, not causal", expanded=False):
+    context_report = context_performance_report(df)
+    if context_report.empty:
+        st.info("Context buckets will populate as current starter-only snapshots resolve.")
+    else:
+        context_view = context_report.copy()
+        context_view["80% Range Coverage"] = context_view["80% Range Coverage"].map(lambda x: "—" if pd.isna(x) else f"{float(x):.1%}")
+        context_view["MAE"] = context_view["MAE"].map(lambda x: "—" if pd.isna(x) else f"{float(x):.3f}")
+        context_view["Bias"] = context_view["Bias"].map(lambda x: "—" if pd.isna(x) else f"{float(x):+.3f}")
+        st.dataframe(context_view, hide_index=True, width="stretch")
+        st.caption("Lineup, workload, rest, history source, opponent K/contact environments are model inputs. Weather Delay Risk is labeled CONTEXT ONLY because weather still does not modify the baseball forecast.")
 
 st.divider()
 st.subheader("🚦 Walk-forward Top 5 model health")

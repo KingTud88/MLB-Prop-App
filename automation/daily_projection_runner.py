@@ -498,7 +498,9 @@ def project(row: dict, matchup_override: dict[str, object] | None = None) -> dic
         "lineup_batters": int(matchup["lineup_batters"]), "lineup_hash": str(matchup["lineup_hash"]),
         "lineup_captured_at_utc": now if bool(matchup["confirmed"]) else "",
         "lineup_preconfirm_projection": np.nan, "lineup_preconfirm_opponent_k_pct": np.nan,
+        "lineup_preconfirm_hits_projection": np.nan, "lineup_preconfirm_opponent_hit_rate": np.nan,
         "lineup_projection_delta": np.nan, "lineup_opponent_k_delta": np.nan,
+        "lineup_hits_projection_delta": np.nan, "lineup_opponent_hit_delta": np.nan,
         "pitch_limit": float(workload.expected_pitches), "umpire_k_factor": 1.0,
         "weather_factor": 1.0, "rest_factor": 1.0,
         **weather,
@@ -581,8 +583,8 @@ def attach_pregame_weather(frame: pd.DataFrame, announced: list[dict]) -> int:
 def refresh_pregame_lineups(frame: pd.DataFrame, announced: list[dict]) -> int:
     """Upgrade roster-fallback snapshots when a confirmed lineup posts pregame.
 
-    Started/finished games are never touched. The old K projection and opponent-K
-    input are retained in audit fields so the impact of the lineup can be measured.
+    Started/finished games are never touched. Old K/Hits projections and opponent
+    K/contact inputs are retained so the lineup impact can be measured with paired outcomes.
     """
     if frame.empty or not announced:
         return 0
@@ -608,6 +610,8 @@ def refresh_pregame_lineups(frame: pd.DataFrame, announced: list[dict]) -> int:
             continue
         old_projection = pd.to_numeric(pd.Series([row.get("projection")]), errors="coerce").iloc[0]
         old_opp_k = pd.to_numeric(pd.Series([row.get("opponent_k_pct")]), errors="coerce").iloc[0]
+        old_hits_projection = pd.to_numeric(pd.Series([row.get("hits_projection")]), errors="coerce").iloc[0]
+        old_opp_hit = pd.to_numeric(pd.Series([row.get("opponent_hit_rate")]), errors="coerce").iloc[0]
         try:
             projected = project(scheduled)
         except Exception as exc:
@@ -626,10 +630,16 @@ def refresh_pregame_lineups(frame: pd.DataFrame, announced: list[dict]) -> int:
                 frame.at[idx, field] = value
         frame.at[idx, "lineup_preconfirm_projection"] = old_projection
         frame.at[idx, "lineup_preconfirm_opponent_k_pct"] = old_opp_k
+        frame.at[idx, "lineup_preconfirm_hits_projection"] = old_hits_projection
+        frame.at[idx, "lineup_preconfirm_opponent_hit_rate"] = old_opp_hit
         new_projection = pd.to_numeric(pd.Series([projected.get("projection")]), errors="coerce").iloc[0]
         new_opp_k = pd.to_numeric(pd.Series([projected.get("opponent_k_pct")]), errors="coerce").iloc[0]
+        new_hits_projection = pd.to_numeric(pd.Series([projected.get("hits_projection")]), errors="coerce").iloc[0]
+        new_opp_hit = pd.to_numeric(pd.Series([projected.get("opponent_hit_rate")]), errors="coerce").iloc[0]
         frame.at[idx, "lineup_projection_delta"] = np.nan if pd.isna(old_projection) or pd.isna(new_projection) else float(new_projection - old_projection)
         frame.at[idx, "lineup_opponent_k_delta"] = np.nan if pd.isna(old_opp_k) or pd.isna(new_opp_k) else float(new_opp_k - old_opp_k)
+        frame.at[idx, "lineup_hits_projection_delta"] = np.nan if pd.isna(old_hits_projection) or pd.isna(new_hits_projection) else float(new_hits_projection - old_hits_projection)
+        frame.at[idx, "lineup_opponent_hit_delta"] = np.nan if pd.isna(old_opp_hit) or pd.isna(new_opp_hit) else float(new_opp_hit - old_opp_hit)
         updated += 1
     return updated
 
@@ -701,7 +711,9 @@ def fill_missing_pregame_paths(frame: pd.DataFrame) -> int:
             old_bf = pd.to_numeric(pd.Series([row.get("expected_bf")]), errors="coerce").iloc[0]
             protected = {
                 "actual_strikeouts", "actual_hits_allowed", "actual_outs", "actual_batters_faced", "actual_pitches", "resolved_at_utc",
-                "lineup_preconfirm_projection", "lineup_preconfirm_opponent_k_pct", "lineup_projection_delta", "lineup_opponent_k_delta",
+                "lineup_preconfirm_projection", "lineup_preconfirm_opponent_k_pct", "lineup_preconfirm_hits_projection",
+                "lineup_preconfirm_opponent_hit_rate", "lineup_projection_delta", "lineup_opponent_k_delta",
+                "lineup_hits_projection_delta", "lineup_opponent_hit_delta",
             }
             for key, value in projected.items():
                 if key not in protected:
