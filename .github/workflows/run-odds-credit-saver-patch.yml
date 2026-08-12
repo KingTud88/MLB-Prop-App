@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - scripts/patch_odds_credit_saver.py
+      - .github/odds-credit-saver-trigger
   workflow_dispatch:
 
 permissions:
