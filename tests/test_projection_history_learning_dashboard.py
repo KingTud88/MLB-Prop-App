@@ -47,3 +47,12 @@ def test_projection_history_bettable_wins_and_clean_archive():
     assert "#22c55e" in text
     assert "#38bdf8" in text
     assert "#facc15" in text
+
+
+def test_projection_archive_groups_rows_into_clickable_dates():
+    text = _page_text()
+    assert 'with st.expander(f"📅 {date_label}' in text
+    assert 'archive_view["_archive_date"]' in text
+    assert 'date_group = date_group.drop(columns=["game_date", "_archive_date"]' in text
+    assert "Click a date to open that slate" in text
+    assert 'expanded=False' in text
