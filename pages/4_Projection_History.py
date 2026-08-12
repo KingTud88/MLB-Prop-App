@@ -17,6 +17,7 @@ from engine.model_health import (
     reliability_table,
     walk_forward_top5,
 )
+from engine.decision_learning import decision_tier_report
 
 ROOT = Path(__file__).resolve().parents[1]
 LOG_PATH = ROOT / "data" / "projection_log.csv"
@@ -299,6 +300,35 @@ with st.expander("Daily historical Top 5 replay"):
         daily_view["Brier Score"] = daily_view["Brier Score"].map(lambda x: f"{float(x):.3f}")
         daily_view["5/5 Sweep"] = daily_view["5/5 Sweep"].map(lambda x: "👑 YES" if bool(x) else "—")
         st.dataframe(daily_view, hide_index=True, width="stretch")
+
+st.divider()
+st.subheader("🎯 Decision-learning tiers")
+st.caption(
+    "This layer studies settled leakage-safe Top 5 legs by market + model-probability band + data-quality band. "
+    "Sportsbook odds, sportsbook edge, book choice, and saved bet selections are excluded. These labels are descriptive evidence only and do not change Top 5 ranking."
+)
+decision_report = decision_tier_report(walk_forward)
+if decision_report.empty:
+    st.info("Decision-learning segments will populate as current starter-only Top 5 legs settle.")
+else:
+    decision_settled = int(pd.to_numeric(decision_report["Settled Legs"], errors="coerce").fillna(0).sum())
+    decision_supported = int(decision_report["Decision Evidence"].isin(["SUPPORTED", "STRONG EVIDENCE"]).sum())
+    decision_strong = int(decision_report["Decision Evidence"].eq("STRONG EVIDENCE").sum())
+    decision_under = int(decision_report["Decision Evidence"].eq("UNDERPERFORMING").sum())
+    d1, d2, d3, d4 = st.columns(4)
+    d1.metric("Settled decision legs", decision_settled)
+    d2.metric("Supported segments", decision_supported)
+    d3.metric("Strong-evidence segments", decision_strong)
+    d4.metric("Underperforming segments", decision_under)
+
+    decision_view = decision_report.copy()
+    for col in ["Hit Rate", "Avg Model Probability", "Calibration Gap", "Wilson Lower 95%", "Lift vs Top 5"]:
+        decision_view[col] = decision_view[col].map(lambda x: "—" if pd.isna(x) else f"{float(x):.1%}")
+    decision_view["Brier Score"] = decision_view["Brier Score"].map(lambda x: "—" if pd.isna(x) else f"{float(x):.3f}")
+    st.dataframe(decision_view, hide_index=True, width="stretch")
+    st.caption(
+        "An exact segment stays LEARNING until it has 20 settled walk-forward legs. STRONG EVIDENCE and UNDERPERFORMING require at least 30, preventing tiny samples from driving decisions."
+    )
 
 st.divider()
 st.subheader("📋 Projection archive")
