@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - scripts/patch_walk_forward_health_ui.py
+      - tests/test_bet_add_buttons_contract.py
   workflow_dispatch:
 
 permissions:
