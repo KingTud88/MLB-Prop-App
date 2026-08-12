@@ -457,9 +457,6 @@ def attach_pregame_weather(frame: pd.DataFrame, announced: list[dict]) -> int:
         row = frame.loc[idx]
         if not row_is_pregame(row, now):
             continue
-        existing = str(row.get("weather_delay_risk", "") or "").upper()
-        if existing in {"NONE", "LOW", "ELEVATED", "HIGH"}:
-            continue
         try:
             key = (int(row["game_pk"]), int(row["pitcher_id"]))
         except Exception:
@@ -468,10 +465,23 @@ def attach_pregame_weather(frame: pd.DataFrame, announced: list[dict]) -> int:
         if not scheduled:
             continue
         fields = weather_snapshot_fields(int(scheduled.get("venue_id", 0) or 0), str(scheduled.get("game_time", "")))
-        frame.at[idx, "venue_id"] = int(scheduled.get("venue_id", 0) or 0)
+        changed = False
+        venue_id = int(scheduled.get("venue_id", 0) or 0)
+        old_venue = pd.to_numeric(pd.Series([row.get("venue_id")]), errors="coerce").iloc[0]
+        if pd.isna(old_venue) or int(old_venue) != venue_id:
+            frame.at[idx, "venue_id"] = venue_id
+            changed = True
         for key_name, value in fields.items():
-            frame.at[idx, key_name] = value
-        updated += 1
+            old_value = row.get(key_name)
+            if pd.isna(value):
+                same = pd.isna(old_value)
+            else:
+                same = str(old_value) == str(value)
+            if not same:
+                frame.at[idx, key_name] = value
+                changed = True
+        if changed:
+            updated += 1
     return updated
 
 

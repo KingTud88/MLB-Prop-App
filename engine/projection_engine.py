@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-import inspect
 import math
 from functools import lru_cache
 from pathlib import Path
@@ -145,15 +144,12 @@ class ProjectionEngine:
             latent=np.exp(rng.normal(0.0,0.10,int(active.sum()))); probs=np.clip(p_k*latent,0.002,0.70); outcomes[active]+=rng.random(int(active.sum()))<probs
         return outcomes,float(outcomes.mean())
     def project(self, features: Mapping[str,float], draws: int=25000, lines: tuple[float,...]=tuple(float(x) for x in range(3,11))) -> ProjectionResult:
+        # Feature construction owns matchup selection. Never inspect the caller and
+        # silently replace an explicit opponent K input: that can make the visible
+        # batter box disagree with the probability engine and harms reproducibility.
         enriched=dict(features)
-        try:
-            caller=inspect.currentframe().f_back; game=caller.f_locals.get("game") if caller is not None else None
-            if game is not None:
-                matchup=_matchup_context_from_game(game)
-                enriched["opponent_k_pct"]=float(matchup.get("opponent_k_pct",LEAGUE_K_RATE))
-                enriched["matchup_source"]=matchup.get("source","league baseline"); enriched["matchup_pa"]=float(matchup.get("matchup_pa",0.0)); enriched["matchup_hitters"]=float(matchup.get("matchup_hitters",0.0)); enriched["pitcher_hand"]=matchup.get("pitcher_hand","")
-        except Exception:
-            enriched.setdefault("matchup_source","league baseline")
+        enriched.setdefault("opponent_k_pct", LEAGUE_K_RATE)
+        enriched.setdefault("matchup_source", "explicit feature input")
         features=enriched
         sim_samples,sim_mean=self.simulate_game(features,draws=draws); sim_sd=float(sim_samples.std(ddof=1)); math_mean,math_sd,factors=self.mathematical_projection(features); math_pmf=self._nb_pmf(math_mean,math_sd); calibration=self._historical_calibration(lines); learned_weights={line:float(getattr(cal,"weight_simulation",self.simulation_weight) if cal is not None else self.simulation_weight) for line,cal in calibration.items()}; valid_weights=[w for w in learned_weights.values() if np.isfinite(w)]; mean_weight=float(np.mean(valid_weights)) if valid_weights else self.simulation_weight; ensemble_mean=mean_weight*sim_mean+(1.0-mean_weight)*math_mean; ensemble_sd=math.sqrt(max(mean_weight*sim_sd**2+(1.0-mean_weight)*math_sd**2,0.01)); sim_probs={}; math_probs={}; ensemble_probs={}; probability_lines={float(x) for x in lines}; probability_lines.update(float(x)+0.5 for x in range(0,20))
         for line in sorted(probability_lines):
