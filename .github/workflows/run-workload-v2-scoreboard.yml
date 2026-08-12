@@ -1,0 +1,47 @@
+name: Run Workload-v2 Scoreboard patch
+
+on:
+  push:
+    paths:
+      - scripts/add_workload_v2_scoreboard.py
+      - .github/workflows/run-workload-v2-scoreboard.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt pytest
+      - name: Apply workload-v2 scoreboard
+        run: python scripts/add_workload_v2_scoreboard.py
+      - name: Compile
+        run: python -m compileall -q streamlit_app.py navigation.py engine automation training pages tests
+      - name: Test
+        run: pytest -q
+      - name: Commit feature
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pages/4_Projection_History.py tests/test_projection_history_learning_dashboard.py
+          if git diff --cached --quiet; then
+            echo "No feature changes to commit"
+            exit 0
+          fi
+          git commit -m "Show workload-v2 candidate validation"
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git rebase origin/main
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
