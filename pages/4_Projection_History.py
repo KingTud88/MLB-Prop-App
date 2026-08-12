@@ -66,6 +66,14 @@ def rolling_learning_frame(frame: pd.DataFrame) -> pd.DataFrame:
 
     current["game_date_dt"] = pd.to_datetime(current.get("game_date"), errors="coerce")
     current = current.sort_values(["game_date_dt", "captured_at_utc"], na_position="last").reset_index(drop=True)
+    resolved_any = (
+        pd.to_numeric(current.get("actual_strikeouts"), errors="coerce").notna()
+        | pd.to_numeric(current.get("actual_hits_allowed"), errors="coerce").notna()
+        | pd.to_numeric(current.get("actual_outs"), errors="coerce").notna()
+    )
+    current = current.loc[resolved_any].reset_index(drop=True)
+    if current.empty:
+        return current
     current["Resolved Start #"] = np.arange(1, len(current) + 1)
 
     specs = (
@@ -105,6 +113,8 @@ numeric_cols = [
     "projection", "k_range_low", "k_range_high", "actual_strikeouts",
     "hits_projection", "hits_range_low", "hits_range_high", "actual_hits_allowed",
     "outs_projection", "outs_range_low", "outs_range_high", "actual_outs", "starter_history_games",
+    "expected_pitches", "expected_bf", "expected_outs", "actual_batters_faced", "actual_pitches",
+    "pitches_per_bf", "days_since_last_start", "pitch_trend", "bf_trend", "outs_trend",
 ]
 for col in numeric_cols:
     if col in df.columns:
@@ -224,6 +234,44 @@ else:
     if not chart_hit.empty:
         st.caption("Rolling frozen 80% range hit rate. A healthy 80% interval should eventually land near its nominal coverage, not necessarily 100%.")
         st.line_chart(chart_hit)
+
+st.divider()
+st.subheader("⚙️ Workload intelligence audit")
+st.caption(
+    "workload-v1 estimates expected pitches, batters faced, and outs from starter-only pitch/BF/outs history, efficiency, recent trend, and conservative short-rest handling. "
+    "Sportsbook data is excluded. Actual BF and pitch count are resolved after games so the exposure model can be validated directly."
+)
+if "workload_version" not in df.columns:
+    st.info("Workload tracking begins with app version 3.7.0; older snapshots remain visible but untagged.")
+else:
+    workload_rows = df.loc[df["workload_version"].astype(str).eq("workload-v1")].copy()
+    if workload_rows.empty:
+        st.info("No workload-v1 snapshots have been captured yet.")
+    else:
+        expected_pitches = pd.to_numeric(workload_rows.get("expected_pitches"), errors="coerce")
+        actual_pitches = pd.to_numeric(workload_rows.get("actual_pitches"), errors="coerce")
+        expected_bf = pd.to_numeric(workload_rows.get("expected_bf"), errors="coerce")
+        actual_bf = pd.to_numeric(workload_rows.get("actual_batters_faced"), errors="coerce")
+        expected_outs = pd.to_numeric(workload_rows.get("expected_outs"), errors="coerce")
+        actual_outs_w = pd.to_numeric(workload_rows.get("actual_outs"), errors="coerce")
+        pitch_ready = expected_pitches.notna() & actual_pitches.notna()
+        bf_ready = expected_bf.notna() & actual_bf.notna()
+        outs_ready_w = expected_outs.notna() & actual_outs_w.notna()
+        wa1,wa2,wa3,wa4 = st.columns(4)
+        wa1.metric("workload-v1 snapshots", len(workload_rows))
+        wa2.metric("Pitch-count MAE", "—" if not pitch_ready.any() else f"{float((actual_pitches[pitch_ready]-expected_pitches[pitch_ready]).abs().mean()):.1f} pitches")
+        wa3.metric("BF MAE", "—" if not bf_ready.any() else f"{float((actual_bf[bf_ready]-expected_bf[bf_ready]).abs().mean()):.2f} BF")
+        wa4.metric("Workload-outs MAE", "—" if not outs_ready_w.any() else f"{float((actual_outs_w[outs_ready_w]-expected_outs[outs_ready_w]).abs().mean()):.2f} outs")
+        upgrades = pd.to_numeric(workload_rows.get("workload_projection_delta_k"), errors="coerce") if "workload_projection_delta_k" in workload_rows.columns else pd.Series(dtype=float)
+        if upgrades.notna().any():
+            st.caption(f"Pregame workload upgrades recorded: {int(upgrades.notna().sum())} · average K projection change {float(upgrades.dropna().mean()):+.2f} K. Started/finished snapshots are never rewritten.")
+        audit_cols = [
+            "game_date", "player", "expected_pitches", "actual_pitches", "expected_bf", "actual_batters_faced",
+            "expected_outs", "actual_outs", "pitches_per_bf", "days_since_last_start", "leash_label", "pitch_trend",
+        ]
+        audit_cols = [col for col in audit_cols if col in workload_rows.columns]
+        audit = workload_rows[audit_cols].sort_values("game_date", ascending=False).head(80).copy()
+        st.dataframe(audit, hide_index=True, width="stretch")
 
 st.divider()
 st.subheader("🧾 Lineup input audit")

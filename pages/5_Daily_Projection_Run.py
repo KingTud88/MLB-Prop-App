@@ -17,6 +17,7 @@ from automation.daily_projection_runner import (
     refresh_pregame_lineups,
     project,
     resolve_row,
+    resolve_workload_actuals,
     schedule,
 )
 from engine.calibration import calibrate_blend
@@ -54,7 +55,7 @@ def load_log() -> pd.DataFrame:
         return pd.DataFrame()
     # Legacy projection logs may predate hits/outs resolution columns. Always
     # materialize them as Series so summary counts never call .notna() on a scalar.
-    for col in ("actual_strikeouts", "actual_hits_allowed", "actual_outs"):
+    for col in ("actual_strikeouts", "actual_hits_allowed", "actual_outs", "actual_batters_faced", "actual_pitches"):
         if col not in frame.columns:
             frame[col] = np.nan
     if "resolved_at_utc" not in frame.columns:
@@ -102,7 +103,7 @@ def save_log(frame: pd.DataFrame) -> None:
         frame["starter_history_mlb_games"] = np.nan
     if "starter_history_observation_games" not in frame.columns:
         frame["starter_history_observation_games"] = np.nan
-    for col in ("actual_strikeouts", "actual_hits_allowed", "actual_outs"):
+    for col in ("actual_strikeouts", "actual_hits_allowed", "actual_outs", "actual_batters_faced", "actual_pitches"):
         if col not in frame.columns:
             frame[col] = np.nan
     if "resolved_at_utc" not in frame.columns:
@@ -248,6 +249,14 @@ def render_projection_rationale(row: pd.Series, history: pd.DataFrame) -> None:
         "History source": row.get("starter_history_source", "—"),
         "MLB starts used": int(_num(row, "starter_history_mlb_games") or 0),
         "Observed starts used": int(_num(row, "starter_history_observation_games") or 0),
+        "Workload version": row.get("workload_version", "—"),
+        "Expected pitches": _num(row, "expected_pitches"),
+        "Expected BF": _num(row, "expected_bf"),
+        "Expected outs workload": _num(row, "expected_outs"),
+        "Pitches / BF": _num(row, "pitches_per_bf"),
+        "Days since last start": _num(row, "days_since_last_start"),
+        "Recent leash": row.get("leash_label", "—"),
+        "Pitch trend": _num(row, "pitch_trend"),
     }
     st.dataframe(pd.DataFrame([facts]), hide_index=True, use_container_width=True)
     st.caption(
@@ -292,7 +301,7 @@ if isinstance(slate, pd.DataFrame):
 
     if not slate.empty:
         display_cols = [
-            "player", "starter_history_games", "starter_history_source", "starter_history_mlb_games", "starter_history_observation_games", "weather_icon", "weather_delay_risk", "weather_precip_probability", "lineup_source", "lineup_batters", "lineup_projection_delta", "team", "opponent", "projection", "k_range_low", "k_range_high",
+            "player", "starter_history_games", "starter_history_source", "starter_history_mlb_games", "starter_history_observation_games", "workload_version", "expected_pitches", "expected_bf", "expected_outs", "pitches_per_bf", "days_since_last_start", "leash_label", "pitch_trend", "weather_icon", "weather_delay_risk", "weather_precip_probability", "lineup_source", "lineup_batters", "lineup_projection_delta", "team", "opponent", "projection", "k_range_low", "k_range_high",
             "hits_projection", "hits_range_low", "hits_range_high",
             "outs_projection", "outs_range_low", "outs_range_high",
             "confidence", "data_quality", "opponent_k_pct", "sim_5p", "math_5p",
@@ -311,6 +320,14 @@ if isinstance(slate, pd.DataFrame):
                 "starter_history_source": "History Source",
                 "starter_history_mlb_games": "MLB Starts",
                 "starter_history_observation_games": "Observed Starts",
+                "workload_version": "Workload",
+                "expected_pitches": "Exp Pitches",
+                "expected_bf": "Exp BF",
+                "expected_outs": "Exp Outs",
+                "pitches_per_bf": "Pitches/BF",
+                "days_since_last_start": "Days Since Start",
+                "leash_label": "Leash",
+                "pitch_trend": "Pitch Trend",
                 "weather_delay_risk": "Weather Risk",
                 "weather_precip_probability": "Rain %",
                 "lineup_source": "Lineup Source",
@@ -428,6 +445,7 @@ if st.button("Resolve completed projection outcomes"):
         if not frame.empty:
             for idx in frame.index:
                 actual_k, actual_hits, actual_outs, resolved = resolve_row(frame.loc[idx])
+                actual_bf, actual_pitches = resolve_workload_actuals(frame.loc[idx])
                 changed = False
                 if pd.notna(actual_k) and pd.isna(frame.loc[idx].get("actual_strikeouts")):
                     frame.at[idx, "actual_strikeouts"] = actual_k
@@ -437,6 +455,12 @@ if st.button("Resolve completed projection outcomes"):
                     changed = True
                 if pd.notna(actual_outs) and pd.isna(frame.loc[idx].get("actual_outs")):
                     frame.at[idx, "actual_outs"] = actual_outs
+                    changed = True
+                if pd.notna(actual_bf) and pd.isna(frame.loc[idx].get("actual_batters_faced")):
+                    frame.at[idx, "actual_batters_faced"] = actual_bf
+                    changed = True
+                if pd.notna(actual_pitches) and pd.isna(frame.loc[idx].get("actual_pitches")):
+                    frame.at[idx, "actual_pitches"] = actual_pitches
                     changed = True
                 if changed:
                     frame.at[idx, "resolved_at_utc"] = resolved

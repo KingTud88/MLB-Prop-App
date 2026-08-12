@@ -20,11 +20,12 @@ from engine.starter_history import TARGET_STARTER_HISTORY, combine_starter_histo
 from engine.opposing_batters import get_opposing_batters, matchup_summary
 from engine.lineup_context import LINEUP_CONFIRMED, get_confirmed_lineup
 from engine.weather_risk import WeatherDelayRisk, fetch_weather_delay_risk
+from engine.workload_context import WorkloadContext, build_workload_context
 from engine.bet_lean import aligned_bet_lean
 from engine.bet_tracker import make_bet_record
 from training.bet_storage import append_bet
 
-APP_VERSION = "3.6.0"
+APP_VERSION = "3.7.0"
 EASTERN = ZoneInfo("America/New_York")
 MLB_API = "https://statsapi.mlb.com/api/v1"
 ODDS_API = "https://api.the-odds-api.com/v4"
@@ -145,12 +146,12 @@ def load_projection_history():
 
 def calibrated_weights(history): return {line:calibrate_blend(history,line) for line in range(3,11)}
 
-def build_engine_features(log,game,opponent_k_pct=.224,lineup_batters=0):
-    starts=log.tail(35).copy(); total_bf=float(starts.bf.sum()); raw_k=float(starts.k.sum()/max(total_bf,1)); pitcher_k=float(np.clip(shrink(raw_k,total_bf),.05,.45)); bf=weighted(starts.bf,5,22); pitches=weighted(starts.pitches,5,88); workload=float(np.clip(92/max(pitches,75),.78,1.12))
-    return {"pitcher_k_pct":pitcher_k,"opponent_k_pct":float(np.clip(opponent_k_pct,.08,.45)),"handedness_factor":1.0,"arsenal_factor":1.0,"park_factor":PARK_K_FACTOR.get(game.venue,1.0),"umpire_factor":1.0,"weather_factor":1.0,"expected_bf":float(np.clip(bf*workload,10,35)),"bf_sd":float(np.clip(starts.bf.std(ddof=1) if len(starts)>2 else 3.5,1,7)),"rest_factor":1.0,"historical_k_sd":float(np.clip(starts.k.std(ddof=1) if len(starts)>2 else 2.0,.75,4.5)),"historical_games":int(len(starts)),"lineup_batters":int(lineup_batters),"arsenal_sample_size":0,"weather_available":0,"umpire_available":0}
+def build_engine_features(log,game,opponent_k_pct=.224,lineup_batters=0,workload_context:WorkloadContext|None=None):
+    starts=log.tail(35).copy(); total_bf=float(starts.bf.sum()); raw_k=float(starts.k.sum()/max(total_bf,1)); pitcher_k=float(np.clip(shrink(raw_k,total_bf),.05,.45)); workload_context=workload_context or build_workload_context(starts,game.game_time)
+    return {"pitcher_k_pct":pitcher_k,"opponent_k_pct":float(np.clip(opponent_k_pct,.08,.45)),"handedness_factor":1.0,"arsenal_factor":1.0,"park_factor":PARK_K_FACTOR.get(game.venue,1.0),"umpire_factor":1.0,"weather_factor":1.0,"expected_bf":float(workload_context.expected_bf),"bf_sd":float(workload_context.bf_sd),"rest_factor":1.0,"historical_k_sd":float(np.clip(starts.k.std(ddof=1) if len(starts)>2 else 2.0,.75,4.5)),"historical_games":int(len(starts)),"lineup_batters":int(lineup_batters),"arsenal_sample_size":0,"weather_available":0,"umpire_available":0}
 
-def calculate_projection(log,game,simulations,opponent_k_pct=.224,lineup_batters=0):
-    history=load_projection_history(); cal=calibrated_weights(history); seed=int(hashlib.sha256(f"{game.key}|{game.game_time}|{APP_VERSION}".encode()).hexdigest()[:8],16); features=build_engine_features(log,game,opponent_k_pct,lineup_batters); engine=ProjectionEngine(simulation_weight=.5,seed=seed); result=engine.project(features,draws=simulations,lines=tuple(float(x) for x in range(3,11))); global_w=float(np.mean([r.weight_simulation for r in cal.values()])) if cal else .5; mean_k=global_w*result.simulation_mean+(1-global_w)*result.mathematical_mean; outs_seed=int(hashlib.sha256(f"outs|{game.key}|{APP_VERSION}".encode()).hexdigest()[:8],16); outs_model=project_total_outs(log,seed=outs_seed,draws=simulations,lines=(13.5,14.5,15.5,16.5,17.5,18.5)); mean_outs=outs_model.ensemble_mean; osd=outs_model.ensemble_sd; outs_samples=outs_model.simulation_samples; outs_probs=np.array([float(np.mean(outs_samples==i)) for i in range(28)]); quality=int(round(result.data_quality)); confidence="High" if result.confidence>=.75 else "Medium" if result.confidence>=.60 else "Low"; return Projection(mean_k,mean_outs,result.ensemble_sd,osd,result.mathematical_pmf,outs_probs,result.simulation_samples,outs_samples,confidence,quality,[(n,v) for n,v,_ in result.drivers],result,outs_model)
+def calculate_projection(log,game,simulations,opponent_k_pct=.224,lineup_batters=0,workload_context:WorkloadContext|None=None):
+    history=load_projection_history(); cal=calibrated_weights(history); workload_context=workload_context or build_workload_context(log,game.game_time); seed=int(hashlib.sha256(f"{game.key}|{game.game_time}|{APP_VERSION}".encode()).hexdigest()[:8],16); features=build_engine_features(log,game,opponent_k_pct,lineup_batters,workload_context); engine=ProjectionEngine(simulation_weight=.5,seed=seed); result=engine.project(features,draws=simulations,lines=tuple(float(x) for x in range(3,11))); global_w=float(np.mean([r.weight_simulation for r in cal.values()])) if cal else .5; mean_k=global_w*result.simulation_mean+(1-global_w)*result.mathematical_mean; outs_seed=int(hashlib.sha256(f"outs|{game.key}|{APP_VERSION}".encode()).hexdigest()[:8],16); outs_model=project_total_outs(log,expected_outs=workload_context.expected_outs,workload_sd=workload_context.outs_sd,seed=outs_seed,draws=simulations,lines=(13.5,14.5,15.5,16.5,17.5,18.5)); mean_outs=outs_model.ensemble_mean; osd=outs_model.ensemble_sd; outs_samples=outs_model.simulation_samples; outs_probs=np.array([float(np.mean(outs_samples==i)) for i in range(28)]); quality=int(round(result.data_quality)); confidence="High" if result.confidence>=.75 else "Medium" if result.confidence>=.60 else "Low"; return Projection(mean_k,mean_outs,result.ensemble_sd,osd,result.mathematical_pmf,outs_probs,result.simulation_samples,outs_samples,confidence,quality,[(n,v) for n,v,_ in result.drivers],result,outs_model)
 
 def american(p):
     p=float(np.clip(p,.001,.999)); o=-100*p/(1-p) if p>=.5 else 100*(1-p)/p; return f"{o:+.0f}"
@@ -405,10 +406,11 @@ opposing_batters=get_opposing_batters(
 opponent_matchup=matchup_summary(opposing_batters,confirmed_lineup=lineup_context.confirmed)
 weather_risk=get_game_weather(game.venue_id,game.game_time)
 confirmed_count=lineup_context.batter_count if lineup_context.confirmed else 0
-proj=calculate_projection(log,game,25000,float(opponent_matchup["k_rate"]),confirmed_count); kdf=ladder(proj,10)
-features_for_hits=build_engine_features(log,game,float(opponent_matchup["k_rate"]),confirmed_count)
+workload_ctx=build_workload_context(log,game.game_time)
+proj=calculate_projection(log,game,25000,float(opponent_matchup["k_rate"]),confirmed_count,workload_ctx); kdf=ladder(proj,10)
+features_for_hits=build_engine_features(log,game,float(opponent_matchup["k_rate"]),confirmed_count,workload_ctx)
 hits_seed=int(hashlib.sha256(f"hits|{game.key}|{game.game_time}|{APP_VERSION}".encode()).hexdigest()[:8],16)
-hits_proj=project_hits_allowed(log,expected_bf=features_for_hits["expected_bf"],opponent_hit_rate=float(opponent_matchup.get("hit_rate",.235)),seed=hits_seed,draws=25000,lines=(3.5,4.5,5.5,6.5,7.5,8.5))
+hits_proj=project_hits_allowed(log,expected_bf=features_for_hits["expected_bf"],bf_sd=workload_ctx.bf_sd,opponent_hit_rate=float(opponent_matchup.get("hit_rate",.235)),seed=hits_seed,draws=25000,lines=(3.5,4.5,5.5,6.5,7.5,8.5))
 odds_events,odds_err=get_odds_events(); odds_event_id=find_odds_event(odds_events,game)
 odds_payload_key=f"projection_live_odds:{game.key}"
 odds_quota_key=f"projection_live_odds_quota:{game.key}"
@@ -455,7 +457,16 @@ if nav=="Distribution":
     with b: st.markdown("### Outs probability distribution"); st.bar_chart(pd.DataFrame({"Probability":proj.outs_probs},index=np.arange(len(proj.outs_probs))))
     st.stop()
 elif nav=="Form & Workload":
-    st.markdown('<div class="section-head">FORM & WORKLOAD</div>',unsafe_allow_html=True); st.caption(f"{game.pitcher_name} · last 15 starts"); d=log.tail(15).copy(); st.line_chart(d.set_index("date")[["k","outs"]]); st.dataframe(d.sort_values("date",ascending=False),use_container_width=True,hide_index=True); st.stop()
+    st.markdown('<div class="section-head">FORM & WORKLOAD</div>',unsafe_allow_html=True); st.caption(f"{game.pitcher_name} · workload-v1 uses starter history only; sportsbook data is not an input.")
+    w1,w2,w3,w4,w5,w6=st.columns(6)
+    w1.metric("Expected pitches",f"{workload_ctx.expected_pitches:.1f}")
+    w2.metric("Expected BF",f"{workload_ctx.expected_bf:.1f}")
+    w3.metric("Expected outs",f"{workload_ctx.expected_outs:.1f}")
+    w4.metric("Pitches / BF",f"{workload_ctx.pitches_per_bf:.2f}")
+    w5.metric("Days since last start","—" if workload_ctx.days_since_last_start is None else workload_ctx.days_since_last_start)
+    w6.metric("Recent leash",workload_ctx.leash_label)
+    st.caption(f"Pitch trend {workload_ctx.pitch_trend:+.1%} · BF trend {workload_ctx.bf_trend:+.1%} · outs trend {workload_ctx.outs_trend:+.1%} · short-rest exposure multiplier {workload_ctx.rest_multiplier:.3f}.")
+    d=log.tail(15).copy(); st.line_chart(d.set_index("date")[["pitches","bf","outs","k"]]); st.dataframe(d.sort_values("date",ascending=False),use_container_width=True,hide_index=True); st.stop()
 elif nav=="Model Card":
     st.markdown('<div class="section-head">MODEL CARD</div>',unsafe_allow_html=True); st.write("Two independent paths: (1) plate-appearance Monte Carlo game simulation with workload uncertainty; (2) independent mathematical Negative-Binomial probability model. Milestone probabilities are calibrated from resolved pregame projections when enough observations exist. Sportsbook prices are used only for edge display, never to create the baseball forecast."); st.markdown("### Path comparison"); path_df=pd.DataFrame([{"Path":"Simulation","Mean K":proj.engine.simulation_mean,"SD":proj.engine.simulation_sd},{"Path":"Mathematical","Mean K":proj.engine.mathematical_mean,"SD":proj.engine.mathematical_sd},{"Path":"Ensemble","Mean K":proj.mean_k,"SD":proj.k_sd}]); path_df["Mean K"]=path_df["Mean K"].map(lambda v:f"{v:.2f}"); path_df["SD"]=path_df["SD"].map(lambda v:f"{v:.2f}"); st.dataframe(path_df,use_container_width=True,hide_index=True); model_view=kdf[["Line","Probability","Simulation","Math","Sim Weight"]].copy()
     for c in ("Probability","Simulation","Math","Sim Weight"): model_view[c]=model_view[c].map(lambda v:f"{v:.1%}")
@@ -552,6 +563,9 @@ with st.expander(f"🔎 Why this projection? · {game.pitcher_name}", expanded=F
         st.caption(f"Calibration: {'learned' if k_cal.calibrated else '50/50 baseline'} · {k_cal.observations} compatible resolved observations.")
         st.write(f"Opponent K input: **{features_for_hits['opponent_k_pct']:.1%}**")
         st.write(f"Expected batters faced: **{features_for_hits['expected_bf']:.1f}**")
+        st.write(f"Expected pitches: **{workload_ctx.expected_pitches:.1f}** · expected outs: **{workload_ctx.expected_outs:.1f}**")
+        st.write(f"Pitch efficiency: **{workload_ctx.pitches_per_bf:.2f} pitches/BF** · recent leash: **{workload_ctx.leash_label}**")
+        st.write(f"Days since last start: **{'—' if workload_ctx.days_since_last_start is None else workload_ctx.days_since_last_start}** · pitch trend: **{workload_ctx.pitch_trend:+.1%}**")
         st.write(f"Park K factor: **{features_for_hits['park_factor']:.3f}**")
     with why_right:
         st.markdown("#### Hits Allowed · Over 5.5")

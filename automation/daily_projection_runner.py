@@ -18,9 +18,10 @@ from engine.hits_allowed import project_hits_allowed
 from engine.outs_projection import project_total_outs
 from engine.starter_history import HISTORY_SEMANTICS, TARGET_STARTER_HISTORY, combine_starter_history, starter_only
 from engine.weather_risk import WeatherDelayRisk, fetch_weather_delay_risk
+from engine.workload_context import WORKLOAD_VERSION, WorkloadContext, build_workload_context
 
 BASE = "https://statsapi.mlb.com/api/v1"
-APP_VERSION = "3.6.0"
+APP_VERSION = "3.7.0"
 PROBABILITY_SEMANTICS = "milestone-ceil-v1"
 EASTERN = ZoneInfo("America/New_York")
 ROOT = Path(__file__).resolve().parents[1]
@@ -349,14 +350,19 @@ def matchup_k_rate(opponent: str, pitcher_id: int, season: int, opponent_team_id
     return float(summary["k_rate"]), int(summary["pa"]), int(len(batters))
 
 
-def features(log: pd.DataFrame, venue: str, opponent_k_pct: float = .224, lineup_batters: int = 0, matchup_source: str = LINEUP_ACTIVE_ROSTER) -> dict[str, float]:
+def features(
+    log: pd.DataFrame,
+    venue: str,
+    opponent_k_pct: float = .224,
+    lineup_batters: int = 0,
+    matchup_source: str = LINEUP_ACTIVE_ROSTER,
+    workload: WorkloadContext | None = None,
+) -> dict[str, float]:
     starts = log.tail(35).copy()
     total_bf = float(starts.bf.sum())
     raw_k = float(starts.k.sum() / max(total_bf, 1))
     pitcher_k = float(np.clip(shrink(raw_k, total_bf), .05, .45))
-    bf = weighted(starts.bf, 5, 22)
-    pitches = weighted(starts.pitches, 5, 88)
-    workload = float(np.clip(92 / max(pitches, 75), .78, 1.12))
+    workload = workload or build_workload_context(starts)
     return {
         "pitcher_k_pct": pitcher_k,
         "opponent_k_pct": float(np.clip(opponent_k_pct, .08, .45)),
@@ -365,8 +371,10 @@ def features(log: pd.DataFrame, venue: str, opponent_k_pct: float = .224, lineup
         "park_factor": PARK_K_FACTOR.get(venue, 1.0),
         "umpire_factor": 1.0,
         "weather_factor": 1.0,
-        "expected_bf": float(np.clip(bf * workload, 10, 35)),
-        "bf_sd": float(np.clip(starts.bf.std(ddof=1) if len(starts) > 2 else 3.5, 1, 7)),
+        "expected_bf": float(workload.expected_bf),
+        "bf_sd": float(workload.bf_sd),
+        # Short-rest handling is already baked into expected exposure. Keep the
+        # engine-level factor neutral so the same rest signal is not counted twice.
         "rest_factor": 1.0,
         "historical_k_sd": float(np.clip(starts.k.std(ddof=1) if len(starts) > 2 else 2.0, .75, 4.5)),
         "historical_games": int(len(starts)),
@@ -421,6 +429,7 @@ def project(row: dict) -> dict | None:
     if log.empty:
         record_history_only(row, history_games=0)
         return None
+    workload = build_workload_context(log, row.get("game_time") or row.get("game_date"))
     matchup = matchup_context(
         row["game_pk"], row["opponent"], row["pitcher_id"], season, row.get("opponent_team_id")
     )
@@ -431,12 +440,14 @@ def project(row: dict) -> dict | None:
         opponent_k_pct=opponent_k_pct,
         lineup_batters=int(matchup["lineup_batters"]),
         matchup_source=str(matchup["source"]),
+        workload=workload,
     )
     seed = int(hashlib.sha256(f"{row['game_pk']}:{row['pitcher_id']}|{row['game_time']}|{APP_VERSION}".encode()).hexdigest()[:8], 16)
     result = ProjectionEngine(seed=seed).project(f, draws=25000, lines=tuple(float(x) for x in range(3, 11)))
     hits = project_hits_allowed(
         log,
         expected_bf=f["expected_bf"],
+        bf_sd=workload.bf_sd,
         opponent_hit_rate=float(matchup.get("hit_rate", .235)),
         seed=seed ^ 0x5A17,
         draws=25000,
@@ -444,6 +455,8 @@ def project(row: dict) -> dict | None:
     )
     outs = project_total_outs(
         log,
+        expected_outs=workload.expected_outs,
+        workload_sd=workload.outs_sd,
         seed=seed ^ 0x0A75,
         draws=25000,
         lines=(13.5, 14.5, 15.5, 16.5, 17.5, 18.5),
@@ -461,6 +474,11 @@ def project(row: dict) -> dict | None:
         "starter_history_source": str(history_provenance["source"]),
         "starter_history_mlb_games": int(history_provenance["mlb_games"]),
         "starter_history_observation_games": int(history_provenance["observation_games"]),
+        **workload.snapshot_fields(),
+        "workload_preupgrade_projection": np.nan, "workload_preupgrade_hits_projection": np.nan,
+        "workload_preupgrade_outs_projection": np.nan, "workload_preupgrade_expected_bf": np.nan,
+        "workload_projection_delta_k": np.nan, "workload_projection_delta_hits": np.nan,
+        "workload_projection_delta_outs": np.nan,
         "projection": result.ensemble_mean, "k_sd": result.ensemble_sd,
         "k_range_low": int(np.quantile(result.simulation_samples, .10)),
         "k_range_high": int(np.quantile(result.simulation_samples, .90)),
@@ -482,7 +500,8 @@ def project(row: dict) -> dict | None:
         "pitch_limit": 92, "umpire_k_factor": 1.0,
         "weather_factor": 1.0, "rest_factor": 1.0,
         **weather,
-        "actual_strikeouts": np.nan, "actual_hits_allowed": np.nan, "actual_outs": np.nan, "resolved_at_utc": "",
+        "actual_strikeouts": np.nan, "actual_hits_allowed": np.nan, "actual_outs": np.nan,
+        "actual_batters_faced": np.nan, "actual_pitches": np.nan, "resolved_at_utc": "",
     }
     for line in range(3, 11):
         out[f"sim_{line}p"] = raw_sim.get(float(line), np.nan)
@@ -594,7 +613,7 @@ def refresh_pregame_lineups(frame: pd.DataFrame, announced: list[dict]) -> int:
             continue
         if not projected or str(projected.get("lineup_source", "")) != LINEUP_CONFIRMED:
             continue
-        protected = {"actual_strikeouts", "actual_hits_allowed", "actual_outs", "resolved_at_utc"}
+        protected = {"actual_strikeouts", "actual_hits_allowed", "actual_outs", "actual_batters_faced", "actual_pitches", "resolved_at_utc"}
         for field, value in projected.items():
             if field not in protected:
                 frame.at[idx, field] = value
@@ -617,7 +636,8 @@ def fill_missing_pregame_paths(frame: pd.DataFrame) -> int:
         row = frame.loc[idx]
         needs_hits = pd.isna(row.get("hits_projection"))
         needs_outs = pd.isna(row.get("outs_projection"))
-        if ((row_has_complete_paths(row) and row_has_current_semantics(row) and not needs_hits and not needs_outs) or not row_is_pregame(row, now)):
+        needs_workload = str(row.get("workload_version", "")) != WORKLOAD_VERSION
+        if ((row_has_complete_paths(row) and row_has_current_semantics(row) and not needs_hits and not needs_outs and not needs_workload) or not row_is_pregame(row, now)):
             continue
         try:
             projected = project({
@@ -638,11 +658,56 @@ def fill_missing_pregame_paths(frame: pd.DataFrame) -> int:
             continue
         if not projected:
             continue
-        for key, value in projected.items():
-            if key.startswith("sim_") or key.startswith("math_") or key.startswith("hits_") or key.startswith("outs_") or key in {"probability_semantics"}:
-                frame.at[idx, key] = value
+        if needs_workload:
+            old_k = pd.to_numeric(pd.Series([row.get("projection")]), errors="coerce").iloc[0]
+            old_hits = pd.to_numeric(pd.Series([row.get("hits_projection")]), errors="coerce").iloc[0]
+            old_outs = pd.to_numeric(pd.Series([row.get("outs_projection")]), errors="coerce").iloc[0]
+            old_bf = pd.to_numeric(pd.Series([row.get("expected_bf")]), errors="coerce").iloc[0]
+            protected = {
+                "actual_strikeouts", "actual_hits_allowed", "actual_outs", "actual_batters_faced", "actual_pitches", "resolved_at_utc",
+                "lineup_preconfirm_projection", "lineup_preconfirm_opponent_k_pct", "lineup_projection_delta", "lineup_opponent_k_delta",
+            }
+            for key, value in projected.items():
+                if key not in protected:
+                    frame.at[idx, key] = value
+            frame.at[idx, "workload_preupgrade_projection"] = old_k
+            frame.at[idx, "workload_preupgrade_hits_projection"] = old_hits
+            frame.at[idx, "workload_preupgrade_outs_projection"] = old_outs
+            frame.at[idx, "workload_preupgrade_expected_bf"] = old_bf
+            for old_value, new_key, delta_key in (
+                (old_k, "projection", "workload_projection_delta_k"),
+                (old_hits, "hits_projection", "workload_projection_delta_hits"),
+                (old_outs, "outs_projection", "workload_projection_delta_outs"),
+            ):
+                new_value = pd.to_numeric(pd.Series([projected.get(new_key)]), errors="coerce").iloc[0]
+                frame.at[idx, delta_key] = np.nan if pd.isna(old_value) or pd.isna(new_value) else float(new_value - old_value)
+        else:
+            for key, value in projected.items():
+                if key.startswith("sim_") or key.startswith("math_") or key.startswith("hits_") or key.startswith("outs_") or key in {"probability_semantics"}:
+                    frame.at[idx, key] = value
         updated += 1
     return updated
+
+
+def resolve_workload_actuals(row: pd.Series) -> tuple[object, object]:
+    if pd.notna(row.get("actual_batters_faced")) and pd.notna(row.get("actual_pitches")):
+        return row.get("actual_batters_faced"), row.get("actual_pitches")
+    if pd.isna(row.get("game_pk")) or pd.isna(row.get("pitcher_id")):
+        return np.nan, np.nan
+    try:
+        data = get_json(f"game/{int(row['game_pk'])}/boxscore", {})
+        status = data.get("gameData", {}).get("status", {})
+        if status.get("abstractGameState") != "Final":
+            return np.nan, np.nan
+        player = data.get("teams", {}).get("away", {}).get("players", {}).get(f"ID{int(row['pitcher_id'])}")
+        if not player:
+            player = data.get("teams", {}).get("home", {}).get("players", {}).get(f"ID{int(row['pitcher_id'])}")
+        pitching = (player or {}).get("stats", {}).get("pitching", {})
+        bf = pitching.get("battersFaced")
+        pitches = pitching.get("numberOfPitches")
+        return (int(bf) if bf is not None else np.nan), (int(pitches) if pitches is not None else np.nan)
+    except (requests.RequestException, ValueError, TypeError):
+        return np.nan, np.nan
 
 
 def resolve_row(row: pd.Series) -> tuple[object, object, object, str]:
@@ -678,12 +743,17 @@ def main() -> None:
     if not frame.empty:
         for idx in frame.index:
             actual_k, actual_hits, actual_outs, resolved = resolve_row(frame.loc[idx])
+            actual_bf, actual_pitches = resolve_workload_actuals(frame.loc[idx])
             if pd.notna(actual_k):
                 frame.at[idx, "actual_strikeouts"] = actual_k
             if pd.notna(actual_hits):
                 frame.at[idx, "actual_hits_allowed"] = actual_hits
             if pd.notna(actual_outs):
                 frame.at[idx, "actual_outs"] = actual_outs
+            if pd.notna(actual_bf):
+                frame.at[idx, "actual_batters_faced"] = actual_bf
+            if pd.notna(actual_pitches):
+                frame.at[idx, "actual_pitches"] = actual_pitches
             if resolved:
                 frame.at[idx, "resolved_at_utc"] = resolved
 
@@ -719,7 +789,7 @@ def main() -> None:
             col = f"{prefix}_{line}p"
             if col not in frame.columns:
                 frame[col] = np.nan
-    for col in ["actual_strikeouts", "actual_hits_allowed", "actual_outs", "resolved_at_utc"]:
+    for col in ["actual_strikeouts", "actual_hits_allowed", "actual_outs", "actual_batters_faced", "actual_pitches", "resolved_at_utc"]:
         if col not in frame.columns:
             frame[col] = np.nan if col != "resolved_at_utc" else ""
     frame.to_csv(LOG_PATH, index=False)
