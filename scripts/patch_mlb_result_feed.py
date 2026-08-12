@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# One-shot patch: route final-game reads through MLB's v1.1 live feed.
 RUNNER = Path("automation/daily_projection_runner.py")
 RESOLVER = Path("automation/resolve_projection_log.py")
 
