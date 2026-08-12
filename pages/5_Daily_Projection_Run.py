@@ -79,7 +79,7 @@ def save_log(frame: pd.DataFrame) -> None:
     frame.to_csv(LOG_PATH, index=False)
 
 
-def run_full_slate(day: str) -> tuple[pd.DataFrame, int, int, list[str]]:
+def run_full_slate(day: str) -> tuple[pd.DataFrame, int, int, list[str], list[str]]:
     frame = load_log()
     announced = schedule(day)
     existing = set()
@@ -93,6 +93,7 @@ def run_full_slate(day: str) -> tuple[pd.DataFrame, int, int, list[str]]:
 
     new_rows: list[dict] = []
     skipped = 0
+    history_only: list[str] = []
     errors: list[str] = []
     for row in announced:
         key = (row["game_pk"], row["pitcher_id"])
@@ -105,7 +106,9 @@ def run_full_slate(day: str) -> tuple[pd.DataFrame, int, int, list[str]]:
             errors.append(f"{row.get('player', 'Unknown')}: {type(exc).__name__}: {exc}")
             continue
         if result is None:
-            errors.append(f"{row.get('player', 'Unknown')}: no usable pitcher history")
+            history_only.append(
+                f"{row.get('player', 'Unknown')}: no usable starter history — final K / hits / outs / BF / pitches will be tracked"
+            )
             continue
         new_rows.append(result)
 
@@ -116,7 +119,7 @@ def run_full_slate(day: str) -> tuple[pd.DataFrame, int, int, list[str]]:
     save_log(frame)
 
     slate = frame.loc[frame.get("game_date", pd.Series(dtype=str)).astype(str).eq(day)].copy() if not frame.empty else pd.DataFrame()
-    return slate, len(new_rows), skipped + refreshed, errors
+    return slate, len(new_rows), skipped + refreshed, history_only, errors
 
 
 def _num(row: pd.Series, key: str) -> float | None:
@@ -221,26 +224,30 @@ st.info(
 if st.button("⚾ RUN ALL TODAY'S PITCHERS", type="primary", use_container_width=True):
     with st.spinner("Simulating every announced starter and writing pregame snapshots..."):
         try:
-            slate, added, skipped, errors = run_full_slate(slate_date.isoformat())
+            slate, added, skipped, history_only, errors = run_full_slate(slate_date.isoformat())
         except Exception as exc:
             slate = pd.DataFrame()
             added = skipped = 0
+            history_only = []
             errors = [f"Slate run failed: {type(exc).__name__}: {exc}"]
     st.session_state["daily_slate"] = slate
     st.session_state["daily_added"] = added
     st.session_state["daily_skipped"] = skipped
+    st.session_state["daily_history_only"] = history_only
     st.session_state["daily_errors"] = errors
 
 slate = st.session_state.get("daily_slate")
 if isinstance(slate, pd.DataFrame):
     added = int(st.session_state.get("daily_added", 0))
     skipped = int(st.session_state.get("daily_skipped", 0))
+    history_only = list(st.session_state.get("daily_history_only", []))
     errors = list(st.session_state.get("daily_errors", []))
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Slate pitchers", len(slate))
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Projected starters", len(slate))
     c2.metric("New snapshots", added)
     c3.metric("Already captured/refreshed", skipped)
-    c4.metric("Errors", len(errors))
+    c4.metric("History-only tracked", len(history_only))
+    c5.metric("Errors", len(errors))
 
     if not slate.empty:
         display_cols = [
@@ -300,8 +307,17 @@ if isinstance(slate, pd.DataFrame):
         compatible = int(slate.get("probability_semantics", pd.Series(dtype=str)).astype(str).eq(PROBABILITY_SEMANTICS).sum())
         st.caption(f"{compatible}/{len(slate)} rows use the current calibration probability semantics: {PROBABILITY_SEMANTICS}.")
 
+    if history_only:
+        st.info("📚 History-only starters being tracked")
+        st.caption(
+            "These starters were not projected because there was not enough legitimate starter history. "
+            "Their final strikeouts, hits allowed, outs, batters faced, and pitches will still be saved so future starts can use the new data."
+        )
+        for pitcher in history_only:
+            st.write(f"- {pitcher}")
+
     if errors:
-        st.warning("Some announced starters could not be captured:")
+        st.warning("Some announced starters hit real capture errors:")
         for error in errors:
             st.write(f"- {error}")
 
