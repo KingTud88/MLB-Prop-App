@@ -300,13 +300,19 @@ if isinstance(slate, pd.DataFrame):
     c6.metric("Confirmed lineups", confirmed_lineups)
 
     if not slate.empty:
+        # Keep the primary projection scan tight: pitcher/matchup first, then Ks.
+        # Audit/context fields (weather, starter sample, workload) stay available
+        # but live farther right so they do not separate the pitcher from Projection K.
         display_cols = [
-            "player", "starter_history_games", "starter_history_source", "starter_history_mlb_games", "starter_history_observation_games", "workload_version", "expected_pitches", "expected_bf", "expected_outs", "pitches_per_bf", "days_since_last_start", "leash_label", "pitch_trend", "weather_icon", "weather_delay_risk", "weather_precip_probability", "lineup_source", "lineup_batters", "lineup_projection_delta", "team", "opponent", "projection", "k_range_low", "k_range_high",
-            "hits_projection", "hits_range_low", "hits_range_high",
-            "outs_projection", "outs_range_low", "outs_range_high",
-            "confidence", "data_quality", "opponent_k_pct", "sim_5p", "math_5p",
-            "hits_sim_over_5_5", "hits_math_over_5_5", "outs_sim_over_15_5", "outs_math_over_15_5", "probability_semantics",
-            "actual_strikeouts", "actual_hits_allowed", "actual_outs",
+            "player", "team", "opponent", "projection", "k_range_low", "k_range_high", "sim_5p", "math_5p",
+            "hits_projection", "hits_range_low", "hits_range_high", "hits_sim_over_5_5", "hits_math_over_5_5",
+            "outs_projection", "outs_range_low", "outs_range_high", "outs_sim_over_15_5", "outs_math_over_15_5",
+            "confidence", "data_quality", "opponent_k_pct",
+            "lineup_source", "lineup_batters", "lineup_projection_delta",
+            "weather_icon", "weather_delay_risk", "weather_precip_probability",
+            "starter_history_games", "starter_history_source", "starter_history_mlb_games", "starter_history_observation_games",
+            "workload_version", "expected_pitches", "expected_bf", "expected_outs", "pitches_per_bf", "days_since_last_start", "leash_label", "pitch_trend",
+            "probability_semantics", "actual_strikeouts", "actual_hits_allowed", "actual_outs",
         ]
         display_cols = [c for c in display_cols if c in slate.columns]
         display = slate[display_cols].copy()
