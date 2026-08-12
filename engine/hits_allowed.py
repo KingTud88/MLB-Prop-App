@@ -52,6 +52,7 @@ def project_hits_allowed(
     log: pd.DataFrame,
     *,
     expected_bf: float | None = None,
+    bf_sd: float | None = None,
     opponent_hit_rate: float | None = None,
     park_factor: float = 1.0,
     seed: int | None = None,
@@ -65,6 +66,9 @@ def project_hits_allowed(
     then draws hits from a binomial game model. The mathematical path uses an
     over-dispersed Negative Binomial distribution fit from the pitcher's recent
     hits-allowed history. Sportsbook prices are intentionally not inputs.
+
+    ``expected_bf`` and ``bf_sd`` may be supplied by the shared pregame workload
+    engine. When omitted, this function retains its historical workload fallback.
     """
     if log.empty or "bf" not in log or "hits" not in log:
         raise ValueError("hits-allowed projection requires game-log 'bf' and 'hits' columns")
@@ -88,7 +92,9 @@ def project_hits_allowed(
     if expected_bf is None:
         expected_bf = _weighted(starts["bf"], 5.0, 22.0)
     expected_bf = float(np.clip(expected_bf, 10.0, 35.0))
-    bf_sd = float(np.clip(starts["bf"].std(ddof=1) if len(starts) > 2 else 3.5, 1.0, 7.0))
+    if bf_sd is None:
+        bf_sd = float(starts["bf"].std(ddof=1) if len(starts) > 2 else 3.5)
+    bf_sd = float(np.clip(bf_sd, 1.0, 7.0))
 
     rng = np.random.default_rng(seed)
     simulated_bf = np.clip(np.rint(rng.normal(expected_bf, bf_sd, int(draws))), 6, 40).astype(int)
