@@ -71,6 +71,7 @@ def test_projection_parlay_builder_has_no_hard_leg_cap():
     assert "if len(legs)>=5" not in source
     assert "very high variance" in source
     assert "does not multiply model probabilities" in source
+    assert "({len(legs)}/5)" not in source
 
 
 def test_tracker_page_applies_result_status_styling_and_grades_parlays():

@@ -209,7 +209,7 @@ def queue_projection_parlay_leg(leg):
     if any(_projection_leg_key(existing)==key for existing in legs):
         return False,"That exact leg is already in the Projection Parlay Builder."
     legs.append(dict(leg)); st.session_state[PROJECTION_PARLAY_KEY]=legs
-    return True,f"Added to Projection Parlay Builder ({len(legs)}/5)."
+    return True,f"Added to Projection Parlay Builder ({len(legs)} leg" + ("" if len(legs)==1 else "s") + ")."
 
 def save_projection_straight(*,game,game_date,market,line,side,projection,model_probability,stake,confidence,data_quality,offer,source):
     price=float(offer.get("price")) if offer is not None and offer.get("price") is not None else None
