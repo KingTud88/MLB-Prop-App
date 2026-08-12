@@ -13,7 +13,7 @@ from training.workload_tight_backtest import (
 
 def _detail() -> pd.DataFrame:
     rows = []
-    dates = pd.date_range("2026-04-01", periods=90, freq="D")
+    dates = pd.date_range("2026-04-01", periods=120, freq="D")
     for i, date in enumerate(dates):
         if i % 3 == 0:
             leash = "TIGHT"
