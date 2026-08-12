@@ -1,0 +1,45 @@
+name: Run team leash refresh hardening
+
+on:
+  push:
+    paths:
+      - scripts/harden_team_leash_refresh.py
+      - .github/workflows/run-team-leash-hardening.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt pytest
+      - name: Apply refresh hardening
+        run: python scripts/harden_team_leash_refresh.py
+      - name: Compile
+        run: python -m compileall -q streamlit_app.py navigation.py pages engine automation tests
+      - name: Test
+        run: pytest -q
+      - name: Commit hardening
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add automation/daily_projection_runner.py tests/test_team_leash_refresh_order.py
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Harden team leash refresh ordering"
+          for attempt in 1 2 3; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              exit 0
+            fi
+            git rebase --abort || true
+            sleep $((attempt * 2))
+          done
+          exit 1
