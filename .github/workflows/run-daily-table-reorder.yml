@@ -1,0 +1,45 @@
+name: Run Daily table reorder
+
+on:
+  push:
+    paths:
+      - scripts/reorder_daily_table.py
+      - .github/workflows/run-daily-table-reorder.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt pytest
+      - name: Apply Daily table reorder
+        run: python scripts/reorder_daily_table.py
+      - name: Compile
+        run: python -m compileall -q streamlit_app.py navigation.py pages engine automation tests
+      - name: Test
+        run: pytest -q
+      - name: Commit feature
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pages/5_Daily_Projection_Run.py tests/test_daily_table_order.py
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Reorder Daily projection table for faster K scanning"
+          for attempt in 1 2 3; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              exit 0
+            fi
+            git rebase --abort || true
+            sleep $((attempt * 2))
+          done
+          exit 1
