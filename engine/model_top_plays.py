@@ -81,8 +81,16 @@ def over_probability(row: Mapping[str, object], market: str, line: float, histor
     return None
 
 
-def build_model_candidate(row: Mapping[str, object], market: str, history: pd.DataFrame) -> dict[str, object] | None:
+def build_model_candidate(
+    row: Mapping[str, object],
+    market: str,
+    history: pd.DataFrame,
+    market_health: Mapping[str, str] | None = None,
+) -> dict[str, object] | None:
     """Build one model-first betting candidate without using sportsbook prices."""
+    health_status = str((market_health or {}).get(market, "LEARNING")).upper()
+    if health_status == "BLOCKED":
+        return None
     if str(row.get("history_semantics", "")) != HISTORY_SEMANTICS:
         return None
     starter_games = _num(row.get("starter_history_games"))
@@ -122,6 +130,7 @@ def build_model_candidate(row: Mapping[str, object], market: str, history: pd.Da
         "Data Quality": int(round(quality)),
         "Starter History": int(starter_games),
         "Status": status,
+        "Model Health": health_status,
         "Game PK": row.get("game_pk"),
         "Pitcher ID": row.get("pitcher_id"),
         "Team": row.get("team", ""),
@@ -138,13 +147,18 @@ def build_model_candidate(row: Mapping[str, object], market: str, history: pd.Da
     }
 
 
-def build_model_board(slate: pd.DataFrame, history: pd.DataFrame, limit: int = 5) -> pd.DataFrame:
-    """Rank the slate by the model's own hit probability, never by price or edge."""
+def build_model_board(
+    slate: pd.DataFrame,
+    history: pd.DataFrame,
+    limit: int = 5,
+    market_health: Mapping[str, str] | None = None,
+) -> pd.DataFrame:
+    """Rank the slate by model hit probability, with validated market-health blocking."""
     rows: list[dict[str, object]] = []
     for _, snapshot in slate.iterrows():
         row = snapshot.to_dict()
         for market in MARKETS:
-            candidate = build_model_candidate(row, market, history)
+            candidate = build_model_candidate(row, market, history, market_health=market_health)
             if candidate is not None:
                 rows.append(candidate)
     if not rows:
