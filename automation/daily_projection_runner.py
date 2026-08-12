@@ -41,8 +41,26 @@ SESSION = requests.Session()
 SESSION.headers.update({"Accept":"application/json", "User-Agent":f"StrikeOutKing9000/{APP_VERSION}"})
 
 
+LIVE_BASE = "https://statsapi.mlb.com/api/v1.1"
+
+
 def get_json(endpoint: str, params: dict) -> dict:
-    r = SESSION.get(f"{BASE}/{endpoint}", params=params, timeout=30)
+    # MLB's live-feed endpoint is the reliable source for final game boxscores.
+    # Keep v1 for schedule/people/stats calls, but transparently route game
+    # boxscore reads through v1.1 and return the shape our resolvers expect.
+    if endpoint.startswith("game/") and endpoint.endswith("/boxscore"):
+        live_endpoint = endpoint[:-len("boxscore")] + "feed/live"
+        r = SESSION.get(f"{LIVE_BASE}/{live_endpoint}", params=params, timeout=30)
+        r.raise_for_status()
+        live = r.json()
+        if not isinstance(live, dict):
+            raise ValueError("Unexpected MLB live-feed response")
+        return {
+            "gameData": live.get("gameData", {}),
+            "teams": live.get("liveData", {}).get("boxscore", {}).get("teams", {}),
+        }
+    base = LIVE_BASE if endpoint.startswith("game/") and endpoint.endswith("/feed/live") else BASE
+    r = SESSION.get(f"{base}/{endpoint}", params=params, timeout=30)
     r.raise_for_status()
     data = r.json()
     if not isinstance(data, dict):

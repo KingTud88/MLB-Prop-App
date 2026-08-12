@@ -13,8 +13,23 @@ SESSION = requests.Session()
 SESSION.headers.update({"Accept": "application/json", "User-Agent": "StrikeOutKing9000/3.5.0"})
 
 
+LIVE_BASE = "https://statsapi.mlb.com/api/v1.1"
+
+
 def get_json(endpoint: str, params: dict | None = None) -> dict:
-    response = SESSION.get(f"{BASE}/{endpoint}", params=params or {}, timeout=30)
+    if endpoint.startswith("game/") and endpoint.endswith("/boxscore"):
+        live_endpoint = endpoint[:-len("boxscore")] + "feed/live"
+        response = SESSION.get(f"{LIVE_BASE}/{live_endpoint}", params=params or {}, timeout=30)
+        response.raise_for_status()
+        live = response.json()
+        if not isinstance(live, dict):
+            raise ValueError("Unexpected MLB live-feed response")
+        return {
+            "gameData": live.get("gameData", {}),
+            "teams": live.get("liveData", {}).get("boxscore", {}).get("teams", {}),
+        }
+    base = LIVE_BASE if endpoint.startswith("game/") and endpoint.endswith("/feed/live") else BASE
+    response = SESSION.get(f"{base}/{endpoint}", params=params or {}, timeout=30)
     response.raise_for_status()
     data = response.json()
     if not isinstance(data, dict):
