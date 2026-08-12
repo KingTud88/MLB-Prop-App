@@ -689,7 +689,7 @@ def refresh_pregame_lineups(frame: pd.DataFrame, announced: list[dict]) -> int:
             "workload_projection_delta_outs", "workload_preupgrade_app_version", "workload_upgraded_at_utc",
         }
         for field, value in projected.items():
-            if field not in protected:
+            if field not in protected and not field.startswith("team_leash_"):
                 frame.at[idx, field] = value
         frame.at[idx, "lineup_preconfirm_projection"] = old_projection
         frame.at[idx, "lineup_preconfirm_opponent_k_pct"] = old_opp_k
@@ -898,6 +898,7 @@ def main() -> None:
     if "probability_semantics" not in frame.columns:
         frame["probability_semantics"] = ""
     refreshed = fill_missing_pregame_paths(frame)
+    team_leash_refreshes += attach_pregame_team_leash(frame)
     lineup_refreshes = refresh_pregame_lineups(frame, rows)
 
     for line in range(3, 11):
