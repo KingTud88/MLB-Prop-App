@@ -92,7 +92,7 @@ text = replace_once(
         )
 ''',
     '''        st.caption(
-            "workload-v1 status stays LEARNING below 30 evaluated starts; HELPING requires at least 3% lower MAE than rolling-5 and a 52%+ individual-start win share. "
+            "Status stays LEARNING below 30 evaluated starts. workload-v1 HELPING requires at least 3% lower MAE than rolling-5 and a 52%+ individual-start win share. "
             "The v2 candidate is judged separately against workload-v1: it must lower MAE, reduce absolute bias, and win enough actually-adjusted starts. "
             "Candidate status is evidence only; workload-v2 remains REPORT ONLY / NOT LIVE until promotion is explicitly earned and implemented."
         )
