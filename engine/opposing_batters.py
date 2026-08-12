@@ -7,10 +7,11 @@ import requests
 
 MLB_API = "https://statsapi.mlb.com/api/v1"
 LEAGUE_K_RATE = 0.224
+LEAGUE_HIT_RATE = 0.235
 LINEUP_SPLIT_PRIOR_PA = 60.0
 
 
-COLUMNS = ["Batter", "Hand", "Lineup Spot", "K% vs Pitcher", "PA", "Risk", "Split Available"]
+COLUMNS = ["Batter", "Hand", "Lineup Spot", "K% vs Pitcher", "H/PA vs Pitcher", "PA", "Risk", "Split Available"]
 
 
 def _risk(rate: float) -> str:
@@ -96,23 +97,28 @@ def get_opposing_batters(
                 person_bat_side = str(((person.get("batSide") or {}).get("code")) or handed.get(pid, ""))
                 best_pa = -1.0
                 best_rate: float | None = None
+                best_hit_rate: float | None = None
                 for block in person.get("stats", []):
                     for split in block.get("splits", []):
                         stat = split.get("stat", {}) or {}
                         pa = float(stat.get("plateAppearances", 0) or 0)
                         so = float(stat.get("strikeOuts", 0) or 0)
+                        hits = float(stat.get("hits", 0) or 0)
                         if pa <= 0:
                             continue
                         rate = float(np.clip(so / pa, 0.0, 1.0))
+                        hit_rate = float(np.clip(hits / pa, 0.0, 1.0))
                         if pa > best_pa:
                             best_pa = pa
                             best_rate = rate
+                            best_hit_rate = hit_rate
                 if best_rate is not None:
                     rows.append({
                         "Batter": name,
                         "Hand": person_bat_side,
                         "Lineup Spot": slot_map.get(pid, np.nan),
                         "K% vs Pitcher": best_rate,
+                        "H/PA vs Pitcher": LEAGUE_HIT_RATE if best_hit_rate is None else best_hit_rate,
                         "PA": best_pa,
                         "Risk": _risk(best_rate),
                         "Split Available": True,
@@ -126,6 +132,7 @@ def get_opposing_batters(
                         "Hand": person_bat_side,
                         "Lineup Spot": slot_map.get(pid, np.nan),
                         "K% vs Pitcher": LEAGUE_K_RATE,
+                        "H/PA vs Pitcher": LEAGUE_HIT_RATE,
                         "PA": 0.0,
                         "Risk": _risk(LEAGUE_K_RATE),
                         "Split Available": False,
@@ -161,9 +168,10 @@ def get_opposing_batters(
 
 def matchup_summary(batters: pd.DataFrame, confirmed_lineup: bool = False) -> dict[str, float | int | bool]:
     if batters.empty:
-        return {"k_rate": LEAGUE_K_RATE, "pa": 0, "high": 0, "elevated": 0, "batters": 0, "confirmed": False}
+        return {"k_rate": LEAGUE_K_RATE, "hit_rate": LEAGUE_HIT_RATE, "pa": 0, "high": 0, "elevated": 0, "batters": 0, "confirmed": False}
     pa = pd.to_numeric(batters["PA"], errors="coerce").fillna(0.0).clip(lower=0.0)
     rates = pd.to_numeric(batters["K% vs Pitcher"], errors="coerce").fillna(LEAGUE_K_RATE).clip(0.0, 1.0)
+    hit_rates = pd.to_numeric(batters.get("H/PA vs Pitcher", LEAGUE_HIT_RATE), errors="coerce").fillna(LEAGUE_HIT_RATE).clip(0.0, 1.0)
     total_pa = float(pa.sum())
 
     if confirmed_lineup:
@@ -171,12 +179,16 @@ def matchup_summary(batters: pd.DataFrame, confirmed_lineup: bool = False) -> di
         # letting the largest historical split sample dominate the matchup.
         # Shrink each hitter independently, then average the lineup.
         adjusted = (rates * pa + LEAGUE_K_RATE * LINEUP_SPLIT_PRIOR_PA) / (pa + LINEUP_SPLIT_PRIOR_PA)
+        adjusted_hits = (hit_rates * pa + LEAGUE_HIT_RATE * LINEUP_SPLIT_PRIOR_PA) / (pa + LINEUP_SPLIT_PRIOR_PA)
         rate = float(adjusted.mean()) if len(adjusted) else LEAGUE_K_RATE
+        hit_rate = float(adjusted_hits.mean()) if len(adjusted_hits) else LEAGUE_HIT_RATE
     else:
         rate = float((rates * pa).sum() / total_pa) if total_pa else LEAGUE_K_RATE
+        hit_rate = float((hit_rates * pa).sum() / total_pa) if total_pa else LEAGUE_HIT_RATE
 
     return {
         "k_rate": float(np.clip(rate, 0.08, 0.45)),
+        "hit_rate": float(np.clip(hit_rate, 0.12, 0.36)),
         "pa": int(total_pa),
         "high": int((batters["Risk"] == "HIGH").sum()),
         "elevated": int((batters["Risk"] == "ELEVATED").sum()),

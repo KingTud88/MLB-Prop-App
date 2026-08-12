@@ -18,18 +18,20 @@ from engine.outs_projection import project_total_outs, OutsProjection
 from engine.outs_calibration import calibrate_outs_blend
 from engine.starter_history import TARGET_STARTER_HISTORY, combine_starter_history, starter_only
 from engine.opposing_batters import get_opposing_batters, matchup_summary
+from engine.lineup_context import LINEUP_CONFIRMED, get_confirmed_lineup
 from engine.weather_risk import WeatherDelayRisk, fetch_weather_delay_risk
 from engine.bet_lean import aligned_bet_lean
 from engine.bet_tracker import make_bet_record
 from training.bet_storage import append_bet
 
-APP_VERSION = "3.5.0"
+APP_VERSION = "3.6.0"
 EASTERN = ZoneInfo("America/New_York")
 MLB_API = "https://statsapi.mlb.com/api/v1"
 ODDS_API = "https://api.the-odds-api.com/v4"
 APP_DIR = Path(__file__).resolve().parent
 BET_LOG = APP_DIR / "data" / "bet_log.csv"
 TEAM_ABBR = {108:"LAA",109:"ARI",110:"BAL",111:"BOS",112:"CHC",113:"CIN",114:"CLE",115:"COL",116:"DET",117:"HOU",118:"KCR",119:"LAD",120:"WSH",121:"NYM",133:"ATH",134:"PIT",135:"SDP",136:"SEA",137:"SFG",138:"STL",139:"TBR",140:"TEX",141:"TOR",142:"MIN",143:"PHI",144:"ATL",145:"CHW",146:"MIA",147:"NYY",158:"MIL"}
+TEAM_ID_BY_ABBR = {abbr: team_id for team_id, abbr in TEAM_ABBR.items()}
 TEAM_NAMES = {"LAA":"Los Angeles Angels","ARI":"Arizona Diamondbacks","BAL":"Baltimore Orioles","BOS":"Boston Red Sox","CHC":"Chicago Cubs","CIN":"Cincinnati Reds","CLE":"Cleveland Guardians","COL":"Colorado Rockies","DET":"Detroit Tigers","HOU":"Houston Astros","KCR":"Kansas City Royals","LAD":"Los Angeles Dodgers","WSH":"Washington Nationals","NYM":"New York Mets","ATH":"Athletics","PIT":"Pittsburgh Pirates","SDP":"San Diego Padres","SEA":"Seattle Mariners","SFG":"San Francisco Giants","STL":"St. Louis Cardinals","TBR":"Tampa Bay Rays","TEX":"Texas Rangers","TOR":"Toronto Blue Jays","MIN":"Minnesota Twins","PHI":"Philadelphia Phillies","ATL":"Atlanta Braves","CHW":"Chicago White Sox","MIA":"Miami Marlins","NYY":"New York Yankees","MIL":"Milwaukee Brewers"}
 PARK_K_FACTOR = {"Coors Field":.94,"T-Mobile Park":1.05,"Petco Park":1.03,"Oracle Park":1.02,"Dodger Stadium":1.01,"Yankee Stadium":.99,"Fenway Park":.98,"Wrigley Field":1.00}
 
@@ -393,13 +395,20 @@ if len(log) < TARGET_STARTER_HISTORY:
     herr=herr or prior_err
 if log.empty: st.error(herr or "Pitcher starter history unavailable."); st.stop()
 pitcher_hand=get_pitcher_hand(game.pitcher_id)
-opposing_batters=get_opposing_batters(game.opponent,pitcher_hand,selected_date.year)
-opponent_matchup=matchup_summary(opposing_batters)
+opponent_team_id=TEAM_ID_BY_ABBR.get(game.opponent,0)
+lineup_context=get_confirmed_lineup(game.game_pk,opponent_team_id)
+opposing_batters=get_opposing_batters(
+    game.opponent,pitcher_hand,selected_date.year,opponent_team_id,
+    lineup_context.player_ids if lineup_context.confirmed else (),
+    lineup_context.spots if lineup_context.confirmed else (),
+)
+opponent_matchup=matchup_summary(opposing_batters,confirmed_lineup=lineup_context.confirmed)
 weather_risk=get_game_weather(game.venue_id,game.game_time)
-proj=calculate_projection(log,game,25000,float(opponent_matchup["k_rate"]),0); kdf=ladder(proj,10)
-features_for_hits=build_engine_features(log,game,float(opponent_matchup["k_rate"]),0)
+confirmed_count=lineup_context.batter_count if lineup_context.confirmed else 0
+proj=calculate_projection(log,game,25000,float(opponent_matchup["k_rate"]),confirmed_count); kdf=ladder(proj,10)
+features_for_hits=build_engine_features(log,game,float(opponent_matchup["k_rate"]),confirmed_count)
 hits_seed=int(hashlib.sha256(f"hits|{game.key}|{game.game_time}|{APP_VERSION}".encode()).hexdigest()[:8],16)
-hits_proj=project_hits_allowed(log,expected_bf=features_for_hits["expected_bf"],seed=hits_seed,draws=25000,lines=(3.5,4.5,5.5,6.5,7.5,8.5))
+hits_proj=project_hits_allowed(log,expected_bf=features_for_hits["expected_bf"],opponent_hit_rate=float(opponent_matchup.get("hit_rate",.235)),seed=hits_seed,draws=25000,lines=(3.5,4.5,5.5,6.5,7.5,8.5))
 odds_events,odds_err=get_odds_events(); odds_event_id=find_odds_event(odds_events,game)
 odds_payload_key=f"projection_live_odds:{game.key}"
 odds_quota_key=f"projection_live_odds_quota:{game.key}"
@@ -483,28 +492,36 @@ with h1: st.markdown(f'<div class="metric-card"><div class="metric-label">PROJEC
 render_reco(h2,hit_reco)
 
 st.markdown('<div class="section-head">OPPOSING BATTER BOX</div>',unsafe_allow_html=True)
-st.caption(f"Active {game.opponent} hitters vs a {pitcher_hand or 'unknown-hand'} pitcher. K% is the same pitcher-hand split used by the matchup input; this box is supplemental and safely degrades when MLB split data is incomplete.")
+lineup_label="✅ CONFIRMED BATTING ORDER" if lineup_context.confirmed else "ACTIVE ROSTER FALLBACK · lineup not posted yet"
+st.caption(f"{lineup_label} · {game.opponent} hitters vs a {pitcher_hand or 'unknown-hand'} pitcher. Pitcher-hand K% and H/PA feed the baseball matchup; incomplete hitter splits shrink safely toward league rates.")
 if opposing_batters.empty:
-    st.info("Opposing batter split data is not available yet. The projection falls back to the protected league opponent-K baseline.")
+    st.info("Opposing batter split data is not available yet. The projection falls back to protected league opponent baselines.")
 else:
-    b1,b2,b3,b4=st.columns(4)
+    b1,b2,b3,b4,b5=st.columns(5)
     b1.metric("Matchup K%",f"{float(opponent_matchup['k_rate']):.1%}")
-    b2.metric("Split PA",int(opponent_matchup["pa"]))
-    b3.metric("HIGH K hitters",int(opponent_matchup["high"]))
-    b4.metric("ELEVATED K hitters",int(opponent_matchup["elevated"]))
+    b2.metric("Matchup H/PA",f"{float(opponent_matchup.get('hit_rate',.235)):.1%}")
+    b3.metric("Split PA",int(opponent_matchup["pa"]))
+    b4.metric("HIGH K hitters",int(opponent_matchup["high"]))
+    b5.metric("ELEVATED K hitters",int(opponent_matchup["elevated"]))
     batter_display=opposing_batters.copy()
     batter_display["K% vs Pitcher"]=pd.to_numeric(batter_display["K% vs Pitcher"],errors="coerce")*100.0
+    batter_display["H/PA vs Pitcher"]=pd.to_numeric(batter_display["H/PA vs Pitcher"],errors="coerce")*100.0
     batter_display["Risk"]=batter_display["Risk"].map({"HIGH":"🔥 HIGH","ELEVATED":"⚠️ ELEVATED","NORMAL":"NORMAL"}).fillna(batter_display["Risk"])
+    batter_display["Split Available"]=batter_display["Split Available"].map({True:"MLB split",False:"League fallback"}).fillna("League fallback")
+    columns=["Lineup Spot","Batter","Hand","K% vs Pitcher","H/PA vs Pitcher","PA","Risk","Split Available"] if lineup_context.confirmed else ["Batter","Hand","K% vs Pitcher","H/PA vs Pitcher","PA","Risk","Split Available"]
     st.dataframe(
-        batter_display[["Batter","Hand","K% vs Pitcher","PA","Risk"]],
+        batter_display[columns],
         hide_index=True,
         width="stretch",
         column_config={
+            "Lineup Spot":st.column_config.NumberColumn("Order",format="%.0f"),
             "Batter":st.column_config.TextColumn("Batter"),
             "Hand":st.column_config.TextColumn("Bats"),
             "K% vs Pitcher":st.column_config.NumberColumn(f"K% vs {pitcher_hand or 'Pitcher'}",format="%.1f%%"),
+            "H/PA vs Pitcher":st.column_config.NumberColumn(f"H/PA vs {pitcher_hand or 'Pitcher'}",format="%.1f%%"),
             "PA":st.column_config.NumberColumn("Split PA",format="%.0f"),
             "Risk":st.column_config.TextColumn("K Risk"),
+            "Split Available":st.column_config.TextColumn("Data"),
         },
     )
 

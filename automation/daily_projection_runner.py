@@ -13,13 +13,14 @@ import requests
 
 from engine.projection_engine import ProjectionEngine
 from engine.opposing_batters import get_opposing_batters, matchup_summary
+from engine.lineup_context import LINEUP_ACTIVE_ROSTER, LINEUP_CONFIRMED, get_confirmed_lineup
 from engine.hits_allowed import project_hits_allowed
 from engine.outs_projection import project_total_outs
 from engine.starter_history import HISTORY_SEMANTICS, TARGET_STARTER_HISTORY, combine_starter_history, starter_only
 from engine.weather_risk import WeatherDelayRisk, fetch_weather_delay_risk
 
 BASE = "https://statsapi.mlb.com/api/v1"
-APP_VERSION = "3.5.0"
+APP_VERSION = "3.6.0"
 PROBABILITY_SEMANTICS = "milestone-ceil-v1"
 EASTERN = ZoneInfo("America/New_York")
 ROOT = Path(__file__).resolve().parents[1]
@@ -290,7 +291,35 @@ def pitcher_hand(pitcher_id: int) -> str:
         return ""
 
 
+def matchup_context(
+    game_pk: int,
+    opponent: str,
+    pitcher_id: int,
+    season: int,
+    opponent_team_id: int | None = None,
+) -> dict[str, object]:
+    hand = pitcher_hand(pitcher_id)
+    if hand not in {"R", "L"}:
+        return {"k_rate": .224, "hit_rate": .235, "pa": 0, "batters": 0, "lineup_batters": 0, "source": LINEUP_ACTIVE_ROSTER, "confirmed": False, "lineup_hash": ""}
+    lineup = get_confirmed_lineup(int(game_pk), int(opponent_team_id or 0))
+    batter_ids = lineup.player_ids if lineup.confirmed else ()
+    lineup_spots = lineup.spots if lineup.confirmed else ()
+    batters = get_opposing_batters(opponent, hand, season, opponent_team_id, batter_ids, lineup_spots)
+    summary = matchup_summary(batters, confirmed_lineup=lineup.confirmed)
+    return {
+        "k_rate": float(summary["k_rate"]),
+        "hit_rate": float(summary.get("hit_rate", .235)),
+        "pa": int(summary["pa"]),
+        "batters": int(len(batters)),
+        "lineup_batters": int(lineup.batter_count if lineup.confirmed else 0),
+        "source": lineup.source,
+        "confirmed": bool(lineup.confirmed),
+        "lineup_hash": lineup.fingerprint,
+    }
+
+
 def matchup_k_rate(opponent: str, pitcher_id: int, season: int, opponent_team_id: int | None = None) -> tuple[float, int, int]:
+    """Legacy active-roster wrapper retained for callers/tests that do not have a game id."""
     hand = pitcher_hand(pitcher_id)
     if hand not in {"R", "L"}:
         return .224, 0, 0
@@ -299,7 +328,7 @@ def matchup_k_rate(opponent: str, pitcher_id: int, season: int, opponent_team_id
     return float(summary["k_rate"]), int(summary["pa"]), int(len(batters))
 
 
-def features(log: pd.DataFrame, venue: str, opponent_k_pct: float = .224) -> dict[str, float]:
+def features(log: pd.DataFrame, venue: str, opponent_k_pct: float = .224, lineup_batters: int = 0, matchup_source: str = LINEUP_ACTIVE_ROSTER) -> dict[str, float]:
     starts = log.tail(35).copy()
     total_bf = float(starts.bf.sum())
     raw_k = float(starts.k.sum() / max(total_bf, 1))
@@ -320,7 +349,8 @@ def features(log: pd.DataFrame, venue: str, opponent_k_pct: float = .224) -> dic
         "rest_factor": 1.0,
         "historical_k_sd": float(np.clip(starts.k.std(ddof=1) if len(starts) > 2 else 2.0, .75, 4.5)),
         "historical_games": int(len(starts)),
-        "lineup_batters": 0,
+        "lineup_batters": int(lineup_batters),
+        "matchup_source": str(matchup_source),
         "arsenal_sample_size": 0,
         "weather_available": 0,
         "umpire_available": 0,
@@ -369,15 +399,23 @@ def project(row: dict) -> dict | None:
     if log.empty:
         record_history_only(row, history_games=0)
         return None
-    opponent_k_pct, matchup_pa, matchup_batters = matchup_k_rate(
-        row["opponent"], row["pitcher_id"], season, row.get("opponent_team_id")
+    matchup = matchup_context(
+        row["game_pk"], row["opponent"], row["pitcher_id"], season, row.get("opponent_team_id")
     )
-    f = features(log, row["venue"], opponent_k_pct=opponent_k_pct)
+    opponent_k_pct = float(matchup["k_rate"])
+    f = features(
+        log,
+        row["venue"],
+        opponent_k_pct=opponent_k_pct,
+        lineup_batters=int(matchup["lineup_batters"]),
+        matchup_source=str(matchup["source"]),
+    )
     seed = int(hashlib.sha256(f"{row['game_pk']}:{row['pitcher_id']}|{row['game_time']}|{APP_VERSION}".encode()).hexdigest()[:8], 16)
     result = ProjectionEngine(seed=seed).project(f, draws=25000, lines=tuple(float(x) for x in range(3, 11)))
     hits = project_hits_allowed(
         log,
         expected_bf=f["expected_bf"],
+        opponent_hit_rate=float(matchup.get("hit_rate", .235)),
         seed=seed ^ 0x5A17,
         draws=25000,
         lines=(3.5, 4.5, 5.5, 6.5, 7.5, 8.5),
@@ -394,7 +432,7 @@ def project(row: dict) -> dict | None:
     raw_math = result.metadata.get("raw_mathematical_probabilities", result.mathematical_probabilities)
     out = {
         "game_pk": row["game_pk"], "game_date": row["game_date"], "pitcher_id": row["pitcher_id"],
-        "player": row["player"], "team": row["team"], "opponent": row["opponent"], "venue_id": row.get("venue_id", 0), "venue": row["venue"],
+        "player": row["player"], "team": row["team"], "opponent": row["opponent"], "opponent_team_id": row.get("opponent_team_id"), "venue_id": row.get("venue_id", 0), "venue": row["venue"],
         "game_time": row["game_time"], "captured_at_utc": now, "app_version": APP_VERSION,
         "probability_semantics": PROBABILITY_SEMANTICS,
         "history_semantics": HISTORY_SEMANTICS, "starter_history_games": int(len(log)),
@@ -409,7 +447,13 @@ def project(row: dict) -> dict | None:
         "outs_range_high": int(np.quantile(outs.simulation_samples, .90)),
         "confidence": "High" if result.confidence >= .75 else "Medium" if result.confidence >= .60 else "Low",
         "data_quality": int(round(result.data_quality)), "simulation_draws": 25000,
-        "opponent_k_pct": opponent_k_pct * 100.0, "matchup_pa": matchup_pa, "matchup_batters": matchup_batters,
+        "opponent_k_pct": opponent_k_pct * 100.0, "opponent_hit_rate": float(matchup.get("hit_rate", .235)) * 100.0,
+        "matchup_pa": int(matchup["pa"]), "matchup_batters": int(matchup["batters"]),
+        "lineup_source": str(matchup["source"]), "lineup_confirmed": bool(matchup["confirmed"]),
+        "lineup_batters": int(matchup["lineup_batters"]), "lineup_hash": str(matchup["lineup_hash"]),
+        "lineup_captured_at_utc": now if bool(matchup["confirmed"]) else "",
+        "lineup_preconfirm_projection": np.nan, "lineup_preconfirm_opponent_k_pct": np.nan,
+        "lineup_projection_delta": np.nan, "lineup_opponent_k_delta": np.nan,
         "pitch_limit": 92, "umpire_k_factor": 1.0,
         "weather_factor": 1.0, "rest_factor": 1.0,
         **weather,
@@ -485,6 +529,57 @@ def attach_pregame_weather(frame: pd.DataFrame, announced: list[dict]) -> int:
                 changed = True
         if changed:
             updated += 1
+    return updated
+
+
+def refresh_pregame_lineups(frame: pd.DataFrame, announced: list[dict]) -> int:
+    """Upgrade roster-fallback snapshots when a confirmed lineup posts pregame.
+
+    Started/finished games are never touched. The old K projection and opponent-K
+    input are retained in audit fields so the impact of the lineup can be measured.
+    """
+    if frame.empty or not announced:
+        return 0
+    now = datetime.now(timezone.utc)
+    lookup = {(int(r["game_pk"]), int(r["pitcher_id"])): r for r in announced}
+    updated = 0
+    for idx in frame.index:
+        row = frame.loc[idx]
+        if not row_is_pregame(row, now) or str(row.get("lineup_source", "")) == LINEUP_CONFIRMED:
+            continue
+        try:
+            key = (int(row["game_pk"]), int(row["pitcher_id"]))
+        except (TypeError, ValueError):
+            continue
+        scheduled = lookup.get(key)
+        if not scheduled:
+            continue
+        context = matchup_context(
+            int(scheduled["game_pk"]), str(scheduled["opponent"]), int(scheduled["pitcher_id"]),
+            datetime.fromisoformat(str(scheduled["game_date"])).year, scheduled.get("opponent_team_id")
+        )
+        if not bool(context.get("confirmed")):
+            continue
+        old_projection = pd.to_numeric(pd.Series([row.get("projection")]), errors="coerce").iloc[0]
+        old_opp_k = pd.to_numeric(pd.Series([row.get("opponent_k_pct")]), errors="coerce").iloc[0]
+        try:
+            projected = project(scheduled)
+        except Exception as exc:
+            print(f"Confirmed-lineup refresh failed for {row.get('player', 'Unknown')} ({row.get('game_pk')}): {exc}")
+            continue
+        if not projected or str(projected.get("lineup_source", "")) != LINEUP_CONFIRMED:
+            continue
+        protected = {"actual_strikeouts", "actual_hits_allowed", "actual_outs", "resolved_at_utc"}
+        for field, value in projected.items():
+            if field not in protected:
+                frame.at[idx, field] = value
+        frame.at[idx, "lineup_preconfirm_projection"] = old_projection
+        frame.at[idx, "lineup_preconfirm_opponent_k_pct"] = old_opp_k
+        new_projection = pd.to_numeric(pd.Series([projected.get("projection")]), errors="coerce").iloc[0]
+        new_opp_k = pd.to_numeric(pd.Series([projected.get("opponent_k_pct")]), errors="coerce").iloc[0]
+        frame.at[idx, "lineup_projection_delta"] = np.nan if pd.isna(old_projection) or pd.isna(new_projection) else float(new_projection - old_projection)
+        frame.at[idx, "lineup_opponent_k_delta"] = np.nan if pd.isna(old_opp_k) or pd.isna(new_opp_k) else float(new_opp_k - old_opp_k)
+        updated += 1
     return updated
 
 
@@ -570,6 +665,7 @@ def main() -> None:
     today = datetime.now(EASTERN).date()
     rows = schedule(today.isoformat())
     weather_refreshes = attach_pregame_weather(frame, rows)
+    lineup_refreshes = refresh_pregame_lineups(frame, rows)
     existing = set()
     if not frame.empty and {"game_pk", "pitcher_id"}.issubset(frame.columns):
         existing = set(zip(pd.to_numeric(frame.game_pk, errors="coerce"), pd.to_numeric(frame.pitcher_id, errors="coerce")))
@@ -605,7 +701,7 @@ def main() -> None:
     observations = load_observation_log()
     unresolved_observations = 0 if observations.empty else int(pd.to_numeric(observations["actual_outs"], errors="coerce").isna().sum())
     print(
-        f"projection log rows={len(frame)} new={len(new_rows)} pregame_path_refreshes={refreshed} weather_refreshes={weather_refreshes} "
+        f"projection log rows={len(frame)} new={len(new_rows)} pregame_path_refreshes={refreshed} weather_refreshes={weather_refreshes} lineup_refreshes={lineup_refreshes} "
         f"history_observations={len(observations)} observation_resolves={observation_updates} unresolved_observations={unresolved_observations}"
     )
 

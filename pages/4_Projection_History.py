@@ -225,6 +225,34 @@ else:
         st.line_chart(chart_hit)
 
 st.divider()
+st.subheader("🧾 Lineup input audit")
+st.caption("Confirmed-lineup and active-roster rows stay separately tagged so we can measure whether posted batting orders improve the baseball forecast. Pregame upgrades also retain the old K projection and the lineup-driven delta.")
+if "lineup_source" not in df.columns:
+    st.info("Lineup-source tracking begins with app version 3.6.0; older rows remain untagged.")
+else:
+    lineup_audit = df.copy()
+    lineup_audit["lineup_source"] = lineup_audit["lineup_source"].fillna("LEGACY/UNKNOWN").astype(str)
+    lineup_audit["k_abs_error"] = (pd.to_numeric(lineup_audit.get("actual_strikeouts"), errors="coerce") - pd.to_numeric(lineup_audit.get("projection"), errors="coerce")).abs()
+    lineup_audit["hits_abs_error"] = (pd.to_numeric(lineup_audit.get("actual_hits_allowed"), errors="coerce") - pd.to_numeric(lineup_audit.get("hits_projection"), errors="coerce")).abs()
+    audit_rows = []
+    for source, group in lineup_audit.groupby("lineup_source", dropna=False):
+        resolved_k = group["k_abs_error"].dropna()
+        resolved_h = group["hits_abs_error"].dropna()
+        deltas = pd.to_numeric(group.get("lineup_projection_delta"), errors="coerce").dropna() if "lineup_projection_delta" in group.columns else pd.Series(dtype=float)
+        audit_rows.append({
+            "Lineup Source": source,
+            "Snapshots": int(len(group)),
+            "Resolved K": int(len(resolved_k)),
+            "K MAE": None if resolved_k.empty else float(resolved_k.mean()),
+            "Resolved Hits": int(len(resolved_h)),
+            "Hits MAE": None if resolved_h.empty else float(resolved_h.mean()),
+            "Pregame Upgrades": int(len(deltas)),
+            "Avg K Projection Delta": None if deltas.empty else float(deltas.mean()),
+        })
+    audit = pd.DataFrame(audit_rows)
+    st.dataframe(audit, hide_index=True, width="stretch")
+
+st.divider()
 st.subheader("🚦 Walk-forward Top 5 model health")
 st.caption(
     "Leakage-safe replay: each historical slate is rebuilt from its frozen pregame snapshots while calibration can only use earlier game dates. "

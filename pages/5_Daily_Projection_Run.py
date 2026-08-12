@@ -12,6 +12,7 @@ from automation.daily_projection_runner import (
     PROBABILITY_SEMANTICS,
     fill_missing_pregame_paths,
     attach_pregame_weather,
+    refresh_pregame_lineups,
     project,
     resolve_row,
     schedule,
@@ -118,10 +119,11 @@ def run_full_slate(day: str) -> tuple[pd.DataFrame, int, int, list[str], list[st
 
     refreshed = fill_missing_pregame_paths(frame)
     weather_refreshed = attach_pregame_weather(frame, announced)
+    lineup_refreshed = refresh_pregame_lineups(frame, announced)
     save_log(frame)
 
     slate = frame.loc[frame.get("game_date", pd.Series(dtype=str)).astype(str).eq(day)].copy() if not frame.empty else pd.DataFrame()
-    return slate, len(new_rows), skipped + refreshed + weather_refreshed, history_only, errors
+    return slate, len(new_rows), skipped + refreshed + weather_refreshed + lineup_refreshed, history_only, errors
 
 
 def _num(row: pd.Series, key: str) -> float | None:
@@ -141,7 +143,7 @@ def render_projection_rationale(row: pd.Series, history: pd.DataFrame) -> None:
     quality = _num(row, "data_quality")
     opp_k = _num(row, "opponent_k_pct")
     outs_mean = _num(row, "outs_projection")
-    c1, c2, c3, c4, c5 = st.columns(5)
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
     c1.metric("Projected Ks", "—" if k_mean is None else f"{k_mean:.2f}")
     c2.metric("Projected outs", "—" if outs_mean is None else f"{outs_mean:.2f}")
     c3.metric("Projected hits allowed", "—" if hits_mean is None else f"{hits_mean:.2f}")
@@ -205,6 +207,9 @@ def render_projection_rationale(row: pd.Series, history: pd.DataFrame) -> None:
         "Confidence": row.get("confidence", "—"),
         "Matchup PA sample": int(_num(row, "matchup_pa") or 0),
         "Matchup batters": int(_num(row, "matchup_batters") or 0),
+        "Lineup source": row.get("lineup_source", "ACTIVE_ROSTER"),
+        "Confirmed lineup hitters": int(_num(row, "lineup_batters") or 0),
+        "Lineup projection delta": _num(row, "lineup_projection_delta"),
         "K 80% range": f"{row.get('k_range_low', '—')}–{row.get('k_range_high', '—')}",
         "Hits 80% range": f"{row.get('hits_range_low', '—')}–{row.get('hits_range_high', '—')}",
         "Outs 80% range": f"{row.get('outs_range_low', '—')}–{row.get('outs_range_high', '—')}",
@@ -220,7 +225,7 @@ def render_projection_rationale(row: pd.Series, history: pd.DataFrame) -> None:
 
 st.info(
     "This page is for batch data capture. The normal Projection page remains the single-pitcher deep-dive workflow. "
-    "Existing game/pitcher snapshots are not overwritten after capture."
+    "Existing game/pitcher snapshots stay frozen after first pitch; while still pregame, a roster-fallback row may upgrade once MLB posts a confirmed batting order."
 )
 
 if st.button("⚾ RUN ALL TODAY'S PITCHERS", type="primary", use_container_width=True):
@@ -250,10 +255,12 @@ if isinstance(slate, pd.DataFrame):
     c3.metric("Already captured/refreshed", skipped)
     c4.metric("History-only tracked", len(history_only))
     c5.metric("Errors", len(errors))
+    confirmed_lineups = int(slate.get("lineup_source", pd.Series(index=slate.index, dtype=str)).astype(str).eq("CONFIRMED_LINEUP").sum()) if not slate.empty else 0
+    c6.metric("Confirmed lineups", confirmed_lineups)
 
     if not slate.empty:
         display_cols = [
-            "player", "weather_icon", "weather_delay_risk", "weather_precip_probability", "team", "opponent", "projection", "k_range_low", "k_range_high",
+            "player", "weather_icon", "weather_delay_risk", "weather_precip_probability", "lineup_source", "lineup_batters", "lineup_projection_delta", "team", "opponent", "projection", "k_range_low", "k_range_high",
             "hits_projection", "hits_range_low", "hits_range_high",
             "outs_projection", "outs_range_low", "outs_range_high",
             "confidence", "data_quality", "opponent_k_pct", "sim_5p", "math_5p",
@@ -270,6 +277,9 @@ if isinstance(slate, pd.DataFrame):
                 "player": "Pitcher",
                 "weather_delay_risk": "Weather Risk",
                 "weather_precip_probability": "Rain %",
+                "lineup_source": "Lineup Source",
+                "lineup_batters": "Lineup Hitters",
+                "lineup_projection_delta": "K Δ from Lineup",
                 "team": "Team",
                 "opponent": "Opp",
                 "projection": "Projection K",
