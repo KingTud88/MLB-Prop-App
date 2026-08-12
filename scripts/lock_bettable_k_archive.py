@@ -1,5 +1,7 @@
 from pathlib import Path
 
+# One-shot patch helper. Retriggered after the UI contract landed on main.
+
 
 def replace_once(text: str, old: str, new: str, label: str) -> str:
     if old not in text:
