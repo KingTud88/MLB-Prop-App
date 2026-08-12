@@ -1,0 +1,35 @@
+name: Run Odds API credit saver patch
+
+on:
+  push:
+    paths:
+      - scripts/patch_odds_credit_saver.py
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt pytest
+      - run: python scripts/patch_odds_credit_saver.py
+      - run: python -m compileall -q streamlit_app.py pages engine automation tests
+      - run: pytest -q
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add streamlit_app.py pages/6_Top_Plays.py tests/test_odds_credit_saver.py
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Add Odds API credit saver mode"
+          git pull --rebase origin main
+          git push origin HEAD:main
