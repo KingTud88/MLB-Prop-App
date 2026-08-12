@@ -21,6 +21,7 @@ from engine.opposing_batters import get_opposing_batters, matchup_summary
 from engine.lineup_context import LINEUP_CONFIRMED, get_confirmed_lineup
 from engine.weather_risk import WeatherDelayRisk, fetch_weather_delay_risk
 from engine.workload_context import WorkloadContext, build_workload_context
+from engine.team_leash import build_team_leash_context, candidate_workload_fields
 from engine.bet_lean import aligned_bet_lean
 from engine.bet_tracker import make_bet_record
 from training.bet_storage import append_bet
@@ -31,6 +32,7 @@ MLB_API = "https://statsapi.mlb.com/api/v1"
 ODDS_API = "https://api.the-odds-api.com/v4"
 APP_DIR = Path(__file__).resolve().parent
 BET_LOG = APP_DIR / "data" / "bet_log.csv"
+OBS_LOG = APP_DIR / "data" / "starter_observation_log.csv"
 TEAM_ABBR = {108:"LAA",109:"ARI",110:"BAL",111:"BOS",112:"CHC",113:"CIN",114:"CLE",115:"COL",116:"DET",117:"HOU",118:"KCR",119:"LAD",120:"WSH",121:"NYM",133:"ATH",134:"PIT",135:"SDP",136:"SEA",137:"SFG",138:"STL",139:"TBR",140:"TEX",141:"TOR",142:"MIN",143:"PHI",144:"ATL",145:"CHW",146:"MIA",147:"NYY",158:"MIL"}
 TEAM_ID_BY_ABBR = {abbr: team_id for team_id, abbr in TEAM_ABBR.items()}
 TEAM_NAMES = {"LAA":"Los Angeles Angels","ARI":"Arizona Diamondbacks","BAL":"Baltimore Orioles","BOS":"Boston Red Sox","CHC":"Chicago Cubs","CIN":"Cincinnati Reds","CLE":"Cleveland Guardians","COL":"Colorado Rockies","DET":"Detroit Tigers","HOU":"Houston Astros","KCR":"Kansas City Royals","LAD":"Los Angeles Dodgers","WSH":"Washington Nationals","NYM":"New York Mets","ATH":"Athletics","PIT":"Pittsburgh Pirates","SDP":"San Diego Padres","SEA":"Seattle Mariners","SFG":"San Francisco Giants","STL":"St. Louis Cardinals","TBR":"Tampa Bay Rays","TEX":"Texas Rangers","TOR":"Toronto Blue Jays","MIN":"Minnesota Twins","PHI":"Philadelphia Phillies","ATL":"Atlanta Braves","CHW":"Chicago White Sox","MIA":"Miami Marlins","NYY":"New York Yankees","MIL":"Milwaukee Brewers"}
@@ -142,6 +144,10 @@ def get_game_weather(venue_id,game_time):
 
 def load_projection_history():
     try:return pd.read_csv(APP_DIR / "data" / "projection_log.csv")
+    except Exception:return pd.DataFrame()
+
+def load_observation_history():
+    try:return pd.read_csv(OBS_LOG)
     except Exception:return pd.DataFrame()
 
 def calibrated_weights(history): return {line:calibrate_blend(history,line) for line in range(3,11)}
@@ -407,6 +413,8 @@ opponent_matchup=matchup_summary(opposing_batters,confirmed_lineup=lineup_contex
 weather_risk=get_game_weather(game.venue_id,game.game_time)
 confirmed_count=lineup_context.batter_count if lineup_context.confirmed else 0
 workload_ctx=build_workload_context(log,game.game_time)
+team_leash_ctx=build_team_leash_context(load_projection_history(),load_observation_history(),game.team,game.game_time)
+team_leash_candidate=candidate_workload_fields(team_leash_ctx,workload_ctx.expected_pitches,workload_ctx.expected_bf,workload_ctx.expected_outs)
 proj=calculate_projection(log,game,25000,float(opponent_matchup["k_rate"]),confirmed_count,workload_ctx); kdf=ladder(proj,10)
 features_for_hits=build_engine_features(log,game,float(opponent_matchup["k_rate"]),confirmed_count,workload_ctx)
 hits_seed=int(hashlib.sha256(f"hits|{game.key}|{game.game_time}|{APP_VERSION}".encode()).hexdigest()[:8],16)
@@ -466,6 +474,19 @@ elif nav=="Form & Workload":
     w5.metric("Days since last start","—" if workload_ctx.days_since_last_start is None else workload_ctx.days_since_last_start)
     w6.metric("Recent leash",workload_ctx.leash_label)
     st.caption(f"Pitch trend {workload_ctx.pitch_trend:+.1%} · BF trend {workload_ctx.bf_trend:+.1%} · outs trend {workload_ctx.outs_trend:+.1%} · short-rest exposure multiplier {workload_ctx.rest_multiplier:.3f}.")
+    st.markdown("#### 🧭 Team leash candidate · CONTEXT ONLY")
+    t1,t2,t3,t4,t5,t6=st.columns(6)
+    t1.metric("Team starts tracked",team_leash_ctx.starts_used)
+    t2.metric("Team avg pitches",f"{team_leash_ctx.team_avg_pitches:.1f}")
+    t3.metric("Team avg BF",f"{team_leash_ctx.team_avg_bf:.1f}")
+    t4.metric("TTO reached",f"{team_leash_ctx.tto_reach_rate:.1%}")
+    t5.metric("90+ pitches",f"{team_leash_ctx.pitch_90_rate:.1%}")
+    t6.metric("Team leash",team_leash_ctx.label)
+    st.caption(
+        f"Status {team_leash_ctx.status} · candidate-only multipliers: pitches {team_leash_ctx.pitch_multiplier_candidate:.3f}, "
+        f"BF {team_leash_ctx.bf_multiplier_candidate:.3f}, outs {team_leash_ctx.outs_multiplier_candidate:.3f}. "
+        "These values do not alter Ks, Hits Allowed, Outs, or Top Plays until leakage-safe validation earns that right."
+    )
     d=log.tail(15).copy(); st.line_chart(d.set_index("date")[["pitches","bf","outs","k"]]); st.dataframe(d.sort_values("date",ascending=False),use_container_width=True,hide_index=True); st.stop()
 elif nav=="Model Card":
     st.markdown('<div class="section-head">MODEL CARD</div>',unsafe_allow_html=True); st.write("Two independent paths: (1) plate-appearance Monte Carlo game simulation with workload uncertainty; (2) independent mathematical Negative-Binomial probability model. Milestone probabilities are calibrated from resolved pregame projections when enough observations exist. Sportsbook prices are used only for edge display, never to create the baseball forecast."); st.markdown("### Path comparison"); path_df=pd.DataFrame([{"Path":"Simulation","Mean K":proj.engine.simulation_mean,"SD":proj.engine.simulation_sd},{"Path":"Mathematical","Mean K":proj.engine.mathematical_mean,"SD":proj.engine.mathematical_sd},{"Path":"Ensemble","Mean K":proj.mean_k,"SD":proj.k_sd}]); path_df["Mean K"]=path_df["Mean K"].map(lambda v:f"{v:.2f}"); path_df["SD"]=path_df["SD"].map(lambda v:f"{v:.2f}"); st.dataframe(path_df,use_container_width=True,hide_index=True); model_view=kdf[["Line","Probability","Simulation","Math","Sim Weight"]].copy()

@@ -14,6 +14,7 @@ from automation.daily_projection_runner import (
     resolve_observation_log,
     fill_missing_pregame_paths,
     attach_pregame_weather,
+    attach_pregame_team_leash,
     refresh_pregame_lineups,
     project,
     resolve_row,
@@ -149,11 +150,12 @@ def run_full_slate(day: str) -> tuple[pd.DataFrame, int, int, list[str], list[st
 
     refreshed = fill_missing_pregame_paths(frame)
     weather_refreshed = attach_pregame_weather(frame, announced)
+    team_leash_refreshed = attach_pregame_team_leash(frame)
     lineup_refreshed = refresh_pregame_lineups(frame, announced)
     save_log(frame)
 
     slate = frame.loc[frame.get("game_date", pd.Series(dtype=str)).astype(str).eq(day)].copy() if not frame.empty else pd.DataFrame()
-    return slate, len(new_rows), skipped + refreshed + weather_refreshed + lineup_refreshed, history_only, errors
+    return slate, len(new_rows), skipped + refreshed + weather_refreshed + team_leash_refreshed + lineup_refreshed, history_only, errors
 
 
 def _num(row: pd.Series, key: str) -> float | None:
@@ -257,6 +259,14 @@ def render_projection_rationale(row: pd.Series, history: pd.DataFrame) -> None:
         "Days since last start": _num(row, "days_since_last_start"),
         "Recent leash": row.get("leash_label", "—"),
         "Pitch trend": _num(row, "pitch_trend"),
+        "Team leash role": row.get("team_leash_role", "—"),
+        "Team leash status": row.get("team_leash_status", "—"),
+        "Team leash label": row.get("team_leash_label", "—"),
+        "Team starts tracked": int(_num(row, "team_leash_starts") or 0),
+        "Team avg pitches": _num(row, "team_leash_avg_pitches"),
+        "Team TTO reach rate": _num(row, "team_leash_tto_reach_rate"),
+        "Team 90+ pitch rate": _num(row, "team_leash_90_pitch_rate"),
+        "Candidate pitch multiplier": _num(row, "team_leash_pitch_multiplier_candidate"),
     }
     st.dataframe(pd.DataFrame([facts]), hide_index=True, use_container_width=True)
     st.caption(
@@ -312,6 +322,7 @@ if isinstance(slate, pd.DataFrame):
             "weather_icon", "weather_delay_risk", "weather_precip_probability",
             "starter_history_games", "starter_history_source", "starter_history_mlb_games", "starter_history_observation_games",
             "workload_version", "expected_pitches", "expected_bf", "expected_outs", "pitches_per_bf", "days_since_last_start", "leash_label", "pitch_trend",
+            "team_leash_label", "team_leash_status", "team_leash_starts", "team_leash_avg_pitches", "team_leash_tto_reach_rate", "team_leash_90_pitch_rate", "team_leash_pitch_multiplier_candidate", "team_leash_role",
             "probability_semantics", "actual_strikeouts", "actual_hits_allowed", "actual_outs",
         ]
         display_cols = [c for c in display_cols if c in slate.columns]
@@ -334,6 +345,14 @@ if isinstance(slate, pd.DataFrame):
                 "days_since_last_start": "Days Since Start",
                 "leash_label": "Leash",
                 "pitch_trend": "Pitch Trend",
+                "team_leash_label": "Team Leash",
+                "team_leash_status": "Team Leash Status",
+                "team_leash_starts": "Team Starts",
+                "team_leash_avg_pitches": "Team Avg Pitches",
+                "team_leash_tto_reach_rate": "TTO Reach Rate",
+                "team_leash_90_pitch_rate": "90+ Pitch Rate",
+                "team_leash_pitch_multiplier_candidate": "Pitch Adj Candidate",
+                "team_leash_role": "Team Leash Role",
                 "weather_delay_risk": "Weather Risk",
                 "weather_precip_probability": "Rain %",
                 "lineup_source": "Lineup Source",

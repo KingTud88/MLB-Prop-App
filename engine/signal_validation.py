@@ -177,6 +177,8 @@ def context_performance_report(history: pd.DataFrame) -> pd.DataFrame:
         dimensions.append(("Opponent K Environment", _matchup_k_band(current["opponent_k_pct"]), "MODEL INPUT"))
     if "opponent_hit_rate" in current.columns:
         dimensions.append(("Opponent Contact Environment", _contact_band(current["opponent_hit_rate"]), "MODEL INPUT"))
+    if "team_leash_label" in current.columns:
+        dimensions.append(("Team Leash Candidate", current["team_leash_label"].fillna("UNKNOWN").astype(str), "CONTEXT ONLY"))
     if "weather_delay_risk" in current.columns:
         dimensions.append(("Weather Delay Risk", current["weather_delay_risk"].fillna("UNKNOWN").astype(str), "CONTEXT ONLY"))
 

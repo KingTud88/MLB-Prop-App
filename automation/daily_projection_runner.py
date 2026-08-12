@@ -19,6 +19,7 @@ from engine.outs_projection import project_total_outs
 from engine.starter_history import HISTORY_SEMANTICS, TARGET_STARTER_HISTORY, combine_starter_history, starter_only
 from engine.weather_risk import WeatherDelayRisk, fetch_weather_delay_risk
 from engine.workload_context import WORKLOAD_VERSION, WorkloadContext, build_workload_context
+from engine.team_leash import build_team_leash_context, candidate_workload_fields
 
 BASE = "https://statsapi.mlb.com/api/v1"
 APP_VERSION = "3.7.0"
@@ -135,6 +136,15 @@ def save_observation_log(frame: pd.DataFrame) -> None:
         if col not in out.columns:
             out[col] = np.nan if col.startswith("actual_") or col == "history_games_available_at_capture" else ""
     out[OBS_COLUMNS].to_csv(OBS_LOG_PATH, index=False)
+
+
+def load_projection_context_log() -> pd.DataFrame:
+    if not LOG_PATH.exists():
+        return pd.DataFrame()
+    try:
+        return pd.read_csv(LOG_PATH)
+    except Exception:
+        return pd.DataFrame()
 
 
 def record_history_only(row: dict, reason: str = "no usable starter history", history_games: int = 0) -> bool:
@@ -407,6 +417,7 @@ def schedule(day: str) -> list[dict]:
                     "pitcher_id": int(pitcher["id"]),
                     "player": pitcher.get("fullName", "Unknown"),
                     "team": TEAM_ABBR.get(tn.get("id"), tn.get("abbreviation", "UNK")),
+                    "team_id": int(tn.get("id")) if tn.get("id") else None,
                     "opponent": TEAM_ABBR.get(on.get("id"), on.get("abbreviation", "UNK")),
                     "opponent_team_id": int(on.get("id")) if on.get("id") else None,
                     "venue_id": int(venue_node.get("id", 0) or 0),
@@ -430,6 +441,13 @@ def project(row: dict, matchup_override: dict[str, object] | None = None) -> dic
         record_history_only(row, history_games=0)
         return None
     workload = build_workload_context(log, row.get("game_time") or row.get("game_date"))
+    team_leash = build_team_leash_context(
+        load_projection_context_log(), load_observation_log(), str(row.get("team", "UNK")),
+        row.get("game_time") or row.get("game_date"),
+    )
+    team_leash_candidate = candidate_workload_fields(
+        team_leash, workload.expected_pitches, workload.expected_bf, workload.expected_outs
+    )
     matchup = matchup_override or matchup_context(
         row["game_pk"], row["opponent"], row["pitcher_id"], season, row.get("opponent_team_id")
     )
@@ -468,7 +486,7 @@ def project(row: dict, matchup_override: dict[str, object] | None = None) -> dic
     raw_math = result.metadata.get("raw_mathematical_probabilities", result.mathematical_probabilities)
     out = {
         "game_pk": row["game_pk"], "game_date": row["game_date"], "pitcher_id": row["pitcher_id"],
-        "player": row["player"], "team": row["team"], "opponent": row["opponent"], "opponent_team_id": row.get("opponent_team_id"), "venue_id": row.get("venue_id", 0), "venue": row["venue"],
+        "player": row["player"], "team": row["team"], "team_id": row.get("team_id"), "opponent": row["opponent"], "opponent_team_id": row.get("opponent_team_id"), "venue_id": row.get("venue_id", 0), "venue": row["venue"],
         "game_time": row["game_time"], "captured_at_utc": now, "app_version": APP_VERSION,
         "probability_semantics": PROBABILITY_SEMANTICS,
         "history_semantics": HISTORY_SEMANTICS, "starter_history_games": int(len(log)),
@@ -476,6 +494,8 @@ def project(row: dict, matchup_override: dict[str, object] | None = None) -> dic
         "starter_history_mlb_games": int(history_provenance["mlb_games"]),
         "starter_history_observation_games": int(history_provenance["observation_games"]),
         **workload.snapshot_fields(),
+        **team_leash.snapshot_fields(),
+        **team_leash_candidate,
         "workload_preupgrade_projection": np.nan, "workload_preupgrade_hits_projection": np.nan,
         "workload_preupgrade_outs_projection": np.nan, "workload_preupgrade_expected_bf": np.nan,
         "workload_projection_delta_k": np.nan, "workload_projection_delta_hits": np.nan,
@@ -540,6 +560,49 @@ def row_is_pregame(row: pd.Series, now: datetime) -> bool:
         return bool(pd.notna(game_time) and game_time.to_pydatetime() > now)
     except Exception:
         return False
+
+
+def attach_pregame_team_leash(frame: pd.DataFrame) -> int:
+    """Refresh context-only team leash metadata for still-pregame snapshots.
+
+    The baseball projection fields are never rewritten here. Team context is
+    reconstructed from strictly earlier resolved starts, so same-day outcomes
+    cannot leak into the current slate.
+    """
+    if frame.empty:
+        return 0
+    now = datetime.now(timezone.utc)
+    observations = load_observation_log()
+    updated = 0
+    for idx in frame.index:
+        row = frame.loc[idx]
+        if not row_is_pregame(row, now):
+            continue
+        context = build_team_leash_context(
+            frame, observations, str(row.get("team", "UNK")), row.get("game_time") or row.get("game_date")
+        )
+        fields = context.snapshot_fields()
+        expected_pitches = pd.to_numeric(pd.Series([row.get("expected_pitches")]), errors="coerce").iloc[0]
+        expected_bf = pd.to_numeric(pd.Series([row.get("expected_bf")]), errors="coerce").iloc[0]
+        expected_outs = pd.to_numeric(pd.Series([row.get("expected_outs")]), errors="coerce").iloc[0]
+        if pd.notna(expected_pitches) and pd.notna(expected_bf) and pd.notna(expected_outs):
+            fields.update(candidate_workload_fields(context, float(expected_pitches), float(expected_bf), float(expected_outs)))
+        changed = False
+        for name, value in fields.items():
+            old = row.get(name)
+            if pd.isna(value):
+                same = pd.isna(old)
+            elif isinstance(value, float):
+                old_num = pd.to_numeric(pd.Series([old]), errors="coerce").iloc[0]
+                same = pd.notna(old_num) and abs(float(old_num) - value) < 1e-12
+            else:
+                same = str(old) == str(value)
+            if not same:
+                frame.at[idx, name] = value
+                changed = True
+        if changed:
+            updated += 1
+    return updated
 
 
 def attach_pregame_weather(frame: pd.DataFrame, announced: list[dict]) -> int:
@@ -810,6 +873,7 @@ def main() -> None:
     today = datetime.now(EASTERN).date()
     rows = schedule(today.isoformat())
     weather_refreshes = attach_pregame_weather(frame, rows)
+    team_leash_refreshes = attach_pregame_team_leash(frame)
     lineup_refreshes = 0
     existing = set()
     if not frame.empty and {"game_pk", "pitcher_id"}.issubset(frame.columns):
@@ -829,6 +893,7 @@ def main() -> None:
 
     if new_rows:
         frame = pd.concat([frame, pd.DataFrame(new_rows)], ignore_index=True)
+        team_leash_refreshes += attach_pregame_team_leash(frame)
 
     if "probability_semantics" not in frame.columns:
         frame["probability_semantics"] = ""
@@ -847,7 +912,7 @@ def main() -> None:
     observations = load_observation_log()
     unresolved_observations = 0 if observations.empty else int(pd.to_numeric(observations["actual_outs"], errors="coerce").isna().sum())
     print(
-        f"projection log rows={len(frame)} new={len(new_rows)} pregame_path_refreshes={refreshed} weather_refreshes={weather_refreshes} lineup_refreshes={lineup_refreshes} "
+        f"projection log rows={len(frame)} new={len(new_rows)} pregame_path_refreshes={refreshed} weather_refreshes={weather_refreshes} team_leash_refreshes={team_leash_refreshes} lineup_refreshes={lineup_refreshes} "
         f"history_observations={len(observations)} observation_resolves={observation_updates} unresolved_observations={unresolved_observations}"
     )
 

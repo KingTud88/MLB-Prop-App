@@ -19,9 +19,11 @@ from engine.model_health import (
 )
 from engine.decision_learning import decision_tier_report
 from engine.signal_validation import context_performance_report, paired_signal_report
+from engine.team_leash import team_leash_walk_forward_report
 
 ROOT = Path(__file__).resolve().parents[1]
 LOG_PATH = ROOT / "data" / "projection_log.csv"
+OBS_LOG_PATH = ROOT / "data" / "starter_observation_log.csv"
 ROLLING_WINDOW = 20
 
 st.set_page_config(page_title="Projection History", page_icon="📚", layout="wide")
@@ -45,6 +47,15 @@ def load_projection_history() -> pd.DataFrame:
         return pd.DataFrame()
     try:
         return pd.read_csv(LOG_PATH)
+    except Exception:
+        return pd.DataFrame()
+
+
+def load_observation_history() -> pd.DataFrame:
+    if not OBS_LOG_PATH.exists():
+        return pd.DataFrame()
+    try:
+        return pd.read_csv(OBS_LOG_PATH)
     except Exception:
         return pd.DataFrame()
 
@@ -329,6 +340,23 @@ else:
     st.dataframe(signal_view, hide_index=True, width="stretch")
     st.caption("HELPING requires at least 20 resolved pairs, at least 5% lower post-upgrade MAE, and improvement in at least 55% of paired starts. HURTING uses the symmetric downside guardrail. These labels do not alter Top Plays yet.")
 
+st.markdown("#### 🧭 Team leash candidate · workload backtest")
+st.caption(
+    "Team/organization starter usage is reconstructed chronologically from resolved frozen starts. For each evaluated game, the candidate adjustment can use only earlier game dates. "
+    "It compares candidate pitches/BF/outs against the existing workload-v1 baseline, but remains CONTEXT ONLY and does not change the baseball forecast."
+)
+team_leash_report = team_leash_walk_forward_report(df, load_observation_history())
+if team_leash_report.empty:
+    st.info("Team leash validation is waiting for workload-v1 snapshots with resolved workload outcomes.")
+else:
+    team_view = team_leash_report.copy()
+    for col in ["Relative MAE Improvement", "Improved Share"]:
+        team_view[col] = team_view[col].map(lambda x: "—" if pd.isna(x) else f"{float(x):+.1%}" if col == "Relative MAE Improvement" else f"{float(x):.1%}")
+    for col in ["Baseline MAE", "Candidate MAE", "MAE Improvement", "Baseline Bias", "Candidate Bias"]:
+        team_view[col] = team_view[col].map(lambda x: "—" if pd.isna(x) else f"{float(x):+.3f}" if col in {"MAE Improvement", "Baseline Bias", "Candidate Bias"} else f"{float(x):.3f}")
+    st.dataframe(team_view, hide_index=True, width="stretch")
+    st.caption("Team leash needs 12 prior team starts before a candidate adjustment is evaluated, then 20 leakage-safe evaluated starts before HELPING/MIXED/HURTING can be assigned. Until we explicitly promote it later, it has zero projection or Top Plays influence.")
+
 with st.expander("Context performance — descriptive, not causal", expanded=False):
     context_report = context_performance_report(df)
     if context_report.empty:
@@ -339,7 +367,7 @@ with st.expander("Context performance — descriptive, not causal", expanded=Fal
         context_view["MAE"] = context_view["MAE"].map(lambda x: "—" if pd.isna(x) else f"{float(x):.3f}")
         context_view["Bias"] = context_view["Bias"].map(lambda x: "—" if pd.isna(x) else f"{float(x):+.3f}")
         st.dataframe(context_view, hide_index=True, width="stretch")
-        st.caption("Lineup, workload, rest, history source, opponent K/contact environments are model inputs. Weather Delay Risk is labeled CONTEXT ONLY because weather still does not modify the baseball forecast.")
+        st.caption("Lineup, workload, rest, history source, opponent K/contact environments are model inputs. Team Leash Candidate is CONTEXT ONLY and does not modify the baseball forecast. Weather Delay Risk is labeled CONTEXT ONLY because weather still does not modify the baseball forecast.")
 
 st.divider()
 st.subheader("🚦 Walk-forward Top 5 model health")
