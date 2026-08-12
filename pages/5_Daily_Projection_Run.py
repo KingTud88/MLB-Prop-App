@@ -10,6 +10,8 @@ import streamlit as st
 from automation.daily_projection_runner import (
     LOG_PATH,
     PROBABILITY_SEMANTICS,
+    load_observation_log,
+    resolve_observation_log,
     fill_missing_pregame_paths,
     attach_pregame_weather,
     refresh_pregame_lineups,
@@ -58,6 +60,27 @@ def load_log() -> pd.DataFrame:
     if "resolved_at_utc" not in frame.columns:
         frame["resolved_at_utc"] = ""
     return frame
+
+
+def history_only_for_day(day: str) -> pd.DataFrame:
+    """Return persistent history-only starter observations for one slate date."""
+    frame = load_observation_log()
+    if frame.empty or "game_date" not in frame.columns:
+        return pd.DataFrame()
+    rows = frame.loc[frame["game_date"].astype(str).eq(str(day))].copy()
+    if rows.empty:
+        return rows
+    actual_cols = [
+        "actual_strikeouts", "actual_hits_allowed", "actual_outs",
+        "actual_batters_faced", "actual_pitches",
+    ]
+    for col in actual_cols + ["history_games_available_at_capture"]:
+        if col in rows.columns:
+            rows[col] = pd.to_numeric(rows[col], errors="coerce")
+    available = [col for col in actual_cols if col in rows.columns]
+    resolved = rows[available].notna().all(axis=1) if available else pd.Series(False, index=rows.index)
+    rows["observation_status"] = np.where(resolved, "RESOLVED", "PENDING")
+    return rows.sort_values(["observation_status", "game_time", "player"], ascending=[True, True, True]).reset_index(drop=True)
 
 
 def save_log(frame: pd.DataFrame) -> None:
@@ -260,7 +283,7 @@ if isinstance(slate, pd.DataFrame):
 
     if not slate.empty:
         display_cols = [
-            "player", "weather_icon", "weather_delay_risk", "weather_precip_probability", "lineup_source", "lineup_batters", "lineup_projection_delta", "team", "opponent", "projection", "k_range_low", "k_range_high",
+            "player", "starter_history_games", "weather_icon", "weather_delay_risk", "weather_precip_probability", "lineup_source", "lineup_batters", "lineup_projection_delta", "team", "opponent", "projection", "k_range_low", "k_range_high",
             "hits_projection", "hits_range_low", "hits_range_high",
             "outs_projection", "outs_range_low", "outs_range_high",
             "confidence", "data_quality", "opponent_k_pct", "sim_5p", "math_5p",
@@ -275,6 +298,7 @@ if isinstance(slate, pd.DataFrame):
         display = display.rename(
             columns={
                 "player": "Pitcher",
+                "starter_history_games": "Starts Used",
                 "weather_delay_risk": "Weather Risk",
                 "weather_precip_probability": "Rain %",
                 "lineup_source": "Lineup Source",
@@ -340,12 +364,56 @@ if isinstance(slate, pd.DataFrame):
             st.write(f"- {error}")
 
 st.divider()
+st.subheader("📚 Persistent history-only starter tracker")
+st.caption(
+    "These rows live in starter_observation_log.csv, separate from projection_log.csv. "
+    "They are real starter observations collected specifically for pitchers who could not yet receive a legitimate projection."
+)
+history_rows = history_only_for_day(slate_date.isoformat())
+if history_rows.empty:
+    st.info("No history-only starter observations are recorded for this slate date.")
+else:
+    resolved_count = int(history_rows["observation_status"].eq("RESOLVED").sum())
+    pending_count = int(history_rows["observation_status"].eq("PENDING").sum())
+    h1, h2, h3 = st.columns(3)
+    h1.metric("History-only starts", len(history_rows))
+    h2.metric("Pending results", pending_count)
+    h3.metric("Resolved into history", resolved_count)
+
+    history_display_cols = [
+        "player", "team", "opponent", "reason", "history_games_available_at_capture",
+        "observation_status", "actual_strikeouts", "actual_hits_allowed", "actual_outs",
+        "actual_batters_faced", "actual_pitches", "resolved_at_utc",
+    ]
+    history_display_cols = [col for col in history_display_cols if col in history_rows.columns]
+    history_display = history_rows[history_display_cols].copy().rename(columns={
+        "player": "Pitcher",
+        "team": "Team",
+        "opponent": "Opp",
+        "reason": "Tracking Reason",
+        "history_games_available_at_capture": "Starts Available",
+        "observation_status": "Status",
+        "actual_strikeouts": "Actual K",
+        "actual_hits_allowed": "Actual Hits Allowed",
+        "actual_outs": "Actual Outs",
+        "actual_batters_faced": "Actual BF",
+        "actual_pitches": "Actual Pitches",
+        "resolved_at_utc": "Resolved At",
+    })
+    st.dataframe(history_display, hide_index=True, use_container_width=True)
+    st.caption(
+        "When a row resolves, its full starter line becomes eligible fallback history for that pitcher on a future start. "
+        "It never becomes a fake historical projection or calibration row."
+    )
+
+st.divider()
 st.subheader("Resolve completed games")
 if st.button("Resolve completed projection outcomes"):
     frame = load_log()
     updated = 0
-    if not frame.empty:
-        with st.spinner("Checking MLB results and attaching actual strikeouts + hits allowed + outs..."):
+    observation_updates = 0
+    with st.spinner("Checking MLB results for projected and history-only starters..."):
+        if not frame.empty:
             for idx in frame.index:
                 actual_k, actual_hits, actual_outs, resolved = resolve_row(frame.loc[idx])
                 changed = False
@@ -362,10 +430,13 @@ if st.button("Resolve completed projection outcomes"):
                     frame.at[idx, "resolved_at_utc"] = resolved
                     updated += 1
             save_log(frame)
-    if updated:
-        st.success(f"Resolved {updated} new projection outcome(s).")
+        observation_updates = resolve_observation_log()
+    if updated or observation_updates:
+        st.success(
+            f"Resolved {updated} new projection outcome(s) and {observation_updates} history-only starter observation(s)."
+        )
     else:
-        st.info("No new completed outcomes were available.")
+        st.info("No new completed projected or history-only starter outcomes were available.")
 
 archive = load_log()
 if not archive.empty and "game_date" in archive.columns:
