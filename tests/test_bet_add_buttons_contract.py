@@ -1,3 +1,4 @@
+# Top Plays UI contracts, including model-health gating and price independence.
 from pathlib import Path
 
 
