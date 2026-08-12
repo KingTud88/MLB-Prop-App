@@ -106,6 +106,7 @@ def game_log(pitcher_id: int, season: int) -> pd.DataFrame:
                 "pitches": float(s.get("numberOfPitches", 0) or 0),
                 "outs": parse_ip(s.get("inningsPitched", "0.0")) * 3,
                 "games_started": int(float(s.get("gamesStarted", 0) or 0)),
+                "history_source": "MLB",
             })
     frame = pd.DataFrame(rows)
     if frame.empty:
@@ -179,7 +180,27 @@ def observation_history(pitcher_id: int) -> pd.DataFrame:
         "pitches": data["actual_pitches"].to_numpy(float),
         "outs": data["actual_outs"].to_numpy(float),
         "games_started": np.ones(len(data), dtype=int),
+        "history_source": np.full(len(data), "OBSERVATION", dtype=object),
     }).dropna(subset=["date"])
+
+
+def starter_history_provenance(log: pd.DataFrame) -> dict[str, object]:
+    """Summarize the actual starter rows used by source without changing the model input."""
+    if log.empty:
+        return {"source": "NONE", "mlb_games": 0, "observation_games": 0}
+    if "history_source" in log.columns:
+        source = log["history_source"].fillna("MLB").astype(str).str.upper()
+    else:
+        source = pd.Series("MLB", index=log.index, dtype=str)
+    mlb_games = int(source.eq("MLB").sum())
+    observation_games = int(source.eq("OBSERVATION").sum())
+    if observation_games and mlb_games:
+        label = "MLB_PLUS_OBSERVATIONS"
+    elif observation_games:
+        label = "OBSERVATIONS_ONLY"
+    else:
+        label = "MLB_ONLY"
+    return {"source": label, "mlb_games": mlb_games, "observation_games": observation_games}
 
 
 def supplement_with_observations(log: pd.DataFrame, pitcher_id: int) -> pd.DataFrame:
@@ -396,6 +417,7 @@ def project(row: dict) -> dict | None:
         prior_log = game_log(row["pitcher_id"], season - 1)
     log = combine_starter_history(current_log, prior_log)
     log = supplement_with_observations(log, row["pitcher_id"])
+    history_provenance = starter_history_provenance(log)
     if log.empty:
         record_history_only(row, history_games=0)
         return None
@@ -436,6 +458,9 @@ def project(row: dict) -> dict | None:
         "game_time": row["game_time"], "captured_at_utc": now, "app_version": APP_VERSION,
         "probability_semantics": PROBABILITY_SEMANTICS,
         "history_semantics": HISTORY_SEMANTICS, "starter_history_games": int(len(log)),
+        "starter_history_source": str(history_provenance["source"]),
+        "starter_history_mlb_games": int(history_provenance["mlb_games"]),
+        "starter_history_observation_games": int(history_provenance["observation_games"]),
         "projection": result.ensemble_mean, "k_sd": result.ensemble_sd,
         "k_range_low": int(np.quantile(result.simulation_samples, .10)),
         "k_range_high": int(np.quantile(result.simulation_samples, .90)),

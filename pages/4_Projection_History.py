@@ -324,7 +324,7 @@ display["hits_result"] = display.apply(lambda r: range_result(r, "actual_hits_al
 display["outs_result"] = display.apply(lambda r: range_result(r, "actual_outs", "outs_range_low", "outs_range_high"), axis=1)
 
 display_columns = [
-    "game_date", "player", "team", "opponent", "starter_history_games",
+    "game_date", "player", "team", "opponent", "starter_history_games", "starter_history_source", "starter_history_mlb_games", "starter_history_observation_games",
     "projection", "k_range_low", "k_range_high", "actual_strikeouts", "k_result", "k_error",
     "hits_projection", "hits_range_low", "hits_range_high", "actual_hits_allowed", "hits_result", "hits_error",
     "outs_projection", "outs_range_low", "outs_range_high", "actual_outs", "outs_result", "outs_error",
@@ -342,6 +342,9 @@ st.dataframe(
         "team": st.column_config.TextColumn("Team"),
         "opponent": st.column_config.TextColumn("Opp"),
         "starter_history_games": st.column_config.NumberColumn("Starts Used", format="%.0f"),
+        "starter_history_source": st.column_config.TextColumn("History Source"),
+        "starter_history_mlb_games": st.column_config.NumberColumn("MLB Starts", format="%.0f"),
+        "starter_history_observation_games": st.column_config.NumberColumn("Observed Starts", format="%.0f"),
         "projection": st.column_config.NumberColumn("Projected K", format="%.2f"),
         "k_range_low": st.column_config.NumberColumn("80% K Low", format="%.0f"),
         "k_range_high": st.column_config.NumberColumn("80% K High", format="%.0f"),

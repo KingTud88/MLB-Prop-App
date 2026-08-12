@@ -96,6 +96,12 @@ def save_log(frame: pd.DataFrame) -> None:
         frame["history_semantics"] = ""
     if "starter_history_games" not in frame.columns:
         frame["starter_history_games"] = np.nan
+    if "starter_history_source" not in frame.columns:
+        frame["starter_history_source"] = ""
+    if "starter_history_mlb_games" not in frame.columns:
+        frame["starter_history_mlb_games"] = np.nan
+    if "starter_history_observation_games" not in frame.columns:
+        frame["starter_history_observation_games"] = np.nan
     for col in ("actual_strikeouts", "actual_hits_allowed", "actual_outs"):
         if col not in frame.columns:
             frame[col] = np.nan
@@ -239,6 +245,9 @@ def render_projection_rationale(row: pd.Series, history: pd.DataFrame) -> None:
         "Probability semantics": row.get("probability_semantics", "—"),
         "History semantics": row.get("history_semantics", "—"),
         "Starter appearances used": int(_num(row, "starter_history_games") or 0),
+        "History source": row.get("starter_history_source", "—"),
+        "MLB starts used": int(_num(row, "starter_history_mlb_games") or 0),
+        "Observed starts used": int(_num(row, "starter_history_observation_games") or 0),
     }
     st.dataframe(pd.DataFrame([facts]), hide_index=True, use_container_width=True)
     st.caption(
@@ -283,7 +292,7 @@ if isinstance(slate, pd.DataFrame):
 
     if not slate.empty:
         display_cols = [
-            "player", "starter_history_games", "weather_icon", "weather_delay_risk", "weather_precip_probability", "lineup_source", "lineup_batters", "lineup_projection_delta", "team", "opponent", "projection", "k_range_low", "k_range_high",
+            "player", "starter_history_games", "starter_history_source", "starter_history_mlb_games", "starter_history_observation_games", "weather_icon", "weather_delay_risk", "weather_precip_probability", "lineup_source", "lineup_batters", "lineup_projection_delta", "team", "opponent", "projection", "k_range_low", "k_range_high",
             "hits_projection", "hits_range_low", "hits_range_high",
             "outs_projection", "outs_range_low", "outs_range_high",
             "confidence", "data_quality", "opponent_k_pct", "sim_5p", "math_5p",
@@ -299,6 +308,9 @@ if isinstance(slate, pd.DataFrame):
             columns={
                 "player": "Pitcher",
                 "starter_history_games": "Starts Used",
+                "starter_history_source": "History Source",
+                "starter_history_mlb_games": "MLB Starts",
+                "starter_history_observation_games": "Observed Starts",
                 "weather_delay_risk": "Weather Risk",
                 "weather_precip_probability": "Rain %",
                 "lineup_source": "Lineup Source",

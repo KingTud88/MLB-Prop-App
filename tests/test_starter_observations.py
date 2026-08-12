@@ -165,3 +165,30 @@ def test_projection_resolver_routes_boxscore_reads_through_v11_live_feed(monkeyp
     data = resolver.get_json("game/12345/boxscore")
     assert called["url"] == "https://statsapi.mlb.com/api/v1.1/game/12345/feed/live"
     assert data["gameData"]["status"]["abstractGameState"] == "Final"
+
+
+def test_starter_history_provenance_distinguishes_mlb_and_observation_rows():
+    log = pd.DataFrame([
+        {"date": pd.Timestamp("2026-08-01"), "history_source": "MLB"},
+        {"date": pd.Timestamp("2026-08-07"), "history_source": "OBSERVATION"},
+        {"date": pd.Timestamp("2026-08-12"), "history_source": "OBSERVATION"},
+    ])
+    info = runner.starter_history_provenance(log)
+    assert info["source"] == "MLB_PLUS_OBSERVATIONS"
+    assert info["mlb_games"] == 1
+    assert info["observation_games"] == 2
+
+
+def test_observation_history_rows_are_labeled_for_provenance(tmp_path, monkeypatch):
+    path = tmp_path / "starter_observation_log.csv"
+    monkeypatch.setattr(runner, "OBS_LOG_PATH", path)
+    runner.record_history_only(_row())
+    frame = runner.load_observation_log()
+    frame.loc[0, "actual_strikeouts"] = 6
+    frame.loc[0, "actual_hits_allowed"] = 4
+    frame.loc[0, "actual_outs"] = 17
+    frame.loc[0, "actual_batters_faced"] = 23
+    frame.loc[0, "actual_pitches"] = 91
+    runner.save_observation_log(frame)
+    history = runner.observation_history(987)
+    assert history.loc[0, "history_source"] == "OBSERVATION"
