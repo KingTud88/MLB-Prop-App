@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - scripts/patch_projection_weather_batters.py
+      - .github/projection-weather-trigger
   workflow_dispatch:
 
 permissions:
