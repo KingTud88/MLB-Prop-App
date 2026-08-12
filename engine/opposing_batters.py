@@ -150,6 +150,7 @@ def get_opposing_batters(
                     "Hand": handed.get(pid, ""),
                     "Lineup Spot": slot_map.get(pid, np.nan),
                     "K% vs Pitcher": LEAGUE_K_RATE,
+                    "H/PA vs Pitcher": LEAGUE_HIT_RATE,
                     "PA": 0.0,
                     "Risk": _risk(LEAGUE_K_RATE),
                     "Split Available": False,
