@@ -100,11 +100,12 @@ def _prepare_starts(log: pd.DataFrame, game_date: object | None) -> pd.DataFrame
 
     # Strictly pregame when a target date is known. This makes the helper safe
     # for historical reconstruction and prevents a later start from leaking in.
-    target = pd.to_datetime(game_date, errors="coerce") if game_date is not None else pd.NaT
+    target = pd.to_datetime(game_date, errors="coerce", utc=True) if game_date is not None else pd.NaT
     if pd.notna(target):
-        target_day = pd.Timestamp(target).normalize()
+        target_day = pd.Timestamp(target).date()
         dated = starts["date"].notna()
-        starts = starts.loc[~dated | (starts["date"].dt.normalize() < target_day)].copy()
+        start_days = starts["date"].dt.date
+        starts = starts.loc[~dated | (start_days < target_day)].copy()
 
     starts = starts.loc[starts[["pitches", "bf", "outs"]].notna().any(axis=1)].copy()
     if starts.empty:
@@ -170,11 +171,13 @@ def build_workload_context(log: pd.DataFrame, game_date: object | None = None) -
     outs_trend = _trend(starts["outs"])
 
     days_since_last_start: int | None = None
-    target = pd.to_datetime(game_date, errors="coerce") if game_date is not None else pd.NaT
+    target = pd.to_datetime(game_date, errors="coerce", utc=True) if game_date is not None else pd.NaT
     dated = starts["date"].dropna()
     if pd.notna(target) and not dated.empty:
-        delta = pd.Timestamp(target).normalize() - pd.Timestamp(dated.iloc[-1]).normalize()
-        days_since_last_start = max(int(delta.days), 0)
+        last_start = pd.to_datetime(dated.iloc[-1], errors="coerce", utc=True)
+        if pd.notna(last_start):
+            delta = pd.Timestamp(target).date() - pd.Timestamp(last_start).date()
+            days_since_last_start = max(int(delta.days), 0)
     rest_multiplier = _rest_multiplier(days_since_last_start)
 
     pitch_base = 0.70 * recent_pitches + 0.30 * long_pitches

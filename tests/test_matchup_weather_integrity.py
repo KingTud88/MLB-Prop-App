@@ -62,3 +62,16 @@ def test_projection_engine_has_no_caller_frame_matchup_override():
     text = Path("engine/projection_engine.py").read_text(encoding="utf-8")
     assert "inspect.currentframe" not in text
     assert "silently replace an explicit opponent K input" in text
+
+
+def test_snapshot_matchup_override_preserves_frozen_rates():
+    row = pd.Series({
+        "opponent_k_pct": 27.5, "opponent_hit_rate": 22.0, "matchup_pa": 321,
+        "matchup_batters": 9, "lineup_batters": 0, "lineup_source": "ACTIVE_ROSTER",
+        "lineup_confirmed": False, "lineup_hash": "",
+    })
+    context = runner.snapshot_matchup_override(row)
+    assert abs(context["k_rate"] - .275) < 1e-9
+    assert abs(context["hit_rate"] - .22) < 1e-9
+    assert context["source"] == "ACTIVE_ROSTER"
+    assert context["confirmed"] is False

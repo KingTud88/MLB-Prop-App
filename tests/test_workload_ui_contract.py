@@ -33,3 +33,21 @@ def test_workload_pages_compile():
     for path in ["streamlit_app.py", "pages/4_Projection_History.py", "pages/5_Daily_Projection_Run.py"]:
         source = Path(path).read_text(encoding="utf-8")
         compile(source, path, "exec")
+
+
+def test_workload_upgrade_isolated_from_lineup_and_seed_drift():
+    source = Path("automation/daily_projection_runner.py").read_text(encoding="utf-8")
+    assert "snapshot_matchup_override(row) if needs_workload else None" in source
+    assert '"seed_version": row.get("app_version", APP_VERSION) if needs_workload else APP_VERSION' in source
+    assert '"workload_preupgrade_app_version"' in source
+    assert '"workload_upgraded_at_utc"' in source
+    assert '"workload_projection_delta_k"' in source
+    assert 'lineup_refreshes = 0' in source
+    assert 'lineup_refreshes = refresh_pregame_lineups(frame, rows)' in source
+
+
+def test_lineup_refresh_preserves_workload_upgrade_audit():
+    source = Path("automation/daily_projection_runner.py").read_text(encoding="utf-8")
+    assert '"workload_preupgrade_projection"' in source
+    assert '"workload_projection_delta_outs"' in source
+    assert '"workload_upgraded_at_utc"' in source

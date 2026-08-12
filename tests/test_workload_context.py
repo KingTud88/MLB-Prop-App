@@ -34,7 +34,7 @@ def test_short_rest_conservatively_reduces_expected_exposure():
         [17, 18, 18, 19, 19, 20],
         dates=pd.date_range("2026-07-01", periods=6, freq="6D"),
     )
-    last = pd.to_datetime(history["date"].iloc[-1])
+    last = pd.Timestamp(history["date"].iloc[-1])
     short = build_workload_context(history, last + pd.Timedelta(days=4))
     normal = build_workload_context(history, last + pd.Timedelta(days=6))
     assert short.rest_multiplier < 1.0
@@ -75,3 +75,16 @@ def test_workload_trend_is_bounded_and_snapshot_fields_are_complete():
         "pitches_per_bf", "days_since_last_start", "pitch_trend", "leash_label",
     ):
         assert key in fields
+
+
+def test_utc_game_time_works_with_date_only_game_log():
+    history = _log(
+        [88, 91, 94, 96, 97, 99],
+        [22, 23, 24, 24, 25, 25],
+        [15, 16, 17, 17, 18, 18],
+        dates=["2026-07-01", "2026-07-07", "2026-07-13", "2026-07-19", "2026-07-25", "2026-08-06"],
+    )
+    ctx = build_workload_context(history, "2026-08-12T23:10:00Z")
+    assert ctx.starts_used == 6
+    assert ctx.days_since_last_start == 6
+    assert 60 <= ctx.expected_pitches <= 112

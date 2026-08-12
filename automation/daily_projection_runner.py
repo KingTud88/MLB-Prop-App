@@ -417,7 +417,7 @@ def schedule(day: str) -> list[dict]:
     return rows
 
 
-def project(row: dict) -> dict | None:
+def project(row: dict, matchup_override: dict[str, object] | None = None) -> dict | None:
     season = datetime.fromisoformat(row["game_date"]).year
     current_log = game_log(row["pitcher_id"], season)
     prior_log = pd.DataFrame()
@@ -430,7 +430,7 @@ def project(row: dict) -> dict | None:
         record_history_only(row, history_games=0)
         return None
     workload = build_workload_context(log, row.get("game_time") or row.get("game_date"))
-    matchup = matchup_context(
+    matchup = matchup_override or matchup_context(
         row["game_pk"], row["opponent"], row["pitcher_id"], season, row.get("opponent_team_id")
     )
     opponent_k_pct = float(matchup["k_rate"])
@@ -442,7 +442,8 @@ def project(row: dict) -> dict | None:
         matchup_source=str(matchup["source"]),
         workload=workload,
     )
-    seed = int(hashlib.sha256(f"{row['game_pk']}:{row['pitcher_id']}|{row['game_time']}|{APP_VERSION}".encode()).hexdigest()[:8], 16)
+    seed_version = str(row.get("seed_version") or APP_VERSION)
+    seed = int(hashlib.sha256(f"{row['game_pk']}:{row['pitcher_id']}|{row['game_time']}|{seed_version}".encode()).hexdigest()[:8], 16)
     result = ProjectionEngine(seed=seed).project(f, draws=25000, lines=tuple(float(x) for x in range(3, 11)))
     hits = project_hits_allowed(
         log,
@@ -478,7 +479,8 @@ def project(row: dict) -> dict | None:
         "workload_preupgrade_projection": np.nan, "workload_preupgrade_hits_projection": np.nan,
         "workload_preupgrade_outs_projection": np.nan, "workload_preupgrade_expected_bf": np.nan,
         "workload_projection_delta_k": np.nan, "workload_projection_delta_hits": np.nan,
-        "workload_projection_delta_outs": np.nan,
+        "workload_projection_delta_outs": np.nan, "workload_preupgrade_app_version": "",
+        "workload_upgraded_at_utc": "",
         "projection": result.ensemble_mean, "k_sd": result.ensemble_sd,
         "k_range_low": int(np.quantile(result.simulation_samples, .10)),
         "k_range_high": int(np.quantile(result.simulation_samples, .90)),
@@ -497,7 +499,7 @@ def project(row: dict) -> dict | None:
         "lineup_captured_at_utc": now if bool(matchup["confirmed"]) else "",
         "lineup_preconfirm_projection": np.nan, "lineup_preconfirm_opponent_k_pct": np.nan,
         "lineup_projection_delta": np.nan, "lineup_opponent_k_delta": np.nan,
-        "pitch_limit": 92, "umpire_k_factor": 1.0,
+        "pitch_limit": float(workload.expected_pitches), "umpire_k_factor": 1.0,
         "weather_factor": 1.0, "rest_factor": 1.0,
         **weather,
         "actual_strikeouts": np.nan, "actual_hits_allowed": np.nan, "actual_outs": np.nan,
@@ -613,7 +615,12 @@ def refresh_pregame_lineups(frame: pd.DataFrame, announced: list[dict]) -> int:
             continue
         if not projected or str(projected.get("lineup_source", "")) != LINEUP_CONFIRMED:
             continue
-        protected = {"actual_strikeouts", "actual_hits_allowed", "actual_outs", "actual_batters_faced", "actual_pitches", "resolved_at_utc"}
+        protected = {
+            "actual_strikeouts", "actual_hits_allowed", "actual_outs", "actual_batters_faced", "actual_pitches", "resolved_at_utc",
+            "workload_preupgrade_projection", "workload_preupgrade_hits_projection", "workload_preupgrade_outs_projection",
+            "workload_preupgrade_expected_bf", "workload_projection_delta_k", "workload_projection_delta_hits",
+            "workload_projection_delta_outs", "workload_preupgrade_app_version", "workload_upgraded_at_utc",
+        }
         for field, value in projected.items():
             if field not in protected:
                 frame.at[idx, field] = value
@@ -625,6 +632,28 @@ def refresh_pregame_lineups(frame: pd.DataFrame, announced: list[dict]) -> int:
         frame.at[idx, "lineup_opponent_k_delta"] = np.nan if pd.isna(old_opp_k) or pd.isna(new_opp_k) else float(new_opp_k - old_opp_k)
         updated += 1
     return updated
+
+
+def snapshot_matchup_override(row: pd.Series) -> dict[str, object]:
+    def _rate(name: str, fallback: float) -> float:
+        value = pd.to_numeric(pd.Series([row.get(name)]), errors="coerce").iloc[0]
+        if pd.isna(value):
+            return float(fallback)
+        value = float(value)
+        return value / 100.0 if value > 1.0 else value
+
+    confirmed_text = str(row.get("lineup_confirmed", "")).strip().lower()
+    confirmed = confirmed_text in {"true", "1", "yes"}
+    return {
+        "k_rate": float(np.clip(_rate("opponent_k_pct", .224), .08, .45)),
+        "hit_rate": float(np.clip(_rate("opponent_hit_rate", .235), .12, .36)),
+        "pa": int(pd.to_numeric(pd.Series([row.get("matchup_pa")]), errors="coerce").fillna(0).iloc[0]),
+        "batters": int(pd.to_numeric(pd.Series([row.get("matchup_batters")]), errors="coerce").fillna(0).iloc[0]),
+        "lineup_batters": int(pd.to_numeric(pd.Series([row.get("lineup_batters")]), errors="coerce").fillna(0).iloc[0]),
+        "source": str(row.get("lineup_source", LINEUP_ACTIVE_ROSTER) or LINEUP_ACTIVE_ROSTER),
+        "confirmed": confirmed,
+        "lineup_hash": str(row.get("lineup_hash", "") or ""),
+    }
 
 
 def fill_missing_pregame_paths(frame: pd.DataFrame) -> int:
@@ -640,7 +669,7 @@ def fill_missing_pregame_paths(frame: pd.DataFrame) -> int:
         if ((row_has_complete_paths(row) and row_has_current_semantics(row) and not needs_hits and not needs_outs and not needs_workload) or not row_is_pregame(row, now)):
             continue
         try:
-            projected = project({
+            refresh_row = {
                 "game_pk": int(row["game_pk"]),
                 "game_date": str(row["game_date"]),
                 "pitcher_id": int(row["pitcher_id"]),
@@ -652,7 +681,14 @@ def fill_missing_pregame_paths(frame: pd.DataFrame) -> int:
                 "venue": row.get("venue", "Unknown"),
                 "game_time": row.get("game_time", ""),
                 "status": row.get("status", "Scheduled"),
-            })
+                # Preserve the original deterministic seed during a workload-only
+                # comparison so app-version seed drift is not mislabeled as workload impact.
+                "seed_version": row.get("app_version", APP_VERSION) if needs_workload else APP_VERSION,
+            }
+            projected = project(
+                refresh_row,
+                matchup_override=snapshot_matchup_override(row) if needs_workload else None,
+            )
         except Exception as exc:
             print(f"Pregame path refresh failed for {row.get('player', 'Unknown')} ({row.get('game_pk')}): {exc}")
             continue
@@ -674,6 +710,8 @@ def fill_missing_pregame_paths(frame: pd.DataFrame) -> int:
             frame.at[idx, "workload_preupgrade_hits_projection"] = old_hits
             frame.at[idx, "workload_preupgrade_outs_projection"] = old_outs
             frame.at[idx, "workload_preupgrade_expected_bf"] = old_bf
+            frame.at[idx, "workload_preupgrade_app_version"] = str(row.get("app_version", "") or "")
+            frame.at[idx, "workload_upgraded_at_utc"] = datetime.now(timezone.utc).isoformat()
             for old_value, new_key, delta_key in (
                 (old_k, "projection", "workload_projection_delta_k"),
                 (old_hits, "hits_projection", "workload_projection_delta_hits"),
@@ -760,7 +798,7 @@ def main() -> None:
     today = datetime.now(EASTERN).date()
     rows = schedule(today.isoformat())
     weather_refreshes = attach_pregame_weather(frame, rows)
-    lineup_refreshes = refresh_pregame_lineups(frame, rows)
+    lineup_refreshes = 0
     existing = set()
     if not frame.empty and {"game_pk", "pitcher_id"}.issubset(frame.columns):
         existing = set(zip(pd.to_numeric(frame.game_pk, errors="coerce"), pd.to_numeric(frame.pitcher_id, errors="coerce")))
@@ -783,6 +821,7 @@ def main() -> None:
     if "probability_semantics" not in frame.columns:
         frame["probability_semantics"] = ""
     refreshed = fill_missing_pregame_paths(frame)
+    lineup_refreshes = refresh_pregame_lineups(frame, rows)
 
     for line in range(3, 11):
         for prefix in ("sim", "math"):
