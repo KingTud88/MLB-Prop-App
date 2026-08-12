@@ -531,6 +531,8 @@ m5.metric("ROI", f"{roi:+.1%}" if roi is not None else "—")
 
 if stake_series.isna().any():
     st.caption("Older saved bets without a stake are still graded, but they are excluded from P/L and ROI calculations.")
+if "american_odds" in tracker.columns and pd.to_numeric(tracker["american_odds"], errors="coerce").isna().any():
+    st.caption("Unpriced model tickets are still graded WIN/LOSS from MLB results, but they stay excluded from P/L and ROI because no sportsbook price was assumed.")
 
 st.subheader("Tracked bets")
 

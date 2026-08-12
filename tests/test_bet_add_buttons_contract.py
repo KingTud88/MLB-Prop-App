@@ -58,6 +58,9 @@ def test_projection_strikeout_ladder_is_clickable_and_actionable():
     assert '"🎟️ Add selected to parlay"' in source
     assert 'tracker_line=float(milestone)-0.5' in source
     assert "Fair Odds are model-only and are never saved as a sportsbook price" in source
+    ladder_pos = source.index('key=f"projection_k_ladder_{game.key}"')
+    builder_pos = source.rindex("render_projection_parlay_builder()")
+    assert ladder_pos < builder_pos
 
 
 def test_tracker_page_applies_result_status_styling_and_grades_parlays():

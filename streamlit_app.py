@@ -652,13 +652,12 @@ else:
         },
     )
 
-st.markdown("#### Add recommendation to Bet Tracker")
+st.markdown("#### Add recommendation to Bet Tracker / Parlay")
 quick_add_stake=st.number_input("Quick-add stake",min_value=0.0,value=1.0,step=0.5,key=f"projection_quick_stake_{game.key}")
 add1,add2,add3=st.columns(3)
 render_add_bet_button(add1,k_reco,"Strikeouts",{"pitcher_strikeouts","pitcher_strikeouts_alternate"},proj.mean_k,quick_add_stake,game,selected_date.isoformat(),odds_rows,proj.confidence,proj.quality,f"add_k_{game.key}")
 render_add_bet_button(add2,out_reco,"Total Outs",{"pitcher_outs","pitcher_outs_alternate"},proj.mean_outs,quick_add_stake,game,selected_date.isoformat(),odds_rows,proj.confidence,proj.quality,f"add_outs_{game.key}")
 render_add_bet_button(add3,hit_reco,"Hits Allowed",{"pitcher_hits_allowed","pitcher_hits_allowed_alternate"},hits_proj.ensemble_mean,quick_add_stake,game,selected_date.isoformat(),odds_rows,proj.confidence,proj.quality,f"add_hits_{game.key}")
-render_projection_parlay_builder()
 with st.expander(f"🔎 Why this projection? · {game.pitcher_name}", expanded=False):
     st.caption("Live single-pitcher rationale using the same model paths shown in the projection cards. Sportsbook prices are comparison inputs only; they do not create the forecast.")
     x1,x2,x3,x4=st.columns(4)
@@ -761,4 +760,5 @@ with right:
         st.dataframe(market_df,use_container_width=True,hide_index=True)
         st.caption("Live sportsbook prices are shown for strikeouts, total outs, and hits allowed markets. Edge compares the independent model probability with implied probability; market prices never feed the forecast.")
     else: st.info("Live market data will populate here when the Odds API returns the pitcher props.")
+render_projection_parlay_builder()
 st.markdown(f'<div class="search-note">Data status: {proj.confidence} confidence · quality {proj.quality}/100 · locked: {locked} · engine v{APP_VERSION}</div>',unsafe_allow_html=True)
