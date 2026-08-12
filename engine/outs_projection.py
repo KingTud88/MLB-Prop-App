@@ -50,6 +50,8 @@ def _beta_binomial_params(mean_outs: float, variance_outs: float, n: int = 27) -
 def project_total_outs(
     log: pd.DataFrame,
     *,
+    expected_outs: float | None = None,
+    workload_sd: float | None = None,
     seed: int | None = None,
     draws: int = 25_000,
     lines: tuple[float, ...] = (13.5, 14.5, 15.5, 16.5, 17.5, 18.5),
@@ -61,6 +63,12 @@ def project_total_outs(
     noise, bounded to 0-27 outs. Mathematical path: beta-binomial distribution on
     27 possible outs, fit to recent workload mean/variance. Sportsbook prices are
     intentionally not model inputs.
+
+    A shared pregame workload target can be supplied through ``expected_outs``.
+    The simulation path shifts historical workloads toward that target while still
+    bootstrapping real starts; the mathematical path centers directly on the same
+    pregame target. This keeps both paths workload-aware without making them the
+    same model.
     """
     if log.empty or "outs" not in log:
         raise ValueError("total-outs projection requires game-log 'outs' column")
@@ -72,23 +80,33 @@ def project_total_outs(
 
     recent_mean = _weighted(outs, 5.0, 16.0)
     recent_sd = float(np.clip(outs.std(ddof=1) if len(outs) > 2 else 4.0, 2.0, 6.5))
+    target_mean = recent_mean if expected_outs is None else float(np.clip(expected_outs, 0.0, 27.0))
+    target_sd = recent_sd if workload_sd is None else float(np.clip(workload_sd, 2.0, 6.5))
 
-    # Simulation path: recency-weighted bootstrap of real starts with modest game noise.
+    # Simulation path: recency-weighted bootstrap of real starts, shifted by the
+    # independent workload target, with modest game noise. The target shift is
+    # bounded so a single workload estimate cannot erase real empirical history.
     values = outs.to_numpy(float)
     ages = np.arange(len(values) - 1, -1, -1)
     weights = 0.5 ** (ages / 5.0)
     weights = weights / weights.sum()
     rng = np.random.default_rng(seed)
     base = rng.choice(values, size=int(draws), replace=True, p=weights)
-    noise_sd = float(np.clip(recent_sd * 0.35, 0.75, 2.0))
-    simulation_samples = np.clip(np.rint(base + rng.normal(0.0, noise_sd, int(draws))), 0, 27).astype(int)
+    target_shift = float(np.clip(target_mean - recent_mean, -3.0, 3.0))
+    noise_sd = float(np.clip(target_sd * 0.35, 0.75, 2.0))
+    simulation_samples = np.clip(
+        np.rint(base + target_shift + rng.normal(0.0, noise_sd, int(draws))),
+        0,
+        27,
+    ).astype(int)
     simulation_mean = float(np.mean(simulation_samples))
     simulation_sd = float(np.std(simulation_samples, ddof=1))
 
-    # Mathematical path: bounded beta-binomial fit to workload distribution.
-    mathematical_mean = float(np.clip(recent_mean, 0.0, 27.0))
+    # Mathematical path: bounded beta-binomial centered on the workload target.
+    mathematical_mean = float(np.clip(target_mean, 0.0, 27.0))
     historical_var = float(max(outs.var(ddof=1) if len(outs) > 2 else recent_sd**2, 1.0))
-    alpha, beta = _beta_binomial_params(mathematical_mean, historical_var, n=27)
+    target_var = float(max(0.60 * historical_var + 0.40 * target_sd**2, 1.0))
+    alpha, beta = _beta_binomial_params(mathematical_mean, target_var, n=27)
     distribution = betabinom(27, alpha, beta)
     mathematical_var = float(distribution.var())
     mathematical_sd = float(math.sqrt(max(mathematical_var, 0.0)))
