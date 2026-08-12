@@ -1,3 +1,4 @@
+# one-shot UI patch helper; remove after successful CI
 from pathlib import Path
 
 HISTORY = Path("pages/4_Projection_History.py")
