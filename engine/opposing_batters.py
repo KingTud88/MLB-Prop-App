@@ -54,6 +54,7 @@ def get_opposing_batters(opponent: str, pitcher_hand: str, season: int, team_id:
             response.raise_for_status()
             for person in response.json().get("people", []):
                 pid = int(person.get("id"))
+                person_bat_side = str(((person.get("batSide") or {}).get("code")) or handed.get(pid, ""))
                 found = False
                 for block in person.get("stats", []):
                     for split in block.get("splits", []):
@@ -63,7 +64,7 @@ def get_opposing_batters(opponent: str, pitcher_hand: str, season: int, team_id:
                         if pa <= 0:
                             continue
                         rate = float(np.clip(so / pa, 0.0, 1.0))
-                        rows.append({"Batter": names.get(pid, person.get("fullName", "Unknown")), "Hand": handed.get(pid, ""), "K% vs Pitcher": rate, "PA": pa, "Risk": _risk(rate)})
+                        rows.append({"Batter": names.get(pid, person.get("fullName", "Unknown")), "Hand": person_bat_side, "K% vs Pitcher": rate, "PA": pa, "Risk": _risk(rate)})
                         found = True
                 if not found:
                     continue

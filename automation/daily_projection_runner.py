@@ -282,7 +282,10 @@ def pitcher_hand(pitcher_id: int) -> str:
     try:
         data = get_json(f"people/{int(pitcher_id)}", {})
         people = data.get("people") or []
-        return str(((people[0].get("pitchingHand") or {}).get("code")) or "").upper() if people else ""
+        if not people:
+            return ""
+        hand = people[0].get("pitchHand") or people[0].get("pitchingHand") or {}
+        return str(hand.get("code") or "").upper()
     except (requests.RequestException, ValueError, TypeError, IndexError):
         return ""
 

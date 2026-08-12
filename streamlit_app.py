@@ -110,7 +110,11 @@ def get_pitcher_hand(pid):
     try:
         payload=MLBClient().get(f"people/{int(pid)}",{})
         people=payload.get("people") or []
-        return str(((people[0].get("pitchingHand") or {}).get("code")) or "").upper() if people else ""
+        if not people:
+            return ""
+        # MLB Person uses `pitchHand`; retain the legacy key only as a defensive fallback.
+        hand=people[0].get("pitchHand") or people[0].get("pitchingHand") or {}
+        return str(hand.get("code") or "").upper()
     except Exception:
         return ""
 
@@ -269,13 +273,26 @@ def get_secret():
         except Exception:pass
     return os.getenv("ODDS_API_KEY") or os.getenv("THE_ODDS_API_KEY")
 
+def safe_odds_error(exc):
+    response=getattr(exc,"response",None)
+    status=getattr(response,"status_code",None)
+    if status==401:
+        return "Odds API unavailable: authentication failed (401). Check or rotate the Odds API key in Streamlit secrets."
+    if status==403:
+        return "Odds API unavailable: request forbidden (403). Check the Odds API account/permissions."
+    if status==429:
+        return "Odds API unavailable: rate or credit limit reached (429)."
+    if status is not None:
+        return f"Odds API unavailable: HTTP {int(status)}."
+    return f"Odds API unavailable: {type(exc).__name__}."
+
 @st.cache_data(ttl=60,show_spinner=False)
 def get_odds_events():
     key=get_secret()
     if not key:return [],"Odds API key not found in Streamlit secrets."
     try:
         r=requests.get(f"{ODDS_API}/sports/baseball_mlb/events",params={"apiKey":key},timeout=15); r.raise_for_status(); return r.json(),None
-    except Exception as e:return [],f"Odds API unavailable: {e}"
+    except requests.RequestException as e:return [],safe_odds_error(e)
 
 @st.cache_data(ttl=60,show_spinner=False)
 def get_event_props(event_id):
@@ -284,7 +301,7 @@ def get_event_props(event_id):
     params={"apiKey":key,"regions":"us","markets":"pitcher_strikeouts,pitcher_strikeouts_alternate,pitcher_outs,pitcher_outs_alternate,pitcher_hits_allowed,pitcher_hits_allowed_alternate","oddsFormat":"american"}
     try:
         r=requests.get(f"{ODDS_API}/sports/baseball_mlb/events/{event_id}/odds",params=params,timeout=15); r.raise_for_status(); return r.json(),None
-    except Exception as e:return [],f"Odds API unavailable: {e}"
+    except requests.RequestException as e:return [],safe_odds_error(e)
 
 def normalize_team(value):
     text=re.sub(r"[^a-z0-9]","",str(value).lower())
