@@ -1,0 +1,1 @@
+game_pk,game_date,pitcher_id,player,team,opponent,venue,game_time,captured_at_utc,reason,history_semantics,history_games_available_at_capture,actual_strikeouts,actual_hits_allowed,actual_outs,actual_batters_faced,actual_pitches,resolved_at_utc
