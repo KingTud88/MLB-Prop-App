@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# One-shot trigger for the batter-box display correction.
 page = Path("streamlit_app.py")
 text = page.read_text(encoding="utf-8")
 old = '    batter_display=opposing_batters.copy()\n    batter_display["Risk"]=batter_display["Risk"].map({"HIGH":"🔥 HIGH","ELEVATED":"⚠️ ELEVATED","NORMAL":"NORMAL"}).fillna(batter_display["Risk"])\n'
