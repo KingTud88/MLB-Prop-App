@@ -365,10 +365,21 @@ if isinstance(slate, pd.DataFrame):
                 "actual_outs": "Actual Outs",
             }
         )
+        projection_highlight_cols = [
+            col for col in ("Projection K", "Projection Hits Allowed", "Projection Outs")
+            if col in display.columns
+        ]
+        styled_display = display.style
+        if projection_highlight_cols:
+            styled_display = styled_display.map(
+                lambda value: "color: #22c55e; font-weight: 700;" if pd.notna(value) else "",
+                subset=projection_highlight_cols,
+            )
+
         st.subheader(f"{slate_date:%B %d, %Y} starter slate")
-        st.caption("Click any pitcher row to inspect why the model produced that frozen projection.")
+        st.caption("Click any pitcher row to inspect why the model produced that frozen projection. Headline projection numbers are highlighted in green for faster scanning.")
         event = st.dataframe(
-            display,
+            styled_display,
             hide_index=True,
             use_container_width=True,
             on_select="rerun",
