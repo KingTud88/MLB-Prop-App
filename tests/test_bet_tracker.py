@@ -145,3 +145,25 @@ def test_parlay_grade_requires_every_leg_to_win():
 def test_result_colors_are_green_for_win_and_red_for_loss():
     assert "#49efb0" in result_cell_css("WIN")
     assert "#ff4b4b" in result_cell_css("LOSS")
+
+
+def test_model_parlay_supports_eighteen_unpriced_legs():
+    legs = [
+        {
+            "player": f"Pitcher {idx}",
+            "market": "Strikeouts",
+            "game_date": "2026-08-12",
+            "line": 4.5 + (idx % 4),
+            "side": "Over",
+            "american_odds": None,
+            "game_pk": 1000 + idx,
+            "pitcher_id": 2000 + idx,
+        }
+        for idx in range(18)
+    ]
+    record = make_parlay_record(legs=legs, stake=0.25, game_date="2026-08-12", source="Projection Page Model Parlay")
+    assert record["bet_type"] == "Parlay"
+    assert record["player"] == "18-leg parlay"
+    parsed = parse_parlay_legs(record["parlay_legs"])
+    assert len(parsed) == 18
+    assert all(leg["american_odds"] == "" for leg in parsed)

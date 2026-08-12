@@ -462,7 +462,7 @@ def project(row: dict, matchup_override: dict[str, object] | None = None) -> dic
     )
     seed_version = str(row.get("seed_version") or APP_VERSION)
     seed = int(hashlib.sha256(f"{row['game_pk']}:{row['pitcher_id']}|{row['game_time']}|{seed_version}".encode()).hexdigest()[:8], 16)
-    result = ProjectionEngine(seed=seed).project(f, draws=25000, lines=tuple(float(x) for x in range(3, 11)))
+    result = ProjectionEngine(seed=seed).project(f, draws=25000, lines=tuple(float(x) for x in range(3, 13)))
     hits = project_hits_allowed(
         log,
         expected_bf=f["expected_bf"],
@@ -527,7 +527,7 @@ def project(row: dict, matchup_override: dict[str, object] | None = None) -> dic
         "actual_strikeouts": np.nan, "actual_hits_allowed": np.nan, "actual_outs": np.nan,
         "actual_batters_faced": np.nan, "actual_pitches": np.nan, "resolved_at_utc": "",
     }
-    for line in range(3, 11):
+    for line in range(3, 13):
         out[f"sim_{line}p"] = raw_sim.get(float(line), np.nan)
         out[f"math_{line}p"] = raw_math.get(float(line), np.nan)
     for line in (3.5, 4.5, 5.5, 6.5, 7.5, 8.5):
@@ -544,7 +544,7 @@ def project(row: dict, matchup_override: dict[str, object] | None = None) -> dic
 
 
 def row_has_complete_paths(row: pd.Series) -> bool:
-    return all(pd.notna(row.get(f"sim_{line}p")) and pd.notna(row.get(f"math_{line}p")) for line in range(3, 11))
+    return all(pd.notna(row.get(f"sim_{line}p")) and pd.notna(row.get(f"math_{line}p")) for line in range(3, 13))
 
 
 def row_has_current_semantics(row: pd.Series) -> bool:
@@ -901,7 +901,7 @@ def main() -> None:
     team_leash_refreshes += attach_pregame_team_leash(frame)
     lineup_refreshes = refresh_pregame_lineups(frame, rows)
 
-    for line in range(3, 11):
+    for line in range(3, 13):
         for prefix in ("sim", "math"):
             col = f"{prefix}_{line}p"
             if col not in frame.columns:

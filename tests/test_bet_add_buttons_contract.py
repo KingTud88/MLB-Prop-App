@@ -61,6 +61,16 @@ def test_projection_strikeout_ladder_is_clickable_and_actionable():
     ladder_pos = source.index('key=f"projection_k_ladder_{game.key}"')
     builder_pos = source.rindex("render_projection_parlay_builder()")
     assert ladder_pos < builder_pos
+    assert "kdf=ladder(proj,12)" in source
+    assert "3+ through 12+" in source
+
+
+def test_projection_parlay_builder_has_no_hard_leg_cap():
+    source = (Path(__file__).resolve().parents[1] / "streamlit_app.py").read_text(encoding="utf-8")
+    assert "capped at five legs" not in source
+    assert "if len(legs)>=5" not in source
+    assert "very high variance" in source
+    assert "does not multiply model probabilities" in source
 
 
 def test_tracker_page_applies_result_status_styling_and_grades_parlays():

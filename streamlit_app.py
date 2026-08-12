@@ -157,7 +157,7 @@ def build_engine_features(log,game,opponent_k_pct=.224,lineup_batters=0,workload
     return {"pitcher_k_pct":pitcher_k,"opponent_k_pct":float(np.clip(opponent_k_pct,.08,.45)),"handedness_factor":1.0,"arsenal_factor":1.0,"park_factor":PARK_K_FACTOR.get(game.venue,1.0),"umpire_factor":1.0,"weather_factor":1.0,"expected_bf":float(workload_context.expected_bf),"bf_sd":float(workload_context.bf_sd),"rest_factor":1.0,"historical_k_sd":float(np.clip(starts.k.std(ddof=1) if len(starts)>2 else 2.0,.75,4.5)),"historical_games":int(len(starts)),"lineup_batters":int(lineup_batters),"arsenal_sample_size":0,"weather_available":0,"umpire_available":0}
 
 def calculate_projection(log,game,simulations,opponent_k_pct=.224,lineup_batters=0,workload_context:WorkloadContext|None=None):
-    history=load_projection_history(); cal=calibrated_weights(history); workload_context=workload_context or build_workload_context(log,game.game_time); seed=int(hashlib.sha256(f"{game.key}|{game.game_time}|{APP_VERSION}".encode()).hexdigest()[:8],16); features=build_engine_features(log,game,opponent_k_pct,lineup_batters,workload_context); engine=ProjectionEngine(simulation_weight=.5,seed=seed); result=engine.project(features,draws=simulations,lines=tuple(float(x) for x in range(3,11))); global_w=float(np.mean([r.weight_simulation for r in cal.values()])) if cal else .5; mean_k=global_w*result.simulation_mean+(1-global_w)*result.mathematical_mean; outs_seed=int(hashlib.sha256(f"outs|{game.key}|{APP_VERSION}".encode()).hexdigest()[:8],16); outs_model=project_total_outs(log,expected_outs=workload_context.expected_outs,workload_sd=workload_context.outs_sd,seed=outs_seed,draws=simulations,lines=(13.5,14.5,15.5,16.5,17.5,18.5)); mean_outs=outs_model.ensemble_mean; osd=outs_model.ensemble_sd; outs_samples=outs_model.simulation_samples; outs_probs=np.array([float(np.mean(outs_samples==i)) for i in range(28)]); quality=int(round(result.data_quality)); confidence="High" if result.confidence>=.75 else "Medium" if result.confidence>=.60 else "Low"; return Projection(mean_k,mean_outs,result.ensemble_sd,osd,result.mathematical_pmf,outs_probs,result.simulation_samples,outs_samples,confidence,quality,[(n,v) for n,v,_ in result.drivers],result,outs_model)
+    history=load_projection_history(); cal=calibrated_weights(history); workload_context=workload_context or build_workload_context(log,game.game_time); seed=int(hashlib.sha256(f"{game.key}|{game.game_time}|{APP_VERSION}".encode()).hexdigest()[:8],16); features=build_engine_features(log,game,opponent_k_pct,lineup_batters,workload_context); engine=ProjectionEngine(simulation_weight=.5,seed=seed); result=engine.project(features,draws=simulations,lines=tuple(float(x) for x in range(3,13))); global_w=float(np.mean([r.weight_simulation for r in cal.values()])) if cal else .5; mean_k=global_w*result.simulation_mean+(1-global_w)*result.mathematical_mean; outs_seed=int(hashlib.sha256(f"outs|{game.key}|{APP_VERSION}".encode()).hexdigest()[:8],16); outs_model=project_total_outs(log,expected_outs=workload_context.expected_outs,workload_sd=workload_context.outs_sd,seed=outs_seed,draws=simulations,lines=(13.5,14.5,15.5,16.5,17.5,18.5)); mean_outs=outs_model.ensemble_mean; osd=outs_model.ensemble_sd; outs_samples=outs_model.simulation_samples; outs_probs=np.array([float(np.mean(outs_samples==i)) for i in range(28)]); quality=int(round(result.data_quality)); confidence="High" if result.confidence>=.75 else "Medium" if result.confidence>=.60 else "Low"; return Projection(mean_k,mean_outs,result.ensemble_sd,osd,result.mathematical_pmf,outs_probs,result.simulation_samples,outs_samples,confidence,quality,[(n,v) for n,v,_ in result.drivers],result,outs_model)
 
 def american(p):
     p=float(np.clip(p,.001,.999)); o=-100*p/(1-p) if p>=.5 else 100*(1-p)/p; return f"{o:+.0f}"
@@ -208,8 +208,6 @@ def queue_projection_parlay_leg(leg):
     key=_projection_leg_key(leg)
     if any(_projection_leg_key(existing)==key for existing in legs):
         return False,"That exact leg is already in the Projection Parlay Builder."
-    if len(legs)>=5:
-        return False,"The Projection Parlay Builder is capped at five legs."
     legs.append(dict(leg)); st.session_state[PROJECTION_PARLAY_KEY]=legs
     return True,f"Added to Projection Parlay Builder ({len(legs)}/5)."
 
@@ -259,7 +257,7 @@ def render_add_bet_button(container,reco,market_label,market_keys,projection_mea
 
 def render_projection_parlay_builder():
     legs=list(st.session_state.get(PROJECTION_PARLAY_KEY,[]))
-    with st.expander(f"🎟️ Projection Parlay Builder · {len(legs)}/5 legs",expanded=bool(legs)):
+    with st.expander(f"🎟️ Projection Parlay Builder · {len(legs)} leg" + ("" if len(legs)==1 else "s"),expanded=bool(legs)):
         st.caption(
             "Add model legs from recommendations or the Strikeout Ladder, then move between pitchers on the same slate. "
             "Sportsbook availability never gates this builder; saved model parlays are unpriced and the sportsbook label is recordkeeping only."
@@ -287,6 +285,8 @@ def render_projection_parlay_builder():
             legs.pop(int(remove_idx)); st.session_state[PROJECTION_PARLAY_KEY]=legs; st.rerun()
         if st.button("Clear Projection Parlay Builder",use_container_width=True,key="projection_parlay_clear"):
             st.session_state[PROJECTION_PARLAY_KEY]=[]; st.rerun()
+        if len(legs)>=10:
+            st.warning(f"🎰 {len(legs)}-leg lotto · very high variance. The app grades every leg but does not multiply model probabilities or claim the legs are independent.")
         duplicate_pitchers=pd.Series([str(leg.get("player","")) for leg in legs]).value_counts()
         correlated=duplicate_pitchers[duplicate_pitchers>1]
         if not correlated.empty:
@@ -359,7 +359,7 @@ def render_reco(card,reco):
 
 def render_calibration_dashboard():
     st.markdown("### Milestone Calibration Dashboard"); st.caption("Resolved pregame projections only. Sportsbook prices are excluded from training.")
-    history=load_projection_history(); report=milestone_calibration_report(history,range(3,11),min_observations=30); display=report.copy()
+    history=load_projection_history(); report=milestone_calibration_report(history,range(3,13),min_observations=30); display=report.copy()
     for col in ["Simulation Brier","Math Brier","Calibrated Brier"]: display[col]=display[col].map(lambda x:"—" if pd.isna(x) else f"{x:.4f}")
     for col in ["Simulation Weight","Math Weight","Actual Hit Rate"]: display[col]=display[col].map(lambda x:"—" if pd.isna(x) else f"{x:.1%}")
     st.dataframe(display,use_container_width=True,hide_index=True); resolved=int(pd.to_numeric(history.get("actual_strikeouts"),errors="coerce").notna().sum()) if not history.empty and "actual_strikeouts" in history.columns else 0; st.info(f"{resolved} resolved projections currently available. Each milestone learns independently after 30 valid observations; until then it stays at a 50/50 simulation/math baseline.")
@@ -510,7 +510,7 @@ confirmed_count=lineup_context.batter_count if lineup_context.confirmed else 0
 workload_ctx=build_workload_context(log,game.game_time)
 team_leash_ctx=build_team_leash_context(load_projection_history(),load_observation_history(),game.team,game.game_time)
 team_leash_candidate=candidate_workload_fields(team_leash_ctx,workload_ctx.expected_pitches,workload_ctx.expected_bf,workload_ctx.expected_outs)
-proj=calculate_projection(log,game,25000,float(opponent_matchup["k_rate"]),confirmed_count,workload_ctx); kdf=ladder(proj,10)
+proj=calculate_projection(log,game,25000,float(opponent_matchup["k_rate"]),confirmed_count,workload_ctx); kdf=ladder(proj,12)
 features_for_hits=build_engine_features(log,game,float(opponent_matchup["k_rate"]),confirmed_count,workload_ctx)
 hits_seed=int(hashlib.sha256(f"hits|{game.key}|{game.game_time}|{APP_VERSION}".encode()).hexdigest()[:8],16)
 hits_proj=project_hits_allowed(log,expected_bf=features_for_hits["expected_bf"],bf_sd=workload_ctx.bf_sd,opponent_hit_rate=float(opponent_matchup.get("hit_rate",.235)),seed=hits_seed,draws=25000,lines=(3.5,4.5,5.5,6.5,7.5,8.5))
@@ -721,7 +721,7 @@ with left:
     ladder_event=st.dataframe(
         view,use_container_width=True,hide_index=True,on_select="rerun",selection_mode="single-row",key=f"projection_k_ladder_{game.key}"
     )
-    st.caption("Click any 3+ through 10+ milestone to add it as a straight or parlay leg. A milestone like 5+ is tracked as Over 4.5 so Bet Tracker grading matches K ≥ 5. Fair Odds are model-only and are never saved as a sportsbook price.")
+    st.caption("Click any 3+ through 12+ milestone to add it as a straight or parlay leg. A milestone like 5+ is tracked as Over 4.5 so Bet Tracker grading matches K ≥ 5. Fair Odds are model-only and are never saved as a sportsbook price.")
     try:
         ladder_selected=list(ladder_event.selection.rows)
     except Exception:
