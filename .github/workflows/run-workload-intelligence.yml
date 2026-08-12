@@ -3,37 +3,74 @@ name: Run workload intelligence patch
 on:
   push:
     paths:
-      - scripts/patch_workload_audit_integrity.py
       - .github/workflows/run-workload-intelligence.yml
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  patch:
-    if: github.actor != 'github-actions[bot]'
+  live-smoke:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: pip install -r requirements.txt pytest
-      - name: Apply workload audit integrity patch
-        run: python scripts/patch_workload_audit_integrity.py
-      - name: Compile
-        run: python -m compileall -q streamlit_app.py navigation.py pages engine automation tests
-      - name: Test
-        run: pytest -q
-      - name: Commit fixes
+      - name: Compile and test
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add engine/workload_context.py automation/daily_projection_runner.py tests/test_workload_context.py tests/test_workload_ui_contract.py tests/test_matchup_weather_integrity.py
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -m "Harden workload audit and live date handling"
-          git pull --rebase origin main
-          git push origin HEAD:main
+          python -m compileall -q streamlit_app.py navigation.py pages engine automation tests
+          pytest -q
+      - name: Live MLB workload smoke
+        run: |
+          python - <<'PY'
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+
+          from automation.daily_projection_runner import (
+              TARGET_STARTER_HISTORY,
+              combine_starter_history,
+              game_log,
+              project,
+              schedule,
+          )
+          from engine.workload_context import WORKLOAD_VERSION, build_workload_context
+
+          today = datetime.now(ZoneInfo("America/New_York")).date()
+          rows = schedule(today.isoformat())
+          if not rows:
+              raise SystemExit("No announced MLB starters returned for live workload smoke")
+
+          checked = False
+          for row in rows:
+              season = today.year
+              current = game_log(int(row["pitcher_id"]), season)
+              prior = game_log(int(row["pitcher_id"]), season - 1) if len(current) < TARGET_STARTER_HISTORY else current.iloc[0:0]
+              history = combine_starter_history(current, prior)
+              if history.empty:
+                  continue
+              ctx = build_workload_context(history, row["game_time"])
+              assert ctx.version == WORKLOAD_VERSION
+              assert 60.0 <= ctx.expected_pitches <= 112.0
+              assert 10.0 <= ctx.expected_bf <= 35.0
+              assert 6.0 <= ctx.expected_outs <= 24.0
+              result = project(row)
+              if result is None:
+                  continue
+              assert result["workload_version"] == WORKLOAD_VERSION
+              assert 60.0 <= float(result["expected_pitches"]) <= 112.0
+              assert 10.0 <= float(result["expected_bf"]) <= 35.0
+              assert 6.0 <= float(result["expected_outs"]) <= 24.0
+              assert result.get("actual_batters_faced") != result.get("actual_batters_faced")  # NaN pregame
+              print(
+                  f"LIVE_WORKLOAD_OK pitcher={row['player']} game={row['game_pk']} "
+                  f"pitches={ctx.expected_pitches:.1f} bf={ctx.expected_bf:.1f} "
+                  f"outs={ctx.expected_outs:.1f} rest={ctx.days_since_last_start}"
+              )
+              checked = True
+              break
+
+          if not checked:
+              raise SystemExit("No announced starter with usable history completed live workload smoke")
+          PY
