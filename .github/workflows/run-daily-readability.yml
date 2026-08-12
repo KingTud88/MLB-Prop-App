@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - scripts/patch_daily_readability.py
+      - scripts/fix_daily_readability_contracts.py
       - .github/workflows/run-daily-readability.yml
   workflow_dispatch:
 
@@ -24,6 +25,8 @@ jobs:
       - run: pip install -r requirements.txt pytest
       - name: Apply readability patch
         run: python scripts/patch_daily_readability.py
+      - name: Update readability contracts
+        run: python scripts/fix_daily_readability_contracts.py
       - name: Compile
         run: python -m compileall -q streamlit_app.py navigation.py pages engine automation tests
       - name: Test
@@ -32,7 +35,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pages/5_Daily_Projection_Run.py tests/test_daily_readability.py
+          git add pages/5_Daily_Projection_Run.py tests/test_daily_readability.py tests/test_daily_history_ui.py tests/test_daily_projection_highlight.py tests/test_weather_snapshot_ui.py
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "Make Daily projection table easier to read"
           for attempt in 1 2 3; do
