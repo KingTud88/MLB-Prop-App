@@ -33,3 +33,14 @@ def test_paid_odds_calls_cache_for_fifteen_minutes_and_track_quota_headers():
         assert 'x-requests-remaining' in source
         assert 'x-requests-used' in source
         assert 'x-requests-last' in source
+
+
+def test_scheduled_projection_automation_never_calls_odds_api():
+    workflow = Path(".github/workflows/daily-projection-resolver.yml").read_text(encoding="utf-8")
+    runner = Path("automation/daily_projection_runner.py").read_text(encoding="utf-8")
+    resolver = Path("automation/resolve_projection_log.py").read_text(encoding="utf-8")
+    for source in (workflow, runner, resolver):
+        lowered = source.lower()
+        assert "the-odds-api" not in lowered
+        assert "odds_api_key" not in lowered
+        assert "training.daily_odds" not in lowered
