@@ -33,7 +33,15 @@ jobs:
           git add streamlit_app.py tests/test_bet_add_buttons_contract.py
           if git diff --cached --quiet; then
             echo "No cleanup changes to commit"
-          else
-            git commit -m "Fix unlimited Projection parlay counter"
-            git push
+            exit 0
           fi
+          git commit -m "Fix unlimited Projection parlay counter"
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git rebase origin/main
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
