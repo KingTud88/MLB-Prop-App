@@ -22,6 +22,13 @@ PROBABILITY_SEMANTICS = "milestone-ceil-v1"
 EASTERN = ZoneInfo("America/New_York")
 ROOT = Path(__file__).resolve().parents[1]
 LOG_PATH = ROOT / "data" / "projection_log.csv"
+OBS_LOG_PATH = ROOT / "data" / "starter_observation_log.csv"
+OBS_COLUMNS = [
+    "game_pk", "game_date", "pitcher_id", "player", "team", "opponent", "venue", "game_time",
+    "captured_at_utc", "reason", "history_semantics", "history_games_available_at_capture",
+    "actual_strikeouts", "actual_hits_allowed", "actual_outs", "actual_batters_faced", "actual_pitches",
+    "resolved_at_utc",
+]
 TEAM_ABBR = {
     108:"LAA",109:"ARI",110:"BAL",111:"BOS",112:"CHC",113:"CIN",114:"CLE",115:"COL",
     116:"DET",117:"HOU",118:"KCR",119:"LAD",120:"WSH",121:"NYM",133:"ATH",134:"PIT",
@@ -83,6 +90,139 @@ def game_log(pitcher_id: int, season: int) -> pd.DataFrame:
     if frame.empty:
         return frame
     return starter_only(frame)
+
+
+def load_observation_log() -> pd.DataFrame:
+    if not OBS_LOG_PATH.exists():
+        return pd.DataFrame(columns=OBS_COLUMNS)
+    try:
+        frame = pd.read_csv(OBS_LOG_PATH)
+    except Exception:
+        return pd.DataFrame(columns=OBS_COLUMNS)
+    for col in OBS_COLUMNS:
+        if col not in frame.columns:
+            frame[col] = np.nan if col.startswith("actual_") or col == "history_games_available_at_capture" else ""
+    return frame[OBS_COLUMNS].copy()
+
+
+def save_observation_log(frame: pd.DataFrame) -> None:
+    OBS_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    out = frame.copy()
+    for col in OBS_COLUMNS:
+        if col not in out.columns:
+            out[col] = np.nan if col.startswith("actual_") or col == "history_games_available_at_capture" else ""
+    out[OBS_COLUMNS].to_csv(OBS_LOG_PATH, index=False)
+
+
+def record_history_only(row: dict, reason: str = "no usable starter history", history_games: int = 0) -> bool:
+    frame = load_observation_log()
+    if not frame.empty and {"game_pk", "pitcher_id"}.issubset(frame.columns):
+        same = (
+            pd.to_numeric(frame["game_pk"], errors="coerce").eq(int(row["game_pk"]))
+            & pd.to_numeric(frame["pitcher_id"], errors="coerce").eq(int(row["pitcher_id"]))
+        )
+        if bool(same.any()):
+            return False
+    now = datetime.now(timezone.utc).isoformat()
+    record = {
+        "game_pk": int(row["game_pk"]), "game_date": str(row["game_date"]), "pitcher_id": int(row["pitcher_id"]),
+        "player": row.get("player", "Unknown"), "team": row.get("team", "UNK"), "opponent": row.get("opponent", "UNK"),
+        "venue": row.get("venue", "Unknown"), "game_time": row.get("game_time", ""), "captured_at_utc": now,
+        "reason": reason, "history_semantics": HISTORY_SEMANTICS,
+        "history_games_available_at_capture": int(history_games),
+        "actual_strikeouts": np.nan, "actual_hits_allowed": np.nan, "actual_outs": np.nan,
+        "actual_batters_faced": np.nan, "actual_pitches": np.nan, "resolved_at_utc": "",
+    }
+    frame = pd.concat([frame, pd.DataFrame([record])], ignore_index=True)
+    save_observation_log(frame)
+    return True
+
+
+def observation_history(pitcher_id: int) -> pd.DataFrame:
+    frame = load_observation_log()
+    if frame.empty:
+        return pd.DataFrame()
+    mask = pd.to_numeric(frame["pitcher_id"], errors="coerce").eq(int(pitcher_id))
+    data = frame.loc[mask].copy()
+    required = ["actual_batters_faced", "actual_strikeouts", "actual_hits_allowed", "actual_outs", "actual_pitches"]
+    for col in required:
+        data[col] = pd.to_numeric(data[col], errors="coerce")
+    data = data.dropna(subset=required)
+    if data.empty:
+        return pd.DataFrame()
+    return pd.DataFrame({
+        "date": pd.to_datetime(data["game_date"], errors="coerce"),
+        "bf": data["actual_batters_faced"].to_numpy(float),
+        "k": data["actual_strikeouts"].to_numpy(float),
+        "hits": data["actual_hits_allowed"].to_numpy(float),
+        "pitches": data["actual_pitches"].to_numpy(float),
+        "outs": data["actual_outs"].to_numpy(float),
+        "games_started": np.ones(len(data), dtype=int),
+    }).dropna(subset=["date"])
+
+
+def supplement_with_observations(log: pd.DataFrame, pitcher_id: int) -> pd.DataFrame:
+    observed = observation_history(pitcher_id)
+    if observed.empty:
+        return log
+    if log.empty:
+        return observed.sort_values("date").tail(TARGET_STARTER_HISTORY).reset_index(drop=True)
+    existing_dates = set(pd.to_datetime(log["date"], errors="coerce").dt.normalize().dropna())
+    observed_dates = pd.to_datetime(observed["date"], errors="coerce").dt.normalize()
+    observed = observed.loc[~observed_dates.isin(existing_dates)].copy()
+    if observed.empty:
+        return log
+    merged = pd.concat([log, observed], ignore_index=True)
+    return merged.sort_values("date").tail(TARGET_STARTER_HISTORY).reset_index(drop=True)
+
+
+def resolve_observation_row(row: pd.Series) -> dict[str, object]:
+    actuals = [row.get("actual_strikeouts"), row.get("actual_hits_allowed"), row.get("actual_outs"), row.get("actual_batters_faced"), row.get("actual_pitches")]
+    if all(pd.notna(value) for value in actuals):
+        return {}
+    if pd.isna(row.get("game_pk")) or pd.isna(row.get("pitcher_id")):
+        return {}
+    try:
+        data = get_json(f"game/{int(row['game_pk'])}/boxscore", {})
+        status = data.get("gameData", {}).get("status", {})
+        if status.get("abstractGameState") != "Final":
+            return {}
+        player = data.get("teams", {}).get("away", {}).get("players", {}).get(f"ID{int(row['pitcher_id'])}")
+        if not player:
+            player = data.get("teams", {}).get("home", {}).get("players", {}).get(f"ID{int(row['pitcher_id'])}")
+        pitching = (player or {}).get("stats", {}).get("pitching", {})
+        innings = pitching.get("inningsPitched")
+        outs = int(round(parse_ip(innings) * 3)) if innings is not None else np.nan
+        result = {
+            "actual_strikeouts": pitching.get("strikeOuts", np.nan),
+            "actual_hits_allowed": pitching.get("hits", np.nan),
+            "actual_outs": outs,
+            "actual_batters_faced": pitching.get("battersFaced", np.nan),
+            "actual_pitches": pitching.get("numberOfPitches", np.nan),
+            "resolved_at_utc": datetime.now(timezone.utc).isoformat(),
+        }
+        if all(pd.isna(result[key]) for key in ("actual_strikeouts", "actual_hits_allowed", "actual_outs", "actual_batters_faced", "actual_pitches")):
+            return {}
+        return result
+    except (requests.RequestException, ValueError, TypeError):
+        return {}
+
+
+def resolve_observation_log() -> int:
+    frame = load_observation_log()
+    if frame.empty:
+        return 0
+    updated = 0
+    for idx in frame.index:
+        result = resolve_observation_row(frame.loc[idx])
+        if not result:
+            continue
+        for key, value in result.items():
+            frame.at[idx, key] = value
+        updated += 1
+    if updated:
+        save_observation_log(frame)
+    return updated
 
 
 def pitcher_hand(pitcher_id: int) -> str:
@@ -167,7 +307,9 @@ def project(row: dict) -> dict | None:
     if len(current_log) < TARGET_STARTER_HISTORY:
         prior_log = game_log(row["pitcher_id"], season - 1)
     log = combine_starter_history(current_log, prior_log)
+    log = supplement_with_observations(log, row["pitcher_id"])
     if log.empty:
+        record_history_only(row, history_games=0)
         return None
     opponent_k_pct, matchup_pa, matchup_batters = matchup_k_rate(
         row["opponent"], row["pitcher_id"], season, row.get("opponent_team_id")
@@ -311,6 +453,7 @@ def resolve_row(row: pd.Series) -> tuple[object, object, object, str]:
 
 def main() -> None:
     LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    observation_updates = resolve_observation_log()
     frame = pd.read_csv(LOG_PATH) if LOG_PATH.exists() else pd.DataFrame()
 
     if not frame.empty:
@@ -359,7 +502,12 @@ def main() -> None:
         if col not in frame.columns:
             frame[col] = np.nan if col != "resolved_at_utc" else ""
     frame.to_csv(LOG_PATH, index=False)
-    print(f"projection log rows={len(frame)} new={len(new_rows)} pregame_path_refreshes={refreshed}")
+    observations = load_observation_log()
+    unresolved_observations = 0 if observations.empty else int(pd.to_numeric(observations["actual_outs"], errors="coerce").isna().sum())
+    print(
+        f"projection log rows={len(frame)} new={len(new_rows)} pregame_path_refreshes={refreshed} "
+        f"history_observations={len(observations)} observation_resolves={observation_updates} unresolved_observations={unresolved_observations}"
+    )
 
 
 if __name__ == "__main__":
