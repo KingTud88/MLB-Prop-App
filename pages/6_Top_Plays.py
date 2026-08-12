@@ -255,6 +255,10 @@ def render_projection_rationale(play: pd.Series, snapshot: pd.Series, history: p
     odds = numeric(play.get("Odds"))
     live_text = f"{book} {int(odds):+d}" if book and odds is not None else "no exact live sportsbook price yet"
     st.caption(f"{play.get('Team', '')} vs {play.get('Opponent', '')} · {play['Market']} · {play['Side']} {float(play['Line']):g} · {live_text}")
+    weather_level = str(play.get("Weather Risk", "") or "").upper()
+    weather_summary = str(play.get("Weather Summary", "") or "").strip()
+    if weather_level in {"HIGH", "ELEVATED"} and weather_summary:
+        st.warning(f"{str(play.get('Weather Icon', '') or '🌩️')} {weather_summary}. Weather is informational and does not affect Top 5 ranking.")
 
     a, b, c, d = st.columns(4)
     a.metric("Model probability", f"{float(play['Model Probability']):.1%}")
@@ -415,7 +419,9 @@ c1.metric("Highest model hit probability", f"{plays['Model Probability'].max():.
 c2.metric("Model-qualified Top 5", model_plays)
 c3.metric("Exact live prices found", f"{live_offers}/{len(plays)}")
 
-view = plays[["Rank", "Status", "Pitcher", "Market", "Side", "Line", "Projection", "Model Probability", "Data Quality", "Starter History", "Book", "Odds"]].copy()
+view = plays[["Rank", "Status", "Pitcher", "Weather Icon", "Weather Risk", "Market", "Side", "Line", "Projection", "Model Probability", "Data Quality", "Starter History", "Book", "Odds"]].copy()
+view["Pitcher"] = view.apply(lambda r: f"{r['Pitcher']} {str(r.get('Weather Icon', '') or '')}".strip(), axis=1)
+view = view.drop(columns=["Weather Icon"])
 view["Model Probability"] = view["Model Probability"].map(lambda x: f"{float(x):.1%}")
 view["Projection"] = view["Projection"].map(lambda x: f"{float(x):.2f}")
 view["Book"] = view["Book"].map(lambda x: x if str(x).strip() else "—")
@@ -444,7 +450,8 @@ for button_idx, (_, play_row) in enumerate(plays.iterrows()):
     live_offer = bool(play_row.get("Live Offer", False)) and numeric(play_row.get("Odds")) is not None
     with button_cols[button_idx]:
         rank = int(play_row["Rank"])
-        st.caption(f"#{rank} {play_row['Pitcher']} · {play_row['Side']} {float(play_row['Line']):g}")
+        weather_icon = str(play_row.get("Weather Icon", "") or "")
+        st.caption(f"#{rank} {play_row['Pitcher']} {weather_icon} · {play_row['Side']} {float(play_row['Line']):g}".replace("  ·", " ·"))
         if st.button("🔎 View details", key=f"view_top_play_{rank}", use_container_width=True):
             st.session_state["top_play_detail_rank"] = rank
         if st.button("➕ Add as bet", key=f"add_top_play_{rank}", use_container_width=True, disabled=not (model_ok and live_offer)):
@@ -482,7 +489,7 @@ st.caption(
 option_map = {}
 for idx, leg in plays.iterrows():
     label = (
-        f"#{int(leg['Rank'])} {leg['Pitcher']} · {leg['Market']} · {leg['Side']} {float(leg['Line']):g} · "
+        f"#{int(leg['Rank'])} {leg['Pitcher']} {str(leg.get('Weather Icon', '') or '')} · {leg['Market']} · {leg['Side']} {float(leg['Line']):g} · "
         f"{float(leg['Model Probability']):.1%} · {leg['Status']}"
     )
     option_map[label] = idx

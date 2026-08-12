@@ -131,6 +131,10 @@ def build_model_candidate(row: Mapping[str, object], market: str, history: pd.Da
         "Probability Semantics": row.get("probability_semantics", ""),
         "History Semantics": row.get("history_semantics", ""),
         "Captured At UTC": row.get("captured_at_utc", ""),
+        "Weather Icon": row.get("weather_icon", ""),
+        "Weather Risk": row.get("weather_delay_risk", ""),
+        "Weather Summary": row.get("weather_summary", ""),
+        "Rain Probability": row.get("weather_precip_probability", None),
     }
 
 

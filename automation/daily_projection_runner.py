@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+from functools import lru_cache
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -15,6 +16,7 @@ from engine.opposing_batters import get_opposing_batters, matchup_summary
 from engine.hits_allowed import project_hits_allowed
 from engine.outs_projection import project_total_outs
 from engine.starter_history import HISTORY_SEMANTICS, TARGET_STARTER_HISTORY, combine_starter_history, starter_only
+from engine.weather_risk import WeatherDelayRisk, fetch_weather_delay_risk
 
 BASE = "https://statsapi.mlb.com/api/v1"
 APP_VERSION = "3.5.0"
@@ -243,6 +245,39 @@ def resolve_observation_log() -> int:
     return updated
 
 
+@lru_cache(maxsize=64)
+def venue_coordinates(venue_id: int) -> tuple[float, float] | None:
+    if not venue_id:
+        return None
+    try:
+        data = get_json(f"venues/{int(venue_id)}", {})
+        venues = data.get("venues") or []
+        coords = ((venues[0].get("location") or {}).get("defaultCoordinates") or {}) if venues else {}
+        lat, lon = coords.get("latitude"), coords.get("longitude")
+        return (float(lat), float(lon)) if lat is not None and lon is not None else None
+    except (requests.RequestException, ValueError, TypeError, IndexError):
+        return None
+
+
+@lru_cache(maxsize=128)
+def game_weather(venue_id: int, game_time: str) -> WeatherDelayRisk:
+    coords = venue_coordinates(int(venue_id or 0))
+    if not coords:
+        return WeatherDelayRisk("UNKNOWN", "", None, None, None, "Venue coordinates unavailable for weather risk.", False)
+    return fetch_weather_delay_risk(coords[0], coords[1], str(game_time or ""))
+
+
+def weather_snapshot_fields(venue_id: int, game_time: str) -> dict[str, object]:
+    risk = game_weather(int(venue_id or 0), str(game_time or ""))
+    return {
+        "weather_delay_risk": risk.level,
+        "weather_icon": risk.icon,
+        "weather_precip_probability": np.nan if risk.precip_probability is None else risk.precip_probability,
+        "weather_precip_mm": np.nan if risk.precipitation_mm is None else risk.precipitation_mm,
+        "weather_summary": risk.summary,
+    }
+
+
 def pitcher_hand(pitcher_id: int) -> str:
     try:
         data = get_json(f"people/{int(pitcher_id)}", {})
@@ -295,6 +330,7 @@ def schedule(day: str) -> list[dict]:
     for block in data.get("dates", []):
         for game in block.get("games", []):
             teams = game.get("teams", {})
+            venue_node = game.get("venue", {}) or {}
             for side, other in (("away", "home"), ("home", "away")):
                 node = teams.get(side, {}) or {}
                 opp = teams.get(other, {}) or {}
@@ -311,7 +347,8 @@ def schedule(day: str) -> list[dict]:
                     "team": TEAM_ABBR.get(tn.get("id"), tn.get("abbreviation", "UNK")),
                     "opponent": TEAM_ABBR.get(on.get("id"), on.get("abbreviation", "UNK")),
                     "opponent_team_id": int(on.get("id")) if on.get("id") else None,
-                    "venue": game.get("venue", {}).get("name", "Unknown"),
+                    "venue_id": int(venue_node.get("id", 0) or 0),
+                    "venue": venue_node.get("name", "Unknown"),
                     "game_time": game.get("gameDate", ""),
                     "status": game.get("status", {}).get("detailedState", "Scheduled"),
                 })
@@ -349,11 +386,12 @@ def project(row: dict) -> dict | None:
         lines=(13.5, 14.5, 15.5, 16.5, 17.5, 18.5),
     )
     now = datetime.now(timezone.utc).isoformat()
+    weather = weather_snapshot_fields(int(row.get("venue_id", 0) or 0), str(row.get("game_time", "")))
     raw_sim = result.metadata.get("raw_simulation_probabilities", result.simulation_probabilities)
     raw_math = result.metadata.get("raw_mathematical_probabilities", result.mathematical_probabilities)
     out = {
         "game_pk": row["game_pk"], "game_date": row["game_date"], "pitcher_id": row["pitcher_id"],
-        "player": row["player"], "team": row["team"], "opponent": row["opponent"], "venue": row["venue"],
+        "player": row["player"], "team": row["team"], "opponent": row["opponent"], "venue_id": row.get("venue_id", 0), "venue": row["venue"],
         "game_time": row["game_time"], "captured_at_utc": now, "app_version": APP_VERSION,
         "probability_semantics": PROBABILITY_SEMANTICS,
         "history_semantics": HISTORY_SEMANTICS, "starter_history_games": int(len(log)),
@@ -371,6 +409,7 @@ def project(row: dict) -> dict | None:
         "opponent_k_pct": opponent_k_pct * 100.0, "matchup_pa": matchup_pa, "matchup_batters": matchup_batters,
         "pitch_limit": 92, "umpire_k_factor": 1.0,
         "weather_factor": 1.0, "rest_factor": 1.0,
+        **weather,
         "actual_strikeouts": np.nan, "actual_hits_allowed": np.nan, "actual_outs": np.nan, "resolved_at_utc": "",
     }
     for line in range(3, 11):
@@ -408,6 +447,34 @@ def row_is_pregame(row: pd.Series, now: datetime) -> bool:
         return False
 
 
+def attach_pregame_weather(frame: pd.DataFrame, announced: list[dict]) -> int:
+    if frame.empty or not announced:
+        return 0
+    now = datetime.now(timezone.utc)
+    lookup = {(int(r["game_pk"]), int(r["pitcher_id"])): r for r in announced}
+    updated = 0
+    for idx in frame.index:
+        row = frame.loc[idx]
+        if not row_is_pregame(row, now):
+            continue
+        existing = str(row.get("weather_delay_risk", "") or "").upper()
+        if existing in {"NONE", "LOW", "ELEVATED", "HIGH"}:
+            continue
+        try:
+            key = (int(row["game_pk"]), int(row["pitcher_id"]))
+        except Exception:
+            continue
+        scheduled = lookup.get(key)
+        if not scheduled:
+            continue
+        fields = weather_snapshot_fields(int(scheduled.get("venue_id", 0) or 0), str(scheduled.get("game_time", "")))
+        frame.at[idx, "venue_id"] = int(scheduled.get("venue_id", 0) or 0)
+        for key_name, value in fields.items():
+            frame.at[idx, key_name] = value
+        updated += 1
+    return updated
+
+
 def fill_missing_pregame_paths(frame: pd.DataFrame) -> int:
     if frame.empty:
         return 0
@@ -428,6 +495,7 @@ def fill_missing_pregame_paths(frame: pd.DataFrame) -> int:
                 "team": row.get("team", "UNK"),
                 "opponent": row.get("opponent", "UNK"),
                 "opponent_team_id": int(row["opponent_team_id"]) if pd.notna(row.get("opponent_team_id")) else None,
+                "venue_id": int(row["venue_id"]) if pd.notna(row.get("venue_id")) else 0,
                 "venue": row.get("venue", "Unknown"),
                 "game_time": row.get("game_time", ""),
                 "status": row.get("status", "Scheduled"),
@@ -488,6 +556,7 @@ def main() -> None:
 
     today = datetime.now(EASTERN).date()
     rows = schedule(today.isoformat())
+    weather_refreshes = attach_pregame_weather(frame, rows)
     existing = set()
     if not frame.empty and {"game_pk", "pitcher_id"}.issubset(frame.columns):
         existing = set(zip(pd.to_numeric(frame.game_pk, errors="coerce"), pd.to_numeric(frame.pitcher_id, errors="coerce")))
@@ -523,7 +592,7 @@ def main() -> None:
     observations = load_observation_log()
     unresolved_observations = 0 if observations.empty else int(pd.to_numeric(observations["actual_outs"], errors="coerce").isna().sum())
     print(
-        f"projection log rows={len(frame)} new={len(new_rows)} pregame_path_refreshes={refreshed} "
+        f"projection log rows={len(frame)} new={len(new_rows)} pregame_path_refreshes={refreshed} weather_refreshes={weather_refreshes} "
         f"history_observations={len(observations)} observation_resolves={observation_updates} unresolved_observations={unresolved_observations}"
     )
 

@@ -11,6 +11,7 @@ from automation.daily_projection_runner import (
     LOG_PATH,
     PROBABILITY_SEMANTICS,
     fill_missing_pregame_paths,
+    attach_pregame_weather,
     project,
     resolve_row,
     schedule,
@@ -116,10 +117,11 @@ def run_full_slate(day: str) -> tuple[pd.DataFrame, int, int, list[str], list[st
         frame = pd.concat([frame, pd.DataFrame(new_rows)], ignore_index=True)
 
     refreshed = fill_missing_pregame_paths(frame)
+    weather_refreshed = attach_pregame_weather(frame, announced)
     save_log(frame)
 
     slate = frame.loc[frame.get("game_date", pd.Series(dtype=str)).astype(str).eq(day)].copy() if not frame.empty else pd.DataFrame()
-    return slate, len(new_rows), skipped + refreshed, history_only, errors
+    return slate, len(new_rows), skipped + refreshed + weather_refreshed, history_only, errors
 
 
 def _num(row: pd.Series, key: str) -> float | None:
@@ -251,7 +253,7 @@ if isinstance(slate, pd.DataFrame):
 
     if not slate.empty:
         display_cols = [
-            "player", "team", "opponent", "projection", "k_range_low", "k_range_high",
+            "player", "weather_icon", "weather_delay_risk", "weather_precip_probability", "team", "opponent", "projection", "k_range_low", "k_range_high",
             "hits_projection", "hits_range_low", "hits_range_high",
             "outs_projection", "outs_range_low", "outs_range_high",
             "confidence", "data_quality", "opponent_k_pct", "sim_5p", "math_5p",
@@ -259,9 +261,15 @@ if isinstance(slate, pd.DataFrame):
             "actual_strikeouts", "actual_hits_allowed", "actual_outs",
         ]
         display_cols = [c for c in display_cols if c in slate.columns]
-        display = slate[display_cols].copy().rename(
+        display = slate[display_cols].copy()
+        if "weather_icon" in display.columns:
+            display["player"] = display.apply(lambda r: f"{r.get('player', 'Unknown')} {str(r.get('weather_icon', '') or '')}".strip(), axis=1)
+            display = display.drop(columns=["weather_icon"])
+        display = display.rename(
             columns={
                 "player": "Pitcher",
+                "weather_delay_risk": "Weather Risk",
+                "weather_precip_probability": "Rain %",
                 "team": "Team",
                 "opponent": "Opp",
                 "projection": "Projection K",
