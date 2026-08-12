@@ -43,13 +43,13 @@ jobs:
       - name: Capture today's projections and resolve finished games
         run: PYTHONPATH=. python automation/daily_projection_runner.py
 
-      - name: Commit updated projection log
+      - name: Commit updated projection and starter-observation logs
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/projection_log.csv
+          git add data/projection_log.csv data/starter_observation_log.csv
           if git diff --cached --quiet; then
-            echo "No projection-log changes to commit."
+            echo "No projection/history-log changes to commit."
             exit 0
           fi
 
@@ -63,12 +63,12 @@ jobs:
               fi
             else
               git rebase --abort || true
-              echo "Rebase conflict while updating projection log; refusing to overwrite main."
+              echo "Rebase conflict while updating projection/history logs; refusing to overwrite main."
               exit 1
             fi
             echo "Push race on attempt ${attempt}; retrying against latest main."
             sleep $((attempt * 2))
           done
 
-          echo "Projection-log push failed after 3 attempts."
+          echo "Projection/history-log push failed after 3 attempts."
           exit 1
