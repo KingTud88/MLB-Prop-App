@@ -286,7 +286,7 @@ def safe_odds_error(exc):
         return f"Odds API unavailable: HTTP {int(status)}."
     return f"Odds API unavailable: {type(exc).__name__}."
 
-@st.cache_data(ttl=60,show_spinner=False)
+@st.cache_data(ttl=900,show_spinner=False)
 def get_odds_events():
     key=get_secret()
     if not key:return [],"Odds API key not found in Streamlit secrets."
@@ -294,14 +294,23 @@ def get_odds_events():
         r=requests.get(f"{ODDS_API}/sports/baseball_mlb/events",params={"apiKey":key},timeout=15); r.raise_for_status(); return r.json(),None
     except requests.RequestException as e:return [],safe_odds_error(e)
 
-@st.cache_data(ttl=60,show_spinner=False)
+MAIN_PROP_MARKETS="pitcher_strikeouts,pitcher_outs,pitcher_hits_allowed"
+
+@st.cache_data(ttl=900,show_spinner=False)
 def get_event_props(event_id):
     key=get_secret()
-    if not key:return [],"Odds API key not found in Streamlit secrets."
-    params={"apiKey":key,"regions":"us","markets":"pitcher_strikeouts,pitcher_strikeouts_alternate,pitcher_outs,pitcher_outs_alternate,pitcher_hits_allowed,pitcher_hits_allowed_alternate","oddsFormat":"american"}
+    if not key:return [],"Odds API key not found in Streamlit secrets.",{}
+    params={"apiKey":key,"regions":"us","markets":MAIN_PROP_MARKETS,"oddsFormat":"american"}
     try:
-        r=requests.get(f"{ODDS_API}/sports/baseball_mlb/events/{event_id}/odds",params=params,timeout=15); r.raise_for_status(); return r.json(),None
-    except requests.RequestException as e:return [],safe_odds_error(e)
+        r=requests.get(f"{ODDS_API}/sports/baseball_mlb/events/{event_id}/odds",params=params,timeout=15)
+        r.raise_for_status()
+        def _h(name):
+            value=r.headers.get(name)
+            try:return int(value) if value is not None else None
+            except (TypeError,ValueError):return None
+        quota={"remaining":_h("x-requests-remaining"),"used":_h("x-requests-used"),"last":_h("x-requests-last")}
+        return r.json(),None,quota
+    except requests.RequestException as e:return [],safe_odds_error(e),{}
 
 def normalize_team(value):
     text=re.sub(r"[^a-z0-9]","",str(value).lower())
@@ -392,8 +401,31 @@ features_for_hits=build_engine_features(log,game,float(opponent_matchup["k_rate"
 hits_seed=int(hashlib.sha256(f"hits|{game.key}|{game.game_time}|{APP_VERSION}".encode()).hexdigest()[:8],16)
 hits_proj=project_hits_allowed(log,expected_bf=features_for_hits["expected_bf"],seed=hits_seed,draws=25000,lines=(3.5,4.5,5.5,6.5,7.5,8.5))
 odds_events,odds_err=get_odds_events(); odds_event_id=find_odds_event(odds_events,game)
-if odds_event_id: odds_payload,prop_err=get_event_props(odds_event_id); odds_err=prop_err if prop_err else odds_err
-else: odds_payload=[]; odds_err=odds_err if odds_err else "No matching Odds API event found for this MLB game."
+odds_payload_key=f"projection_live_odds:{game.key}"
+odds_quota_key=f"projection_live_odds_quota:{game.key}"
+odds_payload=st.session_state.get(odds_payload_key,{})
+if odds_event_id:
+    with st.sidebar:
+        st.markdown("#### 💳 Odds API Credit Saver")
+        st.caption("Paid odds are OFF by default. Main Strikeouts + Outs + Hits only; one US region; up to 3 credits when you press load. Alternate markets stay off.")
+        load_live_odds=st.button("LOAD LIVE ODDS · ≤3 credits",key=f"load_live_odds:{game.key}",use_container_width=True)
+    if load_live_odds:
+        loaded_payload,prop_err,quota=get_event_props(odds_event_id)
+        if loaded_payload:
+            odds_payload=loaded_payload
+            st.session_state[odds_payload_key]=loaded_payload
+        if quota:
+            st.session_state[odds_quota_key]=quota
+        odds_err=prop_err if prop_err else odds_err
+else:
+    odds_payload=[]
+    odds_err=odds_err if odds_err else "No matching Odds API event found for this MLB game."
+quota_view=st.session_state.get(odds_quota_key,{})
+if quota_view:
+    with st.sidebar:
+        st.caption(f"Last paid load: {quota_view.get('last','—')} credit(s) · {quota_view.get('remaining','—')} remaining · {quota_view.get('used','—')} used.")
+if not odds_payload and not odds_err:
+    odds_err="Live sportsbook prices not loaded. Credit Saver is ON; the baseball projection does not need sportsbook data."
 odds_rows=extract_player_odds(odds_payload,game.pitcher_name)
 k_reco=market_recommendation(proj,odds_rows,"pitcher_strikeouts_alternate",5.5,"k"); k_reco["label"]="STRIKEOUT BET LEAN"
 out_reco=market_recommendation(proj,odds_rows,"pitcher_outs_alternate",15.5,"outs"); out_reco["label"]="TOTAL OUTS BET LEAN"

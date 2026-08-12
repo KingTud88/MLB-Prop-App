@@ -43,7 +43,11 @@ TEAM_NAMES = {
     "PHI":"Philadelphia Phillies","ATL":"Atlanta Braves","CHW":"Chicago White Sox","MIA":"Miami Marlins",
     "NYY":"New York Yankees","MIL":"Milwaukee Brewers",
 }
-MARKETS = "pitcher_strikeouts,pitcher_strikeouts_alternate,pitcher_outs,pitcher_outs_alternate,pitcher_hits_allowed,pitcher_hits_allowed_alternate"
+MAIN_MARKET_KEYS = {
+    "Strikeouts": "pitcher_strikeouts",
+    "Total Outs": "pitcher_outs",
+    "Hits Allowed": "pitcher_hits_allowed",
+}
 ROOT = Path(__file__).resolve().parents[1]
 BET_LOG = ROOT / "data" / "bet_log.csv"
 
@@ -85,7 +89,7 @@ def normalize_team(value: str) -> str:
     return text.upper()
 
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=900, show_spinner=False)
 def odds_events(api_key: str) -> list[dict]:
     r = requests.get(f"{ODDS_API}/sports/baseball_mlb/events", params={"apiKey": api_key}, timeout=20)
     r.raise_for_status()
@@ -93,16 +97,30 @@ def odds_events(api_key: str) -> list[dict]:
     return data if isinstance(data, list) else []
 
 
-@st.cache_data(ttl=60, show_spinner=False)
-def event_props(api_key: str, event_id: str) -> dict:
+@st.cache_data(ttl=900, show_spinner=False)
+def event_props(api_key: str, event_id: str, markets: tuple[str, ...]) -> tuple[dict, dict[str, int | None]]:
+    market_csv = ",".join(sorted(set(str(m) for m in markets if str(m))))
+    if not market_csv:
+        return {}, {"remaining": None, "used": None, "last": 0}
     r = requests.get(
         f"{ODDS_API}/sports/baseball_mlb/events/{event_id}/odds",
-        params={"apiKey": api_key, "regions": "us", "markets": MARKETS, "oddsFormat": "american"},
+        params={"apiKey": api_key, "regions": "us", "markets": market_csv, "oddsFormat": "american"},
         timeout=20,
     )
     r.raise_for_status()
     data = r.json()
-    return data if isinstance(data, dict) else {}
+    def _header_int(name: str) -> int | None:
+        value = r.headers.get(name)
+        try:
+            return int(value) if value is not None else None
+        except (TypeError, ValueError):
+            return None
+    quota = {
+        "remaining": _header_int("x-requests-remaining"),
+        "used": _header_int("x-requests-used"),
+        "last": _header_int("x-requests-last"),
+    }
+    return (data if isinstance(data, dict) else {}), quota
 
 
 def match_event(events: list[dict], team: str, opponent: str) -> dict | None:
@@ -361,56 +379,106 @@ if plays.empty:
     st.warning("Today's frozen snapshots do not yet contain enough current two-path probability data to build the model Top 5. Re-run Daily Projection Run while the games are still pregame so missing paths can be backfilled safely.")
     st.stop()
 
-# The board exists before any sportsbook request. Live prices are attached afterward
-# only when an exact matching line is available; they never affect rank.
+# The board exists before any paid sportsbook request. Credit Saver keeps paid
+# odds OFF by default and only asks for main markets represented in the Top 5.
 plays["Book"] = ""
 plays["Odds"] = np.nan
 plays["No-Vig Implied"] = np.nan
 plays["Edge"] = np.nan
 plays["Live Offer"] = False
-candidate_pool = pd.DataFrame()
+
+live_state_key = f"top_plays_live_overlay:{today}"
+quota_state_key = f"top_plays_live_quota:{today}"
+candidate_pool = pd.DataFrame(st.session_state.get(live_state_key, []))
+request_plan: dict[str, set[str]] = {}
+event_snapshots: dict[str, dict[str, pd.Series]] = {}
 
 if api_key:
     try:
+        # /events is quota-free; it only maps MLB games to Odds API event ids.
         events = odds_events(api_key)
-        all_legs: list[dict] = []
-        scanned = set()
         for _, play in plays.iterrows():
-            key = (numeric(play.get("Game PK")), numeric(play.get("Pitcher ID")))
-            if key in scanned:
-                continue
-            scanned.add(key)
             snapshot = find_snapshot(history, play)
             if snapshot is None:
                 continue
             event_match = match_event(events, str(snapshot.get("team", "")), str(snapshot.get("opponent", "")))
-            if not event_match:
+            market_key = MAIN_MARKET_KEYS.get(str(play.get("Market", "")))
+            if not event_match or not market_key:
                 continue
-            try:
-                all_legs.extend(collect_legs(snapshot, event_props(api_key, str(event_match.get("id"))), history))
-            except requests.RequestException:
+            event_id = str(event_match.get("id", ""))
+            if not event_id:
                 continue
-        if all_legs:
-            candidate_pool = pd.DataFrame(all_legs)
-            for idx, play in plays.iterrows():
-                matches = candidate_pool.loc[
-                    candidate_pool["Pitcher"].astype(str).eq(str(play["Pitcher"]))
-                    & candidate_pool["Market"].astype(str).eq(str(play["Market"]))
-                    & candidate_pool["Side"].astype(str).eq(str(play["Side"]))
-                    & pd.to_numeric(candidate_pool["Line"], errors="coerce").eq(float(play["Line"]))
-                ]
-                if matches.empty:
-                    continue
-                best = matches.sort_values("Odds", ascending=False).iloc[0]
-                plays.at[idx, "Book"] = best.get("Book", "")
-                plays.at[idx, "Odds"] = best.get("Odds", np.nan)
-                plays.at[idx, "No-Vig Implied"] = best.get("No-Vig Implied", np.nan)
-                plays.at[idx, "Edge"] = best.get("Edge", np.nan)
-                plays.at[idx, "Live Offer"] = True
+            request_plan.setdefault(event_id, set()).add(market_key)
+            pitcher_key = str(play.get("Pitcher ID", play.get("Pitcher", "")))
+            event_snapshots.setdefault(event_id, {})[pitcher_key] = snapshot
     except requests.RequestException as exc:
-        st.caption(f"Live sportsbook overlay unavailable right now ({type(exc).__name__}). The model Top 5 is still valid because odds do not rank it.")
+        st.caption(f"Quota-free event matching is unavailable right now ({type(exc).__name__}). The model Top 5 is unaffected.")
+
+estimated_credits = sum(len(markets) for markets in request_plan.values())
+if api_key and request_plan:
+    st.caption(
+        f"💳 Credit Saver: sportsbook odds are OFF until requested. Loading this Top 5 asks only for "
+        f"{estimated_credits} main market/event combination(s) in the US region — at most {estimated_credits} credits if returned. "
+        "Alternate markets are disabled by default."
+    )
+    if st.button(
+        f"💳 Load / reuse live Top 5 prices · ≤{estimated_credits} credits",
+        key="load_top_plays_live_prices",
+        help="Paid Odds API call. Results are cached for 15 minutes; clicking again inside that window reuses the cache.",
+    ):
+        all_legs: list[dict] = []
+        quota_rows: list[dict[str, int | None]] = []
+        for event_id, market_keys in request_plan.items():
+            try:
+                payload, quota = event_props(api_key, event_id, tuple(sorted(market_keys)))
+                quota_rows.append(quota)
+            except requests.RequestException as exc:
+                st.caption(f"Live price request failed for one event ({type(exc).__name__}).")
+                continue
+            for snapshot in event_snapshots.get(event_id, {}).values():
+                all_legs.extend(collect_legs(snapshot, payload, history))
+        st.session_state[live_state_key] = all_legs
+        if quota_rows:
+            actual_cost = sum(int(q.get("last") or 0) for q in quota_rows)
+            final_quota = quota_rows[-1]
+            st.session_state[quota_state_key] = {
+                "last": actual_cost,
+                "remaining": final_quota.get("remaining"),
+                "used": final_quota.get("used"),
+            }
+        st.rerun()
 else:
-    st.caption("Odds API key is not available, so the model Top 5 is shown without live execution prices. Ranking is unaffected.")
+    if not api_key:
+        st.caption("Odds API key is not available, so the model Top 5 is shown without live execution prices. Ranking is unaffected.")
+
+quota_view = st.session_state.get(quota_state_key, {})
+if quota_view:
+    remaining = quota_view.get("remaining")
+    used = quota_view.get("used")
+    last = quota_view.get("last")
+    st.caption(
+        "Odds API usage from the last manual Top 5 load: "
+        + f"{last if last is not None else '—'} credit(s) · "
+        + f"{remaining if remaining is not None else '—'} remaining · "
+        + f"{used if used is not None else '—'} used this quota period."
+    )
+
+if not candidate_pool.empty:
+    for idx, play in plays.iterrows():
+        matches = candidate_pool.loc[
+            candidate_pool["Pitcher"].astype(str).eq(str(play["Pitcher"]))
+            & candidate_pool["Market"].astype(str).eq(str(play["Market"]))
+            & candidate_pool["Side"].astype(str).eq(str(play["Side"]))
+            & pd.to_numeric(candidate_pool["Line"], errors="coerce").eq(float(play["Line"]))
+        ]
+        if matches.empty:
+            continue
+        best = matches.sort_values("Odds", ascending=False).iloc[0]
+        plays.at[idx, "Book"] = best.get("Book", "")
+        plays.at[idx, "Odds"] = best.get("Odds", np.nan)
+        plays.at[idx, "No-Vig Implied"] = best.get("No-Vig Implied", np.nan)
+        plays.at[idx, "Edge"] = best.get("Edge", np.nan)
+        plays.at[idx, "Live Offer"] = True
 
 model_plays = int(((plays["Model Probability"] >= 0.55) & (plays["Data Quality"] >= 60)).sum())
 live_offers = int(plays["Live Offer"].fillna(False).sum())
