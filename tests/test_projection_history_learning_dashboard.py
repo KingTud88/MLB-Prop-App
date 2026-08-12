@@ -56,3 +56,15 @@ def test_projection_archive_groups_rows_into_clickable_dates():
     assert 'date_group = date_group.drop(columns=["game_date", "_archive_date"]' in text
     assert "Click a date to open that slate" in text
     assert 'expanded=False' in text
+
+
+def test_projection_history_shows_report_only_workload_v2_candidate():
+    text = _page_text()
+    assert "workload-v2-bias-candidate" in text
+    assert "REPORT ONLY / NOT LIVE" in text
+    assert '"Candidate_MAE": "v2 MAE"' in text
+    assert '"Relative_MAE_vs_Workload": "v2 MAE Improvement vs v1"' in text
+    assert '"Candidate_Win_Share_vs_Workload": "v2 Win Share vs v1"' in text
+    assert '"Candidate_Status": "v2 Status"' in text
+    assert "v2 adjusted target-starts" in text
+    assert "cannot change Ks, Hits, Outs, or Top Plays" in text

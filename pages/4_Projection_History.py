@@ -339,7 +339,8 @@ else:
 st.markdown("#### 🧪 Historical workload validation")
 st.caption(
     "Leakage-safe MLB replay over pitchers already tracked by the app. Each 2026 target start is rebuilt from only earlier starter games, with 2025 allowed as prior-season carry. "
-    "workload-v1 is compared against rolling-5 and season-to-date workload baselines. Sportsbook data is excluded, and this report does not modify live projections."
+    "workload-v1 is compared against rolling-5 and season-to-date baselines, while workload-v2-bias-candidate learns a tightly capped correction from strictly earlier workload-v1 errors. "
+    "Sportsbook data is excluded, and this report does not modify live projections. workload-v2 is REPORT ONLY / NOT LIVE and cannot change Ks, Hits, Outs, or Top Plays."
 )
 _workload_summary_path = ROOT / "data" / "workload_backtest_summary.csv"
 _workload_segments_path = ROOT / "data" / "workload_backtest_segments.csv"
@@ -357,9 +358,18 @@ else:
         _n = pd.to_numeric(_validation.get("Evaluated_Starts"), errors="coerce")
         _v1, _v2, _v3, _v4 = st.columns(4)
         _v1.metric("Validated workload targets", int(_n.fillna(0).sum()))
-        _v2.metric("HELPING metrics", int(_status.eq("HELPING").sum()))
-        _v3.metric("MIXED metrics", int(_status.eq("MIXED").sum()))
-        _v4.metric("HURTING metrics", int(_status.eq("HURTING").sum()))
+        _v2.metric("workload-v1 HELPING", int(_status.eq("HELPING").sum()))
+        _v3.metric("workload-v1 MIXED", int(_status.eq("MIXED").sum()))
+        _v4.metric("workload-v1 HURTING", int(_status.eq("HURTING").sum()))
+
+        if "Candidate_Status" in _validation.columns:
+            _candidate_status = _validation["Candidate_Status"].astype(str)
+            _adjusted = pd.to_numeric(_validation.get("Candidate_Adjusted_Starts"), errors="coerce")
+            _c1, _c2, _c3, _c4 = st.columns(4)
+            _c1.metric("v2 adjusted target-starts", int(_adjusted.fillna(0).sum()))
+            _c2.metric("v2 HELPING metrics", int(_candidate_status.eq("HELPING").sum()))
+            _c3.metric("v2 MIXED metrics", int(_candidate_status.eq("MIXED").sum()))
+            _c4.metric("v2 HURTING metrics", int(_candidate_status.eq("HURTING").sum()))
 
         _view = _validation.rename(columns={
             "Evaluated_Starts": "Evaluated Starts",
@@ -374,17 +384,25 @@ else:
             "Relative_MAE_vs_Rolling5": "MAE Improvement vs Rolling-5",
             "Relative_MAE_vs_SeasonToDate": "MAE Improvement vs Season-to-date",
             "Workload_Win_Share_vs_Rolling5": "Win Share vs Rolling-5",
+            "Candidate_Adjusted_Starts": "v2 Adjusted Starts",
+            "Candidate_MAE": "v2 MAE",
+            "Candidate_RMSE": "v2 RMSE",
+            "Candidate_Bias": "v2 Bias",
+            "Relative_MAE_vs_Workload": "v2 MAE Improvement vs v1",
+            "Candidate_Win_Share_vs_Workload": "v2 Win Share vs v1",
+            "Candidate_Status": "v2 Status",
         }).copy()
-        for col in ["MAE Improvement vs Rolling-5", "MAE Improvement vs Season-to-date", "Win Share vs Rolling-5"]:
+        for col in ["MAE Improvement vs Rolling-5", "MAE Improvement vs Season-to-date", "Win Share vs Rolling-5", "v2 MAE Improvement vs v1", "v2 Win Share vs v1"]:
             if col in _view.columns:
                 _view[col] = _view[col].map(lambda x: "—" if pd.isna(x) else f"{float(x):+.1%}" if "Improvement" in col else f"{float(x):.1%}")
-        for col in ["Workload MAE", "Workload RMSE", "Workload Bias", "Rolling-5 MAE", "Rolling-5 RMSE", "Rolling-5 Bias", "Season-to-date MAE"]:
+        for col in ["Workload MAE", "Workload RMSE", "Workload Bias", "Rolling-5 MAE", "Rolling-5 RMSE", "Rolling-5 Bias", "Season-to-date MAE", "v2 MAE", "v2 RMSE", "v2 Bias"]:
             if col in _view.columns:
                 _view[col] = _view[col].map(lambda x: "—" if pd.isna(x) else f"{float(x):+.3f}" if "Bias" in col else f"{float(x):.3f}")
         st.dataframe(_view, hide_index=True, width="stretch")
         st.caption(
-            "Status stays LEARNING below 30 evaluated starts. HELPING requires at least 3% lower MAE than rolling-5 and workload-v1 to beat rolling-5 on at least 52% of individual starts. "
-            "HURTING uses the symmetric downside guardrail. No status changes the live forecast automatically."
+            "Status stays LEARNING below 30 evaluated starts. workload-v1 HELPING requires at least 3% lower MAE than rolling-5 and a 52%+ individual-start win share. "
+            "The v2 candidate is judged separately against workload-v1: it must lower MAE, reduce absolute bias, and win enough actually-adjusted starts. "
+            "Candidate status is evidence only; workload-v2 remains REPORT ONLY / NOT LIVE until promotion is explicitly earned and implemented."
         )
 
         if _workload_segments_path.exists():
@@ -395,14 +413,14 @@ else:
             if not _segments.empty:
                 with st.expander("Historical workload segments — descriptive", expanded=False):
                     _seg = _segments.copy()
-                    for col in ["Relative MAE vs Rolling5", "Win Share vs Rolling5"]:
+                    for col in ["Relative MAE vs Rolling5", "Win Share vs Rolling5", "Candidate MAE Improvement vs Workload", "Candidate Win Share vs Workload"]:
                         if col in _seg.columns:
                             _seg[col] = _seg[col].map(lambda x: "—" if pd.isna(x) else f"{float(x):+.1%}" if "Relative" in col else f"{float(x):.1%}")
-                    for col in ["Workload MAE", "Rolling5 MAE"]:
+                    for col in ["Workload MAE", "Candidate MAE", "Rolling5 MAE"]:
                         if col in _seg.columns:
                             _seg[col] = _seg[col].map(lambda x: "—" if pd.isna(x) else f"{float(x):.3f}")
                     st.dataframe(_seg, hide_index=True, width="stretch")
-                    st.caption("Segments only appear with at least 15 evaluated starts. They are diagnostic slices, not automatic adjustment rules.")
+                    st.caption("Segments only appear with at least 15 evaluated starts. They are diagnostic slices, not automatic adjustment rules. Any v2 segment gains or losses remain report-only evidence.")
 
 st.divider()
 st.subheader("🧾 Lineup input audit")
