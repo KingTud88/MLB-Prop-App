@@ -1,25 +1,60 @@
 from __future__ import annotations
 
+import math
+
 import numpy as np
 import pandas as pd
 
 from engine.starter_history import HISTORY_SEMANTICS
 
+MIN_K_MILESTONE = 3
+MAX_K_MILESTONE = 12
+
+
+def _numeric(value: object) -> float | None:
+    parsed = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+    return None if pd.isna(parsed) else float(parsed)
+
+
+def bettable_k_target(projection: object) -> int | None:
+    """Convert a frozen K mean to the highest supported whole-K ladder target.
+
+    A 5.07 projection supports 5+, not 6+. Targets below the app's 3+ ladder
+    are intentionally treated as NO CALL. Means above 12 still map to the
+    highest currently supported ladder milestone, 12+.
+    """
+    projected = _numeric(projection)
+    if projected is None or projected < float(MIN_K_MILESTONE):
+        return None
+    return int(min(math.floor(projected), MAX_K_MILESTONE))
+
+
+def bettable_k_label(projection: object) -> str:
+    target = bettable_k_target(projection)
+    return "—" if target is None else f"{target}+"
+
+
+def bettable_k_result(projection: object, actual_strikeouts: object) -> str:
+    """Grade the model-derived whole-K milestone that could actually be played."""
+    target = bettable_k_target(projection)
+    actual = _numeric(actual_strikeouts)
+    if target is None:
+        return "NO CALL"
+    if actual is None:
+        return "PENDING"
+    return "✅ WIN" if actual >= float(target) else "❌ MISS"
+
 
 def directional_k_result(projection: object, actual_strikeouts: object) -> str:
-    """Grade the user's directional K rule: actual Ks above projection = WIN."""
-    projected = pd.to_numeric(pd.Series([projection]), errors="coerce").iloc[0]
-    actual = pd.to_numeric(pd.Series([actual_strikeouts]), errors="coerce").iloc[0]
-    if pd.isna(projected) or pd.isna(actual):
-        return "PENDING"
-    return "✅ WIN" if float(actual) > float(projected) else "❌ MISS"
+    """Backward-compatible alias for the bettable milestone result."""
+    return bettable_k_result(projection, actual_strikeouts)
 
 
 def _current_win_streak(group: pd.DataFrame) -> int:
     ordered = group.sort_values(["_game_date", "_captured"], ascending=[False, False])
     streak = 0
-    for margin in ordered["_margin"].tolist():
-        if float(margin) > 0.0:
+    for won in ordered["_win"].tolist():
+        if bool(won):
             streak += 1
         else:
             break
@@ -27,14 +62,14 @@ def _current_win_streak(group: pd.DataFrame) -> int:
 
 
 def crusher_report(history: pd.DataFrame) -> pd.DataFrame:
-    """Summarize pitchers who repeatedly finish above the frozen K projection.
+    """Summarize pitchers who repeatedly beat the model-derived K ladder target.
 
     This is a descriptive decision/evaluation view only. It does not feed the
     baseball forecast, calibration, or Top Plays ranking.
     """
     columns = [
-        "Pitcher", "Resolved Starts", "Projection Wins", "Win Rate",
-        "Avg K Margin", "Avg Win Margin", "Total K Above Projection",
+        "Pitcher", "Resolved Starts", "Ladder Wins", "Win Rate",
+        "Avg K Above Target", "Avg Win Margin", "Total K Above Target",
         "2+ K Crushes", "Recent 5 Win Rate", "Current Win Streak", "Crusher Status",
     ]
     if history is None or history.empty:
@@ -48,12 +83,14 @@ def crusher_report(history: pd.DataFrame) -> pd.DataFrame:
 
     frame["_projection"] = pd.to_numeric(frame.get("projection"), errors="coerce")
     frame["_actual"] = pd.to_numeric(frame.get("actual_strikeouts"), errors="coerce")
-    frame = frame.loc[frame["_projection"].notna() & frame["_actual"].notna()].copy()
+    frame["_target"] = frame["_projection"].map(bettable_k_target)
+    frame = frame.loc[frame["_target"].notna() & frame["_actual"].notna()].copy()
     if frame.empty:
         return pd.DataFrame(columns=columns)
 
-    frame["_margin"] = frame["_actual"] - frame["_projection"]
-    frame["_win"] = frame["_margin"] > 0.0
+    frame["_target"] = frame["_target"].astype(float)
+    frame["_margin"] = frame["_actual"] - frame["_target"]
+    frame["_win"] = frame["_actual"] >= frame["_target"]
     frame["_game_date"] = pd.to_datetime(frame.get("game_date"), errors="coerce")
     frame["_captured"] = pd.to_datetime(frame.get("captured_at_utc"), errors="coerce", utc=True)
 
@@ -70,7 +107,7 @@ def crusher_report(history: pd.DataFrame) -> pd.DataFrame:
         wins = int(ordered["_win"].sum())
         win_rate = float(wins / starts) if starts else np.nan
         margins = ordered["_margin"].astype(float)
-        win_margins = margins[margins > 0.0]
+        win_margins = margins[ordered["_win"]]
         recent = ordered.tail(5)
         recent_rate = float(recent["_win"].mean()) if not recent.empty else np.nan
         avg_margin = float(margins.mean())
@@ -78,18 +115,18 @@ def crusher_report(history: pd.DataFrame) -> pd.DataFrame:
             status = "LEARNING"
         elif win_rate >= (2.0 / 3.0) and avg_margin > 0.5:
             status = "🔥 CRUSHER"
-        elif win_rate >= 0.55 and avg_margin > 0.0:
-            status = "✅ ABOVE PROJECTION"
+        elif win_rate >= 0.55 and avg_margin >= 0.0:
+            status = "✅ ABOVE TARGET"
         else:
             status = "MIXED"
         rows.append({
             "Pitcher": str(ordered.get("player", pd.Series(["Unknown"])).iloc[-1]),
             "Resolved Starts": starts,
-            "Projection Wins": wins,
+            "Ladder Wins": wins,
             "Win Rate": win_rate,
-            "Avg K Margin": avg_margin,
+            "Avg K Above Target": avg_margin,
             "Avg Win Margin": float(win_margins.mean()) if not win_margins.empty else np.nan,
-            "Total K Above Projection": float(margins.clip(lower=0.0).sum()),
+            "Total K Above Target": float(margins.clip(lower=0.0).sum()),
             "2+ K Crushes": int((margins >= 2.0).sum()),
             "Recent 5 Win Rate": recent_rate,
             "Current Win Streak": _current_win_streak(ordered),
@@ -97,10 +134,10 @@ def crusher_report(history: pd.DataFrame) -> pd.DataFrame:
         })
 
     report = pd.DataFrame(rows, columns=columns)
-    status_rank = {"🔥 CRUSHER": 0, "✅ ABOVE PROJECTION": 1, "LEARNING": 2, "MIXED": 3}
+    status_rank = {"🔥 CRUSHER": 0, "✅ ABOVE TARGET": 1, "LEARNING": 2, "MIXED": 3}
     report["_status_rank"] = report["Crusher Status"].map(status_rank).fillna(9)
     report = report.sort_values(
-        ["_status_rank", "Projection Wins", "Win Rate", "Avg K Margin", "Resolved Starts"],
+        ["_status_rank", "Ladder Wins", "Win Rate", "Avg K Above Target", "Resolved Starts"],
         ascending=[True, False, False, False, False],
     ).drop(columns=["_status_rank"]).reset_index(drop=True)
     return report
