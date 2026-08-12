@@ -1,0 +1,35 @@
+name: Run confirmed lineup UI fix
+
+on:
+  push:
+    paths:
+      - scripts/fix_confirmed_lineup_ui.py
+      - .github/workflows/run-confirmed-lineup-ui-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt pytest
+      - run: python scripts/fix_confirmed_lineup_ui.py
+      - run: python -m compileall -q streamlit_app.py pages engine automation tests
+      - run: pytest -q
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pages/5_Daily_Projection_Run.py engine/opposing_batters.py tests/test_lineup_integration_contract.py
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Fix confirmed lineup Daily UI metric"
+          git pull --rebase origin main
+          git push origin HEAD:main
