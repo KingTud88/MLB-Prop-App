@@ -31,14 +31,19 @@ def test_projection_history_has_rolling_accuracy_and_starts_used():
     assert 'NumberColumn("Starts Used"' in text
 
 
-def test_projection_history_directional_wins_and_clean_archive():
+def test_projection_history_bettable_wins_and_clean_archive():
     text = _page_text()
-    assert "K Projection Wins & Crushers" in text
-    assert "actual strikeouts > the frozen projected K mean" in text
+    assert "Bettable K Wins & Crushers" in text
+    assert "highest whole-K ladder milestone fully supported" in text
+    assert "5.07 projects to a 5+ target, so 5 actual Ks = ✅ WIN" in text
     assert "Projection Crushers" in text
-    assert "Directional K Result" in text
+    assert 'TextColumn("K Target"' in text
+    assert 'TextColumn("K Result"' in text
+    assert 'NumberColumn("Vs Target"' in text
+    assert 'NumberColumn("Vs Projection"' in text
     assert "80% Range Result" in text
-    assert "archive_populated" in text
-    assert "Completely empty columns are hidden automatically" in text
+    assert "empty_token" in text
+    assert '"none", "null", "nat", "<na>"' in text
     assert "#22c55e" in text
+    assert "#38bdf8" in text
     assert "#facc15" in text
