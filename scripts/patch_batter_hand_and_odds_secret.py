@@ -1,3 +1,4 @@
+# one-shot patch helper; remove after successful CI
 from pathlib import Path
 
 APP = Path("streamlit_app.py")
@@ -37,4 +38,4 @@ if old not in batters:
     raise SystemExit("batter hand row anchor not found")
 BATTERS.write_text(batters.replace(old, new, 1), encoding="utf-8")
 
-TEST.write_text('''from pathlib import Path\n\nimport requests\n\n\ndef test_pitcher_hand_uses_mlb_person_pitch_hand_key():\n    app = Path("streamlit_app.py").read_text(encoding="utf-8")\n    runner = Path("automation/daily_projection_runner.py").read_text(encoding="utf-8")\n    assert 'get("pitchHand")' in app\n    assert 'get("pitchHand")' in runner\n\n\ndef test_odds_errors_never_render_raw_exception_url_or_key():\n    app = Path("streamlit_app.py").read_text(encoding="utf-8")\n    assert 'safe_odds_error' in app\n    assert 'f"Odds API unavailable: {e}"' not in app\n    assert 'authentication failed (401)' in app\n\n\ndef test_batter_box_reads_bat_side_from_hydrated_person():\n    text = Path("engine/opposing_batters.py").read_text(encoding="utf-8")\n    assert 'person.get("batSide")' in text\n    assert '"Hand": person_bat_side' in text\n''', encoding="utf-8")
+TEST.write_text('''from pathlib import Path\n\n\ndef test_pitcher_hand_uses_mlb_person_pitch_hand_key():\n    app = Path("streamlit_app.py").read_text(encoding="utf-8")\n    runner = Path("automation/daily_projection_runner.py").read_text(encoding="utf-8")\n    assert 'get("pitchHand")' in app\n    assert 'get("pitchHand")' in runner\n\n\ndef test_odds_errors_never_render_raw_exception_url_or_key():\n    app = Path("streamlit_app.py").read_text(encoding="utf-8")\n    assert 'safe_odds_error' in app\n    assert 'f"Odds API unavailable: {e}"' not in app\n    assert 'authentication failed (401)' in app\n\n\ndef test_batter_box_reads_bat_side_from_hydrated_person():\n    text = Path("engine/opposing_batters.py").read_text(encoding="utf-8")\n    assert 'person.get("batSide")' in text\n    assert '"Hand": person_bat_side' in text\n''', encoding="utf-8")
