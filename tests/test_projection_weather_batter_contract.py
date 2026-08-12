@@ -11,6 +11,7 @@ def test_projection_page_has_weather_badge_and_batter_box():
     assert 'float(opponent_matchup["k_rate"])' in text
     assert "HIGH K hitters" in text
     assert "ELEVATED K hitters" in text
+    assert '*100.0' in text
 
 
 def test_projection_page_compiles():

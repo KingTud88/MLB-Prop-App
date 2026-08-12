@@ -444,6 +444,7 @@ else:
     b3.metric("HIGH K hitters",int(opponent_matchup["high"]))
     b4.metric("ELEVATED K hitters",int(opponent_matchup["elevated"]))
     batter_display=opposing_batters.copy()
+    batter_display["K% vs Pitcher"]=pd.to_numeric(batter_display["K% vs Pitcher"],errors="coerce")*100.0
     batter_display["Risk"]=batter_display["Risk"].map({"HIGH":"🔥 HIGH","ELEVATED":"⚠️ ELEVATED","NORMAL":"NORMAL"}).fillna(batter_display["Risk"])
     st.dataframe(
         batter_display[["Batter","Hand","K% vs Pitcher","PA","Risk"]],
