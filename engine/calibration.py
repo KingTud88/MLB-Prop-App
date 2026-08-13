@@ -6,7 +6,7 @@ import pandas as pd
 
 from engine.starter_history import HISTORY_SEMANTICS
 
-CALIBRATION_VERSION = "1.3"
+CALIBRATION_VERSION = "1.4"
 PROBABILITY_SEMANTICS = "milestone-ceil-v1"
 __all__ = ["CalibrationResult", "calibrate_blend", "milestone_calibration_report", "calibration_summary"]
 
@@ -26,13 +26,24 @@ def _brier(y: np.ndarray, p: np.ndarray) -> float:
 
 
 def _eligible_probability_rows(frame: pd.DataFrame) -> pd.DataFrame:
-    """Use only rows captured under current probability and starter-history semantics."""
-    required = {"probability_semantics", "history_semantics"}
+    """Use only resolved-compatible rows with explicit modern pregame lineage.
+
+    Keep this production learner aligned with the calibration-lineage audit: a
+    row must explicitly carry current probability/history semantics plus valid
+    game/capture dates. A capture on or after the next UTC day is conservatively
+    rejected when exact first-pitch lineage is unavailable.
+    """
+    required = {"game_date", "captured_at_utc", "probability_semantics", "history_semantics"}
     if frame.empty or not required.issubset(frame.columns):
         return frame.iloc[0:0].copy()
+    game_date = pd.to_datetime(frame["game_date"], errors="coerce", utc=True)
+    captured = pd.to_datetime(frame["captured_at_utc"], errors="coerce", utc=True)
     mask = (
         frame["probability_semantics"].astype(str).eq(PROBABILITY_SEMANTICS)
         & frame["history_semantics"].astype(str).eq(HISTORY_SEMANTICS)
+        & game_date.notna()
+        & captured.notna()
+        & captured.lt(game_date + pd.Timedelta(days=1))
     )
     return frame.loc[mask].copy()
 
