@@ -1,8 +1,23 @@
 from pathlib import Path
 
-# Validation v2: ticket renderer patch is deterministic and UI-only.
+# Bet Tracker live-stat + ticket renderer patch. The live MLB game feed is the
+# source of truth while a game is in progress; date-range stats remain a safe
+# fallback for settled games or transient live-feed gaps.
 page = Path("pages/2_Bet_Tracker.py")
 s = page.read_text(encoding="utf-8")
+
+if "# BET_TRACKER_LIVE_BOXSCORE_V1" not in s:
+    live_helper = '''\n\n# BET_TRACKER_LIVE_BOXSCORE_V1\ndef _live_pitching_stats(game_pk: int | None, pitcher_id: int | None) -> dict | None:\n    \"\"\"Return the pitcher's current game pitching line from MLB's live boxscore.\"\"\"\n    if not game_pk or not pitcher_id:\n        return None\n    try:\n        r = requests.get(\n            f\"{MLB_LIVE_API}/game/{int(game_pk)}/feed/live\",\n            params=_fresh_params(),\n            headers=MLB_HEADERS,\n            timeout=10,\n        )\n        if not r.ok:\n            return None\n        teams = (((r.json().get(\"liveData\", {}) or {}).get(\"boxscore\", {}) or {}).get(\"teams\", {}) or {})\n        player_key = f\"ID{int(pitcher_id)}\"\n        for side in (\"away\", \"home\"):\n            players = ((teams.get(side, {}) or {}).get(\"players\", {}) or {})\n            player = players.get(player_key) or {}\n            pitching = ((player.get(\"stats\", {}) or {}).get(\"pitching\", {}) or {})\n            if pitching:\n                return pitching\n        return None\n    except Exception:\n        return None\n'''
+    anchor = '\n\ndef _live_status(game_pk: int | None, fallback: str) -> tuple[str, bool]:\n'
+    if anchor not in s:
+        raise SystemExit("Live-status anchor not found")
+    s = s.replace(anchor, live_helper + anchor, 1)
+
+    old = '''    if not resolved_id:\n        return None, \"Pitcher could not be resolved\", final\n    stat = _date_pitching_stats(resolved_id, game_date)\n    if not stat:\n        return None, f\"No pitching stats posted yet · {status}\", final\n'''
+    new = '''    if not resolved_id:\n        return None, \"Pitcher could not be resolved\", final\n    # MLB's date-range stats endpoint can lag during live games. Read the\n    # current boxscore first so in-progress K / H / outs update promptly, then\n    # fall back to the date-range endpoint for final or transient cases.\n    stat = _live_pitching_stats(found_game_pk, resolved_id)\n    if not stat:\n        stat = _date_pitching_stats(resolved_id, game_date)\n    if not stat:\n        return None, f\"No pitching stats posted yet · {status}\", final\n'''
+    if old not in s:
+        raise SystemExit("live_pitcher_prop stat-source anchor not found")
+    s = s.replace(old, new, 1)
 
 if "# BET_TRACKER_TICKET_CARDS_V1" not in s:
     s = s.replace(
@@ -143,4 +158,4 @@ for ticket_index, (_, ticket) in enumerate(results.iterrows()):
     s = s[:table_start] + ticket_ui + s[download_start:]
 
 page.write_text(s, encoding="utf-8")
-print("Bet Tracker ticket cards patched.")
+print("Bet Tracker live boxscore + ticket cards patched.")
