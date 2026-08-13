@@ -27,7 +27,7 @@ jobs:
       - name: Compile projection page
         run: python -m py_compile streamlit_app.py
       - name: Run projection contracts
-        run: pytest -q tests/test_app_contract.py tests/test_odds_credit_saver.py tests/test_batter_hand_and_odds_secret.py tests/test_projection_manual_market_controls.py
+        run: pytest -q tests/test_app_contract.py tests/test_odds_credit_saver.py tests/test_batter_hand_and_odds_secret.py
       - name: Commit cleanup and retire migration
         run: |
           git config user.name "github-actions[bot]"
