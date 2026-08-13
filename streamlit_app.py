@@ -23,6 +23,7 @@ from engine.opposing_batters import get_opposing_batters, matchup_summary
 from engine.lineup_context import LINEUP_CONFIRMED, get_confirmed_lineup
 from engine.weather_risk import WeatherDelayRisk, fetch_weather_delay_risk
 from engine.workload_context import WorkloadContext, build_workload_context
+from engine.role_workload_gate import build_role_workload_decision
 from engine.team_leash import build_team_leash_context, candidate_workload_fields
 from engine.bet_lean import aligned_bet_lean
 from engine.bet_tracker import make_bet_record, make_parlay_record
@@ -151,6 +152,10 @@ def load_projection_history():
 
 def load_observation_history():
     try:return pd.read_csv(OBS_LOG)
+    except Exception:return pd.DataFrame()
+
+def load_role_runtime_state():
+    try:return pd.read_csv(APP_DIR / "data" / "starter_role_runtime_state.csv")
     except Exception:return pd.DataFrame()
 
 def calibrated_weights(history): return {line:calibrate_blend(history,line) for line in range(3,11)}
@@ -576,10 +581,15 @@ opponent_matchup=matchup_summary(opposing_batters,confirmed_lineup=lineup_contex
 weather_risk=get_game_weather(game.venue_id,game.game_time)
 confirmed_count=lineup_context.batter_count if lineup_context.confirmed else 0
 workload_ctx=build_workload_context(log,game.game_time)
+role_workload_decision=build_role_workload_decision(
+    log,workload_ctx,load_role_runtime_state(),game.game_time,
+    mode=os.getenv("STRIKEOUT_ROLE_WORKLOAD_MODE","shadow"),
+)
+effective_workload_ctx=role_workload_decision.effective
 team_leash_ctx=build_team_leash_context(load_projection_history(),load_observation_history(),game.team,game.game_time)
 team_leash_candidate=candidate_workload_fields(team_leash_ctx,workload_ctx.expected_pitches,workload_ctx.expected_bf,workload_ctx.expected_outs)
-proj=calculate_projection(log,game,25000,float(opponent_matchup["k_rate"]),confirmed_count,workload_ctx); kdf=ladder(proj,12)
-features_for_hits=build_engine_features(log,game,float(opponent_matchup["k_rate"]),confirmed_count,workload_ctx)
+proj=calculate_projection(log,game,25000,float(opponent_matchup["k_rate"]),confirmed_count,effective_workload_ctx); kdf=ladder(proj,12)
+features_for_hits=build_engine_features(log,game,float(opponent_matchup["k_rate"]),confirmed_count,effective_workload_ctx)
 hits_seed=int(hashlib.sha256(f"hits|{game.key}|{game.game_time}|{APP_VERSION}".encode()).hexdigest()[:8],16)
 hits_proj=project_hits_allowed(log,expected_bf=features_for_hits["expected_bf"],bf_sd=workload_ctx.bf_sd,opponent_hit_rate=float(opponent_matchup.get("hit_rate",.235)),seed=hits_seed,draws=25000,lines=(3.5,4.5,5.5,6.5,7.5,8.5))
 odds_events,odds_err=get_odds_events(); odds_event_id=find_odds_event(odds_events,game)
@@ -637,6 +647,15 @@ elif nav=="Form & Workload":
     w5.metric("Days since last start","—" if workload_ctx.days_since_last_start is None else workload_ctx.days_since_last_start)
     w6.metric("Recent leash",workload_ctx.leash_label)
     st.caption(f"Pitch trend {workload_ctx.pitch_trend:+.1%} · BF trend {workload_ctx.bf_trend:+.1%} · outs trend {workload_ctx.outs_trend:+.1%} · short-rest exposure multiplier {workload_ctx.rest_multiplier:.3f}.")
+    role_name="LOW_RECENT_EXPOSURE" if role_workload_decision.role=="RESTRICTED" else role_workload_decision.role
+    st.markdown("#### 🧪 Starter role workload · SHADOW / FEATURE GATED")
+    r1,r2,r3,r4,r5=st.columns(5)
+    r1.metric("Role",role_name)
+    r2.metric("Gate mode",role_workload_decision.mode.upper())
+    r3.metric("Candidate pitches",f"{role_workload_decision.candidate.expected_pitches:.1f}")
+    r4.metric("Candidate BF",f"{role_workload_decision.candidate.expected_bf:.1f}")
+    r5.metric("Candidate outs",f"{role_workload_decision.candidate.expected_outs:.1f}")
+    st.caption(f"Applied to projection: {'YES' if role_workload_decision.applied else 'NO'} · {role_workload_decision.reason} · corrections {role_workload_decision.correction_pitches:+.2f} pitches / {role_workload_decision.correction_bf:+.2f} BF / {role_workload_decision.correction_outs:+.2f} outs.")
     st.markdown("#### 🧭 Team leash candidate · CONTEXT ONLY")
     t1,t2,t3,t4,t5,t6=st.columns(6)
     t1.metric("Team starts tracked",team_leash_ctx.starts_used)
