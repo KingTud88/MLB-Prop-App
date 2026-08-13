@@ -24,9 +24,12 @@ jobs:
       - name: Validate
         run: |
           python -m compileall -q pages/2_Bet_Tracker.py engine/bet_tracker.py
-          grep -q 'BET_TRACKER_TICKET_UI_V1' pages/2_Bet_Tracker.py
-          grep -q 'Leg progress' pages/2_Bet_Tracker.py
-          grep -q 'st.expander(ticket_title' pages/2_Bet_Tracker.py
+          grep -q 'BET_TRACKER_TICKET_CARDS_V1' pages/2_Bet_Tracker.py
+          grep -q 'Open any ticket to see each pitcher leg' pages/2_Bet_Tracker.py
+          grep -q 'st.progress(_progress_value(actual, line))' pages/2_Bet_Tracker.py
+          grep -q '"_Legs": leg_details' pages/2_Bet_Tracker.py
+          grep -q 'LIVE AHEAD' engine/bet_tracker.py
+          grep -q 'LIVE BEHIND' engine/bet_tracker.py
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"
