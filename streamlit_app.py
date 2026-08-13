@@ -26,6 +26,7 @@ from engine.workload_context import WorkloadContext, build_workload_context
 from engine.role_workload_gate import build_role_workload_decision
 from engine.team_leash import build_team_leash_context, candidate_workload_fields
 from engine.bet_lean import aligned_bet_lean
+from engine.alt_k import best_alt_k
 from engine.bet_tracker import make_bet_record, make_parlay_record
 from training.bet_storage import append_bet
 
@@ -56,6 +57,7 @@ h1,h2,h3{letter-spacing:-.02em}
 .metric-card{padding:16px;text-align:center;min-height:150px}.metric-label{font-weight:800;color:#d8e5ef;letter-spacing:.05em}.metric-value{font-size:3.0rem;font-weight:900;line-height:1.05}
 .reco-card{padding:14px 12px;text-align:center;min-height:150px;background:rgba(9,27,44,.94);border:1px solid #20425f;border-radius:16px}.reco-label{font-weight:900;color:#d8e5ef;letter-spacing:.05em;font-size:.92rem}.reco-side{font-size:2.15rem;font-weight:900;line-height:1.0;margin-top:8px}.reco-line{font-size:1.05rem;font-weight:900;margin-top:6px}.reco-meta{color:#9fb3c3;font-size:.78rem;margin-top:6px}.reco-good{color:#49efb0}.reco-under{color:#ff4b5f}.reco-neutral{color:#f2f6fa}.reco-warn{color:#ffd166}
 .badge{display:inline-block;background:#073d2c;border:1px solid #087c59;color:#49efb0;border-radius:999px;padding:5px 10px;font-weight:800;font-size:.82rem}
+.alt-k-badge{display:block;width:max-content;max-width:95%;margin:9px auto 0;background:#102d49;border:1px solid #2f6590;color:#dff3ff;border-radius:999px;padding:5px 11px;font-weight:900;font-size:.78rem;letter-spacing:.03em}
 .search-note{color:var(--muted);font-size:.82rem}
 .market-ok{color:#49efb0;font-weight:800}.market-empty{color:#8fa5b7}
 </style>""", unsafe_allow_html=True)
@@ -696,8 +698,10 @@ if weather_risk.available and weather_risk.level in {"HIGH","ELEVATED"}:
 elif weather_risk.available and weather_risk.level == "LOW":
     st.caption(f"{weather_risk.icon} {weather_risk.summary}. Informational only.")
 st.markdown('<div class="section-head">PROJECTION SUMMARY</div>',unsafe_allow_html=True)
+alt_k_choice=best_alt_k([(int(str(row["Line"]).rstrip("+")),float(row["Probability"])) for _,row in kdf.iterrows()])
+alt_k_html=(f'<div class="alt-k-badge">BEST ALT K · {alt_k_choice.milestone}+ · {alt_k_choice.probability:.0%} HIT</div>' if alt_k_choice else '<div class="alt-k-badge">BEST ALT K · NO 70%+ ALT</div>')
 c1,c2,c3,c4=st.columns(4)
-with c1: st.markdown(f'<div class="metric-card"><div class="metric-label">PROJECTED STRIKEOUTS</div><div class="metric-value">{proj.mean_k:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(proj.k_samples,.1))}-{int(np.quantile(proj.k_samples,.9))}</span></div>',unsafe_allow_html=True)
+with c1: st.markdown(f'<div class="metric-card"><div class="metric-label">PROJECTED STRIKEOUTS</div><div class="metric-value">{proj.mean_k:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(proj.k_samples,.1))}-{int(np.quantile(proj.k_samples,.9))}</span>{alt_k_html}</div>',unsafe_allow_html=True)
 render_reco(c2,k_reco,key_prefix=f"manual_k:{game.key}",market_key="pitcher_strikeouts",proj=proj,hits_proj=hits_proj)
 with c3: st.markdown(f'<div class="metric-card"><div class="metric-label">PROJECTED OUTS</div><div class="metric-value">{proj.mean_outs:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(proj.outs_samples,.1))}-{int(np.quantile(proj.outs_samples,.9))}</span></div>',unsafe_allow_html=True)
 render_reco(c4,out_reco,key_prefix=f"manual_outs:{game.key}",market_key="pitcher_outs",proj=proj,hits_proj=hits_proj)
