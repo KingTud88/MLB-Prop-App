@@ -1,6 +1,7 @@
-name: Fix Streamlit schedule cache
+name: Apply Best Alt K UI
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -10,32 +11,48 @@ permissions:
   contents: write
 
 jobs:
-  fix-cache:
+  apply-alt-k:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Remove non-serializable schedule cache
-        shell: bash
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Apply best-alt-K projection card edit
         run: |
           python - <<'PY'
           from pathlib import Path
-          p = Path("streamlit_app.py")
-          text = p.read_text(encoding="utf-8")
-          old = '@st.cache_data(ttl=120, show_spinner=False)\ndef get_schedule'
-          new = 'def get_schedule'
-          if old not in text:
-              raise SystemExit("Expected schedule cache decorator was not found")
-          p.write_text(text.replace(old, new, 1), encoding="utf-8")
+          p=Path('streamlit_app.py')
+          s=p.read_text(encoding='utf-8')
+          if 'from engine.alt_k import best_alt_k' not in s:
+              s=s.replace('from engine.bet_lean import aligned_bet_lean\n','from engine.bet_lean import aligned_bet_lean\nfrom engine.alt_k import best_alt_k\n',1)
+          badge='.badge{display:inline-block;background:#073d2c;border:1px solid #087c59;color:#49efb0;border-radius:999px;padding:5px 10px;font-weight:800;font-size:.82rem}\n'
+          if '.alt-k-badge{' not in s:
+              s=s.replace(badge,badge+'.alt-k-badge{display:block;width:max-content;max-width:95%;margin:9px auto 0;background:#102d49;border:1px solid #2f6590;color:#dff3ff;border-radius:999px;padding:5px 11px;font-weight:900;font-size:.78rem;letter-spacing:.03em}\n',1)
+          old="st.markdown('<div class=\"section-head\">PROJECTION SUMMARY</div>',unsafe_allow_html=True)\nc1,c2,c3,c4=st.columns(4)\nwith c1: st.markdown(f'<div class=\"metric-card\"><div class=\"metric-label\">PROJECTED STRIKEOUTS</div><div class=\"metric-value\">{proj.mean_k:.2f}</div><span class=\"badge\">↑ 80% RANGE {int(np.quantile(proj.k_samples,.1))}-{int(np.quantile(proj.k_samples,.9))}</span></div>',unsafe_allow_html=True)"
+          new="st.markdown('<div class=\"section-head\">PROJECTION SUMMARY</div>',unsafe_allow_html=True)\nalt_k_choice=best_alt_k([(int(str(row[\"Line\"]).rstrip(\"+\")),float(row[\"Probability\"])) for _,row in kdf.iterrows()])\nalt_k_html=(f'<div class=\"alt-k-badge\">BEST ALT K · {alt_k_choice.milestone}+ · {alt_k_choice.probability:.0%} HIT</div>' if alt_k_choice else '<div class=\"alt-k-badge\">BEST ALT K · NO 70%+ ALT</div>')\nc1,c2,c3,c4=st.columns(4)\nwith c1: st.markdown(f'<div class=\"metric-card\"><div class=\"metric-label\">PROJECTED STRIKEOUTS</div><div class=\"metric-value\">{proj.mean_k:.2f}</div><span class=\"badge\">↑ 80% RANGE {int(np.quantile(proj.k_samples,.1))}-{int(np.quantile(proj.k_samples,.9))}</span>{alt_k_html}</div>',unsafe_allow_html=True)"
+          if 'BEST ALT K ·' not in s:
+              if old not in s: raise SystemExit('projection summary anchor not found')
+              s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
           PY
-
-      - name: Commit fix
-        shell: bash
+      - name: Validate UI and selector contracts
+        run: |
+          pip install -r requirements.txt pytest
+          python -m compileall -q streamlit_app.py engine tests
+          pytest -q tests/test_alt_k.py tests/test_bet_lean.py
+          grep -q 'BEST ALT K' streamlit_app.py
+      - name: Commit UI edit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add streamlit_app.py
           git diff --cached --quiet && exit 0
-          git commit -m "Fix schedule cache serialization"
-          git push
+          git commit -m "Show best alt K on projection card"
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
