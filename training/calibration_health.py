@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from training.calibration_lineage import filter_calibration_eligible
+from training.calibration_lineage import eligible_rows
 
 REPORT_VERSION = "calibration-health-v1"
 MILESTONES = (4.5, 5.5, 6.5, 7.5, 8.5)
@@ -18,7 +18,7 @@ def _probability_column(line: float) -> str:
 
 
 def build_report(frame: pd.DataFrame) -> pd.DataFrame:
-    eligible, _ = filter_calibration_eligible(frame)
+    eligible = eligible_rows(frame)
     if eligible.empty:
         return pd.DataFrame(columns=[
             "Line", "Resolved_Starts", "Brier_Score", "Mean_Predicted_Probability",
