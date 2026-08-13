@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 import pandas as pd
+from pandas.errors import EmptyDataError
 
 GATE_VERSION = "live-role-shadow-gate-v1"
 REQUIRED_ROLES = ("RAMPING", "LOW_RECENT_EXPOSURE")
@@ -67,12 +68,24 @@ def evaluate(summary: pd.DataFrame) -> tuple[pd.DataFrame, str]:
     return report, overall
 
 
+def _read_summary(path: Path) -> pd.DataFrame:
+    if not path.exists() or path.stat().st_size == 0:
+        return pd.DataFrame()
+    try:
+        return pd.read_csv(path)
+    except EmptyDataError:
+        # A report-only producer may intentionally emit a newline when there
+        # are zero genuinely live resolved rows. Treat that as no evidence,
+        # not as a pipeline failure; evaluate() will correctly return LEARNING.
+        return pd.DataFrame()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Activation gate for genuinely live resolved role-shadow evidence.")
     parser.add_argument("--summary", type=Path, default=Path("data/live_role_shadow_summary.csv"))
     parser.add_argument("--output", type=Path, default=Path("data/live_role_shadow_gate.csv"))
     args = parser.parse_args()
-    summary = pd.read_csv(args.summary) if args.summary.exists() and args.summary.stat().st_size else pd.DataFrame()
+    summary = _read_summary(args.summary)
     report, overall = evaluate(summary)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     report.to_csv(args.output, index=False)
