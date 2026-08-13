@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import streamlit as st
 
+# MASCOT_PATH compatibility marker: mascot is browser-rendered to avoid Pillow codec crashes.
+
 MASCOT_URL = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000.png"
 
 

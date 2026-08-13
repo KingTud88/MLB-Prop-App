@@ -383,63 +383,15 @@ if slate.empty:
     st.info("No pregame projection snapshots are available for today's slate yet. Run Daily Projection Run first.")
     st.stop()
 
-with st.expander("Hits Allowed calibration status", expanded=False):
-    report = hits_calibration_report(history)
-    st.dataframe(report, hide_index=True, use_container_width=True)
-    ready = int((report["Status"] == "Calibrated").sum()) if not report.empty else 0
-    st.caption(f"{ready}/{len(report)} tracked hit lines currently have learned SIM/MATH weights. Until a line reaches 30 resolved frozen observations, Top Plays uses the protected 50/50 baseline for that line.")
-
-with st.expander("Total Outs calibration status", expanded=False):
-    outs_report = outs_calibration_report(history)
-    st.dataframe(outs_report, hide_index=True, use_container_width=True)
-    outs_ready = int((outs_report["Status"] == "Calibrated").sum()) if not outs_report.empty else 0
-    st.caption(f"{outs_ready}/{len(outs_report)} tracked outs lines currently have learned SIM/MATH weights. Until a line reaches 30 resolved frozen observations, Top Plays uses the protected 50/50 baseline.")
-
+# TOP_PLAYS_SIMPLIFIED_LAYOUT_V1
+# Evidence is still computed before ranking; only its presentation moved below the plays.
+report = hits_calibration_report(history)
+outs_report = outs_calibration_report(history)
 walk_forward = walk_forward_top5(history)
 health_report = health_from_walk_forward(walk_forward)
 health_map = market_health_map(health_report)
-with st.expander("🚦 Walk-forward model health", expanded=False):
-    health_view = health_report.loc[health_report["Market"].ne("ALL TOP 5")].copy()
-    if health_view.empty:
-        st.info("Model health is still waiting for starter-only walk-forward results.")
-    else:
-        for col in ["Hit Rate", "Avg Model Probability", "Calibration Gap", "Recent Hit Rate", "Recent Avg Probability", "Recent Calibration Gap"]:
-            health_view[col] = health_view[col].map(lambda x: "—" if pd.isna(x) else f"{float(x):.1%}")
-        health_view["Brier Score"] = health_view["Brier Score"].map(lambda x: "—" if pd.isna(x) else f"{float(x):.3f}")
-        st.dataframe(health_view, hide_index=True, width="stretch")
-    st.caption("LEARNING and WATCH markets stay eligible. After 30 settled walk-forward Top 5 legs, a market that falls outside the safety guardrails becomes BLOCKED and is removed before today's Top 5 is ranked.")
-
 decision_report = decision_tier_report(walk_forward)
-with st.expander("🎯 Decision-learning evidence", expanded=False):
-    st.caption(
-        "Segment evidence is built only from settled leakage-safe Top 5 recommendations, grouped by market + probability band + data-quality band. "
-        "Sportsbook prices and saved bets are excluded, and this layer does not reorder today's board."
-    )
-    if decision_report.empty:
-        st.info("Decision evidence is still waiting for settled starter-only Top 5 legs.")
-    else:
-        decision_view = decision_report.copy()
-        for col in ["Hit Rate", "Avg Model Probability", "Calibration Gap", "Wilson Lower 95%", "Lift vs Top 5"]:
-            decision_view[col] = decision_view[col].map(lambda x: "—" if pd.isna(x) else f"{float(x):.1%}")
-        decision_view["Brier Score"] = decision_view["Brier Score"].map(lambda x: "—" if pd.isna(x) else f"{float(x):.3f}")
-        st.dataframe(decision_view, hide_index=True, width="stretch")
-    st.caption("Exact segments stay LEARNING below 20 settled legs. Strong or underperforming labels require at least 30 settled legs.")
-
-
 signal_report = paired_signal_report(history)
-with st.expander("🧪 Signal accountability", expanded=False):
-    st.caption(
-        "Paired pregame upgrade evidence measures whether workload-v1 and confirmed-lineup changes reduced same-game prediction error after the final result. "
-        "This evidence is attached after ranking and cannot reorder or remove today's legs."
-    )
-    if signal_report.empty:
-        st.info("Signal evidence is still waiting for resolved paired upgrades.")
-    else:
-        signal_view = signal_report.copy()
-        for col in ["Relative MAE Improvement", "Improved Share"]:
-            signal_view[col] = signal_view[col].map(lambda x: "—" if pd.isna(x) else f"{float(x):+.1%}" if col == "Relative MAE Improvement" else f"{float(x):.1%}")
-        st.dataframe(signal_view[["Signal", "Market", "Resolved Pairs", "Pre MAE", "Post MAE", "Relative MAE Improvement", "Improved Share", "Status", "Reason"]], hide_index=True, width="stretch")
-    st.caption("Signals remain LEARNING below 20 resolved pairs. HELPING/MIXED/HURTING are evidence labels only; sportsbook data is excluded.")
 
 plays = build_model_board(slate, history, limit=5, market_health=health_map)
 if plays.empty:
@@ -559,28 +511,6 @@ c2.metric("Model-qualified Top 5", model_plays)
 c3.metric("Decision-supported legs", decision_supported)
 c4.metric("Signal-supported legs", signal_supported)
 c5.metric("Exact live prices found", f"{live_offers}/{len(plays)}")
-
-view = plays[["Rank", "Pitcher", "Weather Icon", "Market", "Side", "Line", "Projection", "Model Probability", "Weather Risk", "Decision Evidence", "Signal Evidence", "Tier Hit Rate"]].copy()
-view["Pitcher"] = view.apply(lambda r: f"{r['Pitcher']} {'' if pd.isna(r.get('Weather Icon')) else str(r.get('Weather Icon') or '')}".strip(), axis=1)
-view = view.drop(columns=["Weather Icon"])
-view["Model Probability"] = view["Model Probability"].map(lambda x: f"{float(x):.1%}")
-view["Projection"] = view["Projection"].map(lambda x: f"{float(x):.2f}")
-view["Tier Hit Rate"] = view["Tier Hit Rate"].map(lambda x: "—" if x is None or pd.isna(x) else f"{float(x):.1%}")
-st.subheader("Today's five highest-probability model legs")
-st.caption("Eligible markets are ranked only by our calibrated hit probability, with data quality as the tie-breaker. Walk-forward model health can block a proven-unhealthy market; decision evidence is descriptive only; signal evidence is descriptive only; sportsbook odds and market edge never decide the Top 5.")
-st.caption("Click a row or use View details to open its frozen projection breakdown.")
-styled_view = view.style.set_properties(
-    subset=["Projection"],
-    **{"background-color":"rgba(93,48,128,.42)","color":"#ffffff","font-weight":"900","border-left":"1px solid #8b4fc7","border-right":"1px solid #8b4fc7"},
-)
-event = st.dataframe(
-    styled_view,
-    hide_index=True,
-    use_container_width=True,
-    key="top_plays_selectable",
-    on_select="rerun",
-    selection_mode="single-row",
-)
 
 st.markdown("#### Top Play actions")
 st.caption("Straight-bet stake is the amount recorded for one individual leg. It does not place a sportsbook wager and it does not affect the projection model.")
@@ -729,15 +659,6 @@ else:
     st.info("Select at least two of our Top 5 model legs to build a parlay.")
 
 selected_rank = st.session_state.get("top_play_detail_rank")
-try:
-    selected_rows = list(event.selection.rows)
-except Exception:
-    selected_rows = list((event.get("selection", {}) or {}).get("rows", [])) if isinstance(event, dict) else []
-if selected_rows:
-    idx = int(selected_rows[0])
-    if 0 <= idx < len(plays):
-        selected_rank = int(plays.iloc[idx]["Rank"])
-        st.session_state["top_play_detail_rank"] = selected_rank
 
 if selected_rank is not None:
     matched = plays.loc[pd.to_numeric(plays["Rank"], errors="coerce").eq(float(selected_rank))]
@@ -748,3 +669,52 @@ if selected_rank is not None:
             render_projection_rationale(play, snapshot, history)
         else:
             st.warning("The frozen projection snapshot for this ranked leg could not be matched in the history log.")
+
+st.markdown("---")
+st.subheader("🧪 Model diagnostics")
+st.caption("Calibration, Model Health, decision-learning evidence, and signal accountability live here so the plays stay first-scan readable. These diagnostics retain their original ranking and safety roles.")
+
+with st.expander("Hits Allowed calibration status", expanded=False):
+    st.dataframe(report, hide_index=True, use_container_width=True)
+    ready = int((report["Status"] == "Calibrated").sum()) if not report.empty else 0
+    st.caption(f"{ready}/{len(report)} tracked hit lines currently have learned SIM/MATH weights. Until a line reaches 30 resolved frozen observations, Top Plays uses the protected 50/50 baseline for that line.")
+
+with st.expander("Total Outs calibration status", expanded=False):
+    st.dataframe(outs_report, hide_index=True, use_container_width=True)
+    outs_ready = int((outs_report["Status"] == "Calibrated").sum()) if not outs_report.empty else 0
+    st.caption(f"{outs_ready}/{len(outs_report)} tracked outs lines currently have learned SIM/MATH weights. Until a line reaches 30 resolved frozen observations, Top Plays uses the protected 50/50 baseline.")
+
+with st.expander("🚦 Walk-forward Model Health", expanded=False):
+    health_view = health_report.loc[health_report["Market"].ne("ALL TOP 5")].copy()
+    if health_view.empty:
+        st.info("Model health is still waiting for starter-only walk-forward results.")
+    else:
+        for col in ["Hit Rate", "Avg Model Probability", "Calibration Gap", "Recent Hit Rate", "Recent Avg Probability", "Recent Calibration Gap"]:
+            health_view[col] = health_view[col].map(lambda x: "—" if pd.isna(x) else f"{float(x):.1%}")
+        health_view["Brier Score"] = health_view["Brier Score"].map(lambda x: "—" if pd.isna(x) else f"{float(x):.3f}")
+        st.dataframe(health_view, hide_index=True, width="stretch")
+    st.caption("LEARNING and WATCH markets stay eligible. After 30 settled walk-forward Top 5 legs, a market that falls outside the safety guardrails becomes BLOCKED and is removed before today's Top 5 is ranked.")
+
+with st.expander("🎯 Decision-learning evidence", expanded=False):
+    st.caption("Segment evidence uses settled leakage-safe Top 5 recommendations only. Sportsbook prices and saved bets are excluded, and this layer does not reorder today's board.")
+    if decision_report.empty:
+        st.info("Decision evidence is still waiting for settled starter-only Top 5 legs.")
+    else:
+        decision_view = decision_report.copy()
+        for col in ["Hit Rate", "Avg Model Probability", "Calibration Gap", "Wilson Lower 95%", "Lift vs Top 5"]:
+            decision_view[col] = decision_view[col].map(lambda x: "—" if pd.isna(x) else f"{float(x):.1%}")
+        decision_view["Brier Score"] = decision_view["Brier Score"].map(lambda x: "—" if pd.isna(x) else f"{float(x):.3f}")
+        st.dataframe(decision_view, hide_index=True, width="stretch")
+    st.caption("Exact segments stay LEARNING below 20 settled legs. Strong or underperforming labels require at least 30 settled legs.")
+
+with st.expander("🧪 Signal accountability", expanded=False):
+    st.caption("Paired pregame upgrade evidence measures whether workload-v1 and confirmed-lineup changes reduced same-game prediction error after the final result. This evidence is attached after ranking and cannot reorder or remove today's legs.")
+    if signal_report.empty:
+        st.info("Signal evidence is still waiting for resolved paired upgrades.")
+    else:
+        signal_view = signal_report.copy()
+        for col in ["Relative MAE Improvement", "Improved Share"]:
+            signal_view[col] = signal_view[col].map(lambda x: "—" if pd.isna(x) else f"{float(x):+.1%}" if col == "Relative MAE Improvement" else f"{float(x):.1%}")
+        st.dataframe(signal_view[["Signal", "Market", "Resolved Pairs", "Pre MAE", "Post MAE", "Relative MAE Improvement", "Improved Share", "Status", "Reason"]], hide_index=True, width="stretch")
+    st.caption("Signals remain LEARNING below 20 resolved pairs. HELPING/MIXED/HURTING are evidence labels only; sportsbook data is excluded.")
+
