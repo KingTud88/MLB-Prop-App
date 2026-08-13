@@ -438,6 +438,7 @@ with st.spinner("Checking saved bets against MLB pitching stats..."):
             legs = parse_parlay_legs(row.get("parlay_legs"))
             leg_grades = []
             leg_summaries = []
+            leg_details = []
             statuses = []
             for leg in legs:
                 leg_player = str(leg.get("player", "Unknown"))
@@ -456,6 +457,17 @@ with st.spinner("Checking saved bets against MLB pitching stats..."):
                 statuses.append(status)
                 actual_text = "—" if actual is None else f"{actual:g}"
                 leg_summaries.append(f"{leg_player} {leg_side} {leg_line:g} {leg_market} [{actual_text} · {leg_grade.result}]")
+                leg_details.append({
+                    "Player": leg_player,
+                    "Market": leg_market,
+                    "Side": leg_side,
+                    "Line": leg_line,
+                    "Actual": actual,
+                    "Game Status": status,
+                    "Result": leg_grade.result,
+                    "Projection": _num(leg.get("projection")),
+                    "Model Probability": _num(leg.get("model_probability")),
+                })
             grade = grade_parlay(leg_grades)
             profit = profit_for(stake, odds, grade)
             resolved_rows.append({
@@ -475,6 +487,7 @@ with st.spinner("Checking saved bets against MLB pitching stats..."):
                 "Projection": None,
                 "Model Probability": None,
                 "Edge": None,
+                "_Legs": leg_details,
             })
             continue
 
@@ -511,6 +524,17 @@ with st.spinner("Checking saved bets against MLB pitching stats..."):
             "Projection": _num(row.get("projection")),
             "Model Probability": _num(row.get("model_probability")),
             "Edge": _num(row.get("edge")),
+            "_Legs": [{
+                "Player": player,
+                "Market": market,
+                "Side": side,
+                "Line": line,
+                "Actual": actual,
+                "Game Status": status,
+                "Result": grade.result,
+                "Projection": _num(row.get("projection")),
+                "Model Probability": _num(row.get("model_probability")),
+            }],
         })
 
 results = pd.DataFrame(resolved_rows)
@@ -583,15 +607,88 @@ with st.expander("🗑️ Delete a saved bet", expanded=False):
     else:
         st.caption("No saved tickets are available to delete.")
 
-view = results.drop(columns=["_BetKey"], errors="ignore").copy()
-view["Stake"] = view["Stake"].map(lambda x: "—" if pd.isna(x) else f"{x:.2f}")
-view["Actual"] = view["Actual"].map(lambda x: "—" if pd.isna(x) else (f"{x:g}" if isinstance(x, (int, float)) else str(x)))
-view["Profit/Loss"] = view["Profit/Loss"].map(lambda x: "—" if pd.isna(x) else f"{x:+.2f}")
-view["Projection"] = view["Projection"].map(lambda x: "—" if pd.isna(x) else f"{x:.2f}")
-view["Model Probability"] = view["Model Probability"].map(lambda x: "—" if pd.isna(x) else f"{x:.1%}")
-view["Edge"] = view["Edge"].map(lambda x: "—" if pd.isna(x) else f"{x:+.1%}")
-styled_view = view.style.map(result_cell_css, subset=["Result"])
-st.dataframe(styled_view, hide_index=True, use_container_width=True)
+# BET_TRACKER_TICKET_CARDS_V1
+# The resolver above remains the source of truth. This presentation preserves
+# each resolved leg so live progress is visible instead of flattened into one row.
+
+def _ticket_icon(result: object) -> str:
+    state = str(result or "").upper()
+    if state == "WIN":
+        return "✅"
+    if state == "LOSS":
+        return "❌"
+    if state == "LIVE AHEAD":
+        return "🟢"
+    if state == "LIVE BEHIND":
+        return "🟠"
+    if state in {"PUSH", "PUSH LEG"}:
+        return "🟡"
+    return "⏳"
+
+
+def _progress_value(actual: object, line: object) -> float:
+    current = _num(actual)
+    target = _num(line)
+    if current is None or target is None or target <= 0:
+        return 0.0
+    return max(0.0, min(float(current) / float(target), 1.0))
+
+
+st.caption("Open any ticket to see each pitcher leg, live stat progress, line, game status, projection, and current grade.")
+for ticket_index, (_, ticket) in enumerate(results.iterrows()):
+    ticket_result = str(ticket.get("Result", "PENDING"))
+    ticket_pitcher = str(ticket.get("Pitcher", "Unknown"))
+    ticket_date = str(ticket.get("Date", ""))
+    ticket_market = str(ticket.get("Market", ""))
+    label = f"{_ticket_icon(ticket_result)} {ticket_date} · {ticket_pitcher} · {ticket_market} · {ticket_result}"
+    with st.expander(label, expanded=ticket_result in {"LIVE AHEAD", "LIVE BEHIND"}):
+        h1, h2, h3, h4, h5 = st.columns(5)
+        h1.metric("Book", str(ticket.get("Book", "") or "—"))
+        stake_value = _num(ticket.get("Stake"))
+        h2.metric("Stake", "—" if stake_value is None else f"{stake_value:.2f}u")
+        h3.metric("Odds", str(ticket.get("Odds", "—")))
+        profit_value = _num(ticket.get("Profit/Loss"))
+        h4.metric("P/L", "—" if profit_value is None else f"{profit_value:+.2f}u")
+        h5.metric("Ticket", ticket_result)
+
+        legs = ticket.get("_Legs", [])
+        if not isinstance(legs, list) or not legs:
+            st.caption("No leg detail is available for this older ticket.")
+        for leg_number, leg in enumerate(legs, start=1):
+            player = str(leg.get("Player", "Unknown"))
+            market = str(leg.get("Market", ""))
+            side = str(leg.get("Side", ""))
+            line = _num(leg.get("Line")) or 0.0
+            actual = _num(leg.get("Actual"))
+            leg_result = str(leg.get("Result", "PENDING"))
+            status = str(leg.get("Game Status", "Pending"))
+            projection = _num(leg.get("Projection"))
+            model_probability = _num(leg.get("Model Probability"))
+            side_color = "#49efb0" if side.upper() == "OVER" else "#ff4b4b"
+            st.markdown(
+                f'<div style="border:1px solid #294b6c;border-radius:10px;padding:10px 12px;margin:8px 0 5px">'
+                f'<div style="font-size:1.05rem;font-weight:900">{leg_number}. {player}</div>'
+                f'<div style="margin-top:2px">{market} · <span style="color:{side_color};font-weight:900">{side.upper()}</span> {line:g}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+            p1, p2, p3, p4 = st.columns(4)
+            p1.metric("Current", "—" if actual is None else f"{actual:g}")
+            p2.metric("Target line", f"{line:g}")
+            p3.metric("Projection", "—" if projection is None else f"{projection:.2f}")
+            p4.metric("Model %", "—" if model_probability is None else f"{model_probability:.1%}")
+            st.progress(_progress_value(actual, line))
+            if actual is None:
+                progress_text = "Waiting for MLB pitching stats"
+            elif side.upper() == "OVER":
+                needed = max(0.0, line - actual)
+                progress_text = f"{actual:g} current · {needed:g} to the listed line" if needed > 0 else f"{actual:g} current · above the listed line"
+            else:
+                room = line - actual
+                progress_text = f"{actual:g} current · {max(0.0, room):g} below the listed line" if room > 0 else f"{actual:g} current · at/above the listed line"
+            st.caption(f"{_ticket_icon(leg_result)} {leg_result} · {status} · {progress_text}")
+
+        st.caption("Live progress comes from MLB pitching stats. Sportsbook prices and stakes remain tracking-only inputs and never feed the projection model.")
 
 st.download_button(
     "Download bet tracker CSV",
