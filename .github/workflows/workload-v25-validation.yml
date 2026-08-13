@@ -1,0 +1,49 @@
+name: Workload v2.5 Sign-Gated Validation
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - training/workload_sign_gated_backtest.py
+      - training/workload_stabilized_backtest.py
+      - training/workload_leash_backtest.py
+      - training/workload_backtest.py
+      - .github/workflows/workload-v25-validation.yml
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt pytest
+      - name: Existing workload contract tests
+        run: pytest -q tests/test_workload_backtest.py tests/test_workload_leash_backtest.py tests/test_workload_tight_backtest.py tests/test_workload_context.py
+      - name: Three-season chronological replay
+        run: python -m training.workload_sign_gated_backtest --seasons 2024 2025 2026
+      - name: Commit validation reports
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/workload_v25_summary.csv data/workload_v25_segments.csv
+          if git diff --cached --quiet; then
+            echo "No v2.5 validation report changes"
+            exit 0
+          fi
+          git commit -m "Refresh workload v2.5 sign-gated validation"
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git rebase origin/main
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
