@@ -560,11 +560,10 @@ c3.metric("Decision-supported legs", decision_supported)
 c4.metric("Signal-supported legs", signal_supported)
 c5.metric("Exact live prices found", f"{live_offers}/{len(plays)}")
 
-view = plays[["Rank", "Status", "Model Health", "Decision Evidence", "Decision Sample", "Signal Evidence", "Signal Sample", "Tier Hit Rate", "Pitcher", "Weather Icon", "Weather Risk", "Market", "Side", "Line", "Projection", "Model Probability", "Data Quality", "Starter History", "Book", "Odds"]].copy()
+view = plays[["Rank", "Pitcher", "Weather Icon", "Market", "Side", "Line", "Projection", "Model Probability", "Status", "Weather Risk", "Data Quality", "Book", "Odds"]].copy()
 view["Pitcher"] = view.apply(lambda r: f"{r['Pitcher']} {str(r.get('Weather Icon', '') or '')}".strip(), axis=1)
 view = view.drop(columns=["Weather Icon"])
 view["Model Probability"] = view["Model Probability"].map(lambda x: f"{float(x):.1%}")
-view["Tier Hit Rate"] = view["Tier Hit Rate"].map(lambda x: "—" if x is None or pd.isna(x) else f"{float(x):.1%}")
 view["Projection"] = view["Projection"].map(lambda x: f"{float(x):.2f}")
 view["Book"] = view["Book"].map(lambda x: x if str(x).strip() else "—")
 view["Odds"] = view["Odds"].map(lambda x: "—" if pd.isna(x) else f"{int(float(x)):+d}")
@@ -593,9 +592,10 @@ for button_idx, (_, play_row) in enumerate(plays.iterrows()):
     with button_cols[button_idx]:
         rank = int(play_row["Rank"])
         weather_icon = str(play_row.get("Weather Icon", "") or "")
-        st.caption(f"#{rank} {play_row['Pitcher']} {weather_icon} · {play_row['Side']} {float(play_row['Line']):g}".replace("  ·", " ·"))
-        st.caption(f"Decision evidence: {play_row.get('Decision Evidence', 'LEARNING')} · n={int(play_row.get('Decision Sample', 0) or 0)}")
-        st.caption(f"Signal evidence: {play_row.get('Signal Evidence', 'LEARNING')} · {play_row.get('Signal Detail', 'No mature paired signal evidence yet.')}")
+        st.markdown(f"### #{rank} · {play_row['Pitcher']} {weather_icon}".strip())
+        st.markdown(f"**{play_row['Market']} · {play_row['Side']} {float(play_row['Line']):g}**")
+        st.markdown(f"Projection **{float(play_row['Projection']):.2f}** · Model **{float(play_row['Model Probability']):.1%}**")
+        st.caption(f"{play_row.get('Status', 'MODEL PLAY')} · {play_row.get('Model Health', 'LEARNING')} health · evidence in View details")
         if st.button("🔎 View details", key=f"view_top_play_{rank}", use_container_width=True):
             st.session_state["top_play_detail_rank"] = rank
         if st.button("➕ Add as bet", key=f"add_top_play_{rank}", use_container_width=True, disabled=not (model_ok and live_offer)):
