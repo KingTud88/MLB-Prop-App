@@ -8,7 +8,8 @@ from training.calibration_health import build_report
 
 def _row(*, actual: float, probability: float, probability_semantics: str = "milestone-ceil-v1", history_semantics: str = "starter-only-v1") -> dict[str, object]:
     return {
-        "captured_at": "2026-08-13T00:00:00Z",
+        "game_date": "2026-08-13",
+        "captured_at_utc": "2026-08-13T00:00:00Z",
         "actual_strikeouts": actual,
         "probability_semantics": probability_semantics,
         "history_semantics": history_semantics,
