@@ -1,0 +1,7 @@
+Role,Metric,Resolved_Starts,Relative_MAE,Candidate_Win_Share,Baseline_Bias,Candidate_Bias,Live_Gate_Status,Reasons,Gate_Version
+RAMPING,PITCHES,0,,,,,LEARNING,missing_live_cell,live-role-shadow-gate-v1
+RAMPING,BF,0,,,,,LEARNING,missing_live_cell,live-role-shadow-gate-v1
+RAMPING,OUTS,0,,,,,LEARNING,missing_live_cell,live-role-shadow-gate-v1
+LOW_RECENT_EXPOSURE,PITCHES,0,,,,,LEARNING,missing_live_cell,live-role-shadow-gate-v1
+LOW_RECENT_EXPOSURE,BF,0,,,,,LEARNING,missing_live_cell,live-role-shadow-gate-v1
+LOW_RECENT_EXPOSURE,OUTS,0,,,,,LEARNING,missing_live_cell,live-role-shadow-gate-v1
