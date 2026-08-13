@@ -4,7 +4,7 @@ import math
 
 import pandas as pd
 
-from training.calibration_health import build_report
+from training.calibration_health import MIN_WEIGHT_OBSERVATIONS, build_report
 
 
 def _row(
@@ -33,7 +33,6 @@ def test_health_maps_integer_milestone_to_equivalent_half_line() -> None:
         _row(actual=8, sim_probability=0.99, math_probability=0.99, probability_semantics="legacy"),
     ])
     report = build_report(frame)
-
     sim = report.loc[(report["Path"] == "SIM") & (report["Milestone"] == 5)].iloc[0]
     math_row = report.loc[(report["Path"] == "MATH") & (report["Milestone"] == 5)].iloc[0]
     assert float(sim["Equivalent_Over_Line"]) == 4.5
@@ -54,6 +53,21 @@ def test_health_preserves_sim_and_math_as_separate_paths() -> None:
     assert all(milestone["Brier_Score"].astype(float).ge(0.0))
 
 
+def test_health_reports_existing_weight_threshold() -> None:
+    waiting = build_report(pd.DataFrame([
+        _row(actual=5, sim_probability=0.4, math_probability=0.6)
+        for _ in range(MIN_WEIGHT_OBSERVATIONS - 1)
+    ]))
+    assert set(waiting["Weight_Learning_Status"]) == {"WAITING"}
+    assert set(waiting["Starts_To_Minimum"].astype(int)) == {1}
+    eligible = build_report(pd.DataFrame([
+        _row(actual=5, sim_probability=0.4, math_probability=0.6)
+        for _ in range(MIN_WEIGHT_OBSERVATIONS)
+    ]))
+    assert set(eligible["Weight_Learning_Status"]) == {"ELIGIBLE_TO_FIT"}
+    assert set(eligible["Starts_To_Minimum"].astype(int)) == {0}
+
+
 def test_health_skips_missing_milestones_without_inventing_probabilities() -> None:
     frame = pd.DataFrame([_row(actual=5, sim_probability=0.4, math_probability=0.6)])
     report = build_report(frame)
@@ -68,3 +82,4 @@ def test_health_returns_schema_when_no_rows_are_eligible() -> None:
     assert report.empty
     assert "Brier_Score" in report.columns
     assert "Path" in report.columns
+    assert "Weight_Learning_Status" in report.columns
