@@ -3,9 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-# A visible green/red BET LEAN should mean more than "slightly above 50%."
-# This is a presentation/decision guardrail only; it does not alter any baseball
-# projection or probability. Keep the threshold fixed across K/outs/hits.
+# Visible BET LEAN is an action label, not merely a directional forecast.
+# These presentation guardrails do not alter the baseball projection itself.
 DEFAULT_MINIMUM_PROBABILITY = 0.58
 DEFAULT_MINIMUM_EDGE = 0.02
 
@@ -40,13 +39,7 @@ def aligned_bet_lean(
     minimum_probability: float = DEFAULT_MINIMUM_PROBABILITY,
     minimum_edge: float = DEFAULT_MINIMUM_EDGE,
 ) -> BetLeanDecision:
-    """Return OVER/UNDER only when direction, confidence, and market edge agree.
-
-    The point projection determines which side is eligible. The directional
-    probability must clear a fixed confidence floor even when no sportsbook is
-    loaded. When a market is loaded, that same side must additionally clear the
-    minimum model-vs-implied edge. Sportsbook data never creates the forecast.
-    """
+    """Return OVER/UNDER only when direction, confidence, and market edge agree."""
     over_probability = min(max(float(over_probability), 0.0), 1.0)
     direction = projection_side(projection_mean, line)
     if direction == "PASS":
@@ -60,10 +53,10 @@ def aligned_bet_lean(
 
     implied = over_implied if direction == "OVER" else under_implied
     if not has_market or implied is None:
-        return BetLeanDecision(direction, directional_probability, None, "model_confidence")
+        return BetLeanDecision(direction, directional_probability, None, "model_direction")
 
     edge = directional_probability - float(implied)
     if edge < float(minimum_edge):
-        return BetLeanDecision("PASS", directional_probability, edge, "insufficient_aligned_edge")
+        return BetLeanDecision("PASS", directional_probability, edge, "no_positive_aligned_edge")
 
-    return BetLeanDecision(direction, directional_probability, edge, "aligned_actionable_edge")
+    return BetLeanDecision(direction, directional_probability, edge, "aligned_positive_edge")
