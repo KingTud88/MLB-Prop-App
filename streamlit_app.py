@@ -53,7 +53,7 @@ h1,h2,h3{letter-spacing:-.02em}
 .pitcher-card,.metric-card,.panel{background:rgba(9,27,44,.94);border:1px solid #20425f;border-radius:16px}.pitcher-card{padding:18px 24px}
 .section-head{background:linear-gradient(90deg,#ed1236,#f0193c);padding:9px 16px;border-radius:14px 14px 0 0;text-align:center;font-weight:900;letter-spacing:.08em}
 .metric-card{padding:16px;text-align:center;min-height:150px}.metric-label{font-weight:800;color:#d8e5ef;letter-spacing:.05em}.metric-value{font-size:3.0rem;font-weight:900;line-height:1.05}
-.reco-card{padding:14px 12px;text-align:center;min-height:150px;background:rgba(9,27,44,.94);border:1px solid #20425f;border-radius:16px}.reco-label{font-weight:900;color:#d8e5ef;letter-spacing:.05em;font-size:.92rem}.reco-side{font-size:2.15rem;font-weight:900;line-height:1.0;margin-top:8px}.reco-line{font-size:1.05rem;font-weight:900;margin-top:6px}.reco-meta{color:#9fb3c3;font-size:.78rem;margin-top:6px}.reco-good{color:#49efb0}.reco-neutral{color:#f2f6fa}.reco-warn{color:#ffd166}
+.reco-card{padding:14px 12px;text-align:center;min-height:150px;background:rgba(9,27,44,.94);border:1px solid #20425f;border-radius:16px}.reco-label{font-weight:900;color:#d8e5ef;letter-spacing:.05em;font-size:.92rem}.reco-side{font-size:2.15rem;font-weight:900;line-height:1.0;margin-top:8px}.reco-line{font-size:1.05rem;font-weight:900;margin-top:6px}.reco-meta{color:#9fb3c3;font-size:.78rem;margin-top:6px}.reco-good{color:#49efb0}.reco-under{color:#ff4b5f}.reco-neutral{color:#f2f6fa}.reco-warn{color:#ffd166}
 .badge{display:inline-block;background:#073d2c;border:1px solid #087c59;color:#49efb0;border-radius:999px;padding:5px 10px;font-weight:800;font-size:.82rem}
 .search-note{color:var(--muted);font-size:.82rem}
 .market-ok{color:#49efb0;font-weight:800}.market-empty{color:#8fa5b7}
@@ -391,7 +391,7 @@ def render_reco(card,reco,*,key_prefix=None,market_key=None,proj=None,hits_proj=
     effective=(manual_market_recommendation(reco,key_prefix,market_key,proj,hits_proj)
                if key_prefix and market_key and proj is not None else dict(reco))
     side=effective["side"]
-    cls="reco-warn" if side=="PASS" else "reco-good"
+    cls="reco-warn" if side=="PASS" else "reco-under" if side=="UNDER" else "reco-good"
     reason_labels={"no_positive_aligned_edge":"NO POSITIVE ALIGNED EDGE","probability_conflicts_with_projection":"PROJECTION / PROBABILITY DISAGREE","projection_on_line":"PROJECTION ON LINE","model_direction":"MODEL LEAN","aligned_positive_edge":"POSITIVE ALIGNED EDGE","manual_market":"MANUAL MARKET"}
     if side=="PASS":
         meta=f"Proj {effective.get('projection_mean',float('nan')):.2f} vs {effective['line']:g} · {reason_labels.get(effective.get('reason'),'NO BET')}"
@@ -540,16 +540,16 @@ with st.sidebar:
         st.switch_page("pages/4_Projection_History.py")
     if nav == "Top Plays":
         st.switch_page("pages/6_Top_Plays.py")
-    st.divider(); selected_date=st.date_input("Slate date",value=datetime.now(EASTERN).date()); st.markdown("### PITCHER SEARCH")
-    locked_key=st.session_state.get("locked_pitcher"); search=st.text_input("Search pitcher...",placeholder="Search pitcher...",label_visibility="collapsed",disabled=bool(locked_key)); st.caption("Search and select a pitcher to lock the projection 🔒")
+    st.divider(); selected_date=st.date_input("Slate date",value=datetime.now(EASTERN).date()); st.markdown("### PITCHER")
+    locked_key=st.session_state.get("locked_pitcher"); st.caption("Select a probable starter, then lock the projection 🔒")
 
 schedule,err=get_schedule(selected_date.isoformat())
 if err: st.error(err)
 if not schedule: st.warning("No announced probable pitchers are available for this date."); st.stop()
 locked_game=next((g for g in schedule if g.key==locked_key),None) if locked_key else None
 if locked_key and locked_game is None: st.session_state["locked_pitcher"]=None; locked_key=None
-matches=schedule if locked_game else [g for g in schedule if not search or search.lower() in g.pitcher_name.lower() or search.lower() in g.team.lower()]
-if not matches: st.info("No pitchers match that search."); st.stop()
+matches=schedule if locked_game is None else [locked_game]
+if not matches: st.info("No probable pitchers are available for this slate."); st.stop()
 names=[f"{g.pitcher_name} · {g.team} vs {g.opponent}" for g in matches]
 with st.sidebar:
     default_index=names.index(f"{locked_game.pitcher_name} · {locked_game.team} vs {locked_game.opponent}") if locked_game else 0
