@@ -376,24 +376,28 @@ def _american_odds_options():
 def manual_market_recommendation(reco, key_prefix, market_key, proj, hits_proj=None):
     if not st.session_state.get(f"{key_prefix}:enabled", False):
         return dict(reco)
-    line=float(st.session_state.get(f"{key_prefix}:line", reco["line"]))
-    side=str(st.session_state.get(f"{key_prefix}:side", reco.get("side") if reco.get("side") in {"OVER","UNDER"} else "OVER")).upper()
-    odds=float(st.session_state.get(f"{key_prefix}:odds", -110))
-    over_model=float(market_model_probability(proj, market_key, line, hits_proj))
-    model_probability=over_model if side=="OVER" else 1.0-over_model
-    sportsbook_implied=implied_prob(odds)
-    edge=model_probability-sportsbook_implied if sportsbook_implied is not None else None
+    applied=st.session_state.get(f"{key_prefix}:applied")
+    if not isinstance(applied,dict):
+        return dict(reco)
+    line=float(applied.get("line",reco["line"]))
+    odds=float(applied.get("odds",-110))
+    over_model=float(market_model_probability(proj,market_key,line,hits_proj))
+    implied=implied_prob(odds)
+    decision=aligned_bet_lean(
+        float(reco.get("projection_mean",0.0)),line,over_model,
+        over_implied=implied,under_implied=implied,has_market=True,
+    )
     updated=dict(reco)
     updated.update({
-        "side":side,
+        "side":decision.side,
         "line":line,
-        "model":model_probability,
-        "edge":edge,
+        "model":decision.model_probability,
+        "edge":decision.edge,
         "has_market":True,
-        "reason":"manual_market",
+        "reason":decision.reason,
         "manual":True,
         "manual_odds":odds,
-        "manual_implied":sportsbook_implied,
+        "manual_implied":implied,
         "over_model":over_model,
     })
     return updated
@@ -404,9 +408,17 @@ def render_reco(card,reco,*,key_prefix=None,market_key=None,proj=None,hits_proj=
                if key_prefix and market_key and proj is not None else dict(reco))
     side=effective["side"]
     cls="reco-warn" if side=="PASS" else "reco-under" if side=="UNDER" else "reco-good"
-    reason_labels={"no_positive_aligned_edge":"NO POSITIVE ALIGNED EDGE","probability_conflicts_with_projection":"PROJECTION / PROBABILITY DISAGREE","projection_on_line":"PROJECTION ON LINE","model_direction":"MODEL LEAN","aligned_positive_edge":"POSITIVE ALIGNED EDGE","manual_market":"MANUAL MARKET"}
+    reason_labels={
+        "no_positive_aligned_edge":"EDGE BELOW 2%",
+        "probability_conflicts_with_projection":"PROJECTION / PROBABILITY DISAGREE",
+        "projection_on_line":"PROJECTION ON LINE",
+        "insufficient_model_confidence":"MODEL CONFIDENCE BELOW 58%",
+        "model_direction":"MODEL LEAN",
+        "aligned_positive_edge":"POSITIVE ALIGNED EDGE",
+    }
     if side=="PASS":
-        meta=f"Proj {effective.get('projection_mean',float('nan')):.2f} vs {effective['line']:g} · {reason_labels.get(effective.get('reason'),'NO BET')}"
+        manual_price=(f" · {effective['manual_odds']:+.0f}" if effective.get("manual") else "")
+        meta=f"Proj {effective.get('projection_mean',float('nan')):.2f} vs {effective['line']:g}{manual_price} · {reason_labels.get(effective.get('reason'),'NO BET')}"
     elif effective.get("manual"):
         edge=f"EDGE {effective['edge']:+.1%}" if effective.get("edge") is not None else "EDGE —"
         meta=f"Model {effective['model']:.1%} · {effective['manual_odds']:+.0f} · {edge}"
@@ -419,23 +431,25 @@ def render_reco(card,reco,*,key_prefix=None,market_key=None,proj=None,hits_proj=
             with st.expander("✍️ MANUAL LINE / ODDS", expanded=False):
                 enabled=st.checkbox("Use manual market",key=f"{key_prefix}:enabled")
                 lines=_manual_line_options(market_key)
-                current_line=float(st.session_state.get(f"{key_prefix}:line", effective.get("line",reco["line"])))
-                default_line=min(lines,key=lambda x:abs(float(x)-current_line))
-                line=st.selectbox("Line",lines,index=lines.index(default_line),key=f"{key_prefix}:line",disabled=not enabled)
-                default_side=effective.get("side") if effective.get("side") in {"OVER","UNDER"} else "OVER"
-                side_options=("OVER","UNDER")
-                side=st.selectbox("Side",side_options,index=side_options.index(default_side),key=f"{key_prefix}:side",disabled=not enabled)
+                applied=st.session_state.get(f"{key_prefix}:applied")
+                applied_line=float(applied.get("line",reco["line"])) if isinstance(applied,dict) else float(reco["line"])
+                default_line=min(lines,key=lambda x:abs(float(x)-applied_line))
+                line=st.selectbox("Line",lines,index=lines.index(default_line),key=f"{key_prefix}:draft_line",disabled=not enabled)
                 odds_options=_american_odds_options()
-                current_odds=int(st.session_state.get(f"{key_prefix}:odds",-110))
-                default_odds=min(odds_options,key=lambda x:abs(int(x)-current_odds))
-                odds=st.selectbox("American odds",odds_options,index=odds_options.index(default_odds),key=f"{key_prefix}:odds",disabled=not enabled,format_func=lambda x:f"{int(x):+d}")
-                if enabled:
-                    over_model=float(market_model_probability(proj,market_key,float(line),hits_proj))
-                    model_p=over_model if side=="OVER" else 1.0-over_model
-                    implied_p=implied_prob(float(odds))
-                    edge=model_p-implied_p if implied_p is not None else None
-                    st.markdown(f"**Model:** {model_p:.1%} &nbsp; · &nbsp; **Sportsbook implied:** {implied_p:.1%} &nbsp; · &nbsp; **Edge:** {edge:+.1%}")
-                    st.caption("Manual market is execution-only. It changes the displayed line/price comparison, never the baseball projection.")
+                applied_odds=int(applied.get("odds",-110)) if isinstance(applied,dict) else -110
+                default_odds=min(odds_options,key=lambda x:abs(int(x)-applied_odds))
+                odds=st.selectbox("American odds",odds_options,index=odds_options.index(default_odds),key=f"{key_prefix}:draft_odds",disabled=not enabled,format_func=lambda x:f"{int(x):+d}")
+                if st.button("✅ APPLY LINE / ODDS",key=f"{key_prefix}:apply",use_container_width=True,disabled=not enabled):
+                    st.session_state[f"{key_prefix}:applied"]={"line":float(line),"odds":float(odds)}
+                    st.rerun()
+                if isinstance(applied,dict) and enabled:
+                    st.caption(f"Applied market: {float(applied['line']):g} at {float(applied['odds']):+.0f}. The card above is recalculated from this line and price.")
+                    if st.button("↩️ CLEAR MANUAL MARKET",key=f"{key_prefix}:clear",use_container_width=True):
+                        st.session_state.pop(f"{key_prefix}:applied",None)
+                        st.session_state[f"{key_prefix}:enabled"]=False
+                        st.rerun()
+                else:
+                    st.caption("Choose a line and price, then press APPLY. The model will decide OVER, UNDER, or PASS; the controls never force the side.")
 
 def render_calibration_dashboard():
     st.markdown("### Milestone Calibration Dashboard"); st.caption("Resolved pregame projections only. Sportsbook prices are excluded from training.")
