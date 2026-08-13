@@ -6,16 +6,15 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-# Report-only diagnostic. Role labels are reconstructed from each pitcher's
-# strictly earlier resolved starts in the projection log. This intentionally
-# does not alter production projections.
-ROLE_VERSION = "starter-role-backtest-v1"
+ROLE_VERSION = "starter-role-backtest-v1.1"
 ROLE_UNKNOWN = "UNKNOWN"
 ROLE_ESTABLISHED = "ESTABLISHED"
 ROLE_RAMPING = "RAMPING"
 ROLE_RESTRICTED = "RESTRICTED"
 ROLE_OPENER_LIKE = "OPENER_LIKE"
 METRICS = ("pitches", "bf", "outs")
+ACTUAL_COLUMNS = {"pitches": "actual_pitches", "bf": "actual_batters_faced", "outs": "actual_outs"}
+PROJECTION_COLUMNS = {"pitches": "expected_pitches", "bf": "expected_bf", "outs": "expected_outs"}
 
 
 def _num(s: object, index: pd.Index) -> pd.Series:
@@ -33,7 +32,7 @@ def _role_from_prior(prior: pd.DataFrame) -> str:
     rp = _num(recent.get("actual_pitches"), recent.index).dropna()
     ro = _num(recent.get("actual_outs"), recent.index).dropna()
     p = _num(prior.get("actual_pitches"), prior.index)
-    bf = _num(prior.get("actual_bf"), prior.index)
+    bf = _num(prior.get("actual_batters_faced"), prior.index)
     outs = _num(prior.get("actual_outs"), prior.index)
     low = (p.le(55) | bf.le(14) | outs.le(9)).fillna(False)
     last3_low = low.tail(min(3, len(low)))
@@ -73,26 +72,18 @@ def summarize(frame: pd.DataFrame, min_starts: int = 20) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
     for (season, role), group in frame.groupby(["season", "starter_role_label"], dropna=False):
         for metric in METRICS:
-            actual = _num(group.get(f"actual_{metric}"), group.index)
-            baseline = _num(group.get(f"candidate_{metric}"), group.index)
-            if baseline.isna().all():
-                baseline = _num(group.get(f"workload_{metric}"), group.index)
+            actual = _num(group.get(ACTUAL_COLUMNS[metric]), group.index)
+            baseline = _num(group.get(PROJECTION_COLUMNS[metric]), group.index)
             ready = actual.notna() & baseline.notna()
             n = int(ready.sum())
             if n < min_starts:
                 continue
             err = baseline[ready].astype(float) - actual[ready].astype(float)
             rows.append({
-                "Season": int(season),
-                "Role": str(role),
-                "Metric": metric.upper(),
-                "Starts": n,
-                "MAE": float(err.abs().mean()),
-                "RMSE": float(np.sqrt(np.mean(np.square(err)))),
-                "Bias": float(err.mean()),
-                "Actual_Mean": float(actual[ready].mean()),
-                "Projected_Mean": float(baseline[ready].mean()),
-                "Role_Version": ROLE_VERSION,
+                "Season": int(season), "Role": str(role), "Metric": metric.upper(), "Starts": n,
+                "MAE": float(err.abs().mean()), "RMSE": float(np.sqrt(np.mean(np.square(err)))),
+                "Bias": float(err.mean()), "Actual_Mean": float(actual[ready].mean()),
+                "Projected_Mean": float(baseline[ready].mean()), "Role_Version": ROLE_VERSION,
             })
     return pd.DataFrame(rows)
 
