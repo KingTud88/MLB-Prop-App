@@ -37,8 +37,12 @@ def test_lineup_quality_credit_requires_confirmed_nine_man_order():
     text = Path("streamlit_app.py").read_text(encoding="utf-8")
     assert 'confirmed_count=lineup_context.batter_count if lineup_context.confirmed else 0' in text
     assert 'workload_ctx=build_workload_context(log,game.game_time)' in text
-    assert 'calculate_projection(log,game,25000,float(opponent_matchup["k_rate"]),confirmed_count,workload_ctx)' in text
-    assert 'build_engine_features(log,game,float(opponent_matchup["k_rate"]),confirmed_count,workload_ctx)' in text
+    # The role workload gate is shadow by default; both projection consumers use
+    # its explicit effective context rather than bypassing the gate.
+    assert 'mode=os.getenv("STRIKEOUT_ROLE_WORKLOAD_MODE","shadow")' in text
+    assert 'effective_workload_ctx=role_workload_decision.effective' in text
+    assert 'calculate_projection(log,game,25000,float(opponent_matchup["k_rate"]),confirmed_count,effective_workload_ctx)' in text
+    assert 'build_engine_features(log,game,float(opponent_matchup["k_rate"]),confirmed_count,effective_workload_ctx)' in text
 
 
 def test_pregame_weather_can_change_on_later_refresh(monkeypatch):
