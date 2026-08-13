@@ -1,0 +1,55 @@
+name: Integrate Daily Role Shadow
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - training/daily_role_shadow.py
+      - tests/test_daily_role_shadow.py
+      - scripts/integrate_daily_role_shadow.py
+      - data/starter_role_runtime_state.csv
+      - .github/workflows/integrate-daily-role-shadow.yml
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt pytest
+      - name: Require validated runtime state
+        run: test -s data/starter_role_runtime_state.csv
+      - name: Daily shadow contracts
+        run: pytest -q tests/test_daily_role_shadow.py tests/test_role_workload_gate.py tests/test_starter_role.py
+      - name: Apply daily shadow integration
+        run: python scripts/integrate_daily_role_shadow.py
+      - name: Compile automated runner
+        run: python -m py_compile training/daily_projection_runner.py training/daily_role_shadow.py engine/role_workload_gate.py
+      - name: Verify projection-preserving shadow hook
+        run: |
+          grep -q 'attach_daily_role_shadow' training/daily_projection_runner.py
+          grep -q 'role_history=load_runtime_state()' training/daily_projection_runner.py
+      - name: Commit daily shadow integration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add training/daily_projection_runner.py
+          if git diff --cached --quiet; then
+            echo "Daily role shadow already integrated"
+            exit 0
+          fi
+          git commit -m "Integrate role workload diagnostics into daily runner"
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git rebase origin/main
+            if git push origin HEAD:main; then exit 0; fi
+            sleep 2
+          done
+          exit 1
