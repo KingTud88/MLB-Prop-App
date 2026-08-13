@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import streamlit as st
 
-MASCOT_URL = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000.svg"
+MASCOT_PATH = Path(__file__).resolve().parent / "assets" / "strikeout_king_9000.png"
 
 
 def render_sidebar(active: str = "projection") -> None:
@@ -16,8 +18,6 @@ def render_sidebar(active: str = "projection") -> None:
         <style>
         [data-testid="stSidebar"]{width:205px!important;min-width:205px!important}
         [data-testid="stSidebar"]>div:first-child{width:205px!important}
-        .sk-nav-mascot{display:flex;justify-content:center;align-items:center;height:118px;margin:-.25rem 0 .15rem}
-        .sk-nav-mascot img{width:112px;height:112px;object-fit:contain;display:block}
         .sk-nav-title{text-align:center;font-family:Impact,"Arial Narrow",sans-serif;font-size:1.18rem;line-height:1;color:#fff}
         .sk-nav-title span{color:#e31837}
         .sk-nav-sub{text-align:center;color:#aebed0;font-size:.68rem;line-height:1.35;margin:.45rem 0 .8rem}
@@ -30,10 +30,9 @@ def render_sidebar(active: str = "projection") -> None:
         unsafe_allow_html=True,
     )
     with st.sidebar:
-        st.markdown(
-            f'<div class="sk-nav-mascot"><img src="{MASCOT_URL}" alt="StrikeOut King 9000 mascot"></div>',
-            unsafe_allow_html=True,
-        )
+        logo_left, logo_center, logo_right = st.columns([1, 3, 1])
+        with logo_center:
+            st.image(str(MASCOT_PATH), width=112)
         st.markdown('<div class="sk-nav-title">StrikeOut <span>King 9000</span></div>', unsafe_allow_html=True)
         st.markdown('<div class="sk-nav-sub">CLE-themed distributional MLB starter projections</div>', unsafe_allow_html=True)
 
