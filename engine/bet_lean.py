@@ -3,6 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
+# A visible green/red BET LEAN should mean more than "slightly above 50%."
+# This is a presentation/decision guardrail only; it does not alter any baseball
+# projection or probability. Keep the threshold fixed across K/outs/hits.
+DEFAULT_MINIMUM_PROBABILITY = 0.58
+DEFAULT_MINIMUM_EDGE = 0.02
+
+
 @dataclass(frozen=True)
 class BetLeanDecision:
     side: str
@@ -30,14 +37,15 @@ def aligned_bet_lean(
     over_implied: float | None = None,
     under_implied: float | None = None,
     has_market: bool = False,
-    minimum_edge: float = 0.0,
+    minimum_probability: float = DEFAULT_MINIMUM_PROBABILITY,
+    minimum_edge: float = DEFAULT_MINIMUM_EDGE,
 ) -> BetLeanDecision:
-    """Choose a lean only when model direction, probability, and market edge agree.
+    """Return OVER/UNDER only when direction, confidence, and market edge agree.
 
-    A sportsbook price can make a low-probability outcome look like positive expected value,
-    but the app's visible BET LEAN is intentionally stricter: it may never recommend a side
-    that conflicts with the point projection. When a live market exists, the aligned side
-    must also have positive edge; otherwise the decision is PASS.
+    The point projection determines which side is eligible. The directional
+    probability must clear a fixed confidence floor even when no sportsbook is
+    loaded. When a market is loaded, that same side must additionally clear the
+    minimum model-vs-implied edge. Sportsbook data never creates the forecast.
     """
     over_probability = min(max(float(over_probability), 0.0), 1.0)
     direction = projection_side(projection_mean, line)
@@ -47,13 +55,15 @@ def aligned_bet_lean(
     directional_probability = over_probability if direction == "OVER" else 1.0 - over_probability
     if directional_probability < 0.5:
         return BetLeanDecision("PASS", directional_probability, None, "probability_conflicts_with_projection")
+    if directional_probability < float(minimum_probability):
+        return BetLeanDecision("PASS", directional_probability, None, "insufficient_model_confidence")
 
     implied = over_implied if direction == "OVER" else under_implied
     if not has_market or implied is None:
-        return BetLeanDecision(direction, directional_probability, None, "model_direction")
+        return BetLeanDecision(direction, directional_probability, None, "model_confidence")
 
     edge = directional_probability - float(implied)
-    if edge <= float(minimum_edge):
-        return BetLeanDecision("PASS", directional_probability, edge, "no_positive_aligned_edge")
+    if edge < float(minimum_edge):
+        return BetLeanDecision("PASS", directional_probability, edge, "insufficient_aligned_edge")
 
-    return BetLeanDecision(direction, directional_probability, edge, "aligned_positive_edge")
+    return BetLeanDecision(direction, directional_probability, edge, "aligned_actionable_edge")
