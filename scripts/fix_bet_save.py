@@ -2,30 +2,87 @@ from pathlib import Path
 
 path = Path("streamlit_app.py")
 text = path.read_text(encoding="utf-8")
+start = text.index("def manual_market_recommendation(")
+end = text.index("\ndef render_calibration_dashboard():", start)
 
-old = '''def _manual_line_options(market_key):
-    if "outs" in str(market_key):
-        return tuple(x + 0.5 for x in range(13, 19))
-    if "hits_allowed" in str(market_key):
-        return tuple(x + 0.5 for x in range(3, 9))
-    return tuple(x + 0.5 for x in range(2, 12))'''
+new = '''def manual_market_recommendation(reco, key_prefix, market_key, proj, hits_proj=None):
+    if not st.session_state.get(f"{key_prefix}:enabled", False):
+        return dict(reco)
+    applied=st.session_state.get(f"{key_prefix}:applied")
+    if not isinstance(applied,dict):
+        return dict(reco)
+    line=float(applied.get("line",reco["line"]))
+    odds=float(applied.get("odds",-110))
+    over_model=float(market_model_probability(proj,market_key,line,hits_proj))
+    implied=implied_prob(odds)
+    decision=aligned_bet_lean(
+        float(reco.get("projection_mean",0.0)),line,over_model,
+        over_implied=implied,under_implied=implied,has_market=True,
+    )
+    updated=dict(reco)
+    updated.update({
+        "side":decision.side,
+        "line":line,
+        "model":decision.model_probability,
+        "edge":decision.edge,
+        "has_market":True,
+        "reason":decision.reason,
+        "manual":True,
+        "manual_odds":odds,
+        "manual_implied":implied,
+        "over_model":over_model,
+    })
+    return updated
 
-new = '''def _manual_line_options(market_key):
-    market=str(market_key)
-    # Important: "strikeouts" contains the substring "outs". Check the
-    # explicit strikeout market first so K props never inherit outs lines.
-    if "strikeouts" in market:
-        return tuple(x + 0.5 for x in range(2, 12))
-    if "pitcher_outs" in market:
-        return tuple(x + 0.5 for x in range(13, 19))
-    if "hits_allowed" in market:
-        return tuple(x + 0.5 for x in range(3, 9))
-    return tuple(x + 0.5 for x in range(2, 12))'''
 
-if new in text:
-    print("Manual market line routing already fixed.")
-elif old in text:
-    path.write_text(text.replace(old, new, 1), encoding="utf-8")
-    print("Manual strikeout lines now use the K range instead of outs lines.")
-else:
-    raise SystemExit("Expected manual line option block was not found; refusing unsafe patch")
+def render_reco(card,reco,*,key_prefix=None,market_key=None,proj=None,hits_proj=None):
+    effective=(manual_market_recommendation(reco,key_prefix,market_key,proj,hits_proj)
+               if key_prefix and market_key and proj is not None else dict(reco))
+    side=effective["side"]
+    cls="reco-warn" if side=="PASS" else "reco-under" if side=="UNDER" else "reco-good"
+    reason_labels={
+        "no_positive_aligned_edge":"EDGE BELOW 2%",
+        "probability_conflicts_with_projection":"PROJECTION / PROBABILITY DISAGREE",
+        "projection_on_line":"PROJECTION ON LINE",
+        "insufficient_model_confidence":"MODEL CONFIDENCE BELOW 58%",
+        "model_direction":"MODEL LEAN",
+        "aligned_positive_edge":"POSITIVE ALIGNED EDGE",
+    }
+    if side=="PASS":
+        manual_price=(f" · {effective['manual_odds']:+.0f}" if effective.get("manual") else "")
+        meta=f"Proj {effective.get('projection_mean',float('nan')):.2f} vs {effective['line']:g}{manual_price} · {reason_labels.get(effective.get('reason'),'NO BET')}"
+    elif effective.get("manual"):
+        edge=f"EDGE {effective['edge']:+.1%}" if effective.get("edge") is not None else "EDGE —"
+        meta=f"Model {effective['model']:.1%} · {effective['manual_odds']:+.0f} · {edge}"
+    else:
+        edge=f"EDGE {effective['edge']:+.1%}" if effective["edge"] is not None else "MODEL LEAN"
+        meta=f"Model {effective['model']:.1%} · {edge}"
+    with card:
+        st.markdown(f'<div class="reco-card"><div class="reco-label">{effective["label"]}</div><div class="reco-side {cls}">{side}</div><div class="reco-line">{effective["line"]:g} LINE</div><div class="reco-meta">{meta}</div></div>',unsafe_allow_html=True)
+        if key_prefix and market_key and proj is not None:
+            with st.expander("✍️ MANUAL LINE / ODDS", expanded=False):
+                enabled=st.checkbox("Use manual market",key=f"{key_prefix}:enabled")
+                lines=_manual_line_options(market_key)
+                applied=st.session_state.get(f"{key_prefix}:applied")
+                applied_line=float(applied.get("line",reco["line"])) if isinstance(applied,dict) else float(reco["line"])
+                default_line=min(lines,key=lambda x:abs(float(x)-applied_line))
+                line=st.selectbox("Line",lines,index=lines.index(default_line),key=f"{key_prefix}:draft_line",disabled=not enabled)
+                odds_options=_american_odds_options()
+                applied_odds=int(applied.get("odds",-110)) if isinstance(applied,dict) else -110
+                default_odds=min(odds_options,key=lambda x:abs(int(x)-applied_odds))
+                odds=st.selectbox("American odds",odds_options,index=odds_options.index(default_odds),key=f"{key_prefix}:draft_odds",disabled=not enabled,format_func=lambda x:f"{int(x):+d}")
+                if st.button("✅ APPLY LINE / ODDS",key=f"{key_prefix}:apply",use_container_width=True,disabled=not enabled):
+                    st.session_state[f"{key_prefix}:applied"]={"line":float(line),"odds":float(odds)}
+                    st.rerun()
+                if isinstance(applied,dict) and enabled:
+                    st.caption(f"Applied market: {float(applied['line']):g} at {float(applied['odds']):+.0f}. The card above is recalculated from this line and price.")
+                    if st.button("↩️ CLEAR MANUAL MARKET",key=f"{key_prefix}:clear",use_container_width=True):
+                        st.session_state.pop(f"{key_prefix}:applied",None)
+                        st.session_state[f"{key_prefix}:enabled"]=False
+                        st.rerun()
+                else:
+                    st.caption("Choose a line and price, then press APPLY. The model will decide OVER, UNDER, or PASS; the controls never force the side.")
+'''
+
+path.write_text(text[:start] + new + text[end:], encoding="utf-8")
+print("Manual market APPLY behavior installed.")
