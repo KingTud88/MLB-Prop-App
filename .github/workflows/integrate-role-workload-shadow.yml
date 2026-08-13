@@ -10,6 +10,9 @@ on:
       - tests/test_role_workload_gate.py
       - .github/workflows/integrate-role-workload-shadow.yml
 
+# Runtime-state commits are produced by GITHUB_TOKEN and therefore do not
+# recursively trigger this workflow. This file change intentionally retriggers
+# the integration from a head that already contains the validated state.
 permissions:
   contents: write
 
