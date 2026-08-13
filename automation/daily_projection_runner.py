@@ -19,6 +19,7 @@ from engine.outs_projection import project_total_outs
 from engine.starter_history import HISTORY_SEMANTICS, TARGET_STARTER_HISTORY, combine_starter_history, starter_only
 from engine.weather_risk import WeatherDelayRisk, fetch_weather_delay_risk
 from engine.workload_context import WORKLOAD_VERSION, WorkloadContext, build_workload_context
+from engine.role_workload_gate import build_role_workload_decision
 from engine.team_leash import build_team_leash_context, candidate_workload_fields
 
 BASE = "https://statsapi.mlb.com/api/v1"
@@ -28,6 +29,7 @@ EASTERN = ZoneInfo("America/New_York")
 ROOT = Path(__file__).resolve().parents[1]
 LOG_PATH = ROOT / "data" / "projection_log.csv"
 OBS_LOG_PATH = ROOT / "data" / "starter_observation_log.csv"
+ROLE_RUNTIME_STATE_PATH = ROOT / "data" / "starter_role_runtime_state.csv"
 OBS_COLUMNS = [
     "game_pk", "game_date", "pitcher_id", "player", "team", "opponent", "venue", "game_time",
     "captured_at_utc", "reason", "history_semantics", "history_games_available_at_capture",
@@ -143,6 +145,14 @@ def load_projection_context_log() -> pd.DataFrame:
         return pd.DataFrame()
     try:
         return pd.read_csv(LOG_PATH)
+    except Exception:
+        return pd.DataFrame()
+
+
+@lru_cache(maxsize=1)
+def load_role_runtime_state() -> pd.DataFrame:
+    try:
+        return pd.read_csv(ROLE_RUNTIME_STATE_PATH) if ROLE_RUNTIME_STATE_PATH.exists() else pd.DataFrame()
     except Exception:
         return pd.DataFrame()
 
@@ -441,6 +451,13 @@ def project(row: dict, matchup_override: dict[str, object] | None = None) -> dic
         record_history_only(row, history_games=0)
         return None
     workload = build_workload_context(log, row.get("game_time") or row.get("game_date"))
+    role_workload = build_role_workload_decision(
+        log,
+        workload,
+        load_role_runtime_state(),
+        game_date=row.get("game_time") or row.get("game_date"),
+        mode="shadow",
+    )
     team_leash = build_team_leash_context(
         load_projection_context_log(), load_observation_log(), str(row.get("team", "UNK")),
         row.get("game_time") or row.get("game_date"),
@@ -494,6 +511,7 @@ def project(row: dict, matchup_override: dict[str, object] | None = None) -> dic
         "starter_history_mlb_games": int(history_provenance["mlb_games"]),
         "starter_history_observation_games": int(history_provenance["observation_games"]),
         **workload.snapshot_fields(),
+        **role_workload.snapshot_fields(),
         **team_leash.snapshot_fields(),
         **team_leash_candidate,
         "workload_preupgrade_projection": np.nan, "workload_preupgrade_hits_projection": np.nan,
