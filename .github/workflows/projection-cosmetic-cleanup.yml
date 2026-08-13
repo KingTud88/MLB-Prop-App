@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
+      - scripts/apply_projection_cosmetics.py
       - .github/workflows/projection-cosmetic-cleanup.yml
 
 permissions:
@@ -11,6 +12,7 @@ permissions:
 
 jobs:
   apply:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,60 +20,21 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
       - run: pip install -r requirements.txt pytest
-      - name: Apply cosmetic cleanup
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          p=Path('streamlit_app.py')
-          s=p.read_text()
-
-          old='.reco-good{color:#49efb0}.reco-neutral{color:#f2f6fa}.reco-warn{color:#ffd166}'
-          new='.reco-good{color:#49efb0}.reco-under{color:#ff4b5f}.reco-neutral{color:#f2f6fa}.reco-warn{color:#ffd166}'
-          if old not in s:
-              raise SystemExit('recommendation color CSS anchor not found')
-          s=s.replace(old,new,1)
-
-          old='cls="reco-warn" if side=="PASS" else "reco-good"'
-          new='cls="reco-warn" if side=="PASS" else "reco-under" if side=="UNDER" else "reco-good"'
-          if old not in s:
-              raise SystemExit('recommendation class anchor not found')
-          s=s.replace(old,new,1)
-
-          old='''    st.divider(); selected_date=st.date_input("Slate date",value=datetime.now(EASTERN).date()); st.markdown("### PITCHER SEARCH")
-    locked_key=st.session_state.get("locked_pitcher"); search=st.text_input("Search pitcher...",placeholder="Search pitcher...",label_visibility="collapsed",disabled=bool(locked_key)); st.caption("Search and select a pitcher to lock the projection 🔒")
-'''
-          new='''    st.divider(); selected_date=st.date_input("Slate date",value=datetime.now(EASTERN).date()); st.markdown("### PITCHER")
-    locked_key=st.session_state.get("locked_pitcher"); st.caption("Select a probable starter, then lock the projection 🔒")
-'''
-          if old not in s:
-              raise SystemExit('pitcher search sidebar anchor not found')
-          s=s.replace(old,new,1)
-
-          old='matches=schedule if locked_game else [g for g in schedule if not search or search.lower() in g.pitcher_name.lower() or search.lower() in g.team.lower()]\nif not matches: st.info("No pitchers match that search."); st.stop()'
-          new='matches=schedule if locked_game is None else [locked_game]\nif not matches: st.info("No probable pitchers are available for this slate."); st.stop()'
-          if old not in s:
-              raise SystemExit('pitcher search filtering anchor not found')
-          s=s.replace(old,new,1)
-
-          p.write_text(s)
-          PY
+      - name: Apply projection cosmetics
+        run: python scripts/apply_projection_cosmetics.py
       - name: Compile projection page
         run: python -m py_compile streamlit_app.py
-      - name: Run projection UI contracts
-        run: pytest -q tests/test_projection_ui_contract.py tests/test_projection_manual_market_controls.py tests/test_odds_api_contract.py
+      - name: Run projection contracts
+        run: pytest -q tests/test_app_contract.py tests/test_odds_credit_saver.py tests/test_batter_hand_and_odds_secret.py tests/test_projection_manual_market_controls.py
       - name: Commit cleanup and retire migration
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm .github/workflows/projection-cosmetic-cleanup.yml
+          git rm .github/workflows/projection-cosmetic-cleanup.yml scripts/apply_projection_cosmetics.py
           git add streamlit_app.py
           git commit -m "Polish projection lean colors and pitcher selector"
-          for attempt in 1 2 3; do
-            git fetch origin main
-            git rebase origin/main
-            if git push origin HEAD:main; then exit 0; fi
-            sleep 2
-          done
-          exit 1
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
