@@ -62,6 +62,22 @@ new_card = '''        weather_raw = play_row.get("Weather Icon", "")
         st.caption(f"Tier Hit Rate: {'—' if tier_hit is None else f'{tier_hit:.1%}'}")'''
 s = s.replace(old_card, new_card, 1)
 
+plain_projection = '''        st.markdown(f"**PROJECTION · {float(play_row['Projection']):.2f}**  |  **MODEL · {float(play_row['Model Probability']):.1%}**")'''
+boxed_projection = '''        st.markdown(
+            f'<div style="border:1px solid #8b4fc7;border-radius:8px;background:rgba(93,48,128,.18);padding:9px 6px;margin:7px 0;text-align:center">'
+            f'<span style="font-size:.72rem;font-weight:800;letter-spacing:.04em">PROJECTION</span><br>'
+            f'<span style="font-size:1.35rem;font-weight:900;color:#fff">{float(play_row["Projection"]):.2f}</span>'
+            f'<span style="display:inline-block;width:1px;height:30px;background:#8b4fc7;margin:0 12px;vertical-align:middle"></span>'
+            f'<span style="font-size:.72rem;font-weight:800;letter-spacing:.04em">MODEL %</span> '
+            f'<span style="font-size:1.35rem;font-weight:900;color:#37e58c">{float(play_row["Model Probability"]):.1%}</span>'
+            f'</div>', unsafe_allow_html=True,
+        )'''
+s = s.replace(plain_projection, boxed_projection, 1)
+
+old_parlay = '''        f"#{int(leg['Rank'])} {leg['Pitcher']} {str(leg.get('Weather Icon', '') or '')} · {leg['Market']} · {leg['Side']} {float(leg['Line']):g} · "'''
+new_parlay = '''        f"#{int(leg['Rank'])} {leg['Pitcher']} {'' if pd.isna(leg.get('Weather Icon')) else str(leg.get('Weather Icon') or '')} · {leg['Market']} · {leg['Side']} {float(leg['Line']):g} · "'''
+s = s.replace(old_parlay, new_parlay, 1)
+
 anchor = 'st.markdown("---")\nst.subheader("🎟️ Parlay Builder")'
 if 'Projections are model estimates at the listed line.' not in s:
     s = s.replace(anchor, 'st.caption("ⓘ Projections are model estimates at the listed line. They are not guaranteed outcomes.")\n\n' + anchor, 1)
