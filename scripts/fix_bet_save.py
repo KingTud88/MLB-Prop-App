@@ -1,88 +1,70 @@
 from pathlib import Path
 
-path = Path("streamlit_app.py")
-text = path.read_text(encoding="utf-8")
-start = text.index("def manual_market_recommendation(")
-end = text.index("\ndef render_calibration_dashboard():", start)
+p = Path("pages/6_Top_Plays.py")
+s = p.read_text(encoding="utf-8")
 
-new = '''def manual_market_recommendation(reco, key_prefix, market_key, proj, hits_proj=None):
-    if not st.session_state.get(f"{key_prefix}:enabled", False):
-        return dict(reco)
-    applied=st.session_state.get(f"{key_prefix}:applied")
-    if not isinstance(applied,dict):
-        return dict(reco)
-    line=float(applied.get("line",reco["line"]))
-    odds=float(applied.get("odds",-110))
-    over_model=float(market_model_probability(proj,market_key,line,hits_proj))
-    implied=implied_prob(odds)
-    decision=aligned_bet_lean(
-        float(reco.get("projection_mean",0.0)),line,over_model,
-        over_implied=implied,under_implied=implied,has_market=True,
+s = s.replace(
+    'view = plays[["Rank", "Pitcher", "Weather Icon", "Market", "Side", "Line", "Projection", "Model Probability", "Status", "Weather Risk", "Data Quality", "Book", "Odds"]].copy()',
+    'view = plays[["Rank", "Pitcher", "Weather Icon", "Market", "Side", "Line", "Projection", "Model Probability", "Weather Risk", "Decision Evidence", "Signal Evidence", "Tier Hit Rate"]].copy()',
+    1,
+)
+s = s.replace(
+    'view["Pitcher"] = view.apply(lambda r: f"{r[\'Pitcher\']} {str(r.get(\'Weather Icon\', \'\') or \'\')}".strip(), axis=1)',
+    'view["Pitcher"] = view.apply(lambda r: f"{r[\'Pitcher\']} {\'\' if pd.isna(r.get(\'Weather Icon\')) else str(r.get(\'Weather Icon\') or \'\')}".strip(), axis=1)',
+    1,
+)
+if 'view["Tier Hit Rate"] = view["Tier Hit Rate"].map' not in s:
+    s = s.replace(
+        'view["Projection"] = view["Projection"].map(lambda x: f"{float(x):.2f}")',
+        'view["Projection"] = view["Projection"].map(lambda x: f"{float(x):.2f}")\nview["Tier Hit Rate"] = view["Tier Hit Rate"].map(lambda x: "—" if x is None or pd.isna(x) else f"{float(x):.1%}")',
+        1,
     )
-    updated=dict(reco)
-    updated.update({
-        "side":decision.side,
-        "line":line,
-        "model":decision.model_probability,
-        "edge":decision.edge,
-        "has_market":True,
-        "reason":decision.reason,
-        "manual":True,
-        "manual_odds":odds,
-        "manual_implied":implied,
-        "over_model":over_model,
-    })
-    return updated
+s = s.replace('view["Book"] = view["Book"].map(lambda x: x if str(x).strip() else "—")\n', '', 1)
+s = s.replace('view["Odds"] = view["Odds"].map(lambda x: "—" if pd.isna(x) else f"{int(float(x)):+d}")\n', '', 1)
 
+old = '''event = st.dataframe(
+    view,
+    hide_index=True,
+    use_container_width=True,
+    key="top_plays_selectable",
+    on_select="rerun",
+    selection_mode="single-row",
+)'''
+new = '''styled_view = view.style.set_properties(
+    subset=["Projection"],
+    **{"background-color":"rgba(93,48,128,.42)","color":"#ffffff","font-weight":"900","border-left":"1px solid #8b4fc7","border-right":"1px solid #8b4fc7"},
+)
+event = st.dataframe(
+    styled_view,
+    hide_index=True,
+    use_container_width=True,
+    key="top_plays_selectable",
+    on_select="rerun",
+    selection_mode="single-row",
+)'''
+s = s.replace(old, new, 1)
 
-def render_reco(card,reco,*,key_prefix=None,market_key=None,proj=None,hits_proj=None):
-    effective=(manual_market_recommendation(reco,key_prefix,market_key,proj,hits_proj)
-               if key_prefix and market_key and proj is not None else dict(reco))
-    side=effective["side"]
-    cls="reco-warn" if side=="PASS" else "reco-under" if side=="UNDER" else "reco-good"
-    reason_labels={
-        "no_positive_aligned_edge":"EDGE BELOW 2%",
-        "probability_conflicts_with_projection":"PROJECTION / PROBABILITY DISAGREE",
-        "projection_on_line":"PROJECTION ON LINE",
-        "insufficient_model_confidence":"MODEL CONFIDENCE BELOW 58%",
-        "model_direction":"MODEL LEAN",
-        "aligned_positive_edge":"POSITIVE ALIGNED EDGE",
-    }
-    if side=="PASS":
-        manual_price=(f" · {effective['manual_odds']:+.0f}" if effective.get("manual") else "")
-        meta=f"Proj {effective.get('projection_mean',float('nan')):.2f} vs {effective['line']:g}{manual_price} · {reason_labels.get(effective.get('reason'),'NO BET')}"
-    elif effective.get("manual"):
-        edge=f"EDGE {effective['edge']:+.1%}" if effective.get("edge") is not None else "EDGE —"
-        meta=f"Model {effective['model']:.1%} · {effective['manual_odds']:+.0f} · {edge}"
-    else:
-        edge=f"EDGE {effective['edge']:+.1%}" if effective["edge"] is not None else "MODEL LEAN"
-        meta=f"Model {effective['model']:.1%} · {edge}"
-    with card:
-        st.markdown(f'<div class="reco-card"><div class="reco-label">{effective["label"]}</div><div class="reco-side {cls}">{side}</div><div class="reco-line">{effective["line"]:g} LINE</div><div class="reco-meta">{meta}</div></div>',unsafe_allow_html=True)
-        if key_prefix and market_key and proj is not None:
-            with st.expander("✍️ MANUAL LINE / ODDS", expanded=False):
-                enabled=st.checkbox("Use manual market",key=f"{key_prefix}:enabled")
-                lines=_manual_line_options(market_key)
-                applied=st.session_state.get(f"{key_prefix}:applied")
-                applied_line=float(applied.get("line",reco["line"])) if isinstance(applied,dict) else float(reco["line"])
-                default_line=min(lines,key=lambda x:abs(float(x)-applied_line))
-                line=st.selectbox("Line",lines,index=lines.index(default_line),key=f"{key_prefix}:draft_line",disabled=not enabled)
-                odds_options=_american_odds_options()
-                applied_odds=int(applied.get("odds",-110)) if isinstance(applied,dict) else -110
-                default_odds=min(odds_options,key=lambda x:abs(int(x)-applied_odds))
-                odds=st.selectbox("American odds",odds_options,index=odds_options.index(default_odds),key=f"{key_prefix}:draft_odds",disabled=not enabled,format_func=lambda x:f"{int(x):+d}")
-                if st.button("✅ APPLY LINE / ODDS",key=f"{key_prefix}:apply",use_container_width=True,disabled=not enabled):
-                    st.session_state[f"{key_prefix}:applied"]={"line":float(line),"odds":float(odds)}
-                    st.rerun()
-                if isinstance(applied,dict) and enabled:
-                    st.caption(f"Applied market: {float(applied['line']):g} at {float(applied['odds']):+.0f}. The card above is recalculated from this line and price.")
-                    if st.button("↩️ CLEAR MANUAL MARKET",key=f"{key_prefix}:clear",use_container_width=True):
-                        st.session_state.pop(f"{key_prefix}:applied",None)
-                        st.session_state[f"{key_prefix}:enabled"]=False
-                        st.rerun()
-                else:
-                    st.caption("Choose a line and price, then press APPLY. The model will decide OVER, UNDER, or PASS; the controls never force the side.")
-'''
+old_card = '''        weather_icon = str(play_row.get("Weather Icon", "") or "")
+        st.markdown(f"### #{rank} · {play_row['Pitcher']} {weather_icon}".strip())
+        st.markdown(f"**{play_row['Market']} · {play_row['Side']} {float(play_row['Line']):g}**")
+        st.markdown(f"Projection **{float(play_row['Projection']):.2f}** · Model **{float(play_row['Model Probability']):.1%}**")
+        st.caption(f"{play_row.get('Status', 'MODEL PLAY')} · {play_row.get('Model Health', 'LEARNING')} health · evidence in View details")'''
+new_card = '''        weather_raw = play_row.get("Weather Icon", "")
+        weather_icon = "" if pd.isna(weather_raw) else str(weather_raw or "")
+        team_raw = play_row.get("Team", "")
+        team = "" if pd.isna(team_raw) else str(team_raw or "")
+        st.markdown(f"### #{rank} · {play_row['Pitcher']} {weather_icon}".strip())
+        if team:
+            st.caption(team)
+        st.markdown(f"**{play_row['Market']} · {play_row['Side']} {float(play_row['Line']):g}**")
+        st.markdown(f"**PROJECTION · {float(play_row['Projection']):.2f}**  |  **MODEL · {float(play_row['Model Probability']):.1%}**")
+        tier_hit = numeric(play_row.get("Tier Hit Rate"))
+        st.caption(f"Tier Hit Rate: {'—' if tier_hit is None else f'{tier_hit:.1%}'}")'''
+s = s.replace(old_card, new_card, 1)
 
-path.write_text(text[:start] + new + text[end:], encoding="utf-8")
-print("Manual market APPLY behavior installed.")
+anchor = 'st.markdown("---")\nst.subheader("🎟️ Parlay Builder")'
+if 'Projections are model estimates at the listed line.' not in s:
+    s = s.replace(anchor, 'st.caption("ⓘ Projections are model estimates at the listed line. They are not guaranteed outcomes.")\n\n' + anchor, 1)
+
+p.write_text(s, encoding="utf-8")
+print("Top Plays approved layout patched.")
