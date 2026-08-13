@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# Validation v2: ticket renderer patch is deterministic and UI-only.
 page = Path("pages/2_Bet_Tracker.py")
 s = page.read_text(encoding="utf-8")
 
