@@ -6,11 +6,16 @@ def test_team_leash_is_context_only_in_live_projection_ui():
     assert "Team leash candidate · CONTEXT ONLY" in source
     assert "These values do not alter Ks, Hits Allowed, Outs, or Top Plays" in source
     build_pos = source.index("workload_ctx=build_workload_context")
+    role_pos = source.index("role_workload_decision=build_role_workload_decision")
     leash_pos = source.index("team_leash_ctx=build_team_leash_context")
     projection_pos = source.index("proj=calculate_projection", leash_pos)
-    assert build_pos < leash_pos < projection_pos
-    # The live projection still receives the unmodified workload context.
-    assert "confirmed_count,workload_ctx" in source[projection_pos:projection_pos + 250]
+    assert build_pos < role_pos < leash_pos < projection_pos
+    # Team leash is diagnostic only. The projection consumes the role gate's
+    # effective workload context, never the team-leash candidate fields.
+    projection_slice = source[projection_pos:projection_pos + 350]
+    assert "confirmed_count,effective_workload_ctx" in projection_slice
+    assert "team_leash_candidate" not in projection_slice
+    assert 'mode=os.getenv("STRIKEOUT_ROLE_WORKLOAD_MODE","shadow")' in source
 
 
 def test_daily_snapshot_logs_candidate_without_using_it_as_expected_bf():
