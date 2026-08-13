@@ -357,9 +357,14 @@ def market_recommendation(proj,odds_rows,market_key,default_line,kind):
     return {"side":decision.side,"line":line,"model":decision.model_probability,"edge":decision.edge,"confidence":confidence,"has_market":bool(rows),"reason":decision.reason,"projection_mean":projection_mean,"over_model":over_model}
 
 def _manual_line_options(market_key):
-    if "outs" in str(market_key):
+    market=str(market_key)
+    # Important: "strikeouts" contains the substring "outs". Check the
+    # explicit strikeout market first so K props never inherit outs lines.
+    if "strikeouts" in market:
+        return tuple(x + 0.5 for x in range(2, 12))
+    if "pitcher_outs" in market:
         return tuple(x + 0.5 for x in range(13, 19))
-    if "hits_allowed" in str(market_key):
+    if "hits_allowed" in market:
         return tuple(x + 0.5 for x in range(3, 9))
     return tuple(x + 0.5 for x in range(2, 12))
 
