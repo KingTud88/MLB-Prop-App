@@ -44,6 +44,8 @@ def test_navigation_does_not_expose_separate_odds_page():
 
 def test_calibration_stays_50_50_until_minimum_sample():
     frame = pd.DataFrame({
+        "game_date": ["2026-08-10"] * 10,
+        "captured_at_utc": ["2026-08-10T14:00:00Z"] * 10,
         "sim_5p": [0.70] * 10,
         "math_5p": [0.55] * 10,
         "actual_strikeouts": [5, 4, 6, 3, 5, 4, 7, 2, 6, 5],
@@ -59,6 +61,8 @@ def test_calibration_stays_50_50_until_minimum_sample():
 
 def test_strikeout_calibration_excludes_mixed_appearance_history():
     frame = pd.DataFrame({
+        "game_date": ["2026-08-10"] * 40,
+        "captured_at_utc": ["2026-08-10T14:00:00Z"] * 40,
         "sim_5p": [0.70] * 40,
         "math_5p": [0.55] * 40,
         "actual_strikeouts": [5] * 40,
@@ -76,6 +80,8 @@ def test_milestone_report_covers_3_plus_through_10_plus():
     rows = []
     for actual in range(2, 12):
         row = {
+            "game_date": "2026-08-10",
+            "captured_at_utc": "2026-08-10T14:00:00Z",
             "actual_strikeouts": actual,
             "probability_semantics": PROBABILITY_SEMANTICS,
             "history_semantics": HISTORY_SEMANTICS,
