@@ -133,6 +133,33 @@ def _date_pitching_stats(pitcher_id: int, game_date: str) -> dict | None:
         return None
 
 
+# BET_TRACKER_LIVE_BOXSCORE_V1
+def _live_pitching_stats(game_pk: int | None, pitcher_id: int | None) -> dict | None:
+    """Return the pitcher's current game pitching line from MLB's live boxscore."""
+    if not game_pk or not pitcher_id:
+        return None
+    try:
+        r = requests.get(
+            f"{MLB_LIVE_API}/game/{int(game_pk)}/feed/live",
+            params=_fresh_params(),
+            headers=MLB_HEADERS,
+            timeout=10,
+        )
+        if not r.ok:
+            return None
+        teams = (((r.json().get("liveData", {}) or {}).get("boxscore", {}) or {}).get("teams", {}) or {})
+        player_key = f"ID{int(pitcher_id)}"
+        for side in ("away", "home"):
+            players = ((teams.get(side, {}) or {}).get("players", {}) or {})
+            player = players.get(player_key) or {}
+            pitching = ((player.get("stats", {}) or {}).get("pitching", {}) or {})
+            if pitching:
+                return pitching
+        return None
+    except Exception:
+        return None
+
+
 def _live_status(game_pk: int | None, fallback: str) -> tuple[str, bool]:
     if not game_pk:
         final = str(fallback).lower() in {"final", "game over"}
@@ -168,7 +195,12 @@ def live_pitcher_prop(
     status, final = _live_status(found_game_pk, schedule_status)
     if not resolved_id:
         return None, "Pitcher could not be resolved", final
-    stat = _date_pitching_stats(resolved_id, game_date)
+    # MLB's date-range stats endpoint can lag during live games. Read the
+    # current boxscore first so in-progress K / H / outs update promptly, then
+    # fall back to the date-range endpoint for final or transient cases.
+    stat = _live_pitching_stats(found_game_pk, resolved_id)
+    if not stat:
+        stat = _date_pitching_stats(resolved_id, game_date)
     if not stat:
         return None, f"No pitching stats posted yet · {status}", final
 
