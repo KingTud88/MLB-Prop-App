@@ -1,0 +1,48 @@
+name: Starter Role Segment Validation
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - engine/starter_role.py
+      - training/starter_role_backtest.py
+      - tests/test_starter_role.py
+      - .github/workflows/starter-role-validation.yml
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt pytest
+      - name: Starter role leakage and classification tests
+        run: pytest -q tests/test_starter_role.py tests/test_workload_context.py tests/test_starter_history.py
+      - name: Chronological role segment report
+        run: python -m training.starter_role_backtest --seasons 2024 2025 2026
+      - name: Commit role report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/starter_role_segments.csv
+          if git diff --cached --quiet; then
+            echo "No starter role report changes"
+            exit 0
+          fi
+          git commit -m "Refresh starter role segment validation"
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git rebase origin/main
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
