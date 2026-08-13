@@ -6,6 +6,8 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+from engine.ui_theme import apply_page_theme
+
 from automation.resolve_projection_log import main as resolve_projection_log
 from engine.calibration import milestone_calibration_report
 from engine.hits_calibration import hits_calibration_report
@@ -28,6 +30,7 @@ OBS_LOG_PATH = ROOT / "data" / "starter_observation_log.csv"
 ROLLING_WINDOW = 20
 
 st.set_page_config(page_title="Projection History", page_icon="📚", layout="wide")
+apply_page_theme()
 st.markdown(
     """
     <style>

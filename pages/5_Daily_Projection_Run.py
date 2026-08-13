@@ -7,6 +7,8 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+from engine.ui_theme import apply_page_theme
+
 from automation.daily_projection_runner import (
     LOG_PATH,
     PROBABILITY_SEMANTICS,
@@ -27,6 +29,7 @@ from engine.outs_calibration import calibrate_outs_blend
 from navigation import render_sidebar
 
 st.set_page_config(page_title="Daily Projection Run", page_icon="📊", layout="wide")
+apply_page_theme()
 render_sidebar("daily")
 st.markdown(
     """

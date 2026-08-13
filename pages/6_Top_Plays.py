@@ -11,6 +11,8 @@ import pandas as pd
 import requests
 import streamlit as st
 
+from engine.ui_theme import apply_page_theme
+
 from automation.daily_projection_runner import LOG_PATH, game_log
 from engine.calibration import calibrate_blend
 from engine.hits_calibration import calibrate_hits_blend, hits_calibration_report
@@ -29,6 +31,7 @@ from navigation import render_sidebar
 from training.bet_storage import append_bet
 
 st.set_page_config(page_title="Top Plays", page_icon="👑", layout="wide")
+apply_page_theme()
 render_sidebar("top")
 st.markdown("<style>.block-container{padding-top:3.25rem!important}</style>", unsafe_allow_html=True)
 st.title("👑 Top Plays")

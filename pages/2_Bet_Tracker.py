@@ -9,6 +9,8 @@ import pandas as pd
 import requests
 import streamlit as st
 
+from engine.ui_theme import apply_page_theme
+
 from automation.daily_projection_runner import LOG_PATH as PROJECTION_LOG, schedule as daily_schedule
 from engine.bet_tracker import (
     MARKETS,
@@ -32,6 +34,7 @@ BET_LOG = ROOT / "data" / "bet_log.csv"
 EASTERN = ZoneInfo("America/New_York")
 
 st.set_page_config(page_title="Bet Tracker", page_icon="📊", layout="wide")
+apply_page_theme()
 render_sidebar("bets")
 st.markdown("<style>.block-container{padding-top:3.25rem!important}</style>", unsafe_allow_html=True)
 st.title("📊 Bet Tracker")
