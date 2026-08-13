@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import requests
+from training.daily_role_shadow import attach_daily_role_shadow, load_runtime_state
 
 APP_VERSION = "2.0.2"
 MLB_API = "https://statsapi.mlb.com/api/v1"
@@ -65,13 +66,14 @@ def project(game:dict[str,Any],log:pd.DataFrame,opponent_k_pct:float=22.4,pitch_
     return {"game_pk":game["game_pk"],"game_date":game["game_time"][:10],"pitcher_id":game["pitcher_id"],"player":game["player"],"team":game["team"],"opponent":game["opponent"],"venue":game["venue"],"game_time":game["game_time"],"app_version":APP_VERSION,"projection":mean,"k_sd":math.sqrt(variance),"k_range_low":int(np.quantile(samples,.10)),"k_range_high":int(np.quantile(samples,.90)),"confidence":confidence,"data_quality":quality,"simulation_draws":simulations,"opponent_k_pct":opponent_k_pct,"pitch_limit":pitch_limit,"umpire_k_factor":umpire_k_factor,"weather_factor":weather_factor,"rest_factor":rest_factor,"actual_strikeouts":"","resolved_at_utc":"","status":game["status"]}
 
 def run_daily_projections(day:str,**kwargs)->tuple[list[dict[str,Any]],list[str],int]:
-    games=get_schedule(day); records=[]; errors=[]; skipped=0; season=date.fromisoformat(day).year
+    games=get_schedule(day); records=[]; errors=[]; skipped=0; season=date.fromisoformat(day).year; role_history=load_runtime_state()
     for game in games:
         if not any(x in game["status"].lower() for x in ("scheduled","pre-game","warmup")): skipped+=1; continue
         try:
             log=game_log(game["pitcher_id"],season)
             if log.empty: log=game_log(game["pitcher_id"],season-1)
             if log.empty: errors.append(f"{game['player']}: no game history"); continue
-            records.append(project(game,log,**kwargs))
+            record=project(game,log,**kwargs)
+            records.append(attach_daily_role_shadow(record,log,game["game_time"],role_history))
         except (requests.RequestException,ValueError,TypeError) as exc: errors.append(f"{game['player']}: {exc}")
     return records,errors,skipped
