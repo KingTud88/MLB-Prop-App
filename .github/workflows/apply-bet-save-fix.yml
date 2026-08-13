@@ -1,9 +1,13 @@
-name: Clean Top Plays Readability
+name: Apply Top Plays Layout
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
+    paths:
+      - scripts/fix_bet_save.py
+      - .github/workflows/apply-bet-save-fix.yml
 
 permissions:
   contents: write
@@ -14,41 +18,27 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Reorder Top Plays board
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          p = Path("pages/6_Top_Plays.py")
-          s = p.read_text(encoding="utf-8")
-          old = 'view = plays[["Rank", "Status", "Model Health", "Decision Evidence", "Decision Sample", "Signal Evidence", "Signal Sample", "Tier Hit Rate", "Pitcher", "Weather Icon", "Weather Risk", "Market", "Side", "Line", "Projection", "Model Probability", "Data Quality", "Starter History", "Book", "Odds"]].copy()'
-          new = 'view = plays[["Rank", "Pitcher", "Weather Icon", "Market", "Side", "Line", "Projection", "Model Probability", "Status", "Weather Risk", "Data Quality", "Book", "Odds"]].copy()'
-          if old in s:
-              s = s.replace(old, new, 1)
-          s = s.replace('view["Tier Hit Rate"] = view["Tier Hit Rate"].map(lambda x: "—" if x is None or pd.isna(x) else f"{float(x):.1%}")\n', '', 1)
-          old1 = '        st.caption(f"#{rank} {play_row[\'Pitcher\']} {weather_icon} · {play_row[\'Side\']} {float(play_row[\'Line\']):g}".replace("  ·", " ·"))\n'
-          old2 = '        st.caption(f"Decision evidence: {play_row.get(\'Decision Evidence\', \'LEARNING\')} · n={int(play_row.get(\'Decision Sample\', 0) or 0)}")\n'
-          old3 = '        st.caption(f"Signal evidence: {play_row.get(\'Signal Evidence\', \'LEARNING\')} · {play_row.get(\'Signal Detail\', \'No mature paired signal evidence yet.\')}")\n'
-          new_cards = '        st.markdown(f"### #{rank} · {play_row[\'Pitcher\']} {weather_icon}".strip())\n        st.markdown(f"**{play_row[\'Market\']} · {play_row[\'Side\']} {float(play_row[\'Line\']):g}**")\n        st.markdown(f"Projection **{float(play_row[\'Projection\']):.2f}** · Model **{float(play_row[\'Model Probability\']):.1%}**")\n        st.caption(f"{play_row.get(\'Status\', \'MODEL PLAY\')} · {play_row.get(\'Model Health\', \'LEARNING\')} health · evidence in View details")\n'
-          if old1 in s and old2 in s and old3 in s:
-              s = s.replace(old1 + old2 + old3, new_cards, 1)
-          p.write_text(s, encoding="utf-8")
-          PY
-
+        with:
+          fetch-depth: 0
+      - name: Apply approved Top Plays layout
+        run: python scripts/fix_bet_save.py
       - name: Validate
         run: |
           python -m compileall -q pages/6_Top_Plays.py
-          grep -q 'view = plays\[\["Rank", "Pitcher"' pages/6_Top_Plays.py
-          grep -q 'Projection \*\*' pages/6_Top_Plays.py
-
+          grep -q 'styled_view = view.style.set_properties' pages/6_Top_Plays.py
+          grep -q 'Decision Evidence' pages/6_Top_Plays.py
+          grep -q 'Tier Hit Rate' pages/6_Top_Plays.py
+          grep -q 'pd.isna(weather_raw)' pages/6_Top_Plays.py
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add pages/6_Top_Plays.py
           if git diff --cached --quiet; then
-            echo "No changes needed."
-          else
-            git commit -m "Clean up Top Plays readability"
-            git push
+            echo "No Top Plays UI changes needed."
+            exit 0
           fi
+          git commit -m "Match Top Plays approved layout"
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
