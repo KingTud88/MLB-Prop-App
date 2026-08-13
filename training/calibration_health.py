@@ -8,9 +8,13 @@ import pandas as pd
 
 from training.calibration_lineage import eligible_rows
 
-REPORT_VERSION = "calibration-health-v2"
+REPORT_VERSION = "calibration-health-v2.1"
 MILESTONES = tuple(range(3, 11))
 PATHS = ("SIM", "MATH")
+# Mirrors engine.calibration.calibrate_blend's established default minimum.
+# This report remains descriptive; crossing the threshold only means a weight
+# fit is permitted to run, not that a new weight is automatically promoted.
+MIN_WEIGHT_OBSERVATIONS = 30
 
 
 def _probability_column(path: str, milestone: int) -> str:
@@ -24,9 +28,9 @@ def build_report(frame: pd.DataFrame) -> pd.DataFrame:
     eligible = eligible_rows(frame)
     columns = [
         "Path", "Milestone", "Equivalent_Over_Line", "Source_Column",
-        "Resolved_Starts", "Brier_Score", "Mean_Predicted_Probability",
-        "Empirical_Hit_Rate", "Calibration_Gap", "Absolute_Calibration_Gap",
-        "Report_Version",
+        "Resolved_Starts", "Weight_Learning_Status", "Starts_To_Minimum",
+        "Brier_Score", "Mean_Predicted_Probability", "Empirical_Hit_Rate",
+        "Calibration_Gap", "Absolute_Calibration_Gap", "Report_Version",
     ]
     if eligible.empty:
         return pd.DataFrame(columns=columns)
@@ -45,6 +49,7 @@ def build_report(frame: pd.DataFrame) -> pd.DataFrame:
                 continue
             p = probability[ready].astype(float).clip(0.0, 1.0)
             y = outcome[ready].astype(float)
+            n = int(ready.sum())
             mean_p = float(p.mean())
             empirical = float(y.mean())
             gap = float(mean_p - empirical)
@@ -53,7 +58,9 @@ def build_report(frame: pd.DataFrame) -> pd.DataFrame:
                 "Milestone": int(milestone),
                 "Equivalent_Over_Line": float(milestone) - 0.5,
                 "Source_Column": column,
-                "Resolved_Starts": int(ready.sum()),
+                "Resolved_Starts": n,
+                "Weight_Learning_Status": "ELIGIBLE_TO_FIT" if n >= MIN_WEIGHT_OBSERVATIONS else "WAITING",
+                "Starts_To_Minimum": max(0, MIN_WEIGHT_OBSERVATIONS - n),
                 "Brier_Score": float(np.mean(np.square(p.to_numpy() - y.to_numpy()))),
                 "Mean_Predicted_Probability": mean_p,
                 "Empirical_Hit_Rate": empirical,
