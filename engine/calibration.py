@@ -1,14 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
+
 import numpy as np
 import pandas as pd
 
 from engine.starter_history import HISTORY_SEMANTICS
 
-CALIBRATION_VERSION = "1.4"
+CALIBRATION_VERSION = "1.5"
 PROBABILITY_SEMANTICS = "milestone-ceil-v1"
-__all__ = ["CalibrationResult", "calibrate_blend", "milestone_calibration_report", "calibration_summary"]
+CALIBRATION_MODE_ENV = "STRIKEOUT_CALIBRATION_MODE"
+__all__ = [
+    "CalibrationResult", "fit_blend_candidate", "calibrate_blend",
+    "milestone_calibration_report", "calibration_summary",
+]
 
 
 @dataclass(frozen=True)
@@ -26,13 +32,7 @@ def _brier(y: np.ndarray, p: np.ndarray) -> float:
 
 
 def _eligible_probability_rows(frame: pd.DataFrame) -> pd.DataFrame:
-    """Use only resolved-compatible rows with explicit modern pregame lineage.
-
-    Keep this production learner aligned with the calibration-lineage audit: a
-    row must explicitly carry current probability/history semantics plus valid
-    game/capture dates. A capture on or after the next UTC day is conservatively
-    rejected when exact first-pitch lineage is unavailable.
-    """
+    """Use only resolved-compatible rows with explicit modern pregame lineage."""
     required = {"game_date", "captured_at_utc", "probability_semantics", "history_semantics"}
     if frame.empty or not required.issubset(frame.columns):
         return frame.iloc[0:0].copy()
@@ -48,13 +48,18 @@ def _eligible_probability_rows(frame: pd.DataFrame) -> pd.DataFrame:
     return frame.loc[mask].copy()
 
 
-def calibrate_blend(
+def fit_blend_candidate(
     frame: pd.DataFrame,
     line: int,
     min_observations: int = 30,
     grid_step: float = 0.02,
 ) -> CalibrationResult:
-    """Choose the simulation/math blend from compatible resolved pregame projections only."""
+    """Fit a research candidate from compatible resolved pregame projections.
+
+    This function has no production authority. It may report a fitted candidate
+    once the minimum sample is reached, but callers must use calibrate_blend()
+    for the production-safe effective weights.
+    """
     sim_col = f"sim_{line}p"
     math_col = f"math_{line}p"
     actual_col = "actual_strikeouts"
@@ -80,7 +85,37 @@ def calibrate_blend(
     shrink = min(1.0, (len(y) - min_observations) / max(min_observations * 3.0, 1.0))
     final_w = 0.50 + shrink * (raw_w - 0.50)
     final_score = _brier(y, final_w * sim + (1.0 - final_w) * math)
-    return CalibrationResult(final_w, 1.0 - final_w, len(y), final_score, True, "Weight learned from compatible starter-only resolved historical projections.")
+    return CalibrationResult(final_w, 1.0 - final_w, len(y), final_score, True, "Research candidate fitted from compatible starter-only resolved historical projections.")
+
+
+def calibrate_blend(
+    frame: pd.DataFrame,
+    line: int,
+    min_observations: int = 30,
+    grid_step: float = 0.02,
+    mode: str | None = None,
+) -> CalibrationResult:
+    """Return production-effective weights behind an explicit authority gate.
+
+    Reaching the fitting minimum is research readiness, not deployment
+    permission. Default mode is shadow, which preserves the 50/50 production
+    baseline even when a research candidate can be fitted. Only mode='active'
+    (or STRIKEOUT_CALIBRATION_MODE=active) may return learned weights.
+    """
+    candidate = fit_blend_candidate(frame, line, min_observations=min_observations, grid_step=grid_step)
+    if not candidate.calibrated:
+        return candidate
+
+    normalized_mode = str(mode if mode is not None else os.getenv(CALIBRATION_MODE_ENV, "shadow")).strip().lower()
+    if normalized_mode != "active":
+        return CalibrationResult(
+            0.50, 0.50, candidate.observations, candidate.brier_score, False,
+            "Research-ready calibration candidate is shadow-only; production remains 50/50 until explicit promotion.",
+        )
+    return CalibrationResult(
+        candidate.weight_simulation, candidate.weight_math, candidate.observations,
+        candidate.brier_score, True, "Active calibration candidate explicitly authorized for production.",
+    )
 
 
 def milestone_calibration_report(
@@ -88,7 +123,7 @@ def milestone_calibration_report(
     lines: range = range(3, 11),
     min_observations: int = 30,
 ) -> pd.DataFrame:
-    """Return one auditable calibration row per strikeout milestone."""
+    """Return one auditable production-effective calibration row per strikeout milestone."""
     columns = [
         "Line", "Observations", "Status", "Simulation Brier", "Math Brier",
         "Calibrated Brier", "Simulation Weight", "Math Weight", "Actual Hit Rate",
@@ -122,11 +157,17 @@ def milestone_calibration_report(
             sim_w = 0.50
         else:
             cal = calibrate_blend(frame, line, min_observations=min_observations)
+            candidate = fit_blend_candidate(frame, line, min_observations=min_observations)
             sim_brier = _brier(y, sim)
             math_brier = _brier(y, math)
             cal_brier = _brier(y, cal.weight_simulation * sim + cal.weight_math * math)
             sim_w = cal.weight_simulation
-            status = "Calibrated" if cal.calibrated else "50/50 baseline"
+            if cal.calibrated:
+                status = "Active calibrated"
+            elif candidate.calibrated:
+                status = "Research-ready / shadow"
+            else:
+                status = "50/50 baseline"
 
         rows.append({
             "Line": f"{line}+",
@@ -147,9 +188,8 @@ def calibration_summary(frame: pd.DataFrame) -> pd.DataFrame:
     frame = _eligible_probability_rows(frame)
     if frame.empty or "actual_strikeouts" not in frame.columns:
         return pd.DataFrame(columns=["Metric", "Value"])
-    data = frame.copy()
-    actual = pd.to_numeric(data["actual_strikeouts"], errors="coerce")
-    projected = pd.to_numeric(data.get("projection"), errors="coerce")
+    actual = pd.to_numeric(frame["actual_strikeouts"], errors="coerce")
+    projected = pd.to_numeric(frame.get("projection"), errors="coerce")
     mask = actual.notna() & projected.notna()
     if not mask.any():
         return pd.DataFrame([
