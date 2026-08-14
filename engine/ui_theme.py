@@ -4,7 +4,7 @@ import streamlit as st
 
 # Shared presentation layer only. This module must never own modeling logic,
 # sportsbook calls, projection inputs, or grading semantics.
-APP_UI_VERSION = "ui-cleveland-future-v2"
+APP_UI_VERSION = "ui-cleveland-future-v3"
 
 
 def apply_page_theme() -> None:
@@ -37,7 +37,8 @@ def apply_page_theme() -> None:
             background:
                 radial-gradient(circle at 82% -8%, rgba(227,25,55,.12), transparent 30rem),
                 radial-gradient(circle at 8% 18%, rgba(57,126,197,.09), transparent 28rem),
-                linear-gradient(180deg, #071428 0%, var(--sk-bg) 38%, #040a14 100%);
+                linear-gradient(180deg, #071428 0%, var(--sk-bg) 38%, #040a14 100%) !important;
+            color: var(--sk-text) !important;
         }
         .stApp::before {
             content: "";
@@ -85,8 +86,30 @@ def apply_page_theme() -> None:
             font-size: .91rem !important;
             line-height: 1.5 !important;
         }
-        [data-testid="stMarkdownContainer"] p {
-            line-height: 1.58;
+        [data-testid="stMarkdownContainer"] p { line-height: 1.58; }
+
+        [data-testid="stSidebar"] {
+            background: linear-gradient(180deg, rgba(7,20,38,.99), rgba(4,12,24,.99)) !important;
+            border-right: 1px solid rgba(62,95,130,.48) !important;
+            box-shadow: 12px 0 42px rgba(0,0,0,.14);
+        }
+        [data-testid="stSidebar"] [data-testid="stRadio"] > div {
+            gap: .28rem !important;
+        }
+        [data-testid="stSidebar"] [data-testid="stRadio"] label {
+            border: 1px solid transparent;
+            border-radius: 10px;
+            padding: .42rem .55rem !important;
+            transition: background .14s ease, border-color .14s ease;
+        }
+        [data-testid="stSidebar"] [data-testid="stRadio"] label:hover {
+            background: rgba(227,25,55,.07);
+            border-color: rgba(227,25,55,.22);
+        }
+        [data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) {
+            background: linear-gradient(90deg, rgba(227,25,55,.22), rgba(19,43,71,.72));
+            border-color: rgba(255,54,85,.44);
+            box-shadow: inset 3px 0 0 var(--sk-red-bright);
         }
 
         [data-testid="stMetric"] {
@@ -102,9 +125,7 @@ def apply_page_theme() -> None:
         [data-testid="stMetric"]::before {
             content: "";
             position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
+            left: 0; top: 0; bottom: 0;
             width: 3px;
             background: linear-gradient(180deg, var(--sk-red-bright), rgba(227,25,55,.12));
         }
@@ -205,17 +226,14 @@ def apply_page_theme() -> None:
             border-width: 1px !important;
             box-shadow: 0 8px 22px rgba(0,0,0,.12);
         }
-        [data-testid="stProgress"] > div > div > div {
-            border-radius: 999px !important;
-        }
+        [data-testid="stProgress"] > div > div > div { border-radius: 999px !important; }
 
         hr {
             border-color: rgba(49,82,116,.58) !important;
             margin: 1.5rem 0 !important;
         }
 
-        .sok-callout,
-        .sk-panel {
+        .sok-callout, .sk-panel {
             background: linear-gradient(145deg, rgba(13,35,65,.93), rgba(7,22,42,.91));
             border: 1px solid var(--sk-border);
             border-radius: 16px;
@@ -251,6 +269,148 @@ def apply_page_theme() -> None:
             color: #fff;
             background: rgba(227,25,55,.10);
         }
+
+        /* Legacy Main Projection components are normalized here so the page
+           follows the same hierarchy without altering projection behavior. */
+        .king-title {
+            font-size: clamp(2.6rem, 6vw, 4.4rem) !important;
+            font-weight: 950 !important;
+            line-height: .88 !important;
+            letter-spacing: -.055em !important;
+            text-align: left !important;
+            margin: .35rem 0 .15rem !important;
+            text-shadow: 0 0 34px rgba(227,25,55,.16) !important;
+        }
+        .king-red { color: var(--sk-red-bright) !important; }
+        .subline {
+            text-align: left !important;
+            color: #aebfd2 !important;
+            border: 0 !important;
+            border-left: 3px solid var(--sk-red-bright) !important;
+            padding: .3rem 0 .3rem .72rem !important;
+            margin-bottom: 1rem !important;
+            font-size: .74rem !important;
+            font-weight: 850 !important;
+            letter-spacing: .105em !important;
+        }
+        .pitcher-card {
+            position: relative;
+            background: linear-gradient(120deg, rgba(16,42,76,.96), rgba(7,22,42,.94)) !important;
+            border: 1px solid rgba(76,112,151,.55) !important;
+            border-radius: 18px !important;
+            padding: 1rem 1.18rem !important;
+            margin: .6rem 0 1rem !important;
+            box-shadow: 0 16px 42px rgba(0,0,0,.20), inset 0 1px 0 rgba(255,255,255,.025) !important;
+            overflow: hidden;
+        }
+        .pitcher-card::after {
+            content: "";
+            position: absolute;
+            right: -36px;
+            top: -36px;
+            width: 130px;
+            height: 130px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(227,25,55,.14), transparent 68%);
+            pointer-events: none;
+        }
+        .pitcher-card h2 {
+            margin: 0 0 .15rem !important;
+            font-size: clamp(1.55rem, 3vw, 2.1rem) !important;
+        }
+        .section-head {
+            background: transparent !important;
+            border: 0 !important;
+            border-bottom: 1px solid rgba(70,105,142,.52) !important;
+            border-radius: 0 !important;
+            padding: .55rem 0 .5rem !important;
+            margin: 1.15rem 0 .75rem !important;
+            text-align: left !important;
+            font-size: .76rem !important;
+            font-weight: 950 !important;
+            letter-spacing: .115em !important;
+            color: #dbe7f3 !important;
+            position: relative;
+        }
+        .section-head::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            bottom: -1px;
+            width: 74px;
+            height: 2px;
+            background: linear-gradient(90deg, var(--sk-red-bright), rgba(227,25,55,0));
+            box-shadow: 0 0 13px rgba(227,25,55,.3);
+        }
+        .metric-card, .reco-card, .panel {
+            background: linear-gradient(145deg, rgba(13,35,65,.95), rgba(7,21,40,.94)) !important;
+            border: 1px solid rgba(73,108,145,.54) !important;
+            border-radius: 16px !important;
+            box-shadow: 0 12px 32px rgba(0,0,0,.17), inset 0 1px 0 rgba(255,255,255,.025) !important;
+        }
+        .metric-card {
+            padding: 1rem !important;
+            min-height: 138px !important;
+            text-align: left !important;
+            border-top-color: rgba(227,25,55,.48) !important;
+        }
+        .metric-label, .reco-label {
+            color: #aebfd2 !important;
+            font-size: .73rem !important;
+            font-weight: 900 !important;
+            letter-spacing: .095em !important;
+            text-transform: uppercase !important;
+        }
+        .metric-value {
+            font-size: clamp(2.35rem, 5vw, 3.25rem) !important;
+            font-weight: 950 !important;
+            line-height: 1 !important;
+            margin: .3rem 0 .55rem !important;
+            letter-spacing: -.05em !important;
+        }
+        .reco-card {
+            padding: 1rem !important;
+            min-height: 138px !important;
+            text-align: left !important;
+        }
+        .reco-side {
+            font-size: clamp(1.65rem, 3.8vw, 2.3rem) !important;
+            font-weight: 950 !important;
+            margin-top: .35rem !important;
+            line-height: 1 !important;
+            letter-spacing: -.035em !important;
+        }
+        .reco-line { font-size: .94rem !important; margin-top: .42rem !important; }
+        .reco-meta { color: #9fb3c7 !important; font-size: .76rem !important; margin-top: .35rem !important; }
+        .reco-good { color: var(--sk-green) !important; }
+        .reco-under { color: #ff5870 !important; }
+        .reco-warn { color: var(--sk-yellow) !important; }
+        .badge, .alt-k-badge {
+            display: inline-flex !important;
+            align-items: center !important;
+            width: auto !important;
+            max-width: 100% !important;
+            border-radius: 999px !important;
+            padding: .28rem .55rem !important;
+            font-size: .68rem !important;
+            font-weight: 900 !important;
+            letter-spacing: .035em !important;
+        }
+        .badge {
+            background: rgba(36,230,155,.075) !important;
+            border: 1px solid rgba(36,230,155,.28) !important;
+            color: #74efbd !important;
+        }
+        .alt-k-badge {
+            margin: .45rem .25rem 0 0 !important;
+            background: rgba(111,183,255,.075) !important;
+            border: 1px solid rgba(111,183,255,.25) !important;
+            color: #cce6ff !important;
+        }
+        .search-note { color: var(--sk-muted) !important; font-size: .79rem !important; }
+        .market-ok { color: var(--sk-green) !important; font-weight: 850 !important; }
+        .market-empty { color: var(--sk-muted) !important; }
+
         .sok-projection { color: var(--sk-green) !important; font-weight: 950 !important; }
         .sok-actual { color: var(--sk-yellow) !important; font-weight: 950 !important; }
         .sok-muted { color: var(--sk-muted) !important; }
@@ -273,6 +433,8 @@ def apply_page_theme() -> None:
             [data-testid="stMetric"] { min-height: 94px !important; }
             h1 { font-size: 2.05rem !important; }
             h2 { font-size: 1.45rem !important; }
+            .king-title { font-size: 2.8rem !important; }
+            .metric-card, .reco-card { min-height: 118px !important; }
         }
         </style>
         """,
