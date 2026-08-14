@@ -9,6 +9,7 @@ on:
       - engine/umpire_context.py
       - automation/umpire_context_capture.py
       - tests/test_umpire_context.py
+      - .github/workflows/daily-projection-resolver.yml
       - .github/workflows/umpire-context-validation.yml
 
 permissions:
