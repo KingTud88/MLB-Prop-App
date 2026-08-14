@@ -1,0 +1,5 @@
+Environment_Group,Bucket,Resolved_K_Starts,MAE,Bias,Status,Audit_Version
+WEATHER,CONTEXT_PRESENT,48,1.9366204811375691,0.4060928356793134,POWERED,environment-effect-v1-report-only
+WEATHER,CONTEXT_ABSENT,75,1.7765860140874092,0.34768323567479337,POWERED,environment-effect-v1-report-only
+UMPIRE,NO_VARIATION,123,,,NO_VARIATION,environment-effect-v1-report-only
+PARK,NO_POWERED_VENUES,123,,,LEARNING,environment-effect-v1-report-only
