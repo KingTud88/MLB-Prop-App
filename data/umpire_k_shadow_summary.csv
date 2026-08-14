@@ -1,0 +1,2 @@
+Metric,Eligible_Starts,Base_MAE,UmpireCandidate_MAE,Relative_MAE_Improvement,Candidate_Win_Share,Candidate_Loss_Share,Base_Bias,UmpireCandidate_Bias,Mean_Absolute_Factor_Delta,Status,Reason,Production_Authority,Historical_Umpire_Availability,Validation_Version
+STRIKEOUTS,86,1.8241108154182764,1.8387445669878193,-0.008022402721288268,0.5116279069767442,0.4883720930232558,0.3205100952705707,0.29238605353239877,0.027023949468197524,MIXED,guardrail,NONE,NOT_PROVEN,umpire-k-shadow-v1-report-only
