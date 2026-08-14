@@ -1,0 +1,37 @@
+name: Projection Resolution Completeness
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - resolution-completeness-audit
+    paths:
+      - training/resolution_completeness.py
+      - .github/workflows/resolution-completeness.yml
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt pytest
+      - name: Full quality suite
+        run: pytest -q
+      - name: Audit projection resolution completeness
+        run: python -m training.resolution_completeness
+      - name: Commit audit evidence
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/resolution_completeness_detail.csv data/resolution_completeness_summary.csv
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Refresh projection resolution completeness"
+          git push origin HEAD:resolution-completeness-audit
