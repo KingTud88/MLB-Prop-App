@@ -1,0 +1,37 @@
+name: Live Role Capture Diagnostic
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - live-role-capture-diagnostic
+    paths:
+      - training/live_role_capture_diagnostic.py
+      - .github/workflows/live-role-capture-diagnostic.yml
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt pytest
+      - name: Quality suite
+        run: pytest -q
+      - name: Diagnose persisted live role shadow rows
+        run: python -m training.live_role_capture_diagnostic
+      - name: Commit diagnostic evidence
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/live_role_capture_diagnostic.csv
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Refresh live role capture diagnostic"
+          git push origin HEAD:live-role-capture-diagnostic
