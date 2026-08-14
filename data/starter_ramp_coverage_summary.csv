@@ -1,0 +1,7 @@
+Signal,Columns_Found,Resolved_K_Starts,Resolved_K_Starts_With_Signal,Resolved_Coverage,Status,Audit_Version
+DAYS_REST,days_since_last_start,123,46,0.37398373983739835,AUDITABLE,starter-ramp-coverage-v1-report-only
+PRIOR_START_PITCHES,,123,0,0.0,COLLECTING,starter-ramp-coverage-v1-report-only
+RECENT_PITCH_CEILING,,123,0,0.0,COLLECTING,starter-ramp-coverage-v1-report-only
+RECENT_STARTS,,123,0,0.0,COLLECTING,starter-ramp-coverage-v1-report-only
+OPENER_FLAG,,123,0,0.0,COLLECTING,starter-ramp-coverage-v1-report-only
+RESTRICTION_FLAG,,123,0,0.0,COLLECTING,starter-ramp-coverage-v1-report-only
