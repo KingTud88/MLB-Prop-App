@@ -5,8 +5,8 @@ game_date,game_pk,pitcher_id,player,team,opponent,game_time,schedule_status,capt
 2026-08-14,824479,695505,Chase Burns,CIN,MIA,2026-08-14T22:10:00Z,Pre-Game,PROJECTED,slate-capture-integrity-v1
 2026-08-14,823346,687562,Jake Bennett,BOS,PIT,2026-08-14T22:40:00Z,Scheduled,PROJECTED,slate-capture-integrity-v1
 2026-08-14,823346,696149,Bubba Chandler,PIT,BOS,2026-08-14T22:40:00Z,Scheduled,PROJECTED,slate-capture-integrity-v1
-2026-08-14,824237,656794,Sean Newcomb,CHW,DET,2026-08-14T22:40:00Z,Scheduled,PROJECTED,slate-capture-integrity-v1
-2026-08-14,824237,695549,Jackson Jobe,DET,CHW,2026-08-14T22:40:00Z,Scheduled,PROJECTED,slate-capture-integrity-v1
+2026-08-14,824237,656794,Sean Newcomb,CHW,DET,2026-08-14T22:40:00Z,Pre-Game,PROJECTED,slate-capture-integrity-v1
+2026-08-14,824237,695549,Jackson Jobe,DET,CHW,2026-08-14T22:40:00Z,Pre-Game,PROJECTED,slate-capture-integrity-v1
 2026-08-14,823591,674841,Andrew Alvarez,WSH,NYM,2026-08-14T23:10:00Z,Scheduled,PROJECTED,slate-capture-integrity-v1
 2026-08-14,823591,476594,Robert Stock,NYM,WSH,2026-08-14T23:10:00Z,Scheduled,PROJECTED,slate-capture-integrity-v1
 2026-08-14,824399,650633,Michael King,SDP,CLE,2026-08-14T23:10:00Z,Scheduled,PROJECTED,slate-capture-integrity-v1
