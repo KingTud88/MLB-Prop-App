@@ -1,0 +1,42 @@
+name: Catcher Context Shadow Capture
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 14,17,20,23 * * *'
+  push:
+    branches:
+      - catcher-intelligence-shadow
+    paths:
+      - training/catcher_context_capture.py
+      - tests/test_catcher_context_capture.py
+      - .github/workflows/catcher-context-shadow.yml
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt pytest
+      - name: Catcher capture regression tests
+        run: pytest -q tests/test_catcher_context_capture.py
+      - name: Full quality suite
+        run: pytest -q
+      - name: Capture posted starting catchers
+        run: python -m training.catcher_context_capture
+      - name: Commit catcher shadow evidence
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/catcher_context_log.csv
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Refresh catcher context shadow evidence"
+          git push origin HEAD:catcher-intelligence-shadow
