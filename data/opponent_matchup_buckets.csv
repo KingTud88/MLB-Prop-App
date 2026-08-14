@@ -1,0 +1,7 @@
+Metric,Feature,Bucket,Resolved_Starts,Feature_Mean,Projection_MAE,Projection_Bias,Powered,Audit_Version
+STRIKEOUTS,opponent_k_pct,LOW,32,20.921880273453933,2.033258131996185,0.5412395042682709,True,opponent-matchup-v1-report-only
+STRIKEOUTS,opponent_k_pct,MID,75,22.400000000000006,1.7765860140874092,0.34768323567479337,True,opponent-matchup-v1-report-only
+STRIKEOUTS,opponent_k_pct,HIGH,16,23.473882996758405,1.7433451794203374,0.13579949850139883,False,opponent-matchup-v1-report-only
+HITS,opponent_hit_rate,LOW,16,21.33412532551038,2.205464277866693,0.4558842134715074,False,opponent-matchup-v1-report-only
+HITS,opponent_hit_rate,MID,16,22.462771937710333,1.4640397143293773,0.17103402807543927,False,opponent-matchup-v1-report-only
+HITS,opponent_hit_rate,HIGH,16,23.30402587460189,1.9093071697514719,-0.06223119383219303,False,opponent-matchup-v1-report-only

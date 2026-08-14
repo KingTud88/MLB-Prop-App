@@ -1,0 +1,3 @@
+Metric,Powered_Buckets,Low_Bias,Mid_Bias,High_Bias,Bias_Spread_High_minus_Low,Monotonic_Bias,Status,Audit_Version
+HITS,0,,,,,False,LEARNING,opponent-matchup-v1-report-only
+STRIKEOUTS,2,,,,,False,LEARNING,opponent-matchup-v1-report-only
