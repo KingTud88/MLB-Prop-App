@@ -1,15 +1,15 @@
 [theme]
 base = "dark"
 primaryColor = "#E31937"
-backgroundColor = "#071A3D"
-secondaryBackgroundColor = "#122A5A"
-textColor = "#FFFFFF"
+backgroundColor = "#050D1A"
+secondaryBackgroundColor = "#0B1D36"
+textColor = "#F7FBFF"
 font = "sans serif"
 headingFont = "sans serif"
 baseRadius = "large"
-borderColor = "#274B7A"
+borderColor = "#294A6D"
 showWidgetBorder = true
-dataframeHeaderBackgroundColor = "#0B214D"
+dataframeHeaderBackgroundColor = "#0E2748"
 
 [client]
 showSidebarNavigation = false
