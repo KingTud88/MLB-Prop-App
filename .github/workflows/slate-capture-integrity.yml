@@ -7,8 +7,6 @@ on:
     # cannot disappear silently from the durable archive.
     - cron: '20 14,17,20,23 * * *'
   push:
-    branches:
-      - slate-integrity-hard-fail
     paths:
       - training/slate_capture_integrity.py
       - .github/workflows/slate-capture-integrity.yml
@@ -39,4 +37,12 @@ jobs:
           git add data/slate_capture_integrity.csv
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "Refresh slate capture integrity audit"
-          git push origin HEAD:slate-integrity-hard-fail
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git rebase origin/main
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
