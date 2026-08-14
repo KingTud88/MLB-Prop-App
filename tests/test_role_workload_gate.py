@@ -43,6 +43,21 @@ def test_shadow_computes_candidate_without_changing_effective_workload() -> None
     assert decision.candidate.expected_pitches > base.expected_pitches
 
 
+def test_aware_live_game_time_can_compare_with_naive_runtime_history() -> None:
+    log = _starter_log()
+    # MLB live schedule timestamps are UTC-aware; runtime residual history is
+    # stored as date-only/naive values. This exact combination previously raised
+    # "Invalid comparison between dtype=datetime64[ns] and Timestamp" only for
+    # eligible role rows.
+    target = pd.Timestamp("2026-08-10T23:10:00Z")
+    base = build_workload_context(log, target)
+    decision = build_role_workload_decision(log, base, _role_history(), target, mode="shadow")
+    assert decision.role == "RAMPING"
+    assert decision.eligible is True
+    assert decision.prior_n_pitches == 40
+    assert decision.candidate.expected_pitches > base.expected_pitches
+
+
 def test_active_mode_applies_only_promoted_candidate() -> None:
     log = _starter_log()
     target = pd.Timestamp("2026-08-10")
