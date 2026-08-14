@@ -1,0 +1,40 @@
+name: Recent Form K Audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - recent-form-k-audit
+    paths:
+      - training/recent_form_k_audit.py
+      - .github/workflows/recent-form-k-audit.yml
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt pytest
+      - name: Quality suite
+        run: pytest -q
+      - name: Build leakage-safe July 2026 historical snapshots
+        run: python -m training.build_historical_dataset --start 2026-07-01 --end 2026-07-31 --output data/historical_snapshots.csv
+      - name: Report-only recent-form K divergence audit
+        run: python -m training.recent_form_k_audit
+      - name: Commit audit evidence to branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/recent_form_k_detail.csv data/recent_form_k_buckets.csv data/recent_form_k_summary.csv
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Refresh recent-form K audit evidence"
+          git push origin HEAD:recent-form-k-audit
