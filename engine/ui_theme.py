@@ -4,7 +4,7 @@ import streamlit as st
 
 # Shared presentation layer only. This module must never own modeling logic,
 # sportsbook calls, projection inputs, or grading semantics.
-APP_UI_VERSION = "ui-cleveland-future-v3"
+APP_UI_VERSION = "ui-cleveland-future-v4"
 
 
 def apply_page_theme() -> None:
@@ -93,9 +93,7 @@ def apply_page_theme() -> None:
             border-right: 1px solid rgba(62,95,130,.48) !important;
             box-shadow: 12px 0 42px rgba(0,0,0,.14);
         }
-        [data-testid="stSidebar"] [data-testid="stRadio"] > div {
-            gap: .28rem !important;
-        }
+        [data-testid="stSidebar"] [data-testid="stRadio"] > div { gap: .28rem !important; }
         [data-testid="stSidebar"] [data-testid="stRadio"] label {
             border: 1px solid transparent;
             border-radius: 10px;
@@ -180,14 +178,39 @@ def apply_page_theme() -> None:
             overflow: hidden !important;
             background: linear-gradient(145deg, rgba(10,28,52,.86), rgba(6,19,37,.84)) !important;
             box-shadow: 0 10px 28px rgba(0,0,0,.14);
+            margin-bottom: .45rem !important;
         }
         div[data-testid="stExpander"] summary {
             font-weight: 850 !important;
             min-height: 3.1rem;
+            letter-spacing: .005em;
         }
         div[data-testid="stExpander"] summary:hover {
             color: #fff !important;
             background: rgba(227,25,55,.045) !important;
+        }
+        div[data-testid="stExpander"] [data-testid="stExpanderDetails"] {
+            border-top: 1px solid rgba(66,101,137,.34);
+            padding-top: .8rem !important;
+        }
+
+        /* Bet-entry forms and tracker controls should feel like compact
+           control panels, not a wall of default Streamlit widgets. */
+        [data-testid="stForm"] {
+            background: linear-gradient(145deg, rgba(10,28,52,.72), rgba(6,18,35,.72)) !important;
+            border: 1px solid rgba(68,103,139,.52) !important;
+            border-radius: 16px !important;
+            padding: 1rem !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.02), 0 10px 28px rgba(0,0,0,.12);
+        }
+        [data-testid="stForm"] label,
+        [data-testid="stSelectbox"] label,
+        [data-testid="stNumberInput"] label,
+        [data-testid="stTextInput"] label,
+        [data-testid="stDateInput"] label {
+            color: #b8c9dc !important;
+            font-weight: 800 !important;
+            font-size: .84rem !important;
         }
 
         .stTabs [data-baseweb="tab-list"] {
@@ -226,7 +249,19 @@ def apply_page_theme() -> None:
             border-width: 1px !important;
             box-shadow: 0 8px 22px rgba(0,0,0,.12);
         }
-        [data-testid="stProgress"] > div > div > div { border-radius: 999px !important; }
+        [data-testid="stProgress"] {
+            margin: .45rem 0 .15rem !important;
+        }
+        [data-testid="stProgress"] > div {
+            background: rgba(31,58,86,.62) !important;
+            border-radius: 999px !important;
+            overflow: hidden !important;
+            box-shadow: inset 0 1px 4px rgba(0,0,0,.32);
+        }
+        [data-testid="stProgress"] > div > div > div {
+            border-radius: 999px !important;
+            box-shadow: 0 0 16px rgba(227,25,55,.18);
+        }
 
         hr {
             border-color: rgba(49,82,116,.58) !important;
@@ -431,6 +466,7 @@ def apply_page_theme() -> None:
                 padding-right: .9rem !important;
             }
             [data-testid="stMetric"] { min-height: 94px !important; }
+            [data-testid="stForm"] { padding: .78rem !important; }
             h1 { font-size: 2.05rem !important; }
             h2 { font-size: 1.45rem !important; }
             .king-title { font-size: 2.8rem !important; }
