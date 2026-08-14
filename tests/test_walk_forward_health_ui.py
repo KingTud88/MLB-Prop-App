@@ -18,5 +18,5 @@ def test_top_plays_applies_health_before_ranking():
     assert "health_report = health_from_walk_forward(walk_forward)" in source
     assert "decision_report = decision_tier_report(walk_forward)" in source
     assert "market_health=health_map" in source
-    assert '"Model Health"' in source
+    assert "health_view = health_report" in source
     assert "BLOCKED and is removed before today's Top 5 is ranked" in source
