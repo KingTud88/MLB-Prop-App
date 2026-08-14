@@ -1,0 +1,2 @@
+Metric,Evaluated_Starts,Powered_Buckets,Spearman_Form_vs_Next_K_Rate_Residual,HOT_minus_COLD_Residual_Spread,Status,Reason,Production_Authority,Validation_Version
+STRIKEOUTS,692,3,0.012441503968573246,-0.0006601609799145513,MIXED,guardrail,NONE,recent-form-k-v1-report-only
