@@ -1,9 +1,9 @@
 Milestone,OOS_Starts,Relative_Brier_Improvement,Baseline_Calibration_Gap,Candidate_Calibration_Gap,Candidate_Win_Share,Promotion_Gate_Status,Reasons,Gate_Version
-3,0,,,,,LEARNING,oos_sample,calibration-shadow-gate-v1
-4,0,,,,,LEARNING,oos_sample,calibration-shadow-gate-v1
-5,0,,,,,LEARNING,oos_sample,calibration-shadow-gate-v1
-6,0,,,,,LEARNING,oos_sample,calibration-shadow-gate-v1
-7,0,,,,,LEARNING,oos_sample,calibration-shadow-gate-v1
-8,0,,,,,LEARNING,oos_sample,calibration-shadow-gate-v1
-9,0,,,,,LEARNING,oos_sample,calibration-shadow-gate-v1
-10,0,,,,,LEARNING,oos_sample,calibration-shadow-gate-v1
+3,2,-0.0277469147385634,-0.1688168094029406,-0.1713325707611431,0.0,LEARNING,oos_sample,calibration-shadow-gate-v1
+4,2,-0.0002524218018511,0.1640185257441653,0.1614183127961003,0.5,LEARNING,oos_sample,calibration-shadow-gate-v1
+5,2,-0.0035721426103621,-0.0262157879090114,-0.0277549572736464,0.5,LEARNING,oos_sample,calibration-shadow-gate-v1
+6,2,-0.0003023559667033,-0.2002231284211586,-0.2000733580819926,0.5,LEARNING,oos_sample,calibration-shadow-gate-v1
+7,2,0.0143156220996744,0.1701293216148106,0.168929086270449,1.0,LEARNING,oos_sample,calibration-shadow-gate-v1
+8,2,0.0367684179410009,0.0868623878470601,0.0853078207135958,1.0,LEARNING,oos_sample,calibration-shadow-gate-v1
+9,2,-0.0650731551316638,0.041083743638899,0.0423380621645178,0.0,LEARNING,oos_sample,calibration-shadow-gate-v1
+10,2,-0.1020419113107795,0.0178846689460247,0.0187491211271172,0.0,LEARNING,oos_sample,calibration-shadow-gate-v1
