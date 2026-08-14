@@ -1,0 +1,7 @@
+Metric,Absolute_Change_Bucket,Paired_Starts,Preconfirm_MAE,Confirmed_MAE,Confirmed_Win_Share,Audit_Version
+STRIKEOUTS,<=0.10,21,2.014846170530371,1.9921697581524123,0.6666666666666666,lineup-sensitivity-v1-report-only
+STRIKEOUTS,0.10-0.25,17,1.8389608122193364,1.780129360867295,0.6470588235294118,lineup-sensitivity-v1-report-only
+STRIKEOUTS,0.25-0.50,5,1.9616112932117804,1.8156311625836072,0.8,lineup-sensitivity-v1-report-only
+HITS,<=0.10,28,1.4814768174384958,1.479775237144775,0.42857142857142855,lineup-sensitivity-v1-report-only
+HITS,0.10-0.25,12,2.2780096107823913,2.338203869891191,0.25,lineup-sensitivity-v1-report-only
+HITS,0.25-0.50,2,1.1261343691889483,1.1778444461644701,0.5,lineup-sensitivity-v1-report-only
