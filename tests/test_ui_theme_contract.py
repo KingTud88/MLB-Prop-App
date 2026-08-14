@@ -3,12 +3,17 @@ from pathlib import Path
 
 def test_shared_theme_keeps_cleveland_night_design_tokens():
     source = Path("engine/ui_theme.py").read_text(encoding="utf-8")
-    assert 'APP_UI_VERSION = "ui-cleveland-future-v2"' in source
+    assert 'APP_UI_VERSION = "ui-cleveland-future-v3"' in source
     assert "--sk-red: #e31937" in source
     assert "--sk-bg: #050d1a" in source
     assert "[data-testid=\"stMetric\"]" in source
     assert ".stTabs [aria-selected=\"true\"]" in source
     assert "@media (max-width: 900px)" in source
+    assert ".king-title" in source
+    assert ".pitcher-card" in source
+    assert ".metric-card" in source
+    assert ".reco-card" in source
+    assert ".section-head" in source
 
 
 def test_sidebar_has_custom_navigation_and_logo_fallback():
