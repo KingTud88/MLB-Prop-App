@@ -32,15 +32,17 @@ def test_metric_gate_can_earn_when_prior_mae_bias_and_win_share_all_improve() ->
 
 
 def test_metric_gate_rejects_mae_gain_when_absolute_bias_worsens() -> None:
-    # v24 wins most rows by trimming large positive misses, but a concentrated
-    # negative shift makes its mean bias worse in absolute value. Bias guardrail
-    # must veto activation even when MAE improves.
+    # v23 is unbiased overall with symmetric +/-4 errors. v24 improves MAE by
+    # trimming the positive half to +1 but moves the negative half to -5. The
+    # mean absolute error improves from 4 to 3, while absolute bias worsens from
+    # 0 to 2. Bias guardrail must veto activation.
     rows = []
+    half = GATE_MIN_CHANGED // 2
     for i in range(GATE_MIN_CHANGED):
-        if i < 45:
+        if i < half:
             rows.append({"actual_pitches": 90.0, "bias_controlled_pitches": 94.0, "v24_candidate_pitches": 91.0})
         else:
-            rows.append({"actual_pitches": 90.0, "bias_controlled_pitches": 86.0, "v24_candidate_pitches": 82.0})
+            rows.append({"actual_pitches": 90.0, "bias_controlled_pitches": 86.0, "v24_candidate_pitches": 85.0})
     prior = pd.DataFrame(rows)
     earned, _n, rel, v23_bias, v24_bias, gate = _prior_gate(prior, "pitches")
     assert rel > 0.0
