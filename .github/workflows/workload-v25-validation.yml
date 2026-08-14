@@ -7,6 +7,7 @@ on:
       - workload-v25-metric-gate
     paths:
       - training/workload_v25_metric_gate_backtest.py
+      - tests/test_workload_v25_metric_gate_backtest.py
       - .github/workflows/workload-v25-validation.yml
 
 permissions:
@@ -24,7 +25,7 @@ jobs:
           python-version: '3.11'
       - run: pip install -r requirements.txt pytest
       - name: Existing workload safety contracts
-        run: pytest -q tests/test_workload_backtest.py tests/test_workload_leash_backtest.py tests/test_workload_tight_backtest.py tests/test_workload_context.py
+        run: pytest -q tests/test_workload_backtest.py tests/test_workload_leash_backtest.py tests/test_workload_tight_backtest.py tests/test_workload_context.py tests/test_workload_v25_metric_gate_backtest.py
       - name: Three-season chronological replay
         run: python -m training.workload_v25_metric_gate_backtest --seasons 2024 2025 2026
       - name: Commit report-only evidence
