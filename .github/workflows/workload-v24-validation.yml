@@ -1,10 +1,12 @@
-name: Workload v2.4 Stabilized Validation
+name: Workload v2.4 Residual-Bias Validation
 
 on:
   workflow_dispatch:
   push:
+    branches:
+      - workload-v24-tight-bias
     paths:
-      - training/workload_stabilized_backtest.py
+      - training/workload_v24_backtest.py
       - .github/workflows/workload-v24-validation.yml
 
 permissions:
@@ -21,26 +23,18 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install -r requirements.txt pytest
-      - name: Existing workload contract tests
+      - name: Existing workload safety contracts
         run: pytest -q tests/test_workload_backtest.py tests/test_workload_leash_backtest.py tests/test_workload_tight_backtest.py tests/test_workload_context.py
       - name: Three-season chronological replay
-        run: python -m training.workload_stabilized_backtest --seasons 2024 2025 2026
-      - name: Commit validation reports
+        run: python -m training.workload_v24_backtest --seasons 2024 2025 2026
+      - name: Commit report-only validation evidence
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/workload_v24_summary.csv data/workload_v24_segments.csv
           if git diff --cached --quiet; then
-            echo "No v2.4 validation report changes"
+            echo "No v2.4 residual-bias evidence changes"
             exit 0
           fi
-          git commit -m "Refresh workload v2.4 stabilized validation"
-          for attempt in 1 2 3; do
-            git fetch origin main
-            git rebase origin/main
-            if git push origin HEAD:main; then
-              exit 0
-            fi
-            sleep 2
-          done
-          exit 1
+          git commit -m "Refresh workload v2.4 residual-bias evidence"
+          git push origin HEAD:workload-v24-tight-bias
