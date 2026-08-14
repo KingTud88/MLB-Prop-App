@@ -1,0 +1,38 @@
+name: Umpire K Shadow Audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - umpire-history-backfill
+    paths:
+      - training/umpire_k_shadow_audit.py
+      - data/umpire_observation_log.csv
+      - .github/workflows/umpire-k-shadow-audit.yml
+
+permissions:
+  contents: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt pytest
+      - name: Umpire leakage contracts
+        run: PYTHONPATH=. pytest -q tests/test_umpire_context.py
+      - name: Historical signal-only umpire K walk-forward audit
+        run: PYTHONPATH=. python -m training.umpire_k_shadow_audit
+      - name: Commit shadow evidence to branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/umpire_k_shadow_detail.csv data/umpire_k_shadow_summary.csv
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Refresh umpire K shadow evidence"
+          git push origin HEAD:umpire-history-backfill
