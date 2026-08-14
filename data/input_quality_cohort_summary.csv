@@ -1,0 +1,7 @@
+Comparison,Metric,Powered_Cohorts,Supportive_Cohorts,Contradictory_Cohorts,Median_Relative_MAE_Improvement,Status,Audit_Version
+starter_history_5p,HITS,0,0,0,,LEARNING,input-quality-cohort-v1-report-only
+starter_history_5p,OUTS,0,0,0,,LEARNING,input-quality-cohort-v1-report-only
+starter_history_5p,STRIKEOUTS,1,0,1,-0.11246413422028245,MIXED,input-quality-cohort-v1-report-only
+workload_history_5p,HITS,0,0,0,,LEARNING,input-quality-cohort-v1-report-only
+workload_history_5p,OUTS,0,0,0,,LEARNING,input-quality-cohort-v1-report-only
+workload_history_5p,STRIKEOUTS,1,0,1,-0.11246413422028245,MIXED,input-quality-cohort-v1-report-only
