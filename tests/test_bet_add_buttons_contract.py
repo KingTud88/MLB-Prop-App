@@ -29,11 +29,12 @@ def test_top_plays_is_model_first_and_odds_are_optional_overlay():
     path = Path(__file__).resolve().parents[1] / "pages" / "6_Top_Plays.py"
     source = path.read_text(encoding="utf-8")
     assert "build_model_board" in source
-    assert 'st.subheader("Today\'s five highest-probability model legs")' in source
-    assert "sportsbook odds and market edge never decide the Top 5" in source
+    assert 'st.markdown("#### Top Play actions")' in source
+    assert "Sportsbook lines/odds are execution info only and never rank the board or feed the forecast" in source
     assert "market_health=health_map" in source
     assert 'plays["Live Offer"] = False' in source
     assert "if api_key:" in source
+    assert 'st.subheader("Today\'s five highest-probability model legs")' not in source
 
 
 def test_projection_page_has_unpriced_straight_and_parlay_actions():
@@ -74,16 +75,32 @@ def test_projection_parlay_builder_has_no_hard_leg_cap():
     assert "({len(legs)}/5)" not in source
 
 
-def test_tracker_page_applies_result_status_styling_and_grades_parlays():
+def test_tracker_page_has_ticket_progress_and_grades_parlays():
     path = Path(__file__).resolve().parents[1] / "pages" / "2_Bet_Tracker.py"
     source = path.read_text(encoding="utf-8")
     compile(source, str(path), "exec")
-    assert "result_cell_css" in source
-    assert 'view.style.map(result_cell_css, subset=["Result"])' in source
     assert "parse_parlay_legs" in source
     assert "grade_parlay" in source
     assert 'if bet_type == "Parlay":' in source
+    assert "# BET_TRACKER_TICKET_CARDS_V1" in source
+    assert "def _ticket_icon" in source
+    assert "def _progress_value" in source
+    assert "with st.expander(label" in source
+    assert 'p1.metric("Current"' in source
+    assert 'p2.metric("Target line"' in source
+    assert "st.progress(_progress_value(actual, line))" in source
     assert "delete_bet" in source
     assert 'st.expander("🗑️ Delete a saved bet"' in source
     assert '"Confirm deletion of this saved ticket"' in source
     assert '"🗑️ Delete selected bet"' in source
+
+
+def test_tracker_live_stats_prefer_boxscore_before_date_range_fallback():
+    path = Path(__file__).resolve().parents[1] / "pages" / "2_Bet_Tracker.py"
+    source = path.read_text(encoding="utf-8")
+    start = source.index("def live_pitcher_prop(")
+    end = source.index("@st.cache_data(ttl=120", start)
+    block = source[start:end]
+    live_pos = block.index("stat = _live_pitching_stats(found_game_pk, resolved_id)")
+    fallback_pos = block.index("stat = _date_pitching_stats(resolved_id, game_date)")
+    assert live_pos < fallback_pos

@@ -16,7 +16,7 @@ def test_top_plays_attaches_decision_evidence_without_ranking_by_it():
     assert '"Decision Evidence"' in source
     assert '"Decision Sample"' in source
     assert '"Tier Hit Rate"' in source
-    assert "decision evidence is descriptive only" in source
+    assert "this layer does not reorder today's board" in source
     assert "walk_forward = walk_forward_top5(history)" in source
     assert "market_health_map(health_report)" in source
 

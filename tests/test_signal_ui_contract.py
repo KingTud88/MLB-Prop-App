@@ -6,7 +6,7 @@ def test_top_plays_attaches_signal_evidence_after_model_board():
     build_pos = source.index("plays = build_model_board(slate, history, limit=5, market_health=health_map)")
     attach_pos = source.index("plays = attach_signal_profiles(plays, history, signal_report)")
     assert attach_pos > build_pos
-    assert "signal evidence is descriptive only" in source
+    assert "attached after ranking and cannot reorder or remove today's legs" in source
     assert "Signal Evidence" in source
 
 
