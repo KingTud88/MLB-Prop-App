@@ -5,10 +5,11 @@ from pathlib import Path
 import pandas as pd
 
 from engine.role_workload_gate import build_role_workload_decision
+from engine.starter_role import build_starter_role_context
 from engine.workload_context import build_workload_context
 
 RUNTIME_STATE_PATH = Path("data/starter_role_runtime_state.csv")
-DAILY_ROLE_SHADOW_VERSION = "daily-role-shadow-v1"
+DAILY_ROLE_SHADOW_VERSION = "daily-role-shadow-v2-classifier-diagnostics"
 
 
 def normalize_daily_starter_log(log: pd.DataFrame) -> pd.DataFrame:
@@ -41,17 +42,11 @@ def attach_daily_role_shadow(
     game_date: object,
     role_history: pd.DataFrame | None = None,
 ) -> dict[str, object]:
-    """Append promoted role-workload diagnostics without changing projections.
-
-    The automated daily runner currently has its own legacy projection routine.
-    This function intentionally leaves every existing record value untouched and
-    adds only shadow diagnostics. The role candidate cannot affect the projected
-    strikeout result until the runner itself is separately promoted to consume
-    the production workload context.
-    """
+    """Append role-workload shadow diagnostics without changing projections."""
     out = dict(record)
     normalized = normalize_daily_starter_log(starter_log)
     base = build_workload_context(normalized, game_date)
+    role_context = build_starter_role_context(normalized, game_date)
     history = role_history if role_history is not None else load_runtime_state()
     decision = build_role_workload_decision(
         normalized,
@@ -62,6 +57,23 @@ def attach_daily_role_shadow(
     )
     out["daily_role_shadow_version"] = DAILY_ROLE_SHADOW_VERSION
     out.update(decision.snapshot_fields())
+
+    # Preserve the raw classifier evidence separately from the workload decision.
+    # These fields are observational only and have zero production authority.
+    out.update(role_context.snapshot_fields())
+    out["role_shadow_classifier_label"] = role_context.label
+    out["role_shadow_classifier_confidence"] = role_context.confidence
+    out["role_shadow_classifier_starts_used"] = role_context.starts_used
+    out["role_shadow_classifier_recent_pitches"] = role_context.recent_pitches
+    out["role_shadow_classifier_prior_pitches"] = role_context.prior_pitches
+    out["role_shadow_classifier_recent_bf"] = role_context.recent_bf
+    out["role_shadow_classifier_prior_bf"] = role_context.prior_bf
+    out["role_shadow_classifier_recent_outs"] = role_context.recent_outs
+    out["role_shadow_classifier_prior_outs"] = role_context.prior_outs
+    out["role_shadow_classifier_low_exposure_share"] = role_context.low_exposure_share
+    out["role_shadow_classifier_ramp_ratio"] = role_context.ramp_ratio
+    out["role_shadow_classifier_reason"] = role_context.reason
+
     out["role_shadow_base_expected_pitches"] = base.expected_pitches
     out["role_shadow_base_expected_bf"] = base.expected_bf
     out["role_shadow_base_expected_outs"] = base.expected_outs
