@@ -65,8 +65,11 @@ def _correction(history: pd.DataFrame, role: str, metric: str, game_date: object
     if history is None or history.empty:
         return 0, 0.0
     work = history.copy()
-    dates = pd.to_datetime(work.get("game_date"), errors="coerce")
-    target = pd.to_datetime(game_date, errors="coerce")
+    # Runtime history is stored as date-only strings while live MLB game times are
+    # UTC timestamps. Normalize both sides to UTC before comparing so an eligible
+    # RAMPING/RESTRICTED starter cannot be dropped by a naive/aware datetime error.
+    dates = pd.to_datetime(work.get("game_date"), errors="coerce", utc=True)
+    target = pd.to_datetime(game_date, errors="coerce", utc=True)
     mask = work.get("starter_role_label", pd.Series("", index=work.index)).astype(str).eq(str(role))
     if pd.notna(target):
         mask &= dates.dt.normalize().lt(pd.Timestamp(target).normalize())
