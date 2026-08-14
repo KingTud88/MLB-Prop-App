@@ -26,6 +26,7 @@ from automation.daily_projection_runner import (
 from engine.calibration import calibrate_blend
 from engine.hits_calibration import calibrate_hits_blend
 from engine.outs_calibration import calibrate_outs_blend
+from engine.odds_snapshot import refresh_strikeout_snapshot, resolve_api_key
 from navigation import render_sidebar
 
 st.set_page_config(page_title="Daily Projection Run", page_icon="📊", layout="wide")
@@ -296,6 +297,20 @@ st.info(
     "This page is for batch data capture. The normal Projection page remains the single-pitcher deep-dive workflow. "
     "Existing game/pitcher snapshots stay frozen after first pitch; while still pregame, a roster-fallback row may upgrade once MLB posts a confirmed batting order."
 )
+
+st.markdown("### 💳 Paid strikeout lines")
+st.caption("Manual only. This button is the ONLY paid Odds API path and requests pitcher_strikeouts only. The saved snapshot is reused by Main Projections without another API call.")
+if st.button("💳 LOAD STRIKEOUT LINES · PAID API", use_container_width=True, key="daily_paid_k_odds"):
+    api_key=resolve_api_key(st.secrets)
+    with st.spinner("Loading today's main pitcher strikeout lines once and saving the snapshot..."):
+        odds_snapshot,quota,odds_error=refresh_strikeout_snapshot(api_key,slate_date.isoformat())
+    if odds_error:
+        st.error(odds_error)
+    else:
+        pitchers=int(odds_snapshot.get("pitcher",pd.Series(dtype=str)).nunique()) if not odds_snapshot.empty else 0
+        st.success(f"Saved {len(odds_snapshot)} strikeout offers for {pitchers} pitchers. Main Projections will reuse this snapshot for free.")
+        if quota:
+            st.caption(f"Last paid request: {quota.get('last','—')} credit(s) · {quota.get('remaining','—')} remaining · {quota.get('used','—')} used.")
 
 if st.button("⚾ RUN ALL TODAY'S PITCHERS", type="primary", use_container_width=True):
     with st.spinner("Simulating every announced starter and writing pregame snapshots..."):
