@@ -1,0 +1,4 @@
+Environment_Group,Candidate_Columns_Found,Rows,Rows_With_Context,Coverage_Rate,Resolved_K_Rows,Resolved_K_Rows_With_Context,Resolved_K_Coverage_Rate,Status,Audit_Version
+WEATHER,weather_summary,147,72,0.4897959183673469,123,48,0.3902439024390244,AUDITABLE,environment-coverage-v1-report-only
+UMPIRE,umpire_k_factor,147,147,1.0,123,123,1.0,AUDITABLE,environment-coverage-v1-report-only
+PARK,venue,147,147,1.0,123,123,1.0,AUDITABLE,environment-coverage-v1-report-only
