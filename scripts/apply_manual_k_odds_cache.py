@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MAIN = ROOT / "streamlit_app.py"
 DAILY = ROOT / "pages" / "5_Daily_Projection_Run.py"
+TOP = ROOT / "pages" / "6_Top_Plays.py"
 
 
 def replace_once(text: str, old: str, new: str, label: str) -> str:
@@ -38,4 +39,14 @@ insert = '''st.markdown("### 💳 Paid strikeout lines")\nst.caption("Manual onl
 daily = replace_once(daily, anchor, insert + anchor, "daily manual odds button")
 DAILY.write_text(daily)
 
-print("patched streamlit_app.py and pages/5_Daily_Projection_Run.py")
+
+top = TOP.read_text()
+top = replace_once(
+    top,
+    "api_key = secret()\n",
+    "api_key = None  # Paid Odds API access is intentionally restricted to Daily Projection Run.\n",
+    "top plays paid odds disable",
+)
+TOP.write_text(top)
+
+print("patched Main Projections, Daily Projection Run, and Top Plays paid-odds ownership")
