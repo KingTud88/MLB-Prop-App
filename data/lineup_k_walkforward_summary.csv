@@ -1,0 +1,2 @@
+Metric,OOS_Paired_Starts,Preconfirm_MAE,Confirmed_MAE,Relative_MAE_Improvement,Confirmed_Win_Share,Confirmed_Loss_Share,Preconfirm_Bias,Confirmed_Bias,Status,Reason,Validation_Version
+STRIKEOUTS,15,2.087119023064939,2.045109728052341,0.020127886597912804,0.6666666666666666,0.3333333333333333,0.3790469861888486,0.3892602095485562,LEARNING,oos_sample,lineup-k-walkforward-v1-report-only
