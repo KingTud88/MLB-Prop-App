@@ -370,7 +370,7 @@ def render_projection_rationale(play: pd.Series, snapshot: pd.Series, history: p
     st.caption(f"Why it ranked: the calibrated model gives this {side_text} a {float(play['Model Probability']):.1%} chance. Top 5 order is based on model hit probability first and data quality second; sportsbook price and edge never enter the ranking. Frozen snapshot confidence: {confidence or '—'}. Captured: {captured or '—'}.")
 
 
-api_key = secret()
+api_key = None  # Paid Odds API access is intentionally restricted to Daily Projection Run.
 
 if not LOG_PATH.exists():
     st.info("No projection log exists yet. Run the Daily Projection page first.")

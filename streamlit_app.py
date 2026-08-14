@@ -27,6 +27,7 @@ from engine.role_workload_gate import build_role_workload_decision
 from engine.team_leash import build_team_leash_context, candidate_workload_fields
 from engine.bet_lean import aligned_bet_lean
 from engine.alt_k import best_alt_k
+from engine.odds_snapshot import load_pitcher_strikeout_odds
 from engine.bet_tracker import make_bet_record, make_parlay_record
 from training.bet_storage import append_bet
 
@@ -613,33 +614,8 @@ proj=calculate_projection(log,game,25000,float(opponent_matchup["k_rate"]),confi
 features_for_hits=build_engine_features(log,game,float(opponent_matchup["k_rate"]),confirmed_count,effective_workload_ctx)
 hits_seed=int(hashlib.sha256(f"hits|{game.key}|{game.game_time}|{APP_VERSION}".encode()).hexdigest()[:8],16)
 hits_proj=project_hits_allowed(log,expected_bf=features_for_hits["expected_bf"],bf_sd=workload_ctx.bf_sd,opponent_hit_rate=float(opponent_matchup.get("hit_rate",.235)),seed=hits_seed,draws=25000,lines=(3.5,4.5,5.5,6.5,7.5,8.5))
-odds_events,odds_err=get_odds_events(); odds_event_id=find_odds_event(odds_events,game)
-odds_payload_key=f"projection_live_odds:{game.key}"
-odds_quota_key=f"projection_live_odds_quota:{game.key}"
-odds_payload=st.session_state.get(odds_payload_key,{})
-if odds_event_id:
-    with st.sidebar:
-        st.markdown("#### 💳 Odds API Credit Saver")
-        st.caption("Paid odds are OFF by default. Main Strikeouts + Outs + Hits only; one US region; up to 3 credits when you press load. Alternate markets stay off.")
-        load_live_odds=st.button("LOAD LIVE ODDS · ≤3 credits",key=f"load_live_odds:{game.key}",use_container_width=True)
-    if load_live_odds:
-        loaded_payload,prop_err,quota=get_event_props(odds_event_id)
-        if loaded_payload:
-            odds_payload=loaded_payload
-            st.session_state[odds_payload_key]=loaded_payload
-        if quota:
-            st.session_state[odds_quota_key]=quota
-        odds_err=prop_err if prop_err else odds_err
-else:
-    odds_payload=[]
-    odds_err=odds_err if odds_err else "No matching Odds API event found for this MLB game."
-quota_view=st.session_state.get(odds_quota_key,{})
-if quota_view:
-    with st.sidebar:
-        st.caption(f"Last paid load: {quota_view.get('last','—')} credit(s) · {quota_view.get('remaining','—')} remaining · {quota_view.get('used','—')} used.")
-if not odds_payload and not odds_err:
-    odds_err="Live sportsbook prices not loaded. Credit Saver is ON; the baseball projection does not need sportsbook data."
-odds_rows=extract_player_odds(odds_payload,game.pitcher_name)
+odds_rows=load_pitcher_strikeout_odds(game.pitcher_name,selected_date.isoformat())
+odds_err=("" if odds_rows else "No saved strikeout odds for this pitcher/slate yet. Use the paid manual button on Daily Projection Run; this page never calls the Odds API.")
 k_reco=market_recommendation(proj,odds_rows,"pitcher_strikeouts_alternate",5.5,"k"); k_reco["label"]="STRIKEOUT BET LEAN"
 out_reco=market_recommendation(proj,odds_rows,"pitcher_outs_alternate",15.5,"outs"); out_reco["label"]="TOTAL OUTS BET LEAN"
 hit_rows=[r for r in odds_rows if r.get("market") in {"pitcher_hits_allowed","pitcher_hits_allowed_alternate"} and r.get("point") is not None]
