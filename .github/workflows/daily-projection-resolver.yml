@@ -4,8 +4,14 @@ on:
   push:
     branches: [main]
   schedule:
+    # Multiple pregame refreshes keep the durable archive in sync with late
+    # probable-starter announcements. Existing (game_pk, pitcher_id) snapshots
+    # are deduped by the runner, so these extra passes do not create duplicates.
     - cron: "15 13 * * *"
+    - cron: "15 16 * * *"
+    - cron: "15 18 * * *"
     - cron: "15 20 * * *"
+    - cron: "15 22 * * *"
     - cron: "15 2 * * *"
   workflow_dispatch:
 
