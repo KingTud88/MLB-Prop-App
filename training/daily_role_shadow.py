@@ -9,7 +9,7 @@ from engine.starter_role import build_starter_role_context
 from engine.workload_context import build_workload_context
 
 RUNTIME_STATE_PATH = Path("data/starter_role_runtime_state.csv")
-DAILY_ROLE_SHADOW_VERSION = "daily-role-shadow-v2-classifier-diagnostics"
+DAILY_ROLE_SHADOW_VERSION = "daily-role-shadow-v1"
 
 
 def normalize_daily_starter_log(log: pd.DataFrame) -> pd.DataFrame:
@@ -58,8 +58,8 @@ def attach_daily_role_shadow(
     out["daily_role_shadow_version"] = DAILY_ROLE_SHADOW_VERSION
     out.update(decision.snapshot_fields())
 
-    # Preserve the raw classifier evidence separately from the workload decision.
-    # These fields are observational only and have zero production authority.
+    # Persist the raw pregame classifier evidence separately from the workload
+    # decision. These fields are observational only and cannot alter projections.
     out.update(role_context.snapshot_fields())
     out["role_shadow_classifier_label"] = role_context.label
     out["role_shadow_classifier_confidence"] = role_context.confidence
