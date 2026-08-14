@@ -1,0 +1,30 @@
+name: Umpire Context Capture Validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - umpire-context-capture
+    paths:
+      - engine/umpire_context.py
+      - automation/umpire_context_capture.py
+      - tests/test_umpire_context.py
+      - .github/workflows/daily-projection-resolver.yml
+      - .github/workflows/umpire-context-validation.yml
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt pytest
+      - name: Umpire leakage contracts
+        run: PYTHONPATH=. pytest -q tests/test_umpire_context.py
+      - name: Full quality suite
+        run: PYTHONPATH=. pytest -q
