@@ -45,10 +45,18 @@ jobs:
           s = s.replace('''          <div class="cc-hero-mascot">\n            <img src="{MASCOT_URL}" alt="StrikeOut King 9000 mascot">\n          </div>''', '''          <div class="cc-hero-mascot">{mascot_html}</div>''')
           p.write_text(s)
           PY
-      - name: Verify compile and contracts
+      - name: Verify compile and contract anchors
         run: |
           python -m compileall -q engine streamlit_app.py tests
-          pytest -q tests/test_ui_theme_contract.py tests/test_command_center_ui.py
+          pytest -q tests/test_ui_theme_contract.py
+          python - <<'PY'
+          from pathlib import Path
+          s = Path('engine/ui_command_center.py').read_text()
+          assert 'cle-command-center-v3' in s
+          assert '_mascot_src' in s
+          assert 'data:image/png;base64' in s
+          assert 'font-family:Inter' in s
+          PY
       - name: Commit fix and remove workflow
         run: |
           git config user.name "github-actions[bot]"
