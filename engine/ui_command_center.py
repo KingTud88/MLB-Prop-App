@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 import streamlit as st
 
 
-COMMAND_CENTER_UI_VERSION = "cle-command-center-v7"
+COMMAND_CENTER_UI_VERSION = "cle-command-center-v8"
 ASSET_DIR = Path(__file__).resolve().parents[1] / "assets"
 MASCOT_PATH = ASSET_DIR / "strikeout_king_9000_clean.png"
 EASTERN = ZoneInfo("America/New_York")
@@ -478,6 +478,114 @@ def apply_command_center_theme() -> None:
             .cc-team-mark { margin:0 auto; }
             .cc-matchup-status { text-align:center; }
         }
+
+
+        /* v8 final Main Projection polish: readability + approved CLE hero. */
+        .st-key-cc_hero_shell { min-height:270px; }
+        .st-key-cc_hero_shell [data-testid="stImage"] img {
+            max-height:248px!important;
+            width:auto!important;
+            filter:drop-shadow(0 16px 20px rgba(0,0,0,.46)) drop-shadow(0 0 20px rgba(236,22,56,.16));
+        }
+        .cc-hero-title {
+            display:flex!important;
+            flex-direction:column;
+            align-items:flex-start;
+            gap:.02em;
+            font-family:Impact,"Arial Black","Arial Narrow",sans-serif!important;
+            font-size:clamp(3.45rem,6.5vw,6.95rem)!important;
+            line-height:.76!important;
+            letter-spacing:.012em!important;
+            white-space:nowrap!important;
+            text-transform:uppercase;
+        }
+        .cc-hero-title .cc-word-top {
+            display:block!important;
+            color:#f5f1e9!important;
+            -webkit-text-stroke:1px rgba(255,255,255,.82);
+            text-shadow:3px 3px 0 #07182b,5px 5px 0 rgba(0,0,0,.42),0 0 22px rgba(255,255,255,.05)!important;
+        }
+        .cc-hero-title .cc-word-bottom {
+            display:block!important;
+            color:var(--cc-red)!important;
+            -webkit-text-stroke:1.4px #f1eee7;
+            paint-order:stroke fill;
+            text-shadow:2px 2px 0 #07182b,4px 4px 0 #790b1d,0 0 22px rgba(236,22,56,.14)!important;
+        }
+        .cc-hero-ribbon {
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            width:max-content;
+            max-width:100%;
+            margin-top:.72rem;
+            padding:.44rem 1.15rem;
+            color:#f7f3ec;
+            border-top:2px solid var(--cc-red);
+            border-bottom:2px solid var(--cc-red);
+            background:linear-gradient(90deg,transparent,rgba(236,22,56,.13) 14%,rgba(7,24,43,.92) 50%,rgba(236,22,56,.13) 86%,transparent);
+            font-family:var(--cc-ui-font)!important;
+            font-size:.86rem;
+            font-weight:900;
+            line-height:1.2;
+            letter-spacing:.075em;
+            text-transform:uppercase;
+            text-shadow:none!important;
+        }
+        .cc-hero-kicker { font-size:.82rem!important;letter-spacing:.115em!important;line-height:1.35!important; }
+
+        .section-head {
+            font-family:var(--cc-ui-font)!important;
+            font-size:.96rem!important;
+            font-weight:900!important;
+            line-height:1.15!important;
+            letter-spacing:.025em!important;
+            text-shadow:none!important;
+            -webkit-font-smoothing:antialiased!important;
+            text-rendering:geometricPrecision!important;
+            min-height:2.35rem;
+            display:flex!important;
+            align-items:center;
+            justify-content:center;
+        }
+        [data-testid="stCaptionContainer"],.reco-meta,.search-note,.cc-status-meta,.cc-matchup-meta,.cc-matchup-status-meta {
+            font-size:.88rem!important;
+            letter-spacing:0!important;
+            text-shadow:none!important;
+        }
+
+        .reco-card.reco-good { border-color:rgba(50,229,141,.72)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 0 0 1px rgba(50,229,141,.08),0 14px 30px rgba(0,0,0,.28)!important; }
+        .reco-card.reco-under { border-color:rgba(255,71,98,.78)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 0 0 1px rgba(236,22,56,.10),0 14px 30px rgba(0,0,0,.28)!important; }
+        .reco-card.reco-warn { border-color:rgba(255,209,102,.72)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 0 0 1px rgba(255,209,102,.08),0 14px 30px rgba(0,0,0,.28)!important; }
+        .reco-side {
+            display:inline-flex!important;
+            align-items:center;
+            justify-content:center;
+            margin:.12rem 0 .38rem!important;
+            padding:.18rem .68rem!important;
+            border-radius:10px;
+            font-family:var(--cc-ui-font)!important;
+            font-size:2.15rem!important;
+            font-weight:950!important;
+            line-height:1.08!important;
+            letter-spacing:.025em!important;
+            text-shadow:none!important;
+        }
+        .reco-side.reco-good { color:#50f2aa!important;background:rgba(12,91,61,.34)!important;border:1px solid rgba(50,229,141,.52)!important; }
+        .reco-side.reco-under { color:#ff6379!important;background:rgba(125,13,36,.36)!important;border:1px solid rgba(255,71,98,.56)!important; }
+        .reco-side.reco-warn { color:#ffe08a!important;background:rgba(111,82,15,.30)!important;border:1px solid rgba(255,209,102,.52)!important; }
+
+        @media (max-width:900px) {
+            .st-key-cc_hero_shell [data-testid="stImage"] img { max-height:165px!important; }
+            .cc-hero-title { font-size:3.25rem!important;white-space:normal!important;align-items:center; }
+            .cc-hero-ribbon { margin-left:auto;margin-right:auto;font-size:.76rem; }
+        }
+        @media (max-width:620px) {
+            .cc-hero-title { font-size:2.75rem!important; }
+            .section-head { font-size:.88rem!important;min-width:180px!important; }
+            .reco-side { font-size:1.8rem!important; }
+        }
+
         </style>
         """,
         unsafe_allow_html=True,
@@ -524,10 +632,10 @@ def render_command_center_hero(*, confidence: str, quality: int, locked: bool, a
     lock_meta = "Frozen pitcher snapshot" if locked else "Use the left rail to freeze outputs"
 
     with st.container(border=False, key="cc_hero_shell"):
-        mascot_col, copy_col, status_col = st.columns([1.15, 3.25, 1.45], gap="medium", vertical_alignment="center")
+        mascot_col, copy_col, status_col = st.columns([1.35, 3.35, 1.45], gap="medium", vertical_alignment="center")
         with mascot_col:
             try:
-                st.image(str(MASCOT_PATH), width=190)
+                st.image(str(MASCOT_PATH), width=235)
             except Exception:
                 st.markdown(
                     '<div class="cc-hero-fallback" aria-label="StrikeOut King 9000">SK9K<span>STRIKEOUT KING</span></div>',
@@ -538,8 +646,8 @@ def render_command_center_hero(*, confidence: str, quality: int, locked: bool, a
                 """
                 <div class="cc-hero-copy">
                   <div class="cc-hero-kicker">Built for CLE baseball · two-path starter intelligence</div>
-                  <div class="cc-hero-title">StrikeOut <span>King 9000</span></div>
-                  <div class="cc-hero-sub">★ MLB Pitcher Projection Engine ★ Two-Path Analytics ★</div>
+                  <div class="cc-hero-title"><span class="cc-word-top">STRIKEOUT</span><span class="cc-word-bottom">KING 9000</span></div>
+                  <div class="cc-hero-ribbon">★ MLB PITCHER PROJECTION ENGINE ★</div>
                 </div>
                 """,
                 unsafe_allow_html=True,

@@ -445,7 +445,7 @@ def render_reco(card,reco,*,key_prefix=None,market_key=None,proj=None,hits_proj=
         edge=f"EDGE {effective['edge']:+.1%}" if effective["edge"] is not None else "MODEL LEAN"
         meta=f"Model {effective['model']:.1%} · {edge}"
     with card:
-        st.markdown(f'<div class="reco-card"><div class="cc-card-top"><div class="cc-card-icon">{icon}</div><div class="reco-label">{effective["label"]}</div></div><div class="reco-side {cls}">{side}</div><div class="reco-line">{effective["line"]:g} LINE</div><div class="reco-meta">{meta}</div></div>',unsafe_allow_html=True)
+        st.markdown(f'<div class="reco-card {cls}"><div class="cc-card-top"><div class="cc-card-icon">{icon}</div><div class="reco-label">{effective["label"]}</div></div><div class="reco-side {cls}">{side}</div><div class="reco-line">{effective["line"]:g} LINE</div><div class="reco-meta">{meta}</div></div>',unsafe_allow_html=True)
         if key_prefix and market_key and proj is not None:
             with st.expander("✍️ MANUAL LINE / ODDS", expanded=False):
                 enabled=st.checkbox("Use manual market",key=f"{key_prefix}:enabled")

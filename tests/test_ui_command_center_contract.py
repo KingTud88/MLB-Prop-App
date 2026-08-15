@@ -1,13 +1,13 @@
 from pathlib import Path
 
 
-def test_command_center_v7_exposes_reusable_brand_components():
+def test_command_center_v8_exposes_reusable_brand_components():
     source = Path("engine/ui_command_center.py").read_text(encoding="utf-8")
-    assert 'COMMAND_CENTER_UI_VERSION = "cle-command-center-v7"' in source
+    assert 'COMMAND_CENTER_UI_VERSION = "cle-command-center-v8"' in source
     assert "def render_command_center_hero(" in source
     assert "def render_matchup_strip(" in source
     assert "cc-hero-fallback" in source
-    assert "st.image(str(MASCOT_PATH), width=190)" in source
+    assert "st.image(str(MASCOT_PATH), width=235)" in source
     assert "def render_sidebar_brand(" in source
     assert "def render_sidebar_pitcher_identity(" in source
     assert "www.mlbstatic.com/team-logos" in source
@@ -65,3 +65,16 @@ def test_brand_pass_adds_team_marks_and_projection_icon_bubbles():
     assert ".cc-team-logo" in theme
     assert "calculate_projection(" in source
     assert "this page never calls the Odds API" in source
+
+
+def test_v8_final_polish_locks_approved_header_tabs_and_lean_highlights():
+    source = Path("engine/ui_command_center.py").read_text(encoding="utf-8")
+    app = Path("streamlit_app.py").read_text(encoding="utf-8")
+    assert 'cc-word-top">STRIKEOUT' in source
+    assert 'cc-word-bottom">KING 9000' in source
+    assert "cc-hero-ribbon" in source
+    assert "font-family:var(--cc-ui-font)!important;" in source
+    assert ".reco-side.reco-good" in source
+    assert ".reco-side.reco-under" in source
+    assert ".reco-side.reco-warn" in source
+    assert '<div class="reco-card {cls}">' in app
