@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 import streamlit as st
 
 
-COMMAND_CENTER_UI_VERSION = "cle-command-center-v4"
+COMMAND_CENTER_UI_VERSION = "cle-command-center-v5"
 ASSET_DIR = Path(__file__).resolve().parents[1] / "assets"
 MASCOT_PATH = ASSET_DIR / "strikeout_king_9000.png"
 EASTERN = ZoneInfo("America/New_York")
@@ -121,6 +121,33 @@ def apply_command_center_theme() -> None:
             max-height:218px;
             object-fit:contain;
             filter:drop-shadow(0 14px 18px rgba(0,0,0,.42)) drop-shadow(0 0 18px rgba(236,22,56,.12));
+        }
+        .cc-hero-fallback {
+            width:180px;
+            height:180px;
+            margin:auto;
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            border-radius:50%;
+            border:3px solid rgba(236,22,56,.78);
+            background:radial-gradient(circle at 35% 30%,#173e69,#07182b 68%);
+            box-shadow:inset 0 0 0 6px rgba(255,255,255,.025),0 14px 28px rgba(0,0,0,.38),0 0 20px rgba(236,22,56,.15);
+            color:#fff;
+            font-family:Impact,"Arial Narrow",Haettenschweiler,sans-serif;
+            font-size:2.55rem;
+            line-height:.9;
+            letter-spacing:.035em;
+            text-align:center;
+        }
+        .cc-hero-fallback span {
+            margin-top:.35rem;
+            color:var(--cc-red);
+            font-family:Inter,"Segoe UI",Roboto,Arial,sans-serif;
+            font-size:.68rem;
+            font-weight:900;
+            letter-spacing:.12em;
         }
         .cc-hero-copy { position:relative;z-index:1;min-width:0; }
         .cc-hero-kicker {
@@ -367,7 +394,7 @@ def apply_command_center_theme() -> None:
         }
         @media (max-width:620px) {
             .st-key-cc_hero_shell { text-align:center; }
-            .st-key-cc_hero_shell [data-testid="stImage"] img { width:150px; }
+            .cc-hero-fallback { width:140px;height:140px;font-size:2rem; }
             .cc-hero-sub { justify-content:center; }
             .cc-matchup-strip { grid-template-columns:1fr;text-align:center; }
             .cc-team-mark { margin:0 auto; }
@@ -390,10 +417,10 @@ def render_command_center_hero(*, confidence: str, quality: int, locked: bool, a
     with st.container(border=False, key="cc_hero_shell"):
         mascot_col, copy_col, status_col = st.columns([1.15, 3.25, 1.45], gap="medium", vertical_alignment="center")
         with mascot_col:
-            if MASCOT_PATH.exists():
-                st.image(str(MASCOT_PATH), width=205)
-            else:
-                st.markdown('<div class="cc-team-mark" aria-label="StrikeOut King 9000">SK9K</div>', unsafe_allow_html=True)
+            st.markdown(
+                '<div class="cc-hero-fallback" aria-label="StrikeOut King 9000">SK9K<span>STRIKEOUT KING</span></div>',
+                unsafe_allow_html=True,
+            )
         with copy_col:
             st.markdown(
                 """
