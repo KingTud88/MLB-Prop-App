@@ -1,0 +1,81 @@
+name: Lower Command Center Polish
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ui-lower-command-center
+    paths:
+      - .github/workflows/ui-lower-command-center.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ui-lower-command-center
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt pytest
+      - name: Apply lower command-center presentation layer
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          app = Path('streamlit_app.py')
+          s = app.read_text(encoding='utf-8')
+          old_actions = '''st.markdown("#### Add recommendation to Bet Tracker / Parlay")\nquick_add_stake=st.number_input("Quick-add stake",min_value=0.0,value=1.0,step=0.5,key=f"projection_quick_stake_{game.key}")\nadd1,add2,add3=st.columns(3)\nrender_add_bet_button(add1,k_reco,"Strikeouts",{"pitcher_strikeouts","pitcher_strikeouts_alternate"},proj.mean_k,quick_add_stake,game,selected_date.isoformat(),odds_rows,proj.confidence,proj.quality,f"add_k_{game.key}")\nrender_add_bet_button(add2,out_reco,"Total Outs",{"pitcher_outs","pitcher_outs_alternate"},proj.mean_outs,quick_add_stake,game,selected_date.isoformat(),odds_rows,proj.confidence,proj.quality,f"add_outs_{game.key}")\nrender_add_bet_button(add3,hit_reco,"Hits Allowed",{"pitcher_hits_allowed","pitcher_hits_allowed_alternate"},hits_proj.ensemble_mean,quick_add_stake,game,selected_date.isoformat(),odds_rows,proj.confidence,proj.quality,f"add_hits_{game.key}")\n'''
+          new_actions = '''st.markdown('<div class="section-head">BET TRACKER / PARLAY ACTIONS</div>',unsafe_allow_html=True)\naction_panel=st.container(border=True,key="cc_bet_action_panel")\naction_panel.caption("Quick-add a model-aligned straight or parlay leg. Sportsbook price stays optional unless a saved market snapshot exists.")\nquick_add_stake=action_panel.number_input("Quick-add stake",min_value=0.0,value=1.0,step=0.5,key=f"projection_quick_stake_{game.key}")\nadd1,add2,add3=action_panel.columns(3,gap="medium")\nrender_add_bet_button(add1,k_reco,"Strikeouts",{"pitcher_strikeouts","pitcher_strikeouts_alternate"},proj.mean_k,quick_add_stake,game,selected_date.isoformat(),odds_rows,proj.confidence,proj.quality,f"add_k_{game.key}")\nrender_add_bet_button(add2,out_reco,"Total Outs",{"pitcher_outs","pitcher_outs_alternate"},proj.mean_outs,quick_add_stake,game,selected_date.isoformat(),odds_rows,proj.confidence,proj.quality,f"add_outs_{game.key}")\nrender_add_bet_button(add3,hit_reco,"Hits Allowed",{"pitcher_hits_allowed","pitcher_hits_allowed_alternate"},hits_proj.ensemble_mean,quick_add_stake,game,selected_date.isoformat(),odds_rows,proj.confidence,proj.quality,f"add_hits_{game.key}")\n'''
+          if old_actions not in s:
+              raise SystemExit('bet action anchor not found')
+          s = s.replace(old_actions, new_actions)
+
+          old_row = 'left,right=st.columns([1.35,1])\n'
+          new_row = 'market_command_row=st.container(border=True,key="cc_market_command_row")\nleft,right=market_command_row.columns([1.35,1],gap="large")\n'
+          if old_row not in s:
+              raise SystemExit('market row anchor not found')
+          s = s.replace(old_row, new_row, 1)
+
+          old_builder = 'render_projection_parlay_builder()\n'
+          new_builder = '''st.markdown('<div class="section-head">PROJECTION PARLAY BUILDER</div>',unsafe_allow_html=True)\nwith st.container(border=True,key="cc_parlay_panel"):\n    render_projection_parlay_builder()\n'''
+          if old_builder not in s:
+              raise SystemExit('parlay builder anchor not found')
+          s = s.replace(old_builder, new_builder, 1)
+          app.write_text(s, encoding='utf-8')
+
+          ui = Path('engine/ui_command_center.py')
+          t = ui.read_text(encoding='utf-8')
+          t = t.replace('COMMAND_CENTER_UI_VERSION = "cle-command-center-v5"', 'COMMAND_CENTER_UI_VERSION = "cle-command-center-v6"')
+          css_anchor = '''        .metric-label,.reco-label {\n            color:#eef3f7!important;\n            letter-spacing:.02em!important;\n            font-size:.88rem!important;\n            line-height:1.25!important;\n            font-family:Inter,"Segoe UI",Roboto,Arial,sans-serif!important;\n            font-weight:800!important;\n            text-shadow:none!important;\n        }\n'''
+          css_add = css_anchor + '''\n        /* Lower command-center modules: presentation only. */\n        .st-key-cc_bet_action_panel,\n        .st-key-cc_market_command_row,\n        .st-key-cc_parlay_panel {\n            position:relative;\n            padding:1rem 1.05rem!important;\n            border:1px solid rgba(76,111,145,.78)!important;\n            border-radius:16px!important;\n            background:linear-gradient(145deg,rgba(8,29,52,.98),rgba(4,17,32,.98))!important;\n            box-shadow:inset 0 1px 0 rgba(255,255,255,.045),0 16px 34px rgba(0,0,0,.27)!important;\n        }\n        .st-key-cc_bet_action_panel { margin-bottom:1rem;border-color:rgba(236,22,56,.46)!important; }\n        .st-key-cc_bet_action_panel::after,\n        .st-key-cc_market_command_row::after,\n        .st-key-cc_parlay_panel::after {\n            content:"";position:absolute;left:10%;right:10%;bottom:0;height:2px;\n            background:linear-gradient(90deg,transparent,var(--cc-red),transparent);opacity:.65;pointer-events:none;\n        }\n        .st-key-cc_bet_action_panel [data-testid="stNumberInput"] { max-width:100%; }\n        .st-key-cc_bet_action_panel div[data-testid="stButton"] button {\n            min-height:3rem!important;border-color:rgba(97,132,166,.72)!important;\n            background:linear-gradient(180deg,rgba(22,53,88,.98),rgba(10,30,55,.98))!important;font-weight:900!important;\n        }\n        .st-key-cc_market_command_row { margin-top:.2rem;margin-bottom:1.15rem; }\n        .st-key-cc_market_command_row [data-testid="stDataFrame"] { border-color:rgba(69,103,139,.82)!important;box-shadow:none!important; }\n        .st-key-cc_market_command_row [data-testid="stCaptionContainer"] { color:#9fb2c5!important; }\n        .st-key-cc_parlay_panel { margin-bottom:1rem; }\n        @media (max-width:760px) {\n            .st-key-cc_bet_action_panel,.st-key-cc_market_command_row,.st-key-cc_parlay_panel { padding:.8rem!important; }\n        }\n'''
+          if css_anchor not in t:
+              raise SystemExit('lower panel css anchor not found')
+          t = t.replace(css_anchor, css_add)
+          ui.write_text(t, encoding='utf-8')
+
+          test = Path('tests/test_ui_command_center_contract.py')
+          u = test.read_text(encoding='utf-8')
+          u = u.replace('test_command_center_v5_exposes_reusable_hero_and_matchup_components', 'test_command_center_v6_exposes_reusable_hero_and_matchup_components')
+          u = u.replace('COMMAND_CENTER_UI_VERSION = "cle-command-center-v5"', 'COMMAND_CENTER_UI_VERSION = "cle-command-center-v6"')
+          u = u.replace('test_main_projection_uses_v5_components_without_removing_model_flow', 'test_main_projection_uses_v6_components_without_removing_model_flow')
+          u += '''\n\ndef test_main_projection_lower_command_center_is_presentation_only():\n    source = Path("streamlit_app.py").read_text(encoding="utf-8")\n    theme = Path("engine/ui_command_center.py").read_text(encoding="utf-8")\n    assert 'key="cc_bet_action_panel"' in source\n    assert 'key="cc_market_command_row"' in source\n    assert 'key="cc_parlay_panel"' in source\n    assert "BET TRACKER / PARLAY ACTIONS" in source\n    assert "PROJECTION PARLAY BUILDER" in source\n    assert ".st-key-cc_bet_action_panel" in theme\n    assert ".st-key-cc_market_command_row" in theme\n    assert ".st-key-cc_parlay_panel" in theme\n    assert "render_add_bet_button(add1,k_reco" in source\n    assert "render_add_bet_button(add2,out_reco" in source\n    assert "render_add_bet_button(add3,hit_reco" in source\n    assert "build_market_table(proj,odds_rows,hits_proj)" in source\n    assert "render_projection_parlay_builder()" in source\n    assert "this page never calls the Odds API" in source\n'''
+          test.write_text(u, encoding='utf-8')
+          PY
+      - name: Full quality gate
+        run: |
+          python -m compileall -q streamlit_app.py navigation.py engine automation tests
+          pytest -q
+      - name: Commit polish and remove workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add streamlit_app.py engine/ui_command_center.py tests/test_ui_command_center_contract.py
+          git rm .github/workflows/ui-lower-command-center.yml
+          git commit -m "Polish Projection lower command center"
+          git push origin HEAD:ui-lower-command-center
