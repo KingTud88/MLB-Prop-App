@@ -24,12 +24,23 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
+
           path = Path('pages/4_Projection_History.py')
           text = path.read_text(encoding='utf-8')
-          text = text.replace('"<div class="history-hero"><strong>Performance archive · frozen pregame evidence</strong>"', "'<div class=\"history-hero\"><strong>Performance archive · frozen pregame evidence</strong>'")
-          text = text.replace('"<span>Scoreboard first, K wins and crushers next, deeper learning diagnostics below.</span></div>"', "'<span>Scoreboard first, K wins and crushers next, deeper learning diagnostics below.</span></div>'")
-          text = text.replace('st.markdown("<div class="history-kicker">Performance scoreboard</div>", unsafe_allow_html=True)', 'st.markdown(\'<div class="history-kicker">Performance scoreboard</div>\', unsafe_allow_html=True)')
-          text = text.replace('st.markdown("<div class="history-kicker">Actionable K results</div>", unsafe_allow_html=True)', 'st.markdown(\'<div class="history-kicker">Actionable K results</div>\', unsafe_allow_html=True)')
+          text = text.replace(
+              '"<div class="history-hero"><strong>Performance archive · frozen pregame evidence</strong>"',
+              "'<div class=\"history-hero\"><strong>Performance archive · frozen pregame evidence</strong>'",
+          )
+          text = text.replace(
+              '"<span>Scoreboard first, K wins and crushers next, deeper learning diagnostics below.</span></div>"',
+              "'<span>Scoreboard first, K wins and crushers next, deeper learning diagnostics below.</span></div>'",
+          )
+          text = re.sub(
+              r'st\.markdown\("<div class="history-kicker">([^<]+)</div>", unsafe_allow_html=True\)',
+              lambda m: "st.markdown('<div class=\"history-kicker\">" + m.group(1) + "</div>', unsafe_allow_html=True)",
+              text,
+          )
           path.write_text(text, encoding='utf-8')
           compile(text, str(path), 'exec')
           PY
