@@ -1,9 +1,32 @@
 from __future__ import annotations
 
+from datetime import datetime
+from html import escape
+from zoneinfo import ZoneInfo
+
 import streamlit as st
 
 
-COMMAND_CENTER_UI_VERSION = "cle-command-center-v1"
+COMMAND_CENTER_UI_VERSION = "cle-command-center-v2"
+MASCOT_URL = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000.png"
+EASTERN = ZoneInfo("America/New_York")
+
+
+def _safe(value: object) -> str:
+    return escape(str(value if value is not None else "—"))
+
+
+def _game_time_text(value: object) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return "Time TBD"
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        if parsed.tzinfo is not None:
+            parsed = parsed.astimezone(EASTERN)
+        return parsed.strftime("%I:%M %p ET").lstrip("0")
+    except Exception:
+        return raw
 
 
 def apply_command_center_theme() -> None:
@@ -24,11 +47,14 @@ def apply_command_center_theme() -> None:
             --cc-cream:#f1eee7;
             --cc-line:#36526d;
             --cc-green:#32e58d;
+            --cc-yellow:#ffd166;
+            --cc-muted:#92a9bd;
         }
 
         .stApp {
             background:
                 radial-gradient(ellipse at 52% 4%, rgba(20,55,91,.48), transparent 36rem),
+                radial-gradient(ellipse at 50% 54%, rgba(7,39,70,.30), transparent 42rem),
                 linear-gradient(180deg, rgba(3,16,32,.98), rgba(2,11,22,.99)) !important;
         }
         .stApp::before {
@@ -41,11 +67,157 @@ def apply_command_center_theme() -> None:
         }
         .block-container { max-width:1520px !important; }
 
-        h1,h2,h3,.section-head,.metric-label,.reco-label {
+        h1,h2,h3,.section-head,.metric-label,.reco-label,
+        .cc-hero-title,.cc-status-label,.cc-matchup-name,.cc-team-mark {
             font-family:Impact,"Arial Narrow",Haettenschweiler,sans-serif !important;
             text-transform:uppercase;
         }
         h1 { color:var(--cc-cream)!important; text-shadow:2px 3px 0 rgba(0,0,0,.38),0 0 22px rgba(236,22,56,.12)!important; }
+
+        .cc-hero {
+            position:relative;
+            display:grid;
+            grid-template-columns:minmax(150px,220px) minmax(360px,1fr) minmax(190px,250px);
+            gap:1.25rem;
+            align-items:center;
+            min-height:245px;
+            padding:1.25rem 1.4rem;
+            margin:.15rem 0 1.1rem;
+            overflow:hidden;
+            border:1px solid rgba(82,108,134,.74);
+            border-radius:18px;
+            background:
+                linear-gradient(90deg,rgba(4,19,36,.96),rgba(6,29,53,.94) 52%,rgba(4,17,32,.97)),
+                radial-gradient(circle at 30% 0%,rgba(236,22,56,.13),transparent 22rem);
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 20px 52px rgba(0,0,0,.34);
+        }
+        .cc-hero::before {
+            content:"";
+            position:absolute;
+            inset:auto 0 0;
+            height:3px;
+            background:linear-gradient(90deg,transparent,var(--cc-red) 18%,var(--cc-red) 82%,transparent);
+            box-shadow:0 0 18px rgba(236,22,56,.42);
+        }
+        .cc-hero::after {
+            content:"";
+            position:absolute;
+            inset:0;
+            pointer-events:none;
+            opacity:.20;
+            background:
+                repeating-linear-gradient(90deg,transparent 0 46px,rgba(255,255,255,.025) 47px,transparent 48px),
+                linear-gradient(0deg,rgba(255,255,255,.015),transparent 45%);
+            mask-image:linear-gradient(to bottom,transparent,black 28%,black 100%);
+        }
+        .cc-hero-mascot { position:relative;z-index:1;display:flex;align-items:center;justify-content:center; }
+        .cc-hero-mascot img {
+            display:block;
+            width:min(205px,100%);
+            max-height:218px;
+            object-fit:contain;
+            filter:drop-shadow(0 14px 18px rgba(0,0,0,.42)) drop-shadow(0 0 18px rgba(236,22,56,.12));
+        }
+        .cc-hero-copy { position:relative;z-index:1;min-width:0; }
+        .cc-hero-kicker {
+            color:#d8e3ed;
+            font-size:.72rem;
+            font-weight:900;
+            letter-spacing:.18em;
+            text-transform:uppercase;
+            margin-bottom:.35rem;
+        }
+        .cc-hero-title {
+            color:var(--cc-cream);
+            font-size:clamp(3.25rem,6vw,6.55rem);
+            line-height:.78;
+            letter-spacing:.01em;
+            text-shadow:3px 4px 0 #07182b,0 0 26px rgba(236,22,56,.12);
+            white-space:nowrap;
+        }
+        .cc-hero-title span { color:var(--cc-red);display:block; }
+        .cc-hero-sub {
+            display:inline-flex;
+            align-items:center;
+            gap:.45rem;
+            margin-top:.8rem;
+            padding:.4rem .75rem;
+            border-top:1px solid rgba(236,22,56,.58);
+            border-bottom:1px solid rgba(236,22,56,.58);
+            color:#f3f6f9;
+            background:linear-gradient(90deg,transparent,rgba(236,22,56,.08),transparent);
+            font-family:Impact,"Arial Narrow",sans-serif;
+            font-size:.78rem;
+            letter-spacing:.13em;
+            text-transform:uppercase;
+        }
+        .cc-hero-status { position:relative;z-index:1;display:grid;gap:.7rem; }
+        .cc-status-card {
+            padding:.78rem .85rem;
+            border:1px solid rgba(91,119,146,.68);
+            border-radius:13px;
+            background:linear-gradient(145deg,rgba(10,33,57,.95),rgba(5,20,36,.96));
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 10px 24px rgba(0,0,0,.22);
+        }
+        .cc-status-label { color:#e8eef4;font-size:.72rem;letter-spacing:.08em; }
+        .cc-status-value { margin-top:.18rem;color:#fff;font-weight:900;font-size:1rem; }
+        .cc-status-value.live { color:var(--cc-green); }
+        .cc-status-meta { margin-top:.16rem;color:var(--cc-muted);font-size:.72rem;line-height:1.35; }
+        .cc-quality-track { height:5px;margin-top:.55rem;border-radius:999px;background:rgba(45,70,95,.7);overflow:hidden; }
+        .cc-quality-fill { height:100%;border-radius:999px;background:linear-gradient(90deg,var(--cc-red),#ff4762);box-shadow:0 0 12px rgba(236,22,56,.35); }
+
+        .cc-matchup-strip {
+            display:grid;
+            grid-template-columns:auto 1fr minmax(185px,260px);
+            gap:1.05rem;
+            align-items:center;
+            padding:1rem 1.15rem;
+            margin:.2rem 0 1.3rem;
+            border:1px solid rgba(80,108,136,.76);
+            border-radius:16px;
+            background:linear-gradient(110deg,rgba(8,28,50,.98),rgba(5,20,37,.98));
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 14px 34px rgba(0,0,0,.28);
+        }
+        .cc-team-mark {
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            width:78px;
+            height:78px;
+            border-radius:50%;
+            color:#fff;
+            font-size:1.55rem;
+            letter-spacing:.035em;
+            border:2px solid rgba(236,22,56,.72);
+            background:radial-gradient(circle at 35% 30%,#173e69,#07182b 66%);
+            box-shadow:inset 0 0 0 5px rgba(255,255,255,.025),0 10px 22px rgba(0,0,0,.28);
+        }
+        .cc-matchup-name { color:var(--cc-cream);font-size:clamp(1.7rem,3vw,2.55rem);line-height:.95;letter-spacing:.015em; }
+        .cc-matchup-vs { margin-top:.38rem;color:#fff;font-weight:900;font-size:1rem; }
+        .cc-matchup-vs strong { color:var(--cc-red); }
+        .cc-matchup-meta { margin-top:.28rem;color:#a9bac9;font-size:.82rem; }
+        .cc-matchup-status {
+            padding-left:1.05rem;
+            border-left:1px solid rgba(76,104,132,.54);
+        }
+        .cc-matchup-status-label { color:var(--cc-green);font-family:Impact,"Arial Narrow",sans-serif;font-size:.86rem;letter-spacing:.075em;text-transform:uppercase; }
+        .cc-matchup-status-time { margin-top:.32rem;color:#fff;font-weight:900;font-size:1rem; }
+        .cc-matchup-status-meta { margin-top:.26rem;color:#9eb0c0;font-size:.78rem; }
+        .cc-lock-pill {
+            display:inline-flex;
+            align-items:center;
+            margin-top:.48rem;
+            padding:.23rem .52rem;
+            border-radius:999px;
+            border:1px solid rgba(82,115,148,.62);
+            background:rgba(10,30,52,.82);
+            color:#dce7f0;
+            font-size:.68rem;
+            font-weight:900;
+            letter-spacing:.045em;
+            text-transform:uppercase;
+        }
+        .cc-lock-pill.locked { border-color:rgba(50,229,141,.42);color:#73f1b4;background:rgba(9,64,44,.38); }
 
         .king-title {
             font-size:clamp(3.4rem,7vw,6.5rem)!important;
@@ -167,12 +339,110 @@ def apply_command_center_theme() -> None:
         }
         .sk-panel-hot { border-color:rgba(236,22,56,.9)!important; }
 
+        @media (max-width:1050px) {
+            .cc-hero { grid-template-columns:150px minmax(320px,1fr); }
+            .cc-hero-status { grid-column:1 / -1;grid-template-columns:repeat(3,1fr); }
+            .cc-hero-title { white-space:normal; }
+        }
         @media (max-width:900px) {
             .king-title { font-size:3.15rem!important; line-height:.84!important; }
             .section-head { min-width:190px; padding:.4rem 1.45rem!important; }
             .metric-value { font-size:3rem!important; }
+            .cc-hero { grid-template-columns:110px 1fr;min-height:0;padding:1rem; }
+            .cc-hero-mascot img { max-height:135px; }
+            .cc-hero-title { font-size:3rem; }
+            .cc-hero-status { grid-template-columns:1fr; }
+            .cc-matchup-strip { grid-template-columns:auto 1fr; }
+            .cc-matchup-status { grid-column:1 / -1;border-left:0;border-top:1px solid rgba(76,104,132,.54);padding:.75rem 0 0; }
+        }
+        @media (max-width:620px) {
+            .cc-hero { grid-template-columns:1fr;text-align:center; }
+            .cc-hero-mascot img { width:150px; }
+            .cc-hero-sub { justify-content:center; }
+            .cc-matchup-strip { grid-template-columns:1fr;text-align:center; }
+            .cc-team-mark { margin:0 auto; }
+            .cc-matchup-status { text-align:center; }
         }
         </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_command_center_hero(*, confidence: str, quality: int, locked: bool, app_version: str) -> None:
+    """Render the branded top-of-page hero/status board for Main Projection."""
+    safe_confidence = _safe(confidence or "Unknown")
+    safe_version = _safe(app_version)
+    quality_value = max(0, min(100, int(quality or 0)))
+    lock_text = "Projection locked" if locked else "Ready to lock"
+    lock_meta = "Frozen pitcher snapshot" if locked else "Use the left rail to freeze outputs"
+    st.markdown(
+        f"""
+        <div class="cc-hero">
+          <div class="cc-hero-mascot">
+            <img src="{MASCOT_URL}" alt="StrikeOut King 9000 mascot">
+          </div>
+          <div class="cc-hero-copy">
+            <div class="cc-hero-kicker">Built for CLE baseball · two-path starter intelligence</div>
+            <div class="cc-hero-title">StrikeOut <span>King 9000</span></div>
+            <div class="cc-hero-sub">★ MLB Pitcher Projection Engine ★ Two-Path Analytics ★</div>
+          </div>
+          <div class="cc-hero-status">
+            <div class="cc-status-card">
+              <div class="cc-status-label">Data Status</div>
+              <div class="cc-status-value live">● Live</div>
+              <div class="cc-status-meta">{safe_confidence} confidence · model quality {quality_value}/100</div>
+              <div class="cc-quality-track"><div class="cc-quality-fill" style="width:{quality_value}%"></div></div>
+            </div>
+            <div class="cc-status-card">
+              <div class="cc-status-label">Pitcher State</div>
+              <div class="cc-status-value">{_safe(lock_text)}</div>
+              <div class="cc-status-meta">{_safe(lock_meta)}</div>
+            </div>
+            <div class="cc-status-card">
+              <div class="cc-status-label">Engine</div>
+              <div class="cc-status-value">v{safe_version}</div>
+              <div class="cc-status-meta">Model first · market second</div>
+            </div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_matchup_strip(
+    *,
+    pitcher_name: str,
+    team: str,
+    opponent: str,
+    venue: str,
+    side: str,
+    status: str,
+    game_time: object,
+    locked: bool,
+    weather_icon: str = "",
+) -> None:
+    """Render the matchup strip without changing any projection state."""
+    lock_class = "cc-lock-pill locked" if locked else "cc-lock-pill"
+    lock_label = "🔒 Locked" if locked else "◇ Unlocked"
+    weather = f" {_safe(weather_icon)}" if weather_icon else ""
+    st.markdown(
+        f"""
+        <div class="cc-matchup-strip">
+          <div class="cc-team-mark">{_safe(team)}</div>
+          <div>
+            <div class="cc-matchup-name">{_safe(pitcher_name)}{weather}</div>
+            <div class="cc-matchup-vs">{_safe(team)} <strong>vs</strong> {_safe(opponent)}</div>
+            <div class="cc-matchup-meta">⚾ {_safe(venue)} · {_safe(side)}</div>
+          </div>
+          <div class="cc-matchup-status">
+            <div class="cc-matchup-status-label">Game Status</div>
+            <div class="cc-matchup-status-time">◫ {_safe(_game_time_text(game_time))}</div>
+            <div class="cc-matchup-status-meta">{_safe(status)} · {_safe(side)}</div>
+            <div class="{lock_class}">{_safe(lock_label)}</div>
+          </div>
+        </div>
         """,
         unsafe_allow_html=True,
     )
