@@ -15,9 +15,18 @@ from engine.ui_command_center import (
     apply_command_center_theme,
     render_command_center_hero,
     render_matchup_strip,
-    render_sidebar_brand,
-    render_sidebar_pitcher_identity,
 )
+try:
+    from engine.ui_command_center import render_sidebar_brand, render_sidebar_pitcher_identity
+except ImportError:
+    # Streamlit Cloud can briefly run a new page file beside a cached older UI
+    # helper during deploy. Keep the app bootable until the worker fully syncs.
+    def render_sidebar_brand() -> None:
+        st.markdown("## StrikeOut King 9000")
+        st.caption("CLE-themed MLB starter projection engine")
+
+    def render_sidebar_pitcher_identity(*, pitcher_name: str, team: str, opponent: str, team_id: int = 0) -> None:
+        st.caption(f"{pitcher_name} · {team} vs {opponent}")
 
 from engine.calibration import PROBABILITY_SEMANTICS, calibrate_blend, calibration_summary, milestone_calibration_report
 from engine.projection_engine import ProjectionEngine, ProjectionResult
