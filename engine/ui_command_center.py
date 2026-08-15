@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 import streamlit as st
 
 
-COMMAND_CENTER_UI_VERSION = "cle-command-center-v5"
+COMMAND_CENTER_UI_VERSION = "cle-command-center-v6"
 ASSET_DIR = Path(__file__).resolve().parents[1] / "assets"
 MASCOT_PATH = ASSET_DIR / "strikeout_king_9000.png"
 EASTERN = ZoneInfo("America/New_York")
@@ -334,6 +334,37 @@ def apply_command_center_theme() -> None:
             font-family:Inter,"Segoe UI",Roboto,Arial,sans-serif!important;
             font-weight:800!important;
             text-shadow:none!important;
+        }
+
+        /* Lower command-center modules: presentation only. */
+        .st-key-cc_bet_action_panel,
+        .st-key-cc_market_command_row,
+        .st-key-cc_parlay_panel {
+            position:relative;
+            padding:1rem 1.05rem!important;
+            border:1px solid rgba(76,111,145,.78)!important;
+            border-radius:16px!important;
+            background:linear-gradient(145deg,rgba(8,29,52,.98),rgba(4,17,32,.98))!important;
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.045),0 16px 34px rgba(0,0,0,.27)!important;
+        }
+        .st-key-cc_bet_action_panel { margin-bottom:1rem;border-color:rgba(236,22,56,.46)!important; }
+        .st-key-cc_bet_action_panel::after,
+        .st-key-cc_market_command_row::after,
+        .st-key-cc_parlay_panel::after {
+            content:"";position:absolute;left:10%;right:10%;bottom:0;height:2px;
+            background:linear-gradient(90deg,transparent,var(--cc-red),transparent);opacity:.65;pointer-events:none;
+        }
+        .st-key-cc_bet_action_panel [data-testid="stNumberInput"] { max-width:100%; }
+        .st-key-cc_bet_action_panel div[data-testid="stButton"] button {
+            min-height:3rem!important;border-color:rgba(97,132,166,.72)!important;
+            background:linear-gradient(180deg,rgba(22,53,88,.98),rgba(10,30,55,.98))!important;font-weight:900!important;
+        }
+        .st-key-cc_market_command_row { margin-top:.2rem;margin-bottom:1.15rem; }
+        .st-key-cc_market_command_row [data-testid="stDataFrame"] { border-color:rgba(69,103,139,.82)!important;box-shadow:none!important; }
+        .st-key-cc_market_command_row [data-testid="stCaptionContainer"] { color:#9fb2c5!important; }
+        .st-key-cc_parlay_panel { margin-bottom:1rem; }
+        @media (max-width:760px) {
+            .st-key-cc_bet_action_panel,.st-key-cc_market_command_row,.st-key-cc_parlay_panel { padding:.8rem!important; }
         }
         .metric-value,.reco-side,[data-testid="stMetricValue"] {
             font-family:Impact,"Arial Narrow",sans-serif!important;

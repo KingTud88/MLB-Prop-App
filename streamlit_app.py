@@ -759,9 +759,11 @@ else:
         },
     )
 
-st.markdown("#### Add recommendation to Bet Tracker / Parlay")
-quick_add_stake=st.number_input("Quick-add stake",min_value=0.0,value=1.0,step=0.5,key=f"projection_quick_stake_{game.key}")
-add1,add2,add3=st.columns(3)
+st.markdown('<div class="section-head">BET TRACKER / PARLAY ACTIONS</div>',unsafe_allow_html=True)
+action_panel=st.container(border=True,key="cc_bet_action_panel")
+action_panel.caption("Quick-add a model-aligned straight or parlay leg. Sportsbook price stays optional unless a saved market snapshot exists.")
+quick_add_stake=action_panel.number_input("Quick-add stake",min_value=0.0,value=1.0,step=0.5,key=f"projection_quick_stake_{game.key}")
+add1,add2,add3=action_panel.columns(3,gap="medium")
 render_add_bet_button(add1,k_reco,"Strikeouts",{"pitcher_strikeouts","pitcher_strikeouts_alternate"},proj.mean_k,quick_add_stake,game,selected_date.isoformat(),odds_rows,proj.confidence,proj.quality,f"add_k_{game.key}")
 render_add_bet_button(add2,out_reco,"Total Outs",{"pitcher_outs","pitcher_outs_alternate"},proj.mean_outs,quick_add_stake,game,selected_date.isoformat(),odds_rows,proj.confidence,proj.quality,f"add_outs_{game.key}")
 render_add_bet_button(add3,hit_reco,"Hits Allowed",{"pitcher_hits_allowed","pitcher_hits_allowed_alternate"},hits_proj.ensemble_mean,quick_add_stake,game,selected_date.isoformat(),odds_rows,proj.confidence,proj.quality,f"add_hits_{game.key}")
@@ -817,7 +819,8 @@ with st.expander(f"🔎 Why this projection? · {game.pitcher_name}", expanded=F
     if not drivers.empty:
         st.markdown("#### Leading model drivers")
         st.dataframe(drivers,use_container_width=True,hide_index=True)
-left,right=st.columns([1.35,1])
+market_command_row=st.container(border=True,key="cc_market_command_row")
+left,right=market_command_row.columns([1.35,1],gap="large")
 with left:
     st.markdown('<div class="section-head">STRIKEOUT MILESTONE LADDER</div>',unsafe_allow_html=True)
     view=kdf[["Line","Probability","Fair Odds","Simulation","Math","Sim Weight"]].copy()
@@ -867,5 +870,7 @@ with right:
         st.dataframe(market_df,use_container_width=True,hide_index=True)
         st.caption("Live sportsbook prices are shown for strikeouts, total outs, and hits allowed markets. Edge compares the independent model probability with implied probability; market prices never feed the forecast.")
     else: st.info("Live market data will populate here when the Odds API returns the pitcher props.")
-render_projection_parlay_builder()
+st.markdown('<div class="section-head">PROJECTION PARLAY BUILDER</div>',unsafe_allow_html=True)
+with st.container(border=True,key="cc_parlay_panel"):
+    render_projection_parlay_builder()
 st.markdown(f'<div class="search-note">Data status: {proj.confidence} confidence · quality {proj.quality}/100 · locked: {locked} · engine v{APP_VERSION}</div>',unsafe_allow_html=True)
