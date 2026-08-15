@@ -11,7 +11,11 @@ import requests
 import streamlit as st
 
 from engine.ui_theme import apply_page_theme
-from engine.ui_command_center import apply_command_center_theme
+from engine.ui_command_center import (
+    apply_command_center_theme,
+    render_command_center_hero,
+    render_matchup_strip,
+)
 
 from engine.calibration import PROBABILITY_SEMANTICS, calibrate_blend, calibration_summary, milestone_calibration_report
 from engine.projection_engine import ProjectionEngine, ProjectionResult
@@ -687,9 +691,24 @@ elif nav=="Daily Projection Run":
     st.markdown('<div class="section-head">DAILY PROJECTION RUN</div>',unsafe_allow_html=True); st.write(f"Slate: {selected_date.isoformat()} · {len(matches)} probable pitcher entries loaded."); st.dataframe(pd.DataFrame([{"Pitcher":g.pitcher_name,"Team":g.team,"Opponent":g.opponent,"Status":g.status} for g in matches]),use_container_width=True,hide_index=True); st.info("Select a pitcher from the left-rail dropdown to run the full two-path projection for that pitcher."); st.stop()
 
 if not locked: st.info("Lock the pitcher in the left rail to freeze all projection outputs for this pitcher.")
-st.markdown('<div class="king-title">STRIKEOUT<br><span class="king-red">KING 9000</span></div><div class="subline">★ MLB PITCHER PROJECTION ENGINE ★ TWO-PATH ANALYTICS ★</div>',unsafe_allow_html=True)
 weather_marker=f" {weather_risk.icon}" if weather_risk.icon else ""
-st.markdown(f'<div class="pitcher-card"><h2>{game.pitcher_name.upper()}{weather_marker}</h2><b>{game.team} vs {game.opponent}</b><br><span class="search-note">{game.venue} · {game.side} · {game.status}</span></div>',unsafe_allow_html=True)
+render_command_center_hero(
+    confidence=proj.confidence,
+    quality=proj.quality,
+    locked=locked,
+    app_version=APP_VERSION,
+)
+render_matchup_strip(
+    pitcher_name=game.pitcher_name,
+    team=game.team,
+    opponent=game.opponent,
+    venue=game.venue,
+    side=game.side,
+    status=game.status,
+    game_time=game.game_time,
+    locked=locked,
+    weather_icon=weather_risk.icon or "",
+)
 if weather_risk.available and weather_risk.level in {"HIGH","ELEVATED"}:
     st.warning(f"{weather_risk.icon} {weather_risk.summary}. Weather risk is informational and does not currently modify the projection.")
 elif weather_risk.available and weather_risk.level == "LOW":
