@@ -11,6 +11,7 @@ import requests
 import streamlit as st
 
 from engine.ui_theme import apply_page_theme
+from engine.ui_command_center import apply_command_center_theme
 
 from engine.calibration import PROBABILITY_SEMANTICS, calibrate_blend, calibration_summary, milestone_calibration_report
 from engine.projection_engine import ProjectionEngine, ProjectionResult
@@ -45,6 +46,7 @@ PARK_K_FACTOR = {"Coors Field":.94,"T-Mobile Park":1.05,"Petco Park":1.03,"Oracl
 
 st.set_page_config(page_title="StrikeOut King 9000", page_icon="⚾", layout="wide", initial_sidebar_state="expanded")
 apply_page_theme()
+apply_command_center_theme()
 st.markdown("""<style>
 :root{--bg:#06111d;--panel:#0b1c2e;--line:#1b3851;--red:#f0193c;--green:#24e69b;--ink:#f2f6fa;--muted:#8fa5b7}
 .stApp{background:linear-gradient(145deg,#04101b,#091a2a);color:var(--ink)}
