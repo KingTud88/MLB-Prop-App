@@ -1,0 +1,59 @@
+name: Normalize mascot asset
+
+on:
+  push:
+    branches: [ui-cle-brand-pass-v2]
+    paths:
+      - .github/workflows/mascot-normalize.yml
+
+permissions:
+  contents: write
+
+jobs:
+  normalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ui-cle-brand-pass-v2
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pillow
+      - name: Decode and normalize mascot
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+
+          candidates = [
+              Path('assets/strikeout_king_9000.png'),
+              Path('assets/strikeout_king_9000_96.png'),
+          ]
+          last = None
+          for src in candidates:
+              try:
+                  with Image.open(src) as im:
+                      print(f'{src}: format={im.format} size={im.size} mode={im.mode}')
+                      fixed = im.convert('RGBA')
+                      fixed.thumbnail((640, 640), Image.Resampling.LANCZOS)
+                      fixed.save('assets/strikeout_king_9000_clean.png', format='PNG', optimize=True)
+                  with Image.open('assets/strikeout_king_9000_clean.png') as check:
+                      check.verify()
+                  print('normalized mascot ok')
+                  break
+              except Exception as exc:
+                  print(f'{src} failed: {exc!r}')
+                  last = exc
+          else:
+              raise SystemExit(f'No mascot candidate decoded: {last!r}')
+          PY
+      - name: Commit normalized mascot only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/strikeout_king_9000_clean.png
+          git rm .github/workflows/mascot-normalize.yml
+          git commit -m "Normalize mascot asset"
+          git push origin HEAD:ui-cle-brand-pass-v2
