@@ -15,6 +15,8 @@ from engine.ui_command_center import (
     apply_command_center_theme,
     render_command_center_hero,
     render_matchup_strip,
+    render_sidebar_brand,
+    render_sidebar_pitcher_identity,
 )
 
 from engine.calibration import PROBABILITY_SEMANTICS, calibrate_blend, calibration_summary, milestone_calibration_report
@@ -415,6 +417,7 @@ def render_reco(card,reco,*,key_prefix=None,market_key=None,proj=None,hits_proj=
                if key_prefix and market_key and proj is not None else dict(reco))
     side=effective["side"]
     cls="reco-warn" if side=="PASS" else "reco-under" if side=="UNDER" else "reco-good"
+    icon=("K+" if "STRIKEOUT" in str(effective.get("label","")) else "OUT" if "OUTS" in str(effective.get("label","")) else "H")
     reason_labels={
         "no_positive_aligned_edge":"EDGE BELOW 2%",
         "probability_conflicts_with_projection":"PROJECTION / PROBABILITY DISAGREE",
@@ -433,7 +436,7 @@ def render_reco(card,reco,*,key_prefix=None,market_key=None,proj=None,hits_proj=
         edge=f"EDGE {effective['edge']:+.1%}" if effective["edge"] is not None else "MODEL LEAN"
         meta=f"Model {effective['model']:.1%} · {edge}"
     with card:
-        st.markdown(f'<div class="reco-card"><div class="reco-label">{effective["label"]}</div><div class="reco-side {cls}">{side}</div><div class="reco-line">{effective["line"]:g} LINE</div><div class="reco-meta">{meta}</div></div>',unsafe_allow_html=True)
+        st.markdown(f'<div class="reco-card"><div class="cc-card-top"><div class="cc-card-icon">{icon}</div><div class="reco-label">{effective["label"]}</div></div><div class="reco-side {cls}">{side}</div><div class="reco-line">{effective["line"]:g} LINE</div><div class="reco-meta">{meta}</div></div>',unsafe_allow_html=True)
         if key_prefix and market_key and proj is not None:
             with st.expander("✍️ MANUAL LINE / ODDS", expanded=False):
                 enabled=st.checkbox("Use manual market",key=f"{key_prefix}:enabled")
@@ -563,7 +566,7 @@ def build_market_table(proj,odds_rows,hits_proj=None):
     return pd.DataFrame(rows).sort_values(["Market","Line","Book"]) if rows else pd.DataFrame()
 
 with st.sidebar:
-    st.markdown("## StrikeOut King 9000"); st.caption("CLE-themed MLB starter projection engine")
+    render_sidebar_brand()
     nav=st.radio("Navigation",["Projection","Distribution","Form & Workload","Model Card","Bet Tracker","Projection History","Daily Projection Run","Top Plays"],label_visibility="collapsed")
     if nav == "Bet Tracker":
         st.switch_page("pages/2_Bet_Tracker.py")
@@ -589,6 +592,10 @@ with st.sidebar:
     choice=st.selectbox("Matching pitchers",names,index=default_index,label_visibility="collapsed",key="pitcher_selector",disabled=bool(locked_game))
 game=matches[names.index(choice)]; locked=st.session_state.get("locked_pitcher")==game.key
 with st.sidebar:
+    render_sidebar_pitcher_identity(
+        pitcher_name=game.pitcher_name, team=game.team, opponent=game.opponent,
+        team_id=TEAM_ID_BY_ABBR.get(game.team,0),
+    )
     if st.button("🔒 LOCK PITCHER" if not locked else "🔓 UNLOCK PITCHER",use_container_width=True): st.session_state["locked_pitcher"]=None if locked else game.key; st.rerun()
 
 log,herr=get_log(game.pitcher_id,selected_date.year)
@@ -708,6 +715,7 @@ render_matchup_strip(
     game_time=game.game_time,
     locked=locked,
     weather_icon=weather_risk.icon or "",
+    team_id=TEAM_ID_BY_ABBR.get(game.team,0),
 )
 if weather_risk.available and weather_risk.level in {"HIGH","ELEVATED"}:
     st.warning(f"{weather_risk.icon} {weather_risk.summary}. Weather risk is informational and does not currently modify the projection.")
@@ -717,12 +725,12 @@ st.markdown('<div class="section-head">PROJECTION SUMMARY</div>',unsafe_allow_ht
 alt_k_choice=best_alt_k([(int(str(row["Line"]).rstrip("+")),float(row["Probability"])) for _,row in kdf.iterrows()])
 alt_k_html=(f'<div class="alt-k-badge">BEST ALT K · {alt_k_choice.milestone}+ · {alt_k_choice.probability:.0%} HIT</div>' if alt_k_choice else '<div class="alt-k-badge">BEST ALT K · NO 70%+ ALT</div>')
 c1,c2,c3,c4=st.columns(4)
-with c1: st.markdown(f'<div class="metric-card"><div class="metric-label">PROJECTED STRIKEOUTS</div><div class="metric-value">{proj.mean_k:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(proj.k_samples,.1))}-{int(np.quantile(proj.k_samples,.9))}</span>{alt_k_html}</div>',unsafe_allow_html=True)
+with c1: st.markdown(f'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon">K</div><div class="metric-label">PROJECTED STRIKEOUTS</div></div><div class="metric-value">{proj.mean_k:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(proj.k_samples,.1))}-{int(np.quantile(proj.k_samples,.9))}</span>{alt_k_html}</div>',unsafe_allow_html=True)
 render_reco(c2,k_reco,key_prefix=f"manual_k:{game.key}",market_key="pitcher_strikeouts",proj=proj,hits_proj=hits_proj)
-with c3: st.markdown(f'<div class="metric-card"><div class="metric-label">PROJECTED OUTS</div><div class="metric-value">{proj.mean_outs:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(proj.outs_samples,.1))}-{int(np.quantile(proj.outs_samples,.9))}</span></div>',unsafe_allow_html=True)
+with c3: st.markdown(f'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon ball">⚾</div><div class="metric-label">PROJECTED OUTS</div></div><div class="metric-value">{proj.mean_outs:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(proj.outs_samples,.1))}-{int(np.quantile(proj.outs_samples,.9))}</span></div>',unsafe_allow_html=True)
 render_reco(c4,out_reco,key_prefix=f"manual_outs:{game.key}",market_key="pitcher_outs",proj=proj,hits_proj=hits_proj)
 h1,h2=st.columns(2)
-with h1: st.markdown(f'<div class="metric-card"><div class="metric-label">PROJECTED HITS ALLOWED</div><div class="metric-value">{hits_proj.ensemble_mean:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(hits_proj.simulation_samples,.1))}-{int(np.quantile(hits_proj.simulation_samples,.9))}</span></div>',unsafe_allow_html=True)
+with h1: st.markdown(f'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon hit">H</div><div class="metric-label">PROJECTED HITS ALLOWED</div></div><div class="metric-value">{hits_proj.ensemble_mean:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(hits_proj.simulation_samples,.1))}-{int(np.quantile(hits_proj.simulation_samples,.9))}</span></div>',unsafe_allow_html=True)
 render_reco(h2,hit_reco,key_prefix=f"manual_hits:{game.key}",market_key="pitcher_hits_allowed",proj=proj,hits_proj=hits_proj)
 
 st.markdown('<div class="section-head">OPPOSING BATTER BOX</div>',unsafe_allow_html=True)

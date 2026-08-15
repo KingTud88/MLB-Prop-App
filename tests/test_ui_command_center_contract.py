@@ -1,13 +1,16 @@
 from pathlib import Path
 
 
-def test_command_center_v6_exposes_reusable_hero_and_matchup_components():
+def test_command_center_v7_exposes_reusable_brand_components():
     source = Path("engine/ui_command_center.py").read_text(encoding="utf-8")
-    assert 'COMMAND_CENTER_UI_VERSION = "cle-command-center-v6"' in source
+    assert 'COMMAND_CENTER_UI_VERSION = "cle-command-center-v7"' in source
     assert "def render_command_center_hero(" in source
     assert "def render_matchup_strip(" in source
     assert "cc-hero-fallback" in source
-    assert "st.image(str(MASCOT_PATH)" not in source
+    assert "st.image(str(MASCOT_PATH), width=190)" in source
+    assert "def render_sidebar_brand(" in source
+    assert "def render_sidebar_pitcher_identity(" in source
+    assert "www.mlbstatic.com/team-logos" in source
     assert "key=\"cc_hero_shell\"" in source
     assert "cc-hero-status" in source
     assert "cc-quality-track" in source
@@ -18,7 +21,7 @@ def test_command_center_v6_exposes_reusable_hero_and_matchup_components():
     assert "raw.githubusercontent.com" not in source
 
 
-def test_main_projection_uses_v6_components_without_removing_model_flow():
+def test_main_projection_uses_v7_components_without_removing_model_flow():
     source = Path("streamlit_app.py").read_text(encoding="utf-8")
     assert "render_command_center_hero(" in source
     assert "render_matchup_strip(" in source
@@ -47,4 +50,18 @@ def test_main_projection_lower_command_center_is_presentation_only():
     assert "render_add_bet_button(add3,hit_reco" in source
     assert "build_market_table(proj,odds_rows,hits_proj)" in source
     assert "render_projection_parlay_builder()" in source
+    assert "this page never calls the Odds API" in source
+
+
+def test_brand_pass_adds_team_marks_and_projection_icon_bubbles():
+    source = Path("streamlit_app.py").read_text(encoding="utf-8")
+    theme = Path("engine/ui_command_center.py").read_text(encoding="utf-8")
+    assert "render_sidebar_brand()" in source
+    assert "render_sidebar_pitcher_identity(" in source
+    assert "team_id=TEAM_ID_BY_ABBR.get(game.team,0)" in source
+    assert "cc-card-icon" in source
+    assert ".cc-card-icon" in theme
+    assert ".cc-sidebar-brand" in theme
+    assert ".cc-team-logo" in theme
+    assert "calculate_projection(" in source
     assert "this page never calls the Odds API" in source
