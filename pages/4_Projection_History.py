@@ -66,8 +66,8 @@ st.caption(
     "total outs, and hits allowed. Current learning diagnostics only use starter-only model rows."
 )
 st.markdown(
-    "<div class="history-hero"><strong>Performance archive · frozen pregame evidence</strong>"
-    "<span>Scoreboard first, K wins and crushers next, deeper learning diagnostics below.</span></div>",
+    '<div class="history-hero"><strong>Performance archive · frozen pregame evidence</strong>'
+    '<span>Scoreboard first, K wins and crushers next, deeper learning diagnostics below.</span></div>',
     unsafe_allow_html=True,
 )
 
@@ -183,7 +183,7 @@ o_resolved = df["actual_outs"].notna()
 o_ready = o_resolved & df["outs_range_low"].notna() & df["outs_range_high"].notna()
 o_hit = o_ready & (df["actual_outs"] >= df["outs_range_low"]) & (df["actual_outs"] <= df["outs_range_high"])
 
-st.markdown("<div class="history-kicker">Performance scoreboard</div>", unsafe_allow_html=True)
+st.markdown('<div class="history-kicker">Performance scoreboard</div>', unsafe_allow_html=True)
 col1, col2, col3, col4, col5, col6 = st.columns(6)
 col1.metric("Archived projections", len(df))
 col2.metric("Resolved games", int((k_resolved | h_resolved | o_resolved).sum()))
@@ -218,7 +218,7 @@ else:
 st.caption("80% range HIT means the final result landed inside that market's frozen pregame interval. Range coverage is calibration evidence, not directional win/loss grading.")
 
 st.divider()
-st.markdown("<div class="history-kicker">Actionable K results</div>", unsafe_allow_html=True)
+st.markdown('<div class="history-kicker">Actionable K results</div>', unsafe_allow_html=True)
 st.subheader("🔥 Bettable K Wins & Crushers")
 st.caption(
     "Archive K grading uses the highest whole-K ladder milestone fully supported by the frozen projection: floor(Projected K), within our 3+–12+ ladder. "
@@ -269,7 +269,7 @@ else:
         st.caption("🔥 CRUSHER requires at least 3 resolved current-model ladder calls, a win rate of at least 66.7%, and average actual Ks more than 0.5 above the bettable target. This board is descriptive tracking only.")
 
 st.divider()
-st.markdown("<div class="history-kicker">Learning diagnostics</div>", unsafe_allow_html=True)
+st.markdown('<div class="history-kicker">Learning diagnostics</div>', unsafe_allow_html=True)
 st.subheader("🧠 Current model learning status")
 current_mask = df["history_semantics"].astype(str).eq(HISTORY_SEMANTICS)
 current = df.loc[current_mask].copy()
@@ -616,7 +616,7 @@ else:
     )
 
 st.divider()
-st.markdown("<div class="history-kicker">Resolved & pending slates</div>", unsafe_allow_html=True)
+st.markdown('<div class="history-kicker">Resolved & pending slates</div>', unsafe_allow_html=True)
 st.subheader("📋 Projection archive")
 display = df.sort_values(["game_date", "captured_at_utc"], ascending=[False, False]).copy()
 display["status"] = display.apply(
