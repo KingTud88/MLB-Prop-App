@@ -8,9 +8,9 @@ from zoneinfo import ZoneInfo
 import streamlit as st
 
 
-COMMAND_CENTER_UI_VERSION = "cle-command-center-v6"
+COMMAND_CENTER_UI_VERSION = "cle-command-center-v7"
 ASSET_DIR = Path(__file__).resolve().parents[1] / "assets"
-MASCOT_PATH = ASSET_DIR / "strikeout_king_9000.png"
+MASCOT_PATH = ASSET_DIR / "strikeout_king_9000_clean.png"
 EASTERN = ZoneInfo("America/New_York")
 
 
@@ -51,6 +51,7 @@ def apply_command_center_theme() -> None:
             --cc-green:#32e58d;
             --cc-yellow:#ffd166;
             --cc-muted:#92a9bd;
+            --cc-ui-font:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
         }
 
         .stApp {
@@ -69,13 +70,28 @@ def apply_command_center_theme() -> None:
         }
         .block-container { max-width:1520px !important; }
 
+        .stApp,[data-testid="stSidebar"],[data-testid="stMarkdownContainer"],
+        [data-testid="stCaptionContainer"],button,input,label {
+            font-family:var(--cc-ui-font)!important;
+            -webkit-font-smoothing:antialiased;
+            -moz-osx-font-smoothing:grayscale;
+            text-rendering:optimizeLegibility;
+        }
+        [data-testid="stCaptionContainer"],.reco-meta,.search-note {
+            font-family:var(--cc-ui-font)!important;
+            font-size:.86rem!important;
+            line-height:1.45!important;
+            letter-spacing:0!important;
+            text-shadow:none!important;
+        }
+
         h1,.section-head,.cc-hero-title,.cc-team-mark {
             font-family:Impact,"Arial Narrow",Haettenschweiler,sans-serif !important;
             text-transform:uppercase;
         }
         h2,h3,.metric-label,.reco-label,.cc-status-label,.cc-matchup-name,
         .cc-matchup-status-label,[data-testid="stDataFrame"] [role="columnheader"] {
-            font-family:Inter,"Segoe UI",Roboto,Arial,sans-serif !important;
+            font-family:var(--cc-ui-font) !important;
             text-transform:uppercase;
             font-weight:800 !important;
             letter-spacing:.025em !important;
@@ -144,7 +160,7 @@ def apply_command_center_theme() -> None:
         .cc-hero-fallback span {
             margin-top:.35rem;
             color:var(--cc-red);
-            font-family:Inter,"Segoe UI",Roboto,Arial,sans-serif;
+            font-family:var(--cc-ui-font);
             font-size:.68rem;
             font-weight:900;
             letter-spacing:.12em;
@@ -152,7 +168,8 @@ def apply_command_center_theme() -> None:
         .cc-hero-copy { position:relative;z-index:1;min-width:0; }
         .cc-hero-kicker {
             color:#d8e3ed;
-            font-size:.72rem;
+            font-family:var(--cc-ui-font);
+            font-size:.78rem;
             font-weight:900;
             letter-spacing:.18em;
             text-transform:uppercase;
@@ -177,10 +194,10 @@ def apply_command_center_theme() -> None:
             border-bottom:1px solid rgba(236,22,56,.58);
             color:#f3f6f9;
             background:linear-gradient(90deg,transparent,rgba(236,22,56,.08),transparent);
-            font-family:Inter,"Segoe UI",Roboto,Arial,sans-serif;
+            font-family:var(--cc-ui-font);
             font-weight:800;
-            font-size:.78rem;
-            letter-spacing:.13em;
+            font-size:.84rem;
+            letter-spacing:.08em;
             text-transform:uppercase;
         }
         .cc-hero-status { position:relative;z-index:1;display:grid;gap:.7rem; }
@@ -191,10 +208,10 @@ def apply_command_center_theme() -> None:
             background:linear-gradient(145deg,rgba(10,33,57,.95),rgba(5,20,36,.96));
             box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 10px 24px rgba(0,0,0,.22);
         }
-        .cc-status-label { color:#e8eef4;font-size:.72rem;letter-spacing:.08em; }
+        .cc-status-label { color:#e8eef4;font-size:.80rem;letter-spacing:.045em; }
         .cc-status-value { margin-top:.18rem;color:#fff;font-weight:900;font-size:1rem; }
         .cc-status-value.live { color:var(--cc-green); }
-        .cc-status-meta { margin-top:.16rem;color:var(--cc-muted);font-size:.72rem;line-height:1.35; }
+        .cc-status-meta { margin-top:.18rem;color:#a8bacb;font-family:var(--cc-ui-font);font-size:.82rem;line-height:1.42; }
         .cc-quality-track { height:5px;margin-top:.55rem;border-radius:999px;background:rgba(45,70,95,.7);overflow:hidden; }
         .cc-quality-fill { height:100%;border-radius:999px;background:linear-gradient(90deg,var(--cc-red),#ff4762);box-shadow:0 0 12px rgba(236,22,56,.35); }
 
@@ -227,14 +244,14 @@ def apply_command_center_theme() -> None:
         .cc-matchup-name { color:var(--cc-cream);font-size:clamp(1.7rem,3vw,2.55rem);line-height:.95;letter-spacing:.015em; }
         .cc-matchup-vs { margin-top:.38rem;color:#fff;font-weight:900;font-size:1rem; }
         .cc-matchup-vs strong { color:var(--cc-red); }
-        .cc-matchup-meta { margin-top:.28rem;color:#a9bac9;font-size:.82rem; }
+        .cc-matchup-meta { margin-top:.32rem;color:#b7c6d3;font-family:var(--cc-ui-font);font-size:.90rem; }
         .cc-matchup-status {
             padding-left:1.05rem;
             border-left:1px solid rgba(76,104,132,.54);
         }
-        .cc-matchup-status-label { color:var(--cc-green);font-family:Inter,"Segoe UI",Roboto,Arial,sans-serif;font-size:.82rem;font-weight:800;letter-spacing:.045em;text-transform:uppercase; }
+        .cc-matchup-status-label { color:var(--cc-green);font-family:var(--cc-ui-font);font-size:.86rem;font-weight:800;letter-spacing:.025em;text-transform:uppercase; }
         .cc-matchup-status-time { margin-top:.32rem;color:#fff;font-weight:900;font-size:1rem; }
-        .cc-matchup-status-meta { margin-top:.26rem;color:#9eb0c0;font-size:.78rem; }
+        .cc-matchup-status-meta { margin-top:.28rem;color:#afc0cf;font-family:var(--cc-ui-font);font-size:.84rem; }
         .cc-lock-pill {
             display:inline-flex;
             align-items:center;
@@ -244,9 +261,9 @@ def apply_command_center_theme() -> None:
             border:1px solid rgba(82,115,148,.62);
             background:rgba(10,30,52,.82);
             color:#dce7f0;
-            font-size:.68rem;
-            font-weight:900;
-            letter-spacing:.045em;
+            font-size:.76rem;
+            font-weight:800;
+            letter-spacing:.02em;
             text-transform:uppercase;
         }
         .cc-lock-pill.locked { border-color:rgba(50,229,141,.42);color:#73f1b4;background:rgba(9,64,44,.38); }
@@ -266,8 +283,8 @@ def apply_command_center_theme() -> None:
             border-bottom:1px solid rgba(236,22,56,.6)!important;
             text-align:center!important;
             padding:.45rem .7rem!important;
-            font-family:Impact,"Arial Narrow",sans-serif!important;
-            font-size:.86rem!important;
+            font-family:var(--cc-ui-font)!important;
+            font-size:.92rem!important;
             letter-spacing:.16em!important;
             color:#f3f6f9!important;
             background:linear-gradient(90deg,transparent,rgba(236,22,56,.08),transparent)!important;
@@ -313,6 +330,36 @@ def apply_command_center_theme() -> None:
         .section-head::before { left:-13px; transform:skewX(-18deg); }
         .section-head::after { right:-13px; transform:skewX(18deg); }
 
+        .cc-card-top { display:flex;align-items:center;justify-content:center;gap:.72rem;margin-bottom:.32rem; }
+        .cc-card-icon {
+            width:48px;height:48px;flex:0 0 48px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+            border:2px solid rgba(236,22,56,.72);background:radial-gradient(circle at 35% 30%,#183e68,#07182b 68%);
+            color:#fff;font-family:Impact,"Arial Narrow",sans-serif;font-size:1.18rem;letter-spacing:.02em;
+            box-shadow:inset 0 0 0 5px rgba(255,255,255,.025),0 8px 18px rgba(0,0,0,.28);
+        }
+        .cc-card-icon.ball { font-family:var(--cc-ui-font);font-size:1.4rem; }
+        .cc-card-icon.hit { color:#ff6a7d; }
+        .cc-team-logo { overflow:hidden;background:radial-gradient(circle at 35% 30%,#122e50,#061426 72%); }
+        .cc-team-logo img { width:66px;height:66px;object-fit:contain;display:block;filter:drop-shadow(0 5px 10px rgba(0,0,0,.28)); }
+
+        .cc-sidebar-brand {
+            padding:.85rem .7rem .8rem;margin:.1rem 0 .8rem;border:1px solid rgba(78,108,137,.66);border-radius:14px;
+            background:linear-gradient(145deg,rgba(8,29,51,.98),rgba(3,16,30,.98));text-align:center;
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 12px 26px rgba(0,0,0,.20);
+        }
+        .cc-sidebar-crown { color:var(--cc-red);font-size:1.2rem;line-height:1; }
+        .cc-sidebar-script { color:#f5f1e9;font-family:Georgia,"Times New Roman",serif;font-size:1.55rem;font-weight:800;font-style:italic;line-height:.95; }
+        .cc-sidebar-king { color:var(--cc-red);font-family:Impact,"Arial Narrow",sans-serif;font-size:1.42rem;letter-spacing:.035em;line-height:1.0;text-transform:uppercase; }
+        .cc-sidebar-tag { margin-top:.38rem;color:#9fb3c5;font-family:var(--cc-ui-font);font-size:.78rem;line-height:1.35; }
+        .cc-sidebar-pitcher {
+            display:flex;align-items:center;gap:.65rem;padding:.58rem .62rem;margin:.45rem 0 .62rem;border:1px solid rgba(63,100,134,.72);
+            border-radius:12px;background:linear-gradient(145deg,rgba(9,31,55,.96),rgba(5,19,35,.96));
+        }
+        .cc-sidebar-pitcher-logo { width:42px;height:42px;flex:0 0 42px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#07182b;overflow:hidden; }
+        .cc-sidebar-pitcher-logo img { width:38px;height:38px;object-fit:contain; }
+        .cc-sidebar-pitcher-name { color:#f4f7fa;font-family:var(--cc-ui-font);font-size:.86rem;font-weight:800;line-height:1.15; }
+        .cc-sidebar-pitcher-meta { margin-top:.15rem;color:#9fb2c4;font-family:var(--cc-ui-font);font-size:.74rem;line-height:1.25; }
+
         .metric-card,.reco-card {
             border-radius:15px!important;
             min-height:168px!important;
@@ -329,9 +376,9 @@ def apply_command_center_theme() -> None:
         .metric-label,.reco-label {
             color:#eef3f7!important;
             letter-spacing:.02em!important;
-            font-size:.88rem!important;
-            line-height:1.25!important;
-            font-family:Inter,"Segoe UI",Roboto,Arial,sans-serif!important;
+            font-size:.92rem!important;
+            line-height:1.30!important;
+            font-family:var(--cc-ui-font)!important;
             font-weight:800!important;
             text-shadow:none!important;
         }
@@ -386,7 +433,7 @@ def apply_command_center_theme() -> None:
             box-shadow:0 15px 34px rgba(0,0,0,.23)!important;
         }
         [data-testid="stDataFrame"] [role="columnheader"] {
-            font-family:Inter,"Segoe UI",Roboto,Arial,sans-serif!important;
+            font-family:var(--cc-ui-font)!important;
             font-weight:800!important;
             text-transform:uppercase!important;
             letter-spacing:.02em!important;
@@ -396,7 +443,7 @@ def apply_command_center_theme() -> None:
         div[data-testid="stButton"] button[kind="primary"] {
             background:linear-gradient(180deg,#f21b3d,#b70d29)!important;
             border-color:#ff3b59!important;
-            font-family:Impact,"Arial Narrow",sans-serif!important;
+            font-family:var(--cc-ui-font)!important;
             text-transform:uppercase!important;
             letter-spacing:.045em!important;
         }
@@ -437,6 +484,37 @@ def apply_command_center_theme() -> None:
     )
 
 
+def _team_logo_url(team_id: int | None) -> str:
+    try:
+        value = int(team_id or 0)
+    except (TypeError, ValueError):
+        value = 0
+    return f"https://www.mlbstatic.com/team-logos/{value}.svg" if value > 0 else ""
+
+
+def render_sidebar_brand() -> None:
+    st.markdown(
+        '<div class="cc-sidebar-brand"><div class="cc-sidebar-crown">♛</div>'
+        '<div class="cc-sidebar-script">StrikeOut</div><div class="cc-sidebar-king">King 9000</div>'
+        '<div class="cc-sidebar-tag">CLE-themed MLB starter projection engine</div></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_sidebar_pitcher_identity(*, pitcher_name: str, team: str, opponent: str, team_id: int = 0) -> None:
+    logo = _team_logo_url(team_id)
+    logo_html = (
+        f'<img src="{logo}" alt="{_safe(team)} logo" loading="lazy">'
+        if logo else f'<span>{_safe(team)}</span>'
+    )
+    st.markdown(
+        f'<div class="cc-sidebar-pitcher"><div class="cc-sidebar-pitcher-logo">{logo_html}</div>'
+        f'<div><div class="cc-sidebar-pitcher-name">{_safe(pitcher_name)}</div>'
+        f'<div class="cc-sidebar-pitcher-meta">{_safe(team)} vs {_safe(opponent)}</div></div></div>',
+        unsafe_allow_html=True,
+    )
+
+
 def render_command_center_hero(*, confidence: str, quality: int, locked: bool, app_version: str) -> None:
     """Render the branded top-of-page hero/status board for Main Projection."""
     safe_confidence = _safe(confidence or "Unknown")
@@ -448,10 +526,13 @@ def render_command_center_hero(*, confidence: str, quality: int, locked: bool, a
     with st.container(border=False, key="cc_hero_shell"):
         mascot_col, copy_col, status_col = st.columns([1.15, 3.25, 1.45], gap="medium", vertical_alignment="center")
         with mascot_col:
-            st.markdown(
-                '<div class="cc-hero-fallback" aria-label="StrikeOut King 9000">SK9K<span>STRIKEOUT KING</span></div>',
-                unsafe_allow_html=True,
-            )
+            try:
+                st.image(str(MASCOT_PATH), width=190)
+            except Exception:
+                st.markdown(
+                    '<div class="cc-hero-fallback" aria-label="StrikeOut King 9000">SK9K<span>STRIKEOUT KING</span></div>',
+                    unsafe_allow_html=True,
+                )
         with copy_col:
             st.markdown(
                 """
@@ -500,15 +581,21 @@ def render_matchup_strip(
     game_time: object,
     locked: bool,
     weather_icon: str = "",
+    team_id: int = 0,
 ) -> None:
     """Render the matchup strip without changing any projection state."""
     lock_class = "cc-lock-pill locked" if locked else "cc-lock-pill"
     lock_label = "🔒 Locked" if locked else "◇ Unlocked"
     weather = f" {_safe(weather_icon)}" if weather_icon else ""
+    logo = _team_logo_url(team_id)
+    team_mark = (
+        f'<div class="cc-team-mark cc-team-logo"><img src="{logo}" alt="{_safe(team)} logo" loading="lazy"></div>'
+        if logo else f'<div class="cc-team-mark">{_safe(team)}</div>'
+    )
     st.markdown(
         f"""
         <div class="cc-matchup-strip">
-          <div class="cc-team-mark">{_safe(team)}</div>
+          {team_mark}
           <div>
             <div class="cc-matchup-name">{_safe(pitcher_name)}{weather}</div>
             <div class="cc-matchup-vs">{_safe(team)} <strong>vs</strong> {_safe(opponent)}</div>
