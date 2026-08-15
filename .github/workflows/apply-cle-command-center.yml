@@ -1,0 +1,51 @@
+name: Apply CLE Command Center Main Skin
+
+on:
+  push:
+    branches:
+      - ui-cle-command-center
+    paths:
+      - .github/workflows/apply-cle-command-center.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Wire command-center presentation layer into Main Projection
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('streamlit_app.py')
+          text = path.read_text(encoding='utf-8')
+          old_import = 'from engine.ui_theme import apply_page_theme\n'
+          new_import = old_import + 'from engine.ui_command_center import apply_command_center_theme\n'
+          if 'from engine.ui_command_center import apply_command_center_theme' not in text:
+              if old_import not in text:
+                  raise SystemExit('ui_theme import anchor missing')
+              text = text.replace(old_import, new_import, 1)
+          old_call = 'apply_page_theme()\n'
+          new_call = old_call + 'apply_command_center_theme()\n'
+          if 'apply_command_center_theme()' not in text:
+              if old_call not in text:
+                  raise SystemExit('apply_page_theme anchor missing')
+              text = text.replace(old_call, new_call, 1)
+          compile(text, str(path), 'exec')
+          path.write_text(text, encoding='utf-8')
+          PY
+      - name: Commit generated skin and remove temporary workflow
+        run: |
+          rm .github/workflows/apply-cle-command-center.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Apply CLE command center skin to Main Projection"
+          git push origin HEAD:ui-cle-command-center
