@@ -35,6 +35,27 @@ st.markdown(
     """
     <style>
     .block-container { padding-top: 3.25rem !important; }
+    /* history-dashboard-v1: presentation only; no grading/model semantics. */
+    .history-hero {
+        margin: .25rem 0 1.2rem; padding: .9rem 1rem; border-radius: 16px;
+        border: 1px solid rgba(227,25,55,.34);
+        background: linear-gradient(120deg, rgba(227,25,55,.09), rgba(10,29,54,.72) 42%, rgba(6,18,35,.76));
+        box-shadow: 0 14px 34px rgba(0,0,0,.16);
+    }
+    .history-hero strong { color:#f8fbff; font-size:1rem; letter-spacing:.01em; }
+    .history-hero span { display:block; color:#9db0c5; font-size:.84rem; margin-top:.18rem; }
+    .history-kicker {
+        margin: 1.35rem 0 .45rem; color:#aebfd2; font-size:.72rem; font-weight:900;
+        letter-spacing:.13em; text-transform:uppercase;
+    }
+    .history-kicker::before {
+        content:''; display:inline-block; width:22px; height:2px; margin-right:.5rem; vertical-align:middle;
+        background:#ff3655; box-shadow:0 0 11px rgba(227,25,55,.42);
+    }
+    @media (max-width: 900px) {
+        .history-hero { padding:.78rem .85rem; }
+        .history-kicker { margin-top:1rem; }
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -43,6 +64,11 @@ st.title("📚 Projection History")
 st.caption(
     "Frozen pregame StrikeOut King 9000 projections, resolved against final MLB strikeouts, "
     "total outs, and hits allowed. Current learning diagnostics only use starter-only model rows."
+)
+st.markdown(
+    '<div class="history-hero"><strong>Performance archive · frozen pregame evidence</strong>'
+    '<span>Scoreboard first, K wins and crushers next, deeper learning diagnostics below.</span></div>',
+    unsafe_allow_html=True,
 )
 
 
@@ -157,6 +183,7 @@ o_resolved = df["actual_outs"].notna()
 o_ready = o_resolved & df["outs_range_low"].notna() & df["outs_range_high"].notna()
 o_hit = o_ready & (df["actual_outs"] >= df["outs_range_low"]) & (df["actual_outs"] <= df["outs_range_high"])
 
+st.markdown('<div class="history-kicker">Performance scoreboard</div>', unsafe_allow_html=True)
 col1, col2, col3, col4, col5, col6 = st.columns(6)
 col1.metric("Archived projections", len(df))
 col2.metric("Resolved games", int((k_resolved | h_resolved | o_resolved).sum()))
@@ -191,6 +218,7 @@ else:
 st.caption("80% range HIT means the final result landed inside that market's frozen pregame interval. Range coverage is calibration evidence, not directional win/loss grading.")
 
 st.divider()
+st.markdown('<div class="history-kicker">Actionable K results</div>', unsafe_allow_html=True)
 st.subheader("🔥 Bettable K Wins & Crushers")
 st.caption(
     "Archive K grading uses the highest whole-K ladder milestone fully supported by the frozen projection: floor(Projected K), within our 3+–12+ ladder. "
@@ -241,6 +269,7 @@ else:
         st.caption("🔥 CRUSHER requires at least 3 resolved current-model ladder calls, a win rate of at least 66.7%, and average actual Ks more than 0.5 above the bettable target. This board is descriptive tracking only.")
 
 st.divider()
+st.markdown('<div class="history-kicker">Learning diagnostics</div>', unsafe_allow_html=True)
 st.subheader("🧠 Current model learning status")
 current_mask = df["history_semantics"].astype(str).eq(HISTORY_SEMANTICS)
 current = df.loc[current_mask].copy()
@@ -587,6 +616,7 @@ else:
     )
 
 st.divider()
+st.markdown('<div class="history-kicker">Resolved & pending slates</div>', unsafe_allow_html=True)
 st.subheader("📋 Projection archive")
 display = df.sort_values(["game_date", "captured_at_utc"], ascending=[False, False]).copy()
 display["status"] = display.apply(
