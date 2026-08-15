@@ -2,6 +2,6 @@ Role,Metric,Resolved_Starts,Relative_MAE,Candidate_Win_Share,Baseline_Bias,Candi
 RAMPING,PITCHES,0,,,,,LEARNING,missing_live_cell,live-role-shadow-gate-v1
 RAMPING,BF,0,,,,,LEARNING,missing_live_cell,live-role-shadow-gate-v1
 RAMPING,OUTS,0,,,,,LEARNING,missing_live_cell,live-role-shadow-gate-v1
-LOW_RECENT_EXPOSURE,PITCHES,0,,,,,LEARNING,missing_live_cell,live-role-shadow-gate-v1
-LOW_RECENT_EXPOSURE,BF,0,,,,,LEARNING,missing_live_cell,live-role-shadow-gate-v1
-LOW_RECENT_EXPOSURE,OUTS,0,,,,,LEARNING,missing_live_cell,live-role-shadow-gate-v1
+LOW_RECENT_EXPOSURE,PITCHES,1,-0.1013260092376038,0.0,49.34567183313493,54.34567183313493,LEARNING,sample,live-role-shadow-gate-v1
+LOW_RECENT_EXPOSURE,BF,1,-0.0823775307872169,0.0,14.94911166053409,16.18058256659128,LEARNING,sample,live-role-shadow-gate-v1
+LOW_RECENT_EXPOSURE,OUTS,1,-0.1099773933221894,0.0,9.553371217387726,10.60402608131526,LEARNING,sample,live-role-shadow-gate-v1
