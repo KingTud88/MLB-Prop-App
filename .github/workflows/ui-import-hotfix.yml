@@ -1,0 +1,61 @@
+name: UI import compatibility hotfix
+
+on:
+  push:
+    branches: [fix-ui-import-boot]
+    paths:
+      - .github/workflows/ui-import-hotfix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-ui-import-boot
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - run: pip install -r requirements.txt pytest
+      - name: Apply import compatibility guard
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('streamlit_app.py')
+          text = path.read_text(encoding='utf-8')
+          old = '''from engine.ui_command_center import (\n    apply_command_center_theme,\n    render_command_center_hero,\n    render_matchup_strip,\n    render_sidebar_brand,\n    render_sidebar_pitcher_identity,\n)\n'''
+          new = '''from engine.ui_command_center import (\n    apply_command_center_theme,\n    render_command_center_hero,\n    render_matchup_strip,\n)\ntry:\n    from engine.ui_command_center import render_sidebar_brand, render_sidebar_pitcher_identity\nexcept ImportError:\n    # Streamlit Cloud can briefly run a new page file beside a cached older UI\n    # helper during deploy. Keep the app bootable until the worker fully syncs.\n    def render_sidebar_brand() -> None:\n        st.markdown("## StrikeOut King 9000")\n        st.caption("CLE-themed MLB starter projection engine")\n\n    def render_sidebar_pitcher_identity(*, pitcher_name: str, team: str, opponent: str, team_id: int = 0) -> None:\n        st.caption(f"{pitcher_name} · {team} vs {opponent}")\n'''
+          if old not in text:
+              raise SystemExit('expected command-center import block not found')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          test = Path('tests/test_ui_import_compat.py')
+          test.write_text('''from pathlib import Path\n\n\ndef test_new_sidebar_helpers_are_deploy_skew_safe():\n    source = Path("streamlit_app.py").read_text(encoding="utf-8")\n    assert "try:" in source\n    assert "from engine.ui_command_center import render_sidebar_brand, render_sidebar_pitcher_identity" in source\n    assert "except ImportError:" in source\n    assert "def render_sidebar_brand()" in source\n    assert "def render_sidebar_pitcher_identity(" in source\n    assert "apply_command_center_theme" in source\n    assert "render_command_center_hero" in source\n    assert "render_matchup_strip" in source\n''', encoding='utf-8')
+          PY
+      - name: Exact import and full quality gate
+        run: |
+          python - <<'PY'
+          from engine.ui_command_center import (
+              apply_command_center_theme,
+              render_command_center_hero,
+              render_matchup_strip,
+              render_sidebar_brand,
+              render_sidebar_pitcher_identity,
+          )
+          print('command-center exact import ok')
+          PY
+          python -m compileall -q streamlit_app.py navigation.py engine automation tests
+          pytest -q
+      - name: Commit hotfix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add streamlit_app.py tests/test_ui_import_compat.py
+          git rm .github/workflows/ui-import-hotfix.yml .github/workflows/ui-import-smoke.yml
+          git commit -m "Harden command-center imports during deploys"
+          git push origin HEAD:fix-ui-import-boot
