@@ -2,6 +2,11 @@ name: Fix Command Center Readability
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - ui-main-projection-v2
+    paths:
+      - .github/workflows/fix-command-center-readability.yml
 
 permissions:
   contents: write
