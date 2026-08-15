@@ -1,0 +1,53 @@
+name: Fix Command Center Readability
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ui-main-projection-v2
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Patch mascot embedding and typography
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('engine/ui_command_center.py')
+          s = p.read_text()
+          s = s.replace('from datetime import datetime\n', 'from datetime import datetime\nimport base64\nfrom pathlib import Path\n')
+          s = s.replace('COMMAND_CENTER_UI_VERSION = "cle-command-center-v2"\nMASCOT_URL = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000.png"\n', 'COMMAND_CENTER_UI_VERSION = "cle-command-center-v3"\nASSET_DIR = Path(__file__).resolve().parents[1] / "assets"\nMASCOT_PATH = ASSET_DIR / "strikeout_king_9000.png"\n')
+          anchor = 'def _safe(value: object) -> str:\n    return escape(str(value if value is not None else "—"))\n\n\n'
+          helper = '''def _safe(value: object) -> str:\n    return escape(str(value if value is not None else "—"))\n\n\ndef _mascot_src() -> str:\n    """Embed the checked-in mascot so the hero never depends on remote image loading."""\n    try:\n        payload = base64.b64encode(MASCOT_PATH.read_bytes()).decode("ascii")\n        return f"data:image/png;base64,{payload}"\n    except Exception:\n        return ""\n\n\n'''
+          if anchor not in s:
+              raise SystemExit('safe helper anchor not found')
+          s = s.replace(anchor, helper, 1)
+          s = s.replace('''        h1,h2,h3,.section-head,.metric-label,.reco-label,\n        .cc-hero-title,.cc-status-label,.cc-matchup-name,.cc-team-mark {\n            font-family:Impact,"Arial Narrow",Haettenschweiler,sans-serif !important;\n            text-transform:uppercase;\n        }''', '''        h1,.section-head,.cc-hero-title,.cc-team-mark {\n            font-family:Impact,"Arial Narrow",Haettenschweiler,sans-serif !important;\n            text-transform:uppercase;\n        }\n        h2,h3,.metric-label,.reco-label,.cc-status-label,.cc-matchup-name,\n        .cc-matchup-status-label,[data-testid="stDataFrame"] [role="columnheader"] {\n            font-family:Inter,"Segoe UI",Roboto,Arial,sans-serif !important;\n            text-transform:uppercase;\n            font-weight:800 !important;\n            letter-spacing:.025em !important;\n            text-shadow:none !important;\n        }''')
+          s = s.replace('font-family:Impact,"Arial Narrow",sans-serif;\n            font-size:.78rem;', 'font-family:Inter,"Segoe UI",Roboto,Arial,sans-serif;\n            font-weight:800;\n            font-size:.78rem;')
+          s = s.replace('font-family:Impact,"Arial Narrow",sans-serif;font-size:.86rem;letter-spacing:.075em;text-transform:uppercase;', 'font-family:Inter,"Segoe UI",Roboto,Arial,sans-serif;font-size:.82rem;font-weight:800;letter-spacing:.045em;text-transform:uppercase;')
+          s = s.replace('''        .metric-label,.reco-label {\n            color:#eef3f7!important;\n            letter-spacing:.035em!important;\n            font-size:1rem!important;\n        }''', '''        .metric-label,.reco-label {\n            color:#eef3f7!important;\n            letter-spacing:.02em!important;\n            font-size:.88rem!important;\n            line-height:1.25!important;\n            font-family:Inter,"Segoe UI",Roboto,Arial,sans-serif!important;\n            font-weight:800!important;\n            text-shadow:none!important;\n        }''')
+          s = s.replace('''        [data-testid="stDataFrame"] [role="columnheader"] {\n            font-family:Impact,"Arial Narrow",sans-serif!important;\n            text-transform:uppercase!important;\n            letter-spacing:.04em!important;\n            background:#0b2139!important;\n        }''', '''        [data-testid="stDataFrame"] [role="columnheader"] {\n            font-family:Inter,"Segoe UI",Roboto,Arial,sans-serif!important;\n            font-weight:800!important;\n            text-transform:uppercase!important;\n            letter-spacing:.02em!important;\n            background:#0b2139!important;\n        }''')
+          s = s.replace('''    st.markdown(\n        f"""\n        <div class="cc-hero">''', '''    mascot_src = _mascot_src()\n    mascot_html = (\n        f'<img src="{mascot_src}" alt="StrikeOut King 9000 mascot">'\n        if mascot_src\n        else '<div class="cc-team-mark" aria-label="StrikeOut King 9000">SK9K</div>'\n    )\n    st.markdown(\n        f"""\n        <div class="cc-hero">''', 1)
+          s = s.replace('''          <div class="cc-hero-mascot">\n            <img src="{MASCOT_URL}" alt="StrikeOut King 9000 mascot">\n          </div>''', '''          <div class="cc-hero-mascot">{mascot_html}</div>''')
+          p.write_text(s)
+          PY
+      - name: Verify compile and contracts
+        run: |
+          python -m compileall -q engine streamlit_app.py tests
+          pytest -q tests/test_ui_theme_contract.py tests/test_command_center_ui.py
+      - name: Commit fix and remove workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add engine/ui_command_center.py
+          git rm .github/workflows/fix-command-center-readability.yml
+          git commit -m "Fix mascot rendering and small-text readability"
+          git push origin HEAD:ui-main-projection-v2
