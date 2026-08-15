@@ -1,19 +1,31 @@
 from __future__ import annotations
 
 from datetime import datetime
+import base64
+from pathlib import Path
 from html import escape
 from zoneinfo import ZoneInfo
 
 import streamlit as st
 
 
-COMMAND_CENTER_UI_VERSION = "cle-command-center-v2"
-MASCOT_URL = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000.png"
+COMMAND_CENTER_UI_VERSION = "cle-command-center-v3"
+ASSET_DIR = Path(__file__).resolve().parents[1] / "assets"
+MASCOT_PATH = ASSET_DIR / "strikeout_king_9000.png"
 EASTERN = ZoneInfo("America/New_York")
 
 
 def _safe(value: object) -> str:
     return escape(str(value if value is not None else "—"))
+
+
+def _mascot_src() -> str:
+    """Embed the checked-in mascot so the hero never depends on remote image loading."""
+    try:
+        payload = base64.b64encode(MASCOT_PATH.read_bytes()).decode("ascii")
+        return f"data:image/png;base64,{payload}"
+    except Exception:
+        return ""
 
 
 def _game_time_text(value: object) -> str:
@@ -67,10 +79,17 @@ def apply_command_center_theme() -> None:
         }
         .block-container { max-width:1520px !important; }
 
-        h1,h2,h3,.section-head,.metric-label,.reco-label,
-        .cc-hero-title,.cc-status-label,.cc-matchup-name,.cc-team-mark {
+        h1,.section-head,.cc-hero-title,.cc-team-mark {
             font-family:Impact,"Arial Narrow",Haettenschweiler,sans-serif !important;
             text-transform:uppercase;
+        }
+        h2,h3,.metric-label,.reco-label,.cc-status-label,.cc-matchup-name,
+        .cc-matchup-status-label,[data-testid="stDataFrame"] [role="columnheader"] {
+            font-family:Inter,"Segoe UI",Roboto,Arial,sans-serif !important;
+            text-transform:uppercase;
+            font-weight:800 !important;
+            letter-spacing:.025em !important;
+            text-shadow:none !important;
         }
         h1 { color:var(--cc-cream)!important; text-shadow:2px 3px 0 rgba(0,0,0,.38),0 0 22px rgba(236,22,56,.12)!important; }
 
@@ -146,7 +165,8 @@ def apply_command_center_theme() -> None:
             border-bottom:1px solid rgba(236,22,56,.58);
             color:#f3f6f9;
             background:linear-gradient(90deg,transparent,rgba(236,22,56,.08),transparent);
-            font-family:Impact,"Arial Narrow",sans-serif;
+            font-family:Inter,"Segoe UI",Roboto,Arial,sans-serif;
+            font-weight:800;
             font-size:.78rem;
             letter-spacing:.13em;
             text-transform:uppercase;
@@ -200,7 +220,7 @@ def apply_command_center_theme() -> None:
             padding-left:1.05rem;
             border-left:1px solid rgba(76,104,132,.54);
         }
-        .cc-matchup-status-label { color:var(--cc-green);font-family:Impact,"Arial Narrow",sans-serif;font-size:.86rem;letter-spacing:.075em;text-transform:uppercase; }
+        .cc-matchup-status-label { color:var(--cc-green);font-family:Inter,"Segoe UI",Roboto,Arial,sans-serif;font-size:.82rem;font-weight:800;letter-spacing:.045em;text-transform:uppercase; }
         .cc-matchup-status-time { margin-top:.32rem;color:#fff;font-weight:900;font-size:1rem; }
         .cc-matchup-status-meta { margin-top:.26rem;color:#9eb0c0;font-size:.78rem; }
         .cc-lock-pill {
@@ -296,8 +316,12 @@ def apply_command_center_theme() -> None:
         }
         .metric-label,.reco-label {
             color:#eef3f7!important;
-            letter-spacing:.035em!important;
-            font-size:1rem!important;
+            letter-spacing:.02em!important;
+            font-size:.88rem!important;
+            line-height:1.25!important;
+            font-family:Inter,"Segoe UI",Roboto,Arial,sans-serif!important;
+            font-weight:800!important;
+            text-shadow:none!important;
         }
         .metric-value,.reco-side,[data-testid="stMetricValue"] {
             font-family:Impact,"Arial Narrow",sans-serif!important;
@@ -319,9 +343,10 @@ def apply_command_center_theme() -> None:
             box-shadow:0 15px 34px rgba(0,0,0,.23)!important;
         }
         [data-testid="stDataFrame"] [role="columnheader"] {
-            font-family:Impact,"Arial Narrow",sans-serif!important;
+            font-family:Inter,"Segoe UI",Roboto,Arial,sans-serif!important;
+            font-weight:800!important;
             text-transform:uppercase!important;
-            letter-spacing:.04em!important;
+            letter-spacing:.02em!important;
             background:#0b2139!important;
         }
 
@@ -376,12 +401,16 @@ def render_command_center_hero(*, confidence: str, quality: int, locked: bool, a
     quality_value = max(0, min(100, int(quality or 0)))
     lock_text = "Projection locked" if locked else "Ready to lock"
     lock_meta = "Frozen pitcher snapshot" if locked else "Use the left rail to freeze outputs"
+    mascot_src = _mascot_src()
+    mascot_html = (
+        f'<img src="{mascot_src}" alt="StrikeOut King 9000 mascot">'
+        if mascot_src
+        else '<div class="cc-team-mark" aria-label="StrikeOut King 9000">SK9K</div>'
+    )
     st.markdown(
         f"""
         <div class="cc-hero">
-          <div class="cc-hero-mascot">
-            <img src="{MASCOT_URL}" alt="StrikeOut King 9000 mascot">
-          </div>
+          <div class="cc-hero-mascot">{mascot_html}</div>
           <div class="cc-hero-copy">
             <div class="cc-hero-kicker">Built for CLE baseball · two-path starter intelligence</div>
             <div class="cc-hero-title">StrikeOut <span>King 9000</span></div>
