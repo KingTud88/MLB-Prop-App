@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-import base64
 from pathlib import Path
 from html import escape
 from zoneinfo import ZoneInfo
@@ -9,7 +8,7 @@ from zoneinfo import ZoneInfo
 import streamlit as st
 
 
-COMMAND_CENTER_UI_VERSION = "cle-command-center-v3"
+COMMAND_CENTER_UI_VERSION = "cle-command-center-v4"
 ASSET_DIR = Path(__file__).resolve().parents[1] / "assets"
 MASCOT_PATH = ASSET_DIR / "strikeout_king_9000.png"
 EASTERN = ZoneInfo("America/New_York")
@@ -17,15 +16,6 @@ EASTERN = ZoneInfo("America/New_York")
 
 def _safe(value: object) -> str:
     return escape(str(value if value is not None else "—"))
-
-
-def _mascot_src() -> str:
-    """Embed the checked-in mascot so the hero never depends on remote image loading."""
-    try:
-        payload = base64.b64encode(MASCOT_PATH.read_bytes()).decode("ascii")
-        return f"data:image/png;base64,{payload}"
-    except Exception:
-        return ""
 
 
 def _game_time_text(value: object) -> str:
@@ -93,24 +83,20 @@ def apply_command_center_theme() -> None:
         }
         h1 { color:var(--cc-cream)!important; text-shadow:2px 3px 0 rgba(0,0,0,.38),0 0 22px rgba(236,22,56,.12)!important; }
 
-        .cc-hero {
+        .st-key-cc_hero_shell {
             position:relative;
-            display:grid;
-            grid-template-columns:minmax(150px,220px) minmax(360px,1fr) minmax(190px,250px);
-            gap:1.25rem;
-            align-items:center;
             min-height:245px;
-            padding:1.25rem 1.4rem;
+            padding:1.25rem 1.4rem!important;
             margin:.15rem 0 1.1rem;
             overflow:hidden;
-            border:1px solid rgba(82,108,134,.74);
-            border-radius:18px;
+            border:1px solid rgba(82,108,134,.74)!important;
+            border-radius:18px!important;
             background:
                 linear-gradient(90deg,rgba(4,19,36,.96),rgba(6,29,53,.94) 52%,rgba(4,17,32,.97)),
-                radial-gradient(circle at 30% 0%,rgba(236,22,56,.13),transparent 22rem);
+                radial-gradient(circle at 30% 0%,rgba(236,22,56,.13),transparent 22rem)!important;
             box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 20px 52px rgba(0,0,0,.34);
         }
-        .cc-hero::before {
+        .st-key-cc_hero_shell::before {
             content:"";
             position:absolute;
             inset:auto 0 0;
@@ -118,7 +104,7 @@ def apply_command_center_theme() -> None:
             background:linear-gradient(90deg,transparent,var(--cc-red) 18%,var(--cc-red) 82%,transparent);
             box-shadow:0 0 18px rgba(236,22,56,.42);
         }
-        .cc-hero::after {
+        .st-key-cc_hero_shell::after {
             content:"";
             position:absolute;
             inset:0;
@@ -129,10 +115,9 @@ def apply_command_center_theme() -> None:
                 linear-gradient(0deg,rgba(255,255,255,.015),transparent 45%);
             mask-image:linear-gradient(to bottom,transparent,black 28%,black 100%);
         }
-        .cc-hero-mascot { position:relative;z-index:1;display:flex;align-items:center;justify-content:center; }
-        .cc-hero-mascot img {
+        .st-key-cc_hero_shell [data-testid="stImage"] { display:flex;align-items:center;justify-content:center; }
+        .st-key-cc_hero_shell [data-testid="stImage"] img {
             display:block;
-            width:min(205px,100%);
             max-height:218px;
             object-fit:contain;
             filter:drop-shadow(0 14px 18px rgba(0,0,0,.42)) drop-shadow(0 0 18px rgba(236,22,56,.12));
@@ -365,24 +350,24 @@ def apply_command_center_theme() -> None:
         .sk-panel-hot { border-color:rgba(236,22,56,.9)!important; }
 
         @media (max-width:1050px) {
-            .cc-hero { grid-template-columns:150px minmax(320px,1fr); }
-            .cc-hero-status { grid-column:1 / -1;grid-template-columns:repeat(3,1fr); }
+            .st-key-cc_hero_shell [data-testid="stHorizontalBlock"] { flex-wrap:wrap; }
+            .cc-hero-status { grid-template-columns:repeat(3,1fr); }
             .cc-hero-title { white-space:normal; }
         }
         @media (max-width:900px) {
             .king-title { font-size:3.15rem!important; line-height:.84!important; }
             .section-head { min-width:190px; padding:.4rem 1.45rem!important; }
             .metric-value { font-size:3rem!important; }
-            .cc-hero { grid-template-columns:110px 1fr;min-height:0;padding:1rem; }
-            .cc-hero-mascot img { max-height:135px; }
+            .st-key-cc_hero_shell { min-height:0;padding:1rem!important; }
+            .st-key-cc_hero_shell [data-testid="stImage"] img { max-height:135px; }
             .cc-hero-title { font-size:3rem; }
             .cc-hero-status { grid-template-columns:1fr; }
             .cc-matchup-strip { grid-template-columns:auto 1fr; }
             .cc-matchup-status { grid-column:1 / -1;border-left:0;border-top:1px solid rgba(76,104,132,.54);padding:.75rem 0 0; }
         }
         @media (max-width:620px) {
-            .cc-hero { grid-template-columns:1fr;text-align:center; }
-            .cc-hero-mascot img { width:150px; }
+            .st-key-cc_hero_shell { text-align:center; }
+            .st-key-cc_hero_shell [data-testid="stImage"] img { width:150px; }
             .cc-hero-sub { justify-content:center; }
             .cc-matchup-strip { grid-template-columns:1fr;text-align:center; }
             .cc-team-mark { margin:0 auto; }
@@ -401,43 +386,49 @@ def render_command_center_hero(*, confidence: str, quality: int, locked: bool, a
     quality_value = max(0, min(100, int(quality or 0)))
     lock_text = "Projection locked" if locked else "Ready to lock"
     lock_meta = "Frozen pitcher snapshot" if locked else "Use the left rail to freeze outputs"
-    mascot_src = _mascot_src()
-    mascot_html = (
-        f'<img src="{mascot_src}" alt="StrikeOut King 9000 mascot">'
-        if mascot_src
-        else '<div class="cc-team-mark" aria-label="StrikeOut King 9000">SK9K</div>'
-    )
-    st.markdown(
-        f"""
-        <div class="cc-hero">
-          <div class="cc-hero-mascot">{mascot_html}</div>
-          <div class="cc-hero-copy">
-            <div class="cc-hero-kicker">Built for CLE baseball · two-path starter intelligence</div>
-            <div class="cc-hero-title">StrikeOut <span>King 9000</span></div>
-            <div class="cc-hero-sub">★ MLB Pitcher Projection Engine ★ Two-Path Analytics ★</div>
-          </div>
-          <div class="cc-hero-status">
-            <div class="cc-status-card">
-              <div class="cc-status-label">Data Status</div>
-              <div class="cc-status-value live">● Live</div>
-              <div class="cc-status-meta">{safe_confidence} confidence · model quality {quality_value}/100</div>
-              <div class="cc-quality-track"><div class="cc-quality-fill" style="width:{quality_value}%"></div></div>
-            </div>
-            <div class="cc-status-card">
-              <div class="cc-status-label">Pitcher State</div>
-              <div class="cc-status-value">{_safe(lock_text)}</div>
-              <div class="cc-status-meta">{_safe(lock_meta)}</div>
-            </div>
-            <div class="cc-status-card">
-              <div class="cc-status-label">Engine</div>
-              <div class="cc-status-value">v{safe_version}</div>
-              <div class="cc-status-meta">Model first · market second</div>
-            </div>
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+
+    with st.container(border=False, key="cc_hero_shell"):
+        mascot_col, copy_col, status_col = st.columns([1.15, 3.25, 1.45], gap="medium", vertical_alignment="center")
+        with mascot_col:
+            if MASCOT_PATH.exists():
+                st.image(str(MASCOT_PATH), width=205)
+            else:
+                st.markdown('<div class="cc-team-mark" aria-label="StrikeOut King 9000">SK9K</div>', unsafe_allow_html=True)
+        with copy_col:
+            st.markdown(
+                """
+                <div class="cc-hero-copy">
+                  <div class="cc-hero-kicker">Built for CLE baseball · two-path starter intelligence</div>
+                  <div class="cc-hero-title">StrikeOut <span>King 9000</span></div>
+                  <div class="cc-hero-sub">★ MLB Pitcher Projection Engine ★ Two-Path Analytics ★</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        with status_col:
+            st.markdown(
+                f"""
+                <div class="cc-hero-status">
+                  <div class="cc-status-card">
+                    <div class="cc-status-label">Data Status</div>
+                    <div class="cc-status-value live">● Live</div>
+                    <div class="cc-status-meta">{safe_confidence} confidence · model quality {quality_value}/100</div>
+                    <div class="cc-quality-track"><div class="cc-quality-fill" style="width:{quality_value}%"></div></div>
+                  </div>
+                  <div class="cc-status-card">
+                    <div class="cc-status-label">Pitcher State</div>
+                    <div class="cc-status-value">{_safe(lock_text)}</div>
+                    <div class="cc-status-meta">{_safe(lock_meta)}</div>
+                  </div>
+                  <div class="cc-status-card">
+                    <div class="cc-status-label">Engine</div>
+                    <div class="cc-status-value">v{safe_version}</div>
+                    <div class="cc-status-meta">Model first · market second</div>
+                  </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
 
 def render_matchup_strip(
