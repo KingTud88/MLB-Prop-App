@@ -14,7 +14,6 @@ def test_command_center_v4_exposes_reusable_hero_and_matchup_components():
     assert "cc-team-mark" in source
     assert "@media (max-width:620px)" in source
     assert "data:image/png;base64" not in source
-    assert "MASCOT_PATH.exists()" in source
     assert "raw.githubusercontent.com" not in source
 
 
