@@ -118,6 +118,286 @@ def render_sidebar(active: str = "projection") -> None:
         """,
         unsafe_allow_html=True,
     )
+
+    if active == "top":
+        st.markdown(
+            """
+            <style>
+            :root {
+                --tp-navy:#031327;
+                --tp-panel:#081e35;
+                --tp-panel-deep:#051628;
+                --tp-line:#36526d;
+                --tp-red:#ec1638;
+                --tp-red-dark:#9f0c25;
+                --tp-cream:#f1eee7;
+                --tp-green:#32e58d;
+                --tp-yellow:#ffd166;
+                --tp-muted:#9fb3c6;
+                --tp-ui:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+            }
+
+            .stApp {
+                background:
+                    radial-gradient(ellipse at 52% 3%, rgba(20,55,91,.46), transparent 35rem),
+                    radial-gradient(ellipse at 50% 58%, rgba(7,39,70,.26), transparent 42rem),
+                    linear-gradient(180deg, rgba(3,16,32,.99), rgba(2,11,22,.99)) !important;
+            }
+            .stApp,[data-testid="stMarkdownContainer"],[data-testid="stCaptionContainer"],button,input,label {
+                font-family:var(--tp-ui)!important;
+                -webkit-font-smoothing:antialiased;
+                -moz-osx-font-smoothing:grayscale;
+                text-rendering:optimizeLegibility;
+            }
+            .block-container {
+                max-width:1520px!important;
+                padding-top:2.35rem!important;
+                padding-bottom:4rem!important;
+            }
+
+            /* Top Plays hero treatment. */
+            h1 {
+                position:relative;
+                margin:.1rem 0 .55rem!important;
+                padding:1.05rem 1.25rem 1rem!important;
+                border:1px solid rgba(82,108,134,.72)!important;
+                border-radius:18px!important;
+                color:var(--tp-cream)!important;
+                background:
+                    linear-gradient(90deg,rgba(4,19,36,.97),rgba(7,31,56,.95) 55%,rgba(4,17,32,.98)),
+                    radial-gradient(circle at 18% 0%,rgba(236,22,56,.16),transparent 20rem)!important;
+                box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 20px 52px rgba(0,0,0,.33)!important;
+                font-family:Impact,"Arial Black","Arial Narrow",sans-serif!important;
+                font-size:clamp(2.6rem,5vw,4.9rem)!important;
+                line-height:.88!important;
+                letter-spacing:.018em!important;
+                text-transform:uppercase!important;
+                text-shadow:3px 4px 0 #07182b,0 0 24px rgba(236,22,56,.13)!important;
+            }
+            h1::after {
+                content:"MODEL-FIRST DAILY COMMAND BOARD";
+                display:block;
+                width:max-content;
+                max-width:100%;
+                margin-top:.7rem;
+                padding:.34rem .72rem;
+                border-top:1px solid rgba(236,22,56,.7);
+                border-bottom:1px solid rgba(236,22,56,.7);
+                color:#dce7f0;
+                font-family:var(--tp-ui)!important;
+                font-size:.72rem;
+                font-weight:900;
+                letter-spacing:.11em;
+                line-height:1.2;
+                text-shadow:none!important;
+            }
+            h1 + [data-testid="stCaptionContainer"] {
+                margin:-.1rem .2rem 1.15rem!important;
+                padding:.75rem .9rem!important;
+                border-left:3px solid var(--tp-red)!important;
+                border-radius:0 10px 10px 0!important;
+                background:rgba(7,27,49,.66)!important;
+                color:#b7c8d7!important;
+                font-size:.9rem!important;
+                line-height:1.5!important;
+            }
+
+            /* Summary scorecard. */
+            [data-testid="stMetric"] {
+                position:relative;
+                overflow:hidden;
+                min-height:122px;
+                padding:.78rem .8rem!important;
+                border:1px solid rgba(77,108,137,.72)!important;
+                border-radius:14px!important;
+                background:linear-gradient(145deg,rgba(9,31,55,.98),rgba(4,18,33,.98))!important;
+                box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 12px 28px rgba(0,0,0,.25)!important;
+            }
+            [data-testid="stMetric"]::after {
+                content:"";position:absolute;left:9%;right:9%;bottom:0;height:2px;
+                background:linear-gradient(90deg,transparent,var(--tp-red),transparent);opacity:.72;
+            }
+            [data-testid="stMetricLabel"] {
+                font-family:var(--tp-ui)!important;
+                color:#dce7ef!important;
+                font-size:.79rem!important;
+                line-height:1.25!important;
+                font-weight:850!important;
+                letter-spacing:.025em!important;
+                text-transform:uppercase!important;
+            }
+            [data-testid="stMetricValue"] {
+                font-family:Impact,"Arial Narrow",sans-serif!important;
+                color:#f7f3ec!important;
+                font-size:2.15rem!important;
+                letter-spacing:.01em!important;
+                text-shadow:2px 3px 0 rgba(0,0,0,.28)!important;
+            }
+
+            /* Section hierarchy. */
+            h2,h3,h4 {
+                font-family:var(--tp-ui)!important;
+                text-shadow:none!important;
+            }
+            h4 {
+                width:max-content;
+                min-width:245px;
+                max-width:92%;
+                margin:1.25rem auto .8rem!important;
+                padding:.48rem 1.8rem!important;
+                border:1px solid #ff3151!important;
+                border-bottom-color:#790b1d!important;
+                border-radius:8px!important;
+                color:#fff!important;
+                background:linear-gradient(180deg,#f21b3d,#b70d29)!important;
+                box-shadow:0 7px 16px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.2)!important;
+                font-size:.94rem!important;
+                font-weight:900!important;
+                line-height:1.15!important;
+                letter-spacing:.03em!important;
+                text-align:center!important;
+                text-transform:uppercase!important;
+            }
+            h2 {
+                margin-top:1.25rem!important;
+                color:#f4f0e8!important;
+                font-size:1.55rem!important;
+                font-weight:900!important;
+                letter-spacing:.01em!important;
+            }
+
+            /* The five Top Play columns become sportsbook-style command cards. */
+            [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:has(button[key^="view_top_play_"]) {
+                position:relative;
+                min-height:355px;
+                padding:.82rem .78rem 1rem!important;
+                border:1px solid rgba(82,112,141,.74)!important;
+                border-radius:16px!important;
+                background:linear-gradient(150deg,rgba(10,34,59,.99),rgba(4,18,33,.99))!important;
+                box-shadow:inset 0 1px 0 rgba(255,255,255,.045),0 15px 34px rgba(0,0,0,.29)!important;
+                overflow:hidden;
+            }
+            [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:has(button[key^="view_top_play_"])::before {
+                content:"";position:absolute;left:0;right:0;top:0;height:3px;
+                background:linear-gradient(90deg,transparent,var(--tp-red) 18%,var(--tp-red) 82%,transparent);
+                box-shadow:0 0 14px rgba(236,22,56,.35);
+            }
+            [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:has(button[key^="view_top_play_"]) h3 {
+                margin:.12rem 0 .25rem!important;
+                color:#f7f3ec!important;
+                font-size:1.12rem!important;
+                line-height:1.15!important;
+                font-weight:900!important;
+                letter-spacing:.005em!important;
+            }
+            [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:has(button[key^="view_top_play_"]) [data-testid="stCaptionContainer"] {
+                color:#9fb3c6!important;
+                font-size:.78rem!important;
+                line-height:1.35!important;
+            }
+            [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:has(button[key^="view_top_play_"]) p strong {
+                color:#f6f1e9!important;
+                font-size:.91rem!important;
+                letter-spacing:.02em!important;
+                text-transform:uppercase!important;
+            }
+
+            /* Override legacy purple projection block while preserving its content. */
+            div[style*="#8b4fc7"] {
+                border:1px solid rgba(70,105,139,.86)!important;
+                border-radius:12px!important;
+                background:linear-gradient(145deg,rgba(12,39,67,.98),rgba(6,23,41,.98))!important;
+                padding:11px 8px!important;
+                margin:10px 0!important;
+                box-shadow:inset 0 1px 0 rgba(255,255,255,.035)!important;
+            }
+            div[style*="#8b4fc7"] span[style*="background:#8b4fc7"],
+            div[style*="#8b4fc7"] span[style*="background: #8b4fc7"] {
+                background:rgba(77,108,137,.72)!important;
+            }
+
+            /* Action controls. */
+            div[data-testid="stButton"] button {
+                min-height:2.65rem!important;
+                border-radius:10px!important;
+                border:1px solid rgba(89,123,157,.72)!important;
+                background:linear-gradient(180deg,rgba(22,53,88,.98),rgba(9,29,53,.98))!important;
+                color:#edf3f8!important;
+                font-family:var(--tp-ui)!important;
+                font-weight:900!important;
+                letter-spacing:.015em!important;
+                box-shadow:inset 0 1px 0 rgba(255,255,255,.04)!important;
+            }
+            div[data-testid="stButton"] button:hover:not(:disabled) {
+                border-color:rgba(236,22,56,.72)!important;
+                background:linear-gradient(180deg,rgba(34,67,104,.99),rgba(12,35,62,.99))!important;
+            }
+            div[data-testid="stButton"] button[kind="primary"] {
+                background:linear-gradient(180deg,#f21b3d,#b70d29)!important;
+                border-color:#ff3b59!important;
+                color:#fff!important;
+                text-transform:uppercase!important;
+                letter-spacing:.04em!important;
+            }
+            div[data-testid="stButton"] button:disabled {
+                opacity:.48!important;
+            }
+
+            /* Form controls / parlay builder. */
+            [data-testid="stNumberInput"],[data-testid="stSelectbox"],[data-testid="stMultiSelect"] {
+                font-family:var(--tp-ui)!important;
+            }
+            [data-baseweb="input"],[data-baseweb="select"] > div {
+                border-color:rgba(75,108,140,.68)!important;
+                background:rgba(7,25,45,.94)!important;
+            }
+
+            /* Diagnostics / rationale panels. */
+            div[data-testid="stExpander"] {
+                margin:.5rem 0!important;
+                border:1px solid rgba(77,106,135,.72)!important;
+                border-radius:13px!important;
+                background:linear-gradient(145deg,rgba(8,28,50,.97),rgba(4,17,31,.98))!important;
+                box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 10px 24px rgba(0,0,0,.19)!important;
+            }
+            div[data-testid="stExpander"] summary {
+                font-family:var(--tp-ui)!important;
+                font-weight:850!important;
+                color:#edf3f8!important;
+            }
+            [data-testid="stDataFrame"] {
+                border:1px solid rgba(75,105,134,.72)!important;
+                border-radius:12px!important;
+                box-shadow:0 12px 28px rgba(0,0,0,.2)!important;
+            }
+            [data-testid="stCaptionContainer"] {
+                color:#9fb3c6!important;
+                font-size:.86rem!important;
+                line-height:1.45!important;
+                letter-spacing:0!important;
+                text-shadow:none!important;
+            }
+            hr {
+                border-color:rgba(70,102,133,.46)!important;
+                margin:1.35rem 0!important;
+            }
+
+            @media (max-width:1100px) {
+                [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:has(button[key^="view_top_play_"]) { min-height:0; }
+            }
+            @media (max-width:760px) {
+                .block-container { padding-top:1rem!important; }
+                h1 { font-size:2.65rem!important;padding:.9rem!important; }
+                h1::after { font-size:.64rem!important;letter-spacing:.07em; }
+                h4 { min-width:180px;padding:.42rem 1rem!important;font-size:.86rem!important; }
+                [data-testid="stMetric"] { min-height:100px; }
+                [data-testid="stMetricValue"] { font-size:1.85rem!important; }
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
     with st.sidebar:
         st.markdown('<div class="sk-nav-brand">', unsafe_allow_html=True)
         st.markdown(
