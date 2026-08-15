@@ -36,6 +36,14 @@ st.markdown(
     """
     <style>
     .block-container { padding-top: 3.25rem !important; }
+    /* daily-control-deck-v2: presentation only. */
+    .daily-hero { margin:.25rem 0 1.15rem; padding:.9rem 1rem; border:1px solid rgba(73,111,151,.48); border-left:3px solid #ff3655; border-radius:16px; background:linear-gradient(120deg,rgba(227,25,55,.08),rgba(10,29,54,.76) 42%,rgba(6,18,35,.78)); box-shadow:0 14px 34px rgba(0,0,0,.16); }
+    .daily-hero strong { color:#f8fbff; font-size:1rem; }
+    .daily-hero span { display:block; color:#9db0c5; font-size:.84rem; margin-top:.2rem; }
+    .daily-kicker { margin:1.35rem 0 .42rem; color:#aebfd2; font-size:.72rem; font-weight:900; letter-spacing:.13em; text-transform:uppercase; }
+    .daily-kicker::before { content:''; display:inline-block; width:22px; height:2px; margin-right:.5rem; vertical-align:middle; background:#ff3655; box-shadow:0 0 11px rgba(227,25,55,.42); }
+    .daily-paid-note { margin:.35rem 0 .8rem; padding:.72rem .85rem; border-radius:13px; border:1px solid rgba(250,204,21,.32); background:rgba(120,79,8,.08); color:#c9d7e5; font-size:.86rem; }
+    @media (max-width:900px) { .daily-hero { padding:.78rem .85rem; } .daily-kicker { margin-top:1rem; } }
     </style>
     """,
     unsafe_allow_html=True,
@@ -44,6 +52,11 @@ st.title("📊 Daily Projection Run")
 st.caption(
     "Run StrikeOut King 9000 across every announced MLB starter on the selected slate. "
     "Each pitcher is captured as an immutable pregame strikeout + total-outs + hits-allowed snapshot for calibration."
+)
+st.markdown(
+    '<div class="daily-hero"><strong>Daily Control Deck · frozen pregame capture</strong>'
+    '<span>Run the slate first. Paid strikeout lines are a separate manual data pull and never drive the baseball projection.</span></div>',
+    unsafe_allow_html=True,
 )
 
 EASTERN = ZoneInfo("America/New_York")
@@ -298,6 +311,8 @@ st.info(
     "Existing game/pitcher snapshots stay frozen after first pitch; while still pregame, a roster-fallback row may upgrade once MLB posts a confirmed batting order."
 )
 
+st.markdown('<div class="daily-kicker">Manual paid data</div>', unsafe_allow_html=True)
+st.markdown('<div class="daily-paid-note">Optional market-data pull · manual only · strikeout lines only · saved snapshot is reused elsewhere without another paid request.</div>', unsafe_allow_html=True)
 st.markdown("### 💳 Paid strikeout lines")
 st.caption("Manual only. This button is the ONLY paid Odds API path and requests pitcher_strikeouts only. The saved snapshot is reused by Main Projections without another API call.")
 if st.button("💳 LOAD STRIKEOUT LINES · PAID API", use_container_width=True, key="daily_paid_k_odds"):
@@ -312,6 +327,7 @@ if st.button("💳 LOAD STRIKEOUT LINES · PAID API", use_container_width=True, 
         if quota:
             st.caption(f"Last paid request: {quota.get('last','—')} credit(s) · {quota.get('remaining','—')} remaining · {quota.get('used','—')} used.")
 
+st.markdown('<div class="daily-kicker">Projection capture</div>', unsafe_allow_html=True)
 if st.button("⚾ RUN ALL TODAY'S PITCHERS", type="primary", use_container_width=True):
     with st.spinner("Simulating every announced starter and writing pregame snapshots..."):
         try:
@@ -327,6 +343,7 @@ if st.button("⚾ RUN ALL TODAY'S PITCHERS", type="primary", use_container_width
     st.session_state["daily_history_only"] = history_only
     st.session_state["daily_errors"] = errors
 
+st.markdown('<div class="daily-kicker">Slate output</div>', unsafe_allow_html=True)
 slate = st.session_state.get("daily_slate")
 if isinstance(slate, pd.DataFrame):
     added = int(st.session_state.get("daily_added", 0))
