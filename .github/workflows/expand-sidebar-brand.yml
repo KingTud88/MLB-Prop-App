@@ -26,6 +26,7 @@ jobs:
 
       - name: Commit safely
         run: |
+          git restore tools/patch_market_line_integrity.py
           if git diff --quiet -- engine/model_top_plays.py engine/bet_tracker.py pages/2_Bet_Tracker.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py; then
             echo "No market-line integrity changes to commit"
             exit 0
