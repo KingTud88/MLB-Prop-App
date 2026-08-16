@@ -15,6 +15,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install repo test dependencies
+        run: pip install -r requirements.txt pytest
 
       - name: Validate patch script
         run: python -m py_compile .github/scripts/projection_weather_layout_v10.py
