@@ -79,6 +79,9 @@ st.markdown(
     [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
     div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
     .bt-ticket-state .status{font-size:.70rem!important}
+    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
+    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
+    .bt-ticket-state .status{font-size:.70rem!important}
     @media (max-width:760px){.block-container{padding-top:1rem!important}.bt-hero{padding:.8rem}.bt-title{font-size:2.7rem}.bt-section{min-width:180px;padding:.4rem 1rem;font-size:.82rem}.bt-ticket-state{align-items:flex-start;flex-direction:column}}
     </style>
     <div class="bt-hero">
