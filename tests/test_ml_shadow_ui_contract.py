@@ -10,11 +10,14 @@ def test_daily_runner_captures_raw_k_path_means_for_future_three_path_research()
 
 
 def test_model_card_reads_shadow_reports_without_training_in_streamlit():
-    source = Path("streamlit_app.py").read_text(encoding="utf-8")
-    assert "ML SHADOW CHALLENGER · REPORT ONLY" in source
-    assert "ml_shadow_summary.csv" in source
-    assert "ml_shadow_live_candidates.csv" in source
-    assert "GradientBoostingRegressor" not in source
+    app = Path("streamlit_app.py").read_text(encoding="utf-8")
+    ui = Path("engine/ml_shadow_ui.py").read_text(encoding="utf-8")
+    assert "render_ml_shadow_dashboard" in app
+    assert "ML SHADOW CHALLENGER · REPORT ONLY" in ui
+    assert "ml_shadow_summary.csv" in ui
+    assert "ml_shadow_live_candidates.csv" in ui
+    assert "GradientBoostingRegressor" not in app
+    assert "GradientBoostingRegressor" not in ui
 
 
 def test_no_line_recommendation_card_uses_compact_projection_value_state():
