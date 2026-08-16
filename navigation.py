@@ -40,13 +40,13 @@ def render_sidebar(active: str = "projection") -> None:
             display:flex;
             justify-content:center;
             align-items:center;
-            height:216px;
-            margin:-.28rem 0 -.18rem;
+            height:248px;
+            margin:-.45rem 0 -.42rem;
             position: relative;
         }
         .sk-nav-mascot img {
-            width:214px;
-            height:214px;
+            width:246px;
+            height:246px;
             object-fit:contain;
             display:block;
             filter: drop-shadow(0 9px 18px rgba(0,0,0,.3));
@@ -69,28 +69,28 @@ def render_sidebar(active: str = "projection") -> None:
         .sk-nav-title {
             text-align:center;
             font-family:Impact,"Arial Narrow",sans-serif;
-            font-size:1.82rem;
-            line-height:.9;
+            font-size:2.05rem;
+            line-height:.86;
             color:#fff;
             letter-spacing:.015em;
         }
-        .sk-nav-title span { color:#ff3655; font-size:2rem; letter-spacing:.04em; }
+        .sk-nav-title span { color:#ff3655; font-size:2.28rem; letter-spacing:.045em; white-space:nowrap; }
         .sk-nav-sub {
             text-align:center;
             color:#9eb1c6;
-            font-size:.68rem;
+            font-size:.72rem;
             font-weight:650;
             line-height:1.38;
             letter-spacing:.02em;
-            margin:.58rem .45rem .08rem;
+            margin:.42rem .35rem .02rem;
         }
         .sk-nav-section {
-            color:#7790aa;
-            font-size:.61rem;
+            color:#d72b43;
+            font-size:.67rem;
             font-weight:900;
             text-transform:uppercase;
             letter-spacing:.16em;
-            margin:.9rem .95rem .38rem;
+            margin:.58rem .95rem .38rem;
         }
         [data-testid="stSidebar"] .sk-page-link { margin:.11rem .28rem; }
         [data-testid="stSidebar"] .sk-page-link a {
@@ -412,7 +412,7 @@ def render_sidebar(active: str = "projection") -> None:
             f'<div class="sk-nav-mascot"><img src="{MASCOT_URL}" alt="StrikeOut King 9000 mascot" onerror="this.style.display=\'none\';this.parentElement.classList.add(\'sk-logo-fallback\')"></div>',
             unsafe_allow_html=True,
         )
-        st.markdown('<div class="sk-nav-title">StrikeOut <span>King 9000</span></div>', unsafe_allow_html=True)
+        st.markdown('<div class="sk-nav-title">STRIKEOUT<br><span>KING 9000</span></div>', unsafe_allow_html=True)
         st.markdown('<div class="sk-nav-sub">CLEVELAND NIGHT MODE · MLB STARTER INTELLIGENCE</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
         st.markdown('<div class="sk-nav-section">Command Center</div>', unsafe_allow_html=True)
