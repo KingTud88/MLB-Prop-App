@@ -12,14 +12,14 @@ def render_sidebar(active: str = "projection") -> None:
         """
         <style>
         [data-testid="stSidebar"] {
-            width: 276px !important;
-            min-width: 276px !important;
+            width: 252px !important;
+            min-width: 252px !important;
             background:
                 radial-gradient(circle at 50% 2%, rgba(227,25,55,.13), transparent 12rem),
                 linear-gradient(180deg, #07162a 0%, #050d19 100%) !important;
             border-right: 1px solid rgba(61,94,129,.45) !important;
         }
-        [data-testid="stSidebar"] > div:first-child { width:276px !important; }
+        [data-testid="stSidebar"] > div:first-child { width:252px !important; }
         .sk-nav-brand {
             margin: .1rem .15rem .75rem;
             padding: .72rem .5rem .75rem;
@@ -40,9 +40,10 @@ def render_sidebar(active: str = "projection") -> None:
             display:flex;
             justify-content:center;
             align-items:center;
-            height:248px;
-            margin:-.45rem 0 -.42rem;
+            height:226px;
+            margin:-.52rem 0 -.55rem;
             position: relative;
+            overflow:hidden;
         }
         .sk-nav-mascot img {
             width:246px;
@@ -50,6 +51,8 @@ def render_sidebar(active: str = "projection") -> None:
             object-fit:contain;
             display:block;
             filter: drop-shadow(0 9px 18px rgba(0,0,0,.3));
+            transform:scale(1.42);
+            transform-origin:50% 50%;
         }
         .sk-nav-mascot.sk-logo-fallback::after {
             content:"SK 9000";
