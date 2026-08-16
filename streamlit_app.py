@@ -243,6 +243,21 @@ h1,h2,h3{letter-spacing:-.02em}
     }
 }
 
+
+/* PROJECTION_EMBLEM_MASTER_V9 · 128px master tiles rendered down for sharper edges */
+.cc-card-icon.cc-emblem{
+    background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_summary_emblems_v2.webp?v=9")!important;
+    background-size:600% 100%!important;
+    background-repeat:no-repeat!important;
+    filter:drop-shadow(0 2px 2px rgba(0,0,0,.28)) drop-shadow(0 0 2px rgba(236,22,56,.12))!important;
+    image-rendering:auto!important;
+}
+.metric-card .cc-emblem.whiff{background-position:0% 50%!important}
+.reco-card .cc-emblem.whiff{background-position:20% 50%!important}
+.metric-card .cc-emblem.glove{background-position:40% 50%!important}
+.reco-card .cc-emblem.glove{background-position:60% 50%!important}
+.metric-card .cc-emblem.contact{background-position:80% 50%!important}
+.reco-card .cc-emblem.contact{background-position:100% 50%!important}
 </style>""", unsafe_allow_html=True)
 
 @dataclass(frozen=True)
