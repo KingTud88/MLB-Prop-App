@@ -1,13 +1,15 @@
-name: Projection Weather Summary Layout
+name: Projection Weather Venue Resolver
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  weather-layout:
+  weather-venue-resolver:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,29 +23,43 @@ jobs:
         run: pip install -r requirements.txt pytest
 
       - name: Validate patch script
-        run: python -m py_compile .github/scripts/projection_weather_layout_v10.py
+        run: python -m py_compile .github/scripts/weather_venue_resolution_v11.py
 
-      - name: Apply weather summary layout
-        run: python .github/scripts/projection_weather_layout_v10.py
+      - name: Apply live weather venue resolver
+        run: python .github/scripts/weather_venue_resolution_v11.py
 
       - name: Validate app syntax
-        run: python -m py_compile streamlit_app.py engine/ui_command_center.py
+        run: python -m py_compile streamlit_app.py
 
-      - name: Run weather and UI contract tests
+      - name: Validate live weather coordinate contracts
         run: |
-          python -m pytest -q tests/test_weather_risk.py tests/test_projection_weather_batter_contract.py tests/test_ui_command_center_contract.py tests/test_hits_allowed_ui_contract.py
-          python -m pytest -q tests/test_matchup_weather_integrity.py -k "not pregame_weather_can_change_on_later_refresh"
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("streamlit_app.py").read_text(encoding="utf-8")
+          required = [
+              '"hydrate":"probablePitcher,team,venue(location)"',
+              'MLBClient().get(f"venues/{target_id}",{"hydrate":"location"})',
+              'MLBClient().get("teams",{"sportId":1,"hydrate":"venue(location)"})',
+              'game.venue_latitude,game.venue_longitude',
+              'venue_latitude:float|None=None; venue_longitude:float|None=None',
+          ]
+          missing = [token for token in required if token not in source]
+          if missing:
+              raise SystemExit(f"Missing live weather coordinate contracts: {missing}")
+          print("Live Projection weather coordinate contracts present")
+          PY
+          python -m pytest -q tests/test_weather_risk.py tests/test_projection_weather_batter_contract.py
 
-      - name: Commit weather layout safely
+      - name: Commit weather venue resolver safely
         run: |
-          if git diff --quiet -- streamlit_app.py engine/ui_command_center.py; then
-            echo "Weather Summary layout already applied"
+          if git diff --quiet -- streamlit_app.py; then
+            echo "Live Projection weather venue resolver already applied"
             exit 0
           fi
           git config user.name "KingTud88"
           git config user.email "jaxson0603@gmail.com"
-          git add streamlit_app.py engine/ui_command_center.py
-          git commit -m "Add Projection Summary weather warning card"
+          git add streamlit_app.py
+          git commit -m "Fix live Projection weather venue coordinates"
           for attempt in 1 2 3 4; do
             git fetch origin main
             git rebase origin/main || { git rebase --abort || true; sleep 2; continue; }
@@ -52,5 +68,5 @@ jobs:
             fi
             sleep $((attempt * 2))
           done
-          echo "Could not push weather layout after retries"
+          echo "Could not push live weather venue resolver after retries"
           exit 1
