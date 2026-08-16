@@ -8,6 +8,11 @@ import pandas as pd
 import streamlit as st
 
 from engine.ui_theme import apply_page_theme
+from engine.explainability_ui import (
+    Explanation, apply_explainability_theme, explain_popover, leg_explanation,
+    projection_metric_explanation, recommendation_explanation, static_explanation,
+    ticket_explanation, top_play_explanation, weather_explanation,
+)
 from engine.command_center_consistency import apply_command_center_consistency
 
 from automation.daily_projection_runner import (
@@ -35,6 +40,7 @@ st.set_page_config(page_title="Daily Projection Run", page_icon="📊", layout="
 apply_page_theme()
 render_sidebar("daily")
 apply_command_center_consistency("daily_run")
+apply_explainability_theme()
 st.markdown(
     """
     <style>
@@ -88,6 +94,7 @@ EASTERN = ZoneInfo("America/New_York")
 today = datetime.now(EASTERN).date()
 ARCHIVE_PATH = LOG_PATH.parent / "projection_archive.csv"
 slate_date = st.date_input("Slate date", value=today)
+explain_popover(Explanation("Slate date","This selects which MLB starter slate Daily Projection Run will capture, inspect or resolve.","The date scopes MLB schedule lookup, frozen projection rows, manual line overlays and result resolution. It does not change model formulas."),label="ⓘ EXPLAIN SLATE CONTROL")
 
 
 def load_log() -> pd.DataFrame:
@@ -465,6 +472,7 @@ st.markdown('<div class="daily-note">Batch capture only · the Projection page r
 
 st.markdown('<div class="daily-section-head">Projection Capture</div>', unsafe_allow_html=True)
 st.markdown('<div class="daily-action-label">⚾ Run the full starter slate</div><div class="daily-action-copy">Primary daily action · capture new eligible starters, preserve frozen snapshots, and refresh only allowed pregame context.</div>', unsafe_allow_html=True)
+explain_popover(static_explanation("daily_capture"),label="ⓘ EXPLAIN PROJECTION CAPTURE")
 if st.button("⚾ RUN ALL TODAY'S PITCHERS", type="primary", use_container_width=True):
     with st.spinner("Simulating every announced starter and writing pregame snapshots..."):
         try:
@@ -527,10 +535,12 @@ if isinstance(slate, pd.DataFrame):
     c5.metric("Errors", len(errors))
     confirmed_lineups = int(slate.get("lineup_source", pd.Series(index=slate.index, dtype=str)).astype(str).eq("CONFIRMED_LINEUP").sum()) if not slate.empty else 0
     c6.metric("Confirmed lineups", confirmed_lineups)
+    explain_popover(static_explanation("daily_status"),label="ⓘ EXPLAIN SLATE STATUS")
 
     if not slate.empty:
         st.markdown('<div class="daily-action-label">🎚️ Manual sportsbook lines</div>', unsafe_allow_html=True)
         st.caption("Open each pitcher bar and enter the real sportsbook lines you want Top Plays to evaluate. Manual values override paid API lines. Half-lines such as 4.5, 15.5, and 5.5 are supported; a blank market is excluded from Top Plays unless a paid active line already exists. Saved manual lines reload automatically after an app restart.")
+        explain_popover(static_explanation("manual_lines"),label="ⓘ EXPLAIN MANUAL LINES")
         durable_archive = load_projection_archive(ARCHIVE_PATH, st.secrets)
         slate = overlay_manual_market_lines(slate, durable_archive)
         st.session_state["daily_slate"] = slate
@@ -753,6 +763,7 @@ if isinstance(slate, pd.DataFrame):
             selection_mode="single-row",
             key="daily_projection_selection",
         )
+        explain_popover(static_explanation("daily_table"),label="ⓘ EXPLAIN DAILY TABLE")
         selected_rows = list(event.selection.rows) if event is not None else []
         if selected_rows:
             selected_pos = int(selected_rows[0])
@@ -802,9 +813,11 @@ quota_note.caption(
     + (f" · checked {checked_at}" if checked_at else " · no paid pull recorded yet")
     + ". This meter never calls the Odds API by itself."
 )
+explain_popover(static_explanation("odds_credits"),label="ⓘ EXPLAIN ODDS CREDITS")
 
 
 st.markdown('<div class="daily-section-head">📚 Persistent history-only starter tracker</div>', unsafe_allow_html=True)
+explain_popover(Explanation("History-only starter tracker","This preserves real starter outcomes for pitchers who did not yet have enough legitimate history to receive a model projection.","The row is stored separately from projection history, then resolved with actual MLB starter statistics. Future starts may use it as fallback starter history, but it never becomes a fake historical projection or calibration row."),label="ⓘ EXPLAIN HISTORY-ONLY TRACKER")
 st.caption(
     "These rows live in starter_observation_log.csv, separate from projection_log.csv. "
     "They are real starter observations collected specifically for pitchers who could not yet receive a legitimate projection."
@@ -847,6 +860,7 @@ else:
     )
 
 st.markdown('<div class="daily-section-head">Resolve Completed Games</div>', unsafe_allow_html=True)
+explain_popover(Explanation("Resolve completed games","This attaches real final MLB pitcher outcomes to previously frozen projection and history-only rows.","The resolver looks up completed game pitching stats and fills actual strikeouts, hits allowed, outs, batters faced and pitches without changing any stored pregame prediction."),label="ⓘ EXPLAIN RESULT RESOLUTION")
 if st.button("Resolve completed projection outcomes"):
     frame = load_log()
     updated = 0

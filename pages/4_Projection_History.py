@@ -7,6 +7,11 @@ import pandas as pd
 import streamlit as st
 
 from engine.ui_theme import apply_page_theme
+from engine.explainability_ui import (
+    Explanation, apply_explainability_theme, explain_popover, leg_explanation,
+    projection_metric_explanation, recommendation_explanation, static_explanation,
+    ticket_explanation, top_play_explanation, weather_explanation,
+)
 from engine.command_center_consistency import apply_command_center_consistency
 from navigation import render_sidebar
 from training.projection_storage import build_projection_archive_view, load_projection_archive
@@ -37,6 +42,7 @@ st.set_page_config(page_title="Projection History", page_icon="📚", layout="wi
 apply_page_theme()
 render_sidebar("history")
 apply_command_center_consistency("projection_history")
+apply_explainability_theme()
 st.markdown(
     """
     <style>
@@ -192,6 +198,7 @@ for col in [
 # PROJECTION_HISTORY_ARCHIVE_COMMAND_V2
 st.markdown('<div class="history-section-head">Projection Archive</div>', unsafe_allow_html=True)
 st.markdown('<div class="history-primary-note">Every frozen daily projection slate appears here automatically. Your sportsbook lines are a durable execution overlay saved separately, so a reboot cannot remove the slate or detach previously saved manual lines.</div>', unsafe_allow_html=True)
+explain_popover(static_explanation("history_archive"),label="ⓘ EXPLAIN PROJECTION ARCHIVE")
 user_archive = load_user_archive(df)
 if user_archive.empty:
     st.info("No frozen projection slates are available yet. Daily Projection Run or the automatic capture job will populate this archive.")
@@ -224,6 +231,7 @@ else:
     a2.metric("Archived pitchers", len(user_archive))
     a3.metric("Manual lines attached", manual_lines)
     a4.metric("Latest slate", latest_archive_date)
+    explain_popover(static_explanation("history_archive"),label="ⓘ EXPLAIN ARCHIVE COUNTERS")
     st.caption(f"{resolved_pitchers} archived pitcher row(s) currently have at least one resolved MLB outcome attached.")
 
     archive_columns = [
@@ -348,6 +356,7 @@ else:
     mae3.metric("Total Outs MAE", "—")
 
 st.caption("80% range HIT means the final result landed inside that market's frozen pregame interval. Range coverage is calibration evidence, not directional win/loss grading.")
+explain_popover(Explanation("Evidence performance scoreboard","This block measures projection error and whether final results landed inside the frozen central 80% ranges.","Range hit rate counts resolved outcomes inside the saved 10th–90th percentile interval. MAE is the average absolute difference between frozen projection and final MLB result.",note="Range coverage is calibration evidence, not sportsbook win/loss grading."),label="ⓘ EXPLAIN EVIDENCE SCOREBOARD")
 
 st.divider()
 st.markdown('<div class="history-kicker">Actionable K results</div>', unsafe_allow_html=True)
@@ -375,6 +384,7 @@ else:
     kw2.metric("Ladder wins", _wins)
     kw3.metric("Ladder win rate", f"{_win_rate:.1%}")
     kw4.metric("Consistent crushers", _crusher_count)
+    explain_popover(Explanation("Bettable K Wins & Crushers","This block grades the model-supported whole-K milestone derived from each frozen strikeout projection and identifies pitchers who have repeatedly cleared those targets.","K Target is floor(Projected K) inside the supported 3+–12+ ladder. Crushers require the existing minimum resolved-call count, win-rate threshold and average margin above target.",note="This is descriptive model tracking. It does not retroactively change old projections or create a new live ranking rule."),label="ⓘ EXPLAIN K RESULTS")
 
     high_calls = _bettable.loc[_bettable.get("confidence", pd.Series(index=_bettable.index, dtype=str)).astype(str).str.upper().eq("HIGH")].copy()
     if not high_calls.empty:
@@ -422,6 +432,7 @@ learn1.metric("Starter-only resolved", len(current_resolved))
 learn2.metric("5+ K calibration rows", f"{k5_obs}/30")
 learn3.metric("O5.5 Hits calibration rows", f"{h55_obs}/30")
 learn4.metric("O15.5 Outs calibration rows", f"{o155_obs}/30")
+explain_popover(static_explanation("history_learning"),label="ⓘ EXPLAIN LEARNING STATUS")
 st.caption(
     f"Only starter-only model rows tagged {HISTORY_SEMANTICS} feed these learning diagnostics. "
     "Each SIM/MATH blend stays at the protected 50/50 baseline until that exact line has at least 30 compatible resolved observations."
@@ -464,6 +475,7 @@ else:
 
 st.divider()
 st.subheader("⚙️ Workload intelligence audit")
+explain_popover(Explanation("Workload intelligence audit","This checks whether the pregame workload forecast is accurately estimating the pitch count, batters faced and outs opportunities that drive starter projections.","Frozen expected workload values are compared with later actual MLB BF/pitches/outs using compatible starter-only rows. The audit is separate from sportsbook results."),label="ⓘ EXPLAIN WORKLOAD AUDIT")
 st.caption(
     "workload-v1 estimates expected pitches, batters faced, and outs from starter-only pitch/BF/outs history, efficiency, recent trend, and conservative short-rest handling. "
     "Sportsbook data is excluded. Actual BF and pitch count are resolved after games so the exposure model can be validated directly."

@@ -11,6 +11,11 @@ import requests
 import streamlit as st
 
 from engine.ui_theme import apply_page_theme
+from engine.explainability_ui import (
+    Explanation, apply_explainability_theme, explain_popover, leg_explanation,
+    projection_metric_explanation, recommendation_explanation, static_explanation,
+    ticket_explanation, top_play_explanation, weather_explanation,
+)
 from engine.ui_command_center import (
     apply_command_center_theme,
     render_command_center_hero,
@@ -63,6 +68,7 @@ PARK_K_FACTOR = {"Coors Field":.94,"T-Mobile Park":1.05,"Petco Park":1.03,"Oracl
 st.set_page_config(page_title="StrikeOut King 9000", page_icon="⚾", layout="wide", initial_sidebar_state="expanded")
 apply_page_theme()
 apply_command_center_theme()
+apply_explainability_theme()
 st.markdown("""<style>
 :root{--bg:#06111d;--panel:#0b1c2e;--line:#1b3851;--red:#f0193c;--green:#24e69b;--ink:#f2f6fa;--muted:#8fa5b7}
 .stApp{background:linear-gradient(145deg,#04101b,#091a2a);color:var(--ink)}
@@ -938,8 +944,14 @@ active_hits_source=str(hit_reco.get("active_line_source","") or "").strip().uppe
 
 if nav=="Distribution":
     st.markdown('<div class="section-head">DISTRIBUTION</div>',unsafe_allow_html=True); st.caption(f"{game.pitcher_name} · {game.team} vs {game.opponent}"); a,b=st.columns(2)
-    with a: st.markdown("### Strikeout probability distribution"); st.bar_chart(pd.DataFrame({"Probability":proj.k_probs},index=np.arange(len(proj.k_probs))))
-    with b: st.markdown("### Outs probability distribution"); st.bar_chart(pd.DataFrame({"Probability":proj.outs_probs},index=np.arange(len(proj.outs_probs))))
+    with a:
+        st.markdown("### Strikeout probability distribution")
+        st.bar_chart(pd.DataFrame({"Probability":proj.k_probs},index=np.arange(len(proj.k_probs))))
+        explain_popover(static_explanation("distribution_k"),label="ⓘ EXPLAIN K DISTRIBUTION")
+    with b:
+        st.markdown("### Outs probability distribution")
+        st.bar_chart(pd.DataFrame({"Probability":proj.outs_probs},index=np.arange(len(proj.outs_probs))))
+        explain_popover(static_explanation("distribution_outs"),label="ⓘ EXPLAIN OUTS DISTRIBUTION")
     st.stop()
 elif nav=="Form & Workload":
     st.markdown('<div class="section-head">FORM & WORKLOAD</div>',unsafe_allow_html=True); st.caption(f"{game.pitcher_name} · workload-v1 uses starter history only; sportsbook data is not an input.")
@@ -950,6 +962,7 @@ elif nav=="Form & Workload":
     w4.metric("Pitches / BF",f"{workload_ctx.pitches_per_bf:.2f}")
     w5.metric("Days since last start","—" if workload_ctx.days_since_last_start is None else workload_ctx.days_since_last_start)
     w6.metric("Recent leash",workload_ctx.leash_label)
+    explain_popover(static_explanation("workload_primary"),label="ⓘ EXPLAIN WORKLOAD BLOCK")
     st.caption(f"Pitch trend {workload_ctx.pitch_trend:+.1%} · BF trend {workload_ctx.bf_trend:+.1%} · outs trend {workload_ctx.outs_trend:+.1%} · short-rest exposure multiplier {workload_ctx.rest_multiplier:.3f}.")
     role_name="LOW_RECENT_EXPOSURE" if role_workload_decision.role=="RESTRICTED" else role_workload_decision.role
     st.markdown("#### 🧪 Starter role workload · SHADOW / FEATURE GATED")
@@ -959,6 +972,7 @@ elif nav=="Form & Workload":
     r3.metric("Candidate pitches",f"{role_workload_decision.candidate.expected_pitches:.1f}")
     r4.metric("Candidate BF",f"{role_workload_decision.candidate.expected_bf:.1f}")
     r5.metric("Candidate outs",f"{role_workload_decision.candidate.expected_outs:.1f}")
+    explain_popover(static_explanation("role_shadow"),label="ⓘ EXPLAIN ROLE SHADOW")
     st.caption(f"Applied to projection: {'YES' if role_workload_decision.applied else 'NO'} · {role_workload_decision.reason} · corrections {role_workload_decision.correction_pitches:+.2f} pitches / {role_workload_decision.correction_bf:+.2f} BF / {role_workload_decision.correction_outs:+.2f} outs.")
     st.markdown("#### 🧭 Team leash candidate · CONTEXT ONLY")
     t1,t2,t3,t4,t5,t6=st.columns(6)
@@ -968,16 +982,17 @@ elif nav=="Form & Workload":
     t4.metric("TTO reached",f"{team_leash_ctx.tto_reach_rate:.1%}")
     t5.metric("90+ pitches",f"{team_leash_ctx.pitch_90_rate:.1%}")
     t6.metric("Team leash",team_leash_ctx.label)
+    explain_popover(static_explanation("team_leash"),label="ⓘ EXPLAIN TEAM LEASH")
     st.caption(
         f"Status {team_leash_ctx.status} · candidate-only multipliers: pitches {team_leash_ctx.pitch_multiplier_candidate:.3f}, "
         f"BF {team_leash_ctx.bf_multiplier_candidate:.3f}, outs {team_leash_ctx.outs_multiplier_candidate:.3f}. "
         "These values do not alter Ks, Hits Allowed, Outs, or Top Plays until leakage-safe validation earns that right."
     )
-    d=log.tail(15).copy(); st.line_chart(d.set_index("date")[["pitches","bf","outs","k"]]); st.dataframe(d.sort_values("date",ascending=False),use_container_width=True,hide_index=True); st.stop()
+    d=log.tail(15).copy(); st.line_chart(d.set_index("date")[["pitches","bf","outs","k"]]); st.dataframe(d.sort_values("date",ascending=False),use_container_width=True,hide_index=True); explain_popover(static_explanation("form_history"),label="ⓘ EXPLAIN RECENT STARTS"); st.stop()
 elif nav=="Model Card":
-    st.markdown('<div class="section-head">MODEL CARD</div>',unsafe_allow_html=True); st.write("Two independent paths: (1) plate-appearance Monte Carlo game simulation with workload uncertainty; (2) independent mathematical Negative-Binomial probability model. Milestone probabilities are calibrated from resolved pregame projections when enough observations exist. Sportsbook prices are used only for edge display, never to create the baseball forecast."); st.markdown("### Path comparison"); path_df=pd.DataFrame([{"Path":"Simulation","Mean K":proj.engine.simulation_mean,"SD":proj.engine.simulation_sd},{"Path":"Mathematical","Mean K":proj.engine.mathematical_mean,"SD":proj.engine.mathematical_sd},{"Path":"Ensemble","Mean K":proj.mean_k,"SD":proj.k_sd}]); path_df["Mean K"]=path_df["Mean K"].map(lambda v:f"{v:.2f}"); path_df["SD"]=path_df["SD"].map(lambda v:f"{v:.2f}"); st.dataframe(path_df,use_container_width=True,hide_index=True); model_view=kdf[["Line","Probability","Simulation","Math","Sim Weight"]].copy()
+    st.markdown('<div class="section-head">MODEL CARD</div>',unsafe_allow_html=True); st.write("Two independent paths: (1) plate-appearance Monte Carlo game simulation with workload uncertainty; (2) independent mathematical Negative-Binomial probability model. Milestone probabilities are calibrated from resolved pregame projections when enough observations exist. Sportsbook prices are used only for edge display, never to create the baseball forecast."); st.markdown("### Path comparison"); path_df=pd.DataFrame([{"Path":"Simulation","Mean K":proj.engine.simulation_mean,"SD":proj.engine.simulation_sd},{"Path":"Mathematical","Mean K":proj.engine.mathematical_mean,"SD":proj.engine.mathematical_sd},{"Path":"Ensemble","Mean K":proj.mean_k,"SD":proj.k_sd}]); path_df["Mean K"]=path_df["Mean K"].map(lambda v:f"{v:.2f}"); path_df["SD"]=path_df["SD"].map(lambda v:f"{v:.2f}"); st.dataframe(path_df,use_container_width=True,hide_index=True); explain_popover(static_explanation("model_paths"),label="ⓘ EXPLAIN MODEL PATHS"); model_view=kdf[["Line","Probability","Simulation","Math","Sim Weight"]].copy()
     for c in ("Probability","Simulation","Math","Sim Weight"): model_view[c]=model_view[c].map(lambda v:f"{v:.1%}")
-    st.dataframe(model_view,use_container_width=True,hide_index=True); st.markdown("### Calibration diagnostics"); render_calibration_dashboard(); st.dataframe(calibration_summary(load_projection_history()),use_container_width=True,hide_index=True); render_ml_shadow_dashboard(game); st.stop()
+    st.dataframe(model_view,use_container_width=True,hide_index=True); explain_popover(static_explanation("model_ladder"),label="ⓘ EXPLAIN MILESTONE TABLE"); st.markdown("### Calibration diagnostics"); render_calibration_dashboard(); st.dataframe(calibration_summary(load_projection_history()),use_container_width=True,hide_index=True); explain_popover(static_explanation("calibration"),label="ⓘ EXPLAIN CALIBRATION"); render_ml_shadow_dashboard(game); explain_popover(static_explanation("ml_shadow"),label="ⓘ EXPLAIN ML SHADOW"); st.stop()
 elif nav=="Bet Tracker":
     st.markdown('<div class="section-head">BET TRACKER</div>',unsafe_allow_html=True); st.caption("Current pitcher markets available from the Odds API are shown here when posted.")
     if odds_err: st.info(odds_err)
@@ -1032,23 +1047,37 @@ for _col,_label,_line,_source in zip(
     _source_text="MANUAL · DAILY RUN" if _manual else (str(_source) if _source else "NO ACTIVE LINE")
     with _col:
         st.markdown(f'<div class="{_cls}"><div class="label">{_label}</div><div class="value">{_value}</div><div class="source">{_source_text}</div></div>',unsafe_allow_html=True)
+explain_popover(static_explanation("active_lines"),label="ⓘ EXPLAIN ACTIVE LINES")
 st.caption("Manual Daily Run lines appear in orange; a saved paid K snapshot appears with its source label. No active line means the projection still shows, but the app will not manufacture a bet lean. Execution lines never alter the baseball projection.")
 st.markdown('<div class="section-head">PROJECTION SUMMARY</div>',unsafe_allow_html=True)
 alt_k_choice=best_alt_k([(int(str(row["Line"]).rstrip("+")),float(row["Probability"])) for _,row in kdf.iterrows()])
 alt_k_html=(f'<div class="alt-k-badge">BEST ALT K · {alt_k_choice.milestone}+ · {alt_k_choice.probability:.0%} HIT</div>' if alt_k_choice else '<div class="alt-k-badge">BEST ALT K · NO 70%+ ALT</div>')
 c1,c2,c3,c4=st.columns(4)
-with c1: st.markdown(f'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon cc-emblem whiff" aria-hidden="true"></div><div class="metric-label">PROJECTED STRIKEOUTS</div></div><div class="metric-value">{proj.mean_k:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(proj.k_samples,.1))}-{int(np.quantile(proj.k_samples,.9))}</span>{alt_k_html}</div>',unsafe_allow_html=True)
+with c1:
+    st.markdown(f'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon cc-emblem whiff" aria-hidden="true"></div><div class="metric-label">PROJECTED STRIKEOUTS</div></div><div class="metric-value">{proj.mean_k:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(proj.k_samples,.1))}-{int(np.quantile(proj.k_samples,.9))}</span>{alt_k_html}</div>',unsafe_allow_html=True)
+    explain_popover(projection_metric_explanation("Strikeouts",proj.mean_k,int(np.quantile(proj.k_samples,.1)),int(np.quantile(proj.k_samples,.9)),extra=(f"Best supported alt K: {alt_k_choice.milestone}+ at {alt_k_choice.probability:.0%}" if alt_k_choice else "No 70%+ alt K milestone",)),label="ⓘ WHY THIS K PROJECTION?")
 render_reco(c2,k_reco)
-with c3: st.markdown(f'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon cc-emblem glove" aria-hidden="true"></div><div class="metric-label">PROJECTED OUTS</div></div><div class="metric-value">{proj.mean_outs:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(proj.outs_samples,.1))}-{int(np.quantile(proj.outs_samples,.9))}</span></div>',unsafe_allow_html=True)
+with c2:
+    explain_popover(recommendation_explanation(k_reco,"Strikeouts"),label="ⓘ WHY THIS K DECISION?")
+with c3:
+    st.markdown(f'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon cc-emblem glove" aria-hidden="true"></div><div class="metric-label">PROJECTED OUTS</div></div><div class="metric-value">{proj.mean_outs:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(proj.outs_samples,.1))}-{int(np.quantile(proj.outs_samples,.9))}</span></div>',unsafe_allow_html=True)
+    explain_popover(projection_metric_explanation("Total Outs",proj.mean_outs,int(np.quantile(proj.outs_samples,.1)),int(np.quantile(proj.outs_samples,.9))),label="ⓘ WHY THIS OUTS PROJECTION?")
 render_reco(c4,out_reco)
+with c4:
+    explain_popover(recommendation_explanation(out_reco,"Total Outs"),label="ⓘ WHY THIS OUTS DECISION?")
 h1,h2,h3=st.columns([1,1,2])
-with h1: st.markdown(f'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon cc-emblem contact" aria-hidden="true"></div><div class="metric-label">PROJECTED HITS ALLOWED</div></div><div class="metric-value">{hits_proj.ensemble_mean:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(hits_proj.simulation_samples,.1))}-{int(np.quantile(hits_proj.simulation_samples,.9))}</span></div>',unsafe_allow_html=True)
+with h1:
+    st.markdown(f'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon cc-emblem contact" aria-hidden="true"></div><div class="metric-label">PROJECTED HITS ALLOWED</div></div><div class="metric-value">{hits_proj.ensemble_mean:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(hits_proj.simulation_samples,.1))}-{int(np.quantile(hits_proj.simulation_samples,.9))}</span></div>',unsafe_allow_html=True)
+    explain_popover(projection_metric_explanation("Hits Allowed",hits_proj.ensemble_mean,int(np.quantile(hits_proj.simulation_samples,.1)),int(np.quantile(hits_proj.simulation_samples,.9))),label="ⓘ WHY THIS HITS PROJECTION?")
 render_reco(h2,hit_reco)
+with h2:
+    explain_popover(recommendation_explanation(hit_reco,"Hits Allowed"),label="ⓘ WHY THIS HITS DECISION?")
 with h3:
     st.markdown(
         f'<div class="game-weather-card {_weather_class}"><div class="game-weather-head"><div><div class="game-weather-title">GAME WEATHER · DELAY RISK</div><div class="game-weather-risk">{_weather_label}</div><div class="game-weather-action">{_weather_action}</div></div><div class="game-weather-icon" aria-hidden="true">{_weather_icon}</div></div><div class="game-weather-grid"><div class="game-weather-stat"><span>Precip chance</span><strong>{_weather_prob}</strong></div><div class="game-weather-stat"><span>Peak precip</span><strong>{_weather_peak}</strong></div></div><div class="game-weather-reason">{_weather_summary}</div><div class="game-weather-note">Game window: 2h before first pitch → 4h after · Roof-capable parks suppress false exterior-rain avoid signals; verify retractable-roof status near first pitch. Weather does not modify the projection.</div></div>',
         unsafe_allow_html=True,
     )
+    explain_popover(weather_explanation(level=weather_risk.level,precip_probability=weather_risk.precip_probability,precipitation_mm=weather_risk.precipitation_mm,summary=weather_risk.summary),label="ⓘ WHY THIS WEATHER STATUS?")
 
 st.markdown('<div class="section-head">OPPOSING BATTER BOX</div>',unsafe_allow_html=True)
 lineup_label="✅ CONFIRMED BATTING ORDER" if lineup_context.confirmed else "ACTIVE ROSTER FALLBACK · lineup not posted yet"
@@ -1062,6 +1091,7 @@ else:
     b3.metric("Split PA",int(opponent_matchup["pa"]))
     b4.metric("HIGH K hitters",int(opponent_matchup["high"]))
     b5.metric("ELEVATED K hitters",int(opponent_matchup["elevated"]))
+    explain_popover(static_explanation("opposing_batters"),label="ⓘ EXPLAIN BATTER MATCHUP")
     batter_display=opposing_batters.copy()
     batter_display["K% vs Pitcher"]=pd.to_numeric(batter_display["K% vs Pitcher"],errors="coerce")*100.0
     batter_display["H/PA vs Pitcher"]=pd.to_numeric(batter_display["H/PA vs Pitcher"],errors="coerce")*100.0
@@ -1087,6 +1117,8 @@ else:
 st.markdown('<div class="section-head">BET TRACKER / PARLAY ACTIONS</div>',unsafe_allow_html=True)
 action_panel=st.container(border=True,key="cc_bet_action_panel")
 action_panel.caption("Quick-add uses the real active line shown above. A sportsbook price may remain unpriced, but the app will not quick-add a fabricated/default market line.")
+with action_panel:
+    explain_popover(static_explanation("projection_actions"),label="ⓘ EXPLAIN BET ACTIONS")
 quick_add_stake=action_panel.number_input("Quick-add stake",min_value=0.0,value=1.0,step=0.5,key=f"projection_quick_stake_{game.key}")
 add1,add2,add3=action_panel.columns(3,gap="medium")
 render_add_bet_button(add1,k_reco,"Strikeouts",{"pitcher_strikeouts","pitcher_strikeouts_alternate"},proj.mean_k,quick_add_stake,game,selected_date.isoformat(),odds_rows,proj.confidence,proj.quality,f"add_k_{game.key}")

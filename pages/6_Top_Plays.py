@@ -12,6 +12,11 @@ import requests
 import streamlit as st
 
 from engine.ui_theme import apply_page_theme
+from engine.explainability_ui import (
+    Explanation, apply_explainability_theme, explain_popover, leg_explanation,
+    projection_metric_explanation, recommendation_explanation, static_explanation,
+    ticket_explanation, top_play_explanation, weather_explanation,
+)
 from engine.command_center_consistency import apply_command_center_consistency
 
 from automation.daily_projection_runner import LOG_PATH, game_log
@@ -36,6 +41,7 @@ st.set_page_config(page_title="Top Plays", page_icon="👑", layout="wide")
 apply_page_theme()
 render_sidebar("top")
 apply_command_center_consistency("top_plays")
+apply_explainability_theme()
 st.markdown(
     """
     <style>
@@ -603,6 +609,7 @@ c2.metric("Actionable model plays", model_plays)
 c3.metric("Decision-supported legs", decision_supported)
 c4.metric("Signal-supported legs", signal_supported)
 c5.metric("Exact live prices found", f"{live_offers}/{len(plays)}")
+explain_popover(static_explanation("top_summary"),label="ⓘ EXPLAIN TOP 5 SUMMARY")
 
 st.markdown('<div class="tp-section-ribbon">Top Play Actions</div>', unsafe_allow_html=True)
 st.caption("Straight-bet stake is the amount recorded for one individual leg. It does not place a sportsbook wager and it does not affect the projection model.")
@@ -678,6 +685,7 @@ for target_col, (_, play_row) in layout_slots:
                 """,
                 unsafe_allow_html=True,
             )
+            explain_popover(top_play_explanation(play_row),label=f"ⓘ WHY IS THIS #{rank}?")
             if live_offer:
                 odds_value = int(float(play_row["Odds"]))
                 book_value = str(play_row.get("Book", "") or "Live book")
@@ -714,6 +722,7 @@ st.caption("ⓘ Projections are model estimates at the listed line. They are not
 
 st.markdown("---")
 st.subheader("🎟️ Parlay Builder")
+explain_popover(static_explanation("top_parlay"),label="ⓘ EXPLAIN PARLAY BUILDER")
 st.caption(
     "Build a parlay directly from our model Top 5. Sportsbook data never filters, ranks, or selects the legs. "
     "Select any 2–5 model legs and choose one stake for the entire tracked model ticket; the sportsbook dropdown is recordkeeping only."
@@ -814,6 +823,7 @@ if selected_rank is not None:
 
 st.markdown("---")
 st.subheader("🧪 Model diagnostics")
+explain_popover(static_explanation("top_diagnostics"),label="ⓘ EXPLAIN DIAGNOSTICS")
 st.caption("Calibration, Model Health, decision-learning evidence, and signal accountability live here so the plays stay first-scan readable. These diagnostics retain their original ranking and safety roles.")
 
 with st.expander("Hits Allowed calibration status", expanded=False):

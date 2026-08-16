@@ -10,6 +10,11 @@ import requests
 import streamlit as st
 
 from engine.ui_theme import apply_page_theme
+from engine.explainability_ui import (
+    Explanation, apply_explainability_theme, explain_popover, leg_explanation,
+    projection_metric_explanation, recommendation_explanation, static_explanation,
+    ticket_explanation, top_play_explanation, weather_explanation,
+)
 from engine.command_center_consistency import apply_command_center_consistency
 
 from automation.daily_projection_runner import LOG_PATH as PROJECTION_LOG, schedule as daily_schedule
@@ -38,6 +43,7 @@ st.set_page_config(page_title="Bet Tracker", page_icon="📊", layout="wide")
 apply_page_theme()
 render_sidebar("bets")
 apply_command_center_consistency("bet_tracker")
+apply_explainability_theme()
 # BET_TRACKER_COMMAND_UI_V1
 st.markdown(
     """
@@ -323,6 +329,7 @@ def load_tracker() -> pd.DataFrame:
 
 
 with st.expander("➕ Add a bet", expanded=False):
+    explain_popover(Explanation("Add a tracked bet","This form saves a sportsbook or model ticket into the persistent Bet Tracker ledger.","The selected pitcher/market supplies identifying information; side, line, odds, stake and book are saved exactly as entered. A frozen projection is attached when available.",note="Manual bet entry is tracking-only and never feeds the projection model."),label="ⓘ EXPLAIN BET ENTRY")
     today = datetime.now(EASTERN).date()
     today_text = today.isoformat()
     slate, slate_error = todays_slate(today_text)
@@ -653,6 +660,7 @@ m2.metric("Record", f"{wins}-{losses}-{pushes}")
 m3.metric("Pending / Live", pending)
 m4.metric("Net P/L", f"{net:+.2f}" if profit_series.notna().any() else "—")
 m5.metric("ROI", f"{roi:+.1%}" if roi is not None else "—")
+explain_popover(static_explanation("tracker_summary"),label="ⓘ EXPLAIN TRACKER SUMMARY")
 
 if invalid:
     st.warning(f"{invalid} legacy model-only ticket(s) are marked INVALID LINE and excluded from the real win/loss record because their saved legs used synthetic/default lines rather than verified sportsbook lines.")
@@ -751,6 +759,7 @@ for ticket_index, (_, ticket) in enumerate(results.iterrows()):
             f'<div class="bt-ticket-state {state_class}"><div class="name">{ticket_pitcher} · {ticket_market}</div><div class="status">{ticket_result}</div></div>',
             unsafe_allow_html=True,
         )
+        explain_popover(ticket_explanation(ticket),label="ⓘ WHY THIS TICKET STATUS?")
         h1, h2, h3, h4, h5, h6 = st.columns(6)
         h1.metric("Book", str(ticket.get("Book", "") or "—"))
         stake_value = _num(ticket.get("Stake"))
@@ -801,6 +810,7 @@ for ticket_index, (_, ticket) in enumerate(results.iterrows()):
                 room = line - actual
                 progress_text = f"{actual:g} current · {max(0.0, room):g} below the listed line" if room > 0 else f"{actual:g} current · at/above the listed line"
             st.caption(f"{_ticket_icon(leg_result)} {leg_result} · {status} · {progress_text}")
+            explain_popover(leg_explanation(leg),label="ⓘ EXPLAIN THIS LEG")
 
         st.caption("Live progress comes from MLB pitching stats. Sportsbook prices and stakes remain tracking-only inputs and never feed the projection model.")
 
