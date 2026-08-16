@@ -1,0 +1,40 @@
+name: Repair project audit cleanup
+
+on:
+  push:
+    paths:
+      - ".github/workflows/repair-project-audit-cleanup.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix generated assertion quoting
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/project-audit-cleanup.yml')
+          lines = path.read_text(encoding='utf-8').splitlines()
+          changed = False
+          for index, line in enumerate(lines):
+              if 'tradable=side in' in line and 'assert' in line:
+                  prefix = line.split('assert', 1)[0]
+                  lines[index] = prefix + '''assert 'tradable=side in {"OVER","UNDER"} and not no_line' in source'''
+                  changed = True
+                  break
+          if not changed:
+              raise SystemExit('Audit workflow assertion target not found')
+          path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          PY
+      - name: Commit repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/project-audit-cleanup.yml
+          git commit -m "Fix audit cleanup test quoting"
+          git push
