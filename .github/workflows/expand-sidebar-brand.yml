@@ -1,8 +1,6 @@
 name: Projection Weather Card Hero
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
