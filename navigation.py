@@ -40,13 +40,13 @@ def render_sidebar(active: str = "projection") -> None:
             display:flex;
             justify-content:center;
             align-items:center;
-            height:126px;
-            margin:-.08rem 0 .2rem;
+            height:174px;
+            margin:-.2rem 0 -.12rem;
             position: relative;
         }
         .sk-nav-mascot img {
-            width:122px;
-            height:122px;
+            width:172px;
+            height:172px;
             object-fit:contain;
             display:block;
             filter: drop-shadow(0 9px 18px rgba(0,0,0,.3));
@@ -69,20 +69,20 @@ def render_sidebar(active: str = "projection") -> None:
         .sk-nav-title {
             text-align:center;
             font-family:Impact,"Arial Narrow",sans-serif;
-            font-size:1.19rem;
-            line-height:1;
+            font-size:1.52rem;
+            line-height:.92;
             color:#fff;
             letter-spacing:.015em;
         }
-        .sk-nav-title span { color:#ff3655; }
+        .sk-nav-title span { color:#ff3655; font-size:1.68rem; letter-spacing:.035em; }
         .sk-nav-sub {
             text-align:center;
             color:#9eb1c6;
-            font-size:.66rem;
+            font-size:.61rem;
             font-weight:650;
             line-height:1.38;
             letter-spacing:.02em;
-            margin:.48rem 0 .05rem;
+            margin:.52rem .2rem .05rem;
         }
         .sk-nav-section {
             color:#7790aa;
