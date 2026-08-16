@@ -4,6 +4,4 @@ game_date,game_pk,pitcher_id,player,team,opponent,Training_Resolved_Starts,Featu
 2026-08-16,824397,663554,Casey Mize,SDP,CLE,106,34,4.626856302479892,5.717820384890853,,,,True,ml-k-shadow-v1-report-only
 2026-08-16,823182,687312,Gabriel Hughes,COL,SFG,106,34,4.825934159552915,3.292426223949973,,,,True,ml-k-shadow-v1-report-only
 2026-08-16,824156,686613,Hunter Brown,HOU,SEA,106,34,5.072816727384349,5.299255321617465,,,,True,ml-k-shadow-v1-report-only
-2026-08-16,823912,701656,Logan Henderson,MIL,LAD,106,34,5.166586769096899,6.378899604053306,,,,True,ml-k-shadow-v1-report-only
 2026-08-16,824397,676440,Tanner Bibee,CLE,SDP,106,34,4.900820874019503,4.880509719860724,,,,True,ml-k-shadow-v1-report-only
-2026-08-16,823912,669373,Tarik Skubal,LAD,MIL,106,34,5.825653446777954,5.457685095029152,,,,True,ml-k-shadow-v1-report-only
