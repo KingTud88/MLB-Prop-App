@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -12,6 +13,7 @@ ODDS_API = "https://api.the-odds-api.com/v4"
 EASTERN = ZoneInfo("America/New_York")
 ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOT_PATH = ROOT / "data" / "odds_strikeout_snapshot.csv"
+QUOTA_PATH = ROOT / "data" / "odds_api_quota.json"
 SNAPSHOT_COLUMNS = [
     "slate_date", "event_id", "commence_time", "home_team", "away_team",
     "pitcher", "book", "market", "name", "point", "price", "fetched_at_utc",
@@ -53,6 +55,29 @@ def _quota(headers: requests.structures.CaseInsensitiveDict) -> dict[str, int | 
     }
 
 
+def save_quota_status(quota: dict[str, int | None], checked_at_utc: str | None = None) -> None:
+    if not quota or not any(value is not None for value in quota.values()):
+        return
+    payload = {
+        "remaining": quota.get("remaining"),
+        "used": quota.get("used"),
+        "last": quota.get("last"),
+        "checked_at_utc": checked_at_utc or datetime.now(timezone.utc).isoformat(),
+    }
+    QUOTA_PATH.parent.mkdir(parents=True, exist_ok=True)
+    QUOTA_PATH.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
+
+
+def load_quota_status() -> dict[str, object]:
+    if not QUOTA_PATH.exists():
+        return {}
+    try:
+        payload = json.loads(QUOTA_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
 def _parse_event(event: dict, payload: dict, slate_date: str, fetched_at: str) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for bookmaker in payload.get("bookmakers", []) if isinstance(payload, dict) else []:
@@ -86,16 +111,17 @@ def refresh_strikeout_snapshot(api_key: str, slate_date: str, *, session: reques
     if not key:
         return pd.DataFrame(columns=SNAPSHOT_COLUMNS), {}, "Odds API key not found in Streamlit secrets."
     http = session or requests.Session()
+    quota: dict[str, int | None] = {}
     try:
         response = http.get(f"{ODDS_API}/sports/baseball_mlb/events", params={"apiKey": key}, timeout=15)
         response.raise_for_status()
+        quota = _quota(response.headers)
         events = response.json()
     except (requests.RequestException, ValueError, TypeError) as exc:
         return pd.DataFrame(columns=SNAPSHOT_COLUMNS), {}, f"Odds API event lookup failed: {type(exc).__name__}."
 
     day_events = [event for event in events if isinstance(event, dict) and _event_local_date(event) == str(slate_date)]
     rows: list[dict[str, object]] = []
-    quota: dict[str, int | None] = {}
     fetched_at = datetime.now(timezone.utc).isoformat()
     for event in day_events:
         try:
@@ -118,6 +144,7 @@ def refresh_strikeout_snapshot(api_key: str, slate_date: str, *, session: reques
     combined = pd.concat([existing, fresh], ignore_index=True) if not existing.empty else fresh.copy()
     SNAPSHOT_PATH.parent.mkdir(parents=True, exist_ok=True)
     combined.to_csv(SNAPSHOT_PATH, index=False)
+    save_quota_status(quota, fetched_at)
     return fresh, quota, None
 
 

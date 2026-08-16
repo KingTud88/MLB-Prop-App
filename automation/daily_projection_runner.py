@@ -17,7 +17,7 @@ from engine.lineup_context import LINEUP_ACTIVE_ROSTER, LINEUP_CONFIRMED, get_co
 from engine.hits_allowed import project_hits_allowed
 from engine.outs_projection import project_total_outs
 from engine.starter_history import HISTORY_SEMANTICS, TARGET_STARTER_HISTORY, combine_starter_history, starter_only
-from engine.weather_risk import WeatherDelayRisk, fetch_weather_delay_risk
+from engine.weather_risk import WeatherDelayRisk, apply_roof_protection, fetch_weather_delay_risk
 from engine.workload_context import WORKLOAD_VERSION, WorkloadContext, build_workload_context
 from engine.role_workload_gate import build_role_workload_decision
 from engine.team_leash import build_team_leash_context, candidate_workload_fields
@@ -302,6 +302,33 @@ def venue_coordinates(venue_id: int) -> tuple[float, float] | None:
         return None
 
 
+@lru_cache(maxsize=64)
+def venue_roof_type(venue_id: int) -> str:
+    if not venue_id:
+        return ""
+    try:
+        data = get_json(f"venues/{int(venue_id)}", {"hydrate": "fieldInfo"})
+        venues = data.get("venues") or []
+        field_info = (venues[0].get("fieldInfo") or {}) if venues else {}
+        roof = str(field_info.get("roofType") or "").strip()
+        if roof:
+            return roof
+    except (requests.RequestException, ValueError, TypeError, IndexError):
+        pass
+    try:
+        data = get_json("teams", {"sportId": 1, "hydrate": "venue(fieldInfo)"})
+        for team in data.get("teams", []) or []:
+            venue = team.get("venue", {}) or {}
+            if int(venue.get("id", 0) or 0) != int(venue_id):
+                continue
+            roof = str(((venue.get("fieldInfo") or {}).get("roofType")) or "").strip()
+            if roof:
+                return roof
+    except (requests.RequestException, ValueError, TypeError, IndexError):
+        pass
+    return ""
+
+
 @lru_cache(maxsize=128)
 def game_weather(
     venue_id: int,
@@ -319,7 +346,8 @@ def game_weather(
         coords = venue_coordinates(int(venue_id or 0))
     if not coords:
         return WeatherDelayRisk("UNKNOWN", "", None, None, None, "Venue coordinates unavailable for weather risk.", False)
-    return fetch_weather_delay_risk(coords[0], coords[1], str(game_time or ""))
+    risk = fetch_weather_delay_risk(coords[0], coords[1], str(game_time or ""))
+    return apply_roof_protection(risk, venue_roof_type(int(venue_id or 0)))
 
 
 def weather_snapshot_fields(
@@ -335,6 +363,7 @@ def weather_snapshot_fields(
         "weather_precip_probability": np.nan if risk.precip_probability is None else risk.precip_probability,
         "weather_precip_mm": np.nan if risk.precipitation_mm is None else risk.precipitation_mm,
         "weather_summary": risk.summary,
+        "weather_roof_type": venue_roof_type(int(venue_id or 0)),
     }
 
 
@@ -670,14 +699,17 @@ def attach_pregame_weather(frame: pd.DataFrame, announced: list[dict]) -> int:
         scheduled = lookup.get(key)
         if not scheduled:
             continue
-        fields = weather_snapshot_fields(
-            int(scheduled.get("venue_id", 0) or 0),
-            str(scheduled.get("game_time", "")),
-            scheduled.get("venue_latitude"),
-            scheduled.get("venue_longitude"),
-        )
-        changed = False
         venue_id = int(scheduled.get("venue_id", 0) or 0)
+        game_time = str(scheduled.get("game_time", ""))
+        latitude = scheduled.get("venue_latitude")
+        longitude = scheduled.get("venue_longitude")
+        # Preserve the original two-argument weather helper contract when
+        # coordinates are unavailable; pass coordinates only when both exist.
+        if latitude is None or longitude is None:
+            fields = weather_snapshot_fields(venue_id, game_time)
+        else:
+            fields = weather_snapshot_fields(venue_id, game_time, latitude, longitude)
+        changed = False
         old_venue = pd.to_numeric(pd.Series([row.get("venue_id")]), errors="coerce").iloc[0]
         if pd.isna(old_venue) or int(old_venue) != venue_id:
             frame.at[idx, "venue_id"] = venue_id

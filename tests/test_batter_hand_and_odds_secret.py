@@ -8,11 +8,12 @@ def test_pitcher_hand_uses_mlb_person_pitch_hand_key():
     assert 'get("pitchHand")' in runner
 
 
-def test_odds_errors_never_render_raw_exception_url_or_key():
+def test_projection_has_no_direct_paid_odds_error_path():
     app = Path("streamlit_app.py").read_text(encoding="utf-8")
-    assert 'safe_odds_error' in app
-    assert 'f"Odds API unavailable: {e}"' not in app
-    assert 'authentication failed (401)' in app
+    odds = Path("engine/odds_snapshot.py").read_text(encoding="utf-8")
+    assert 'get_event_props' not in app
+    assert 'load_pitcher_strikeout_odds' in app
+    assert 'type(exc).__name__' in odds
 
 
 def test_batter_box_reads_bat_side_from_hydrated_person():

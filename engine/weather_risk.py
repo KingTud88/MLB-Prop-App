@@ -26,6 +26,34 @@ def _empty(summary: str = "Weather forecast unavailable for this game window.") 
     return WeatherDelayRisk("UNKNOWN", "", None, None, None, summary, False)
 
 
+def roof_protected(roof_type: object) -> bool:
+    """Return whether MLB venue metadata describes a covered/closable roof."""
+    text = str(roof_type or "").strip().lower()
+    if not text or text == "open":
+        return False
+    return any(token in text for token in ("retract", "dome", "fixed roof", "closed roof"))
+
+
+def apply_roof_protection(risk: WeatherDelayRisk, roof_type: object) -> WeatherDelayRisk:
+    """Keep exterior weather visible while preventing false delay alarms under a roof.
+
+    Retractable-roof parks still require a near-game roof-status check, so this
+    is an informational protection label rather than a claim that the roof is
+    definitely closed.
+    """
+    if not roof_protected(roof_type):
+        return risk
+    label = str(roof_type or "roof-capable").strip()
+    exterior = str(risk.level or "UNKNOWN").upper()
+    summary = (
+        f"Roof-capable venue ({label}). Exterior weather is {exterior.lower()} but is not treated "
+        "as an automatic pitcher-avoid delay signal; verify roof status near first pitch."
+    )
+    return WeatherDelayRisk(
+        "ROOF", "🏟️", risk.precip_probability, risk.precipitation_mm, risk.weather_code, summary, True
+    )
+
+
 def assess_delay_risk(hourly: dict, game_time_utc: datetime) -> WeatherDelayRisk:
     """Classify rain/thunder risk from two hours before first pitch through four hours after.
 

@@ -9,7 +9,9 @@ def test_projection_page_has_weather_badge_and_batter_box():
     assert 'MLBClient().get("teams",{"sportId":1,"hydrate":"venue(location)"})' in text
     assert "venue_latitude:float|None=None; venue_longitude:float|None=None" in text
     assert "weather_marker" in text
-    assert "Weather risk is informational and does not currently modify the projection" in text
+    assert "Weather does not modify the projection" in text
+    assert "ROOF PROTECTED" in text
+    assert "get_venue_roof_type" in text
     assert "OPPOSING BATTER BOX" in text
     assert "get_confirmed_lineup(game.game_pk,opponent_team_id)" in text
     assert "lineup_context.player_ids if lineup_context.confirmed else ()" in text

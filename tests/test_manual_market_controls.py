@@ -1,29 +1,30 @@
 from pathlib import Path
 
 
-def test_projection_lean_cards_support_manual_line_and_odds_without_forecast_feedback():
+def test_projection_uses_daily_lines_without_local_manual_market_editor():
     source = Path("streamlit_app.py").read_text(encoding="utf-8")
-    assert 'MANUAL LINE / ODDS' in source
-    assert 'Use manual market' in source
-    assert 'American odds' in source
-    assert '✅ APPLY LINE / ODDS' in source
-    assert 'manual_market_recommendation' in source
-    assert 'market_model_probability' in source
-    assert 'manual_implied' in source
-    assert 'st.session_state[f"{key_prefix}:applied"]' in source
+    assert "MANUAL LINE / ODDS" not in source
+    assert "Use manual market" not in source
+    assert "manual_market_recommendation" not in source
+    assert "overlay_manual_market_lines" in source
+    assert "apply_active_line_to_recommendation" in source
+    assert "NO ACTIVE LINE" in source
+    assert "PROJECTION ONLY" in source
 
 
-def test_all_three_projection_markets_have_manual_controls():
-    source = Path("streamlit_app.py").read_text(encoding="utf-8")
-    assert 'key_prefix=f"manual_k:{game.key}"' in source
-    assert 'key_prefix=f"manual_outs:{game.key}"' in source
-    assert 'key_prefix=f"manual_hits:{game.key}"' in source
-    assert 'market_key="pitcher_strikeouts"' in source
-    assert 'market_key="pitcher_outs"' in source
-    assert 'market_key="pitcher_hits_allowed"' in source
+def test_daily_run_is_single_persistent_manual_line_source_for_all_three_markets():
+    projection = Path("streamlit_app.py").read_text(encoding="utf-8")
+    daily = Path("pages/5_Daily_Projection_Run.py").read_text(encoding="utf-8")
+    assert "manual_k_line" in projection
+    assert "manual_outs_line" in projection
+    assert "manual_hits_line" in projection
+    assert "daily_manual_k_" in daily
+    assert "daily_manual_outs_" in daily
+    assert "daily_manual_hits_" in daily
+    assert "APPLY LINES + ADD TO PROJECTION ARCHIVE" in daily
 
 
-def test_manual_controls_do_not_enter_projection_feature_builder():
+def test_manual_lines_do_not_enter_projection_feature_builder():
     source = Path("streamlit_app.py").read_text(encoding="utf-8")
     feature_block = source[source.index('def build_engine_features'):source.index('def calculate_projection')]
     assert 'manual_' not in feature_block

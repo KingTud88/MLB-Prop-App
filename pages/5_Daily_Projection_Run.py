@@ -26,7 +26,7 @@ from automation.daily_projection_runner import (
 from engine.calibration import calibrate_blend
 from engine.hits_calibration import calibrate_hits_blend
 from engine.outs_calibration import calibrate_outs_blend
-from engine.odds_snapshot import refresh_strikeout_snapshot, resolve_api_key
+from engine.odds_snapshot import load_quota_status, refresh_strikeout_snapshot, resolve_api_key
 from navigation import render_sidebar
 from training.projection_storage import load_projection_archive, overlay_manual_market_lines, save_projection_archive
 
@@ -577,12 +577,12 @@ if isinstance(slate, pd.DataFrame):
         # but live farther right so they do not separate the pitcher from Projection K.
         display_cols = [
             "player", "team", "opponent",
-            "active_strikeout_line", "active_strikeout_line_source", "projection", "k_range_low", "k_range_high", "sim_5p", "math_5p",
-            "active_outs_line", "active_outs_line_source", "outs_projection", "outs_range_low", "outs_range_high", "outs_sim_over_15_5", "outs_math_over_15_5",
-            "active_hits_allowed_line", "active_hits_allowed_line_source", "hits_projection", "hits_range_low", "hits_range_high", "hits_sim_over_5_5", "hits_math_over_5_5",
+            "projection", "k_range_low", "k_range_high", "sim_5p", "math_5p", "active_strikeout_line", "active_strikeout_line_source",
+            "outs_projection", "outs_range_low", "outs_range_high", "outs_sim_over_15_5", "outs_math_over_15_5", "active_outs_line", "active_outs_line_source",
+            "hits_projection", "hits_range_low", "hits_range_high", "hits_sim_over_5_5", "hits_math_over_5_5", "active_hits_allowed_line", "active_hits_allowed_line_source",
             "confidence", "data_quality", "opponent_k_pct",
             "lineup_source", "lineup_batters", "lineup_projection_delta",
-            "weather_icon", "weather_delay_risk", "weather_precip_probability",
+            "weather_icon", "weather_delay_risk", "weather_roof_type", "weather_precip_probability",
             "starter_history_games", "starter_history_source", "starter_history_mlb_games", "starter_history_observation_games",
             "workload_version", "expected_pitches", "expected_bf", "expected_outs", "pitches_per_bf", "days_since_last_start", "leash_label", "pitch_trend",
             "team_leash_label", "team_leash_status", "team_leash_starts", "team_leash_avg_pitches", "team_leash_tto_reach_rate", "team_leash_90_pitch_rate", "team_leash_pitch_multiplier_candidate", "team_leash_role",
@@ -636,6 +636,7 @@ if isinstance(slate, pd.DataFrame):
                 "team_leash_pitch_multiplier_candidate": "Pitch Adj",
                 "team_leash_role": "Team Leash Role",
                 "weather_delay_risk": "Weather",
+                "weather_roof_type": "Roof",
                 "weather_precip_probability": "Rain %",
                 "lineup_source": "Lineup",
                 "lineup_batters": "Hitters",
@@ -739,7 +740,7 @@ if isinstance(slate, pd.DataFrame):
 
         st.subheader(f"{slate_date:%B %d, %Y} starter slate")
         st.caption(
-            "How to read: Line = active sportsbook execution line attached after projection capture · Projection = frozen expected average outcome · 80% Range = one central simulated interval (10th–90th percentile), not an 80% chance at each endpoint · "
+            "How to read: Projection = frozen expected average outcome · Line = active sportsbook execution line attached after projection capture · 80% Range = one central simulated interval (10th–90th percentile), not an 80% chance at each endpoint · "
             "SIM/MATH = the probability from each independent model path. MANUAL/PAID API source labels show exactly where each line came from. Adding or changing a line never changes the frozen projection. Click a pitcher row for the full breakdown. Headline projections are green."
         )
         event = st.dataframe(
@@ -777,6 +778,7 @@ st.markdown('<div class="daily-section-head">Manual Paid Data</div>', unsafe_all
 st.markdown('<div class="daily-note paid">Optional market-data pull · manual only · strikeout lines only · saved snapshot is reused elsewhere without another paid request.</div>', unsafe_allow_html=True)
 st.markdown('<div class="daily-action-label">💳 Paid strikeout lines</div>', unsafe_allow_html=True)
 st.caption("Manual only. This button is the ONLY paid Odds API path and requests pitcher_strikeouts only. The saved snapshot is reused by Main Projections without another API call.")
+paid_quota = load_quota_status()
 if st.button("💳 LOAD STRIKEOUT LINES · PAID API", use_container_width=True, key="daily_paid_k_odds"):
     api_key=resolve_api_key(st.secrets)
     with st.spinner("Loading today's main pitcher strikeout lines once and saving the snapshot..."):
@@ -787,11 +789,20 @@ if st.button("💳 LOAD STRIKEOUT LINES · PAID API", use_container_width=True, 
         pitchers=int(odds_snapshot.get("pitcher",pd.Series(dtype=str)).nunique()) if not odds_snapshot.empty else 0
         active_lines = apply_paid_strikeout_lines(odds_snapshot, slate_date.isoformat())
         st.success(f"Saved {len(odds_snapshot)} strikeout offers for {pitchers} pitchers and applied {active_lines} active K line(s) for Top Plays. Manual K lines override these paid lines.")
-        if quota:
-            st.caption(f"Last paid request: {quota.get('last','—')} credit(s) · {quota.get('remaining','—')} remaining · {quota.get('used','—')} used.")
+        paid_quota = load_quota_status()
+
+remaining = paid_quota.get("remaining") if isinstance(paid_quota, dict) else None
+checked_at = str(paid_quota.get("checked_at_utc", "") or "") if isinstance(paid_quota, dict) else ""
+quota_col, quota_note = st.columns([1, 2])
+quota_col.metric("Odds API credits remaining", "—" if remaining is None else f"{int(remaining):,}")
+quota_note.caption(
+    "Saved from the response headers of the last paid pull"
+    + (f" · checked {checked_at}" if checked_at else " · no paid pull recorded yet")
+    + ". This meter never calls the Odds API by itself."
+)
 
 
-st.markdown('<div class="daily-section-head">Persistent History-Only Tracker</div>', unsafe_allow_html=True)
+st.markdown('<div class="daily-section-head">📚 Persistent history-only starter tracker</div>', unsafe_allow_html=True)
 st.caption(
     "These rows live in starter_observation_log.csv, separate from projection_log.csv. "
     "They are real starter observations collected specifically for pitchers who could not yet receive a legitimate projection."

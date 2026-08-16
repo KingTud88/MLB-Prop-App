@@ -57,6 +57,7 @@ class FakeSession:
 
 def test_refresh_requests_only_main_strikeout_market(tmp_path, monkeypatch):
     monkeypatch.setattr(odds, "SNAPSHOT_PATH", tmp_path / "odds.csv")
+    monkeypatch.setattr(odds, "QUOTA_PATH", tmp_path / "quota.json")
     session = FakeSession()
     frame, quota, error = odds.refresh_strikeout_snapshot("secret", "2026-08-14", session=session)
     assert error is None
@@ -65,6 +66,9 @@ def test_refresh_requests_only_main_strikeout_market(tmp_path, monkeypatch):
     prop_calls = [params for url, params in session.calls if "/odds" in url]
     assert prop_calls and all(params.get("markets") == "pitcher_strikeouts" for params in prop_calls)
     assert quota["last"] == 1
+    saved_quota = odds.load_quota_status()
+    assert saved_quota["remaining"] == 99
+    assert saved_quota["last"] == 1
 
 
 def test_main_page_loader_is_disk_only(tmp_path, monkeypatch):

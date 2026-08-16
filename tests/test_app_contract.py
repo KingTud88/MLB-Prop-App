@@ -28,11 +28,14 @@ def test_projection_contains_two_path_engine_contract():
     assert '"market_used_for_forecast":False' in engine.replace(" ", "")
 
 
-def test_projection_owns_odds_workflow():
+def test_daily_run_owns_paid_odds_workflow_and_projection_reuses_snapshot():
     source = APP.read_text(encoding="utf-8")
-    assert "get_event_props" in source
-    assert "extract_player_odds" in source
-    assert "THE_ODDS_API_KEY" in source
+    daily = (ROOT / "pages" / "5_Daily_Projection_Run.py").read_text(encoding="utf-8")
+    assert "get_event_props" not in source
+    assert "extract_player_odds" not in source
+    assert "load_pitcher_strikeout_odds" in source
+    assert "refresh_strikeout_snapshot" in daily
+    assert "resolve_api_key" in daily
     assert "pitcher_strikeouts_alternate" in source
 
 

@@ -29,11 +29,12 @@ def test_top_plays_is_model_first_and_odds_are_optional_overlay():
     path = Path(__file__).resolve().parents[1] / "pages" / "6_Top_Plays.py"
     source = path.read_text(encoding="utf-8")
     assert "build_model_board" in source
-    assert 'st.markdown("#### Top Play actions")' in source
-    assert "Sportsbook lines/odds are execution info only and never rank the board or feed the forecast" in source
+    assert "require_market_lines=True" in source
+    assert "Line integrity: every ranked leg below uses an active sportsbook line" in source
+    assert "Sportsbook lines and odds are execution information only" in source
     assert "market_health=health_map" in source
     assert 'plays["Live Offer"] = False' in source
-    assert "if api_key:" in source
+    assert "api_key = None" in source
     assert 'st.subheader("Today\'s five highest-probability model legs")' not in source
 
 
@@ -44,11 +45,25 @@ def test_projection_page_has_unpriced_straight_and_parlay_actions():
     assert "render_add_bet_button" in source
     assert 'button("➕ Straight"' in source
     assert 'button("🎟️ Parlay"' in source
-    assert 'disabled=(side=="PASS")' in source
+    assert 'tradable=side in {"OVER","UNDER"} and not no_line' in source
+    assert "disabled=not tradable" in source
     assert "render_projection_parlay_builder" in source
     assert "make_parlay_record" in source
     assert "Projection Page Model Parlay" in source
     assert "append_bet(BET_LOG,record,st.secrets)" in source
+
+
+def test_projection_bet_leans_require_real_lines_and_manual_editor_is_gone():
+    source = (Path(__file__).resolve().parents[1] / "streamlit_app.py").read_text(encoding="utf-8")
+    assert "no_active_line_recommendation" in source
+    assert "PROJECTION ONLY" in source
+    assert "NO ACTIVE LINE" in source
+    assert "the app will not manufacture a bet lean" in source
+    assert "MANUAL LINE / ODDS" not in source
+    assert "manual_market_recommendation" not in source
+    assert "get_odds_events" not in source
+    assert "get_event_props" not in source
+
 
 
 def test_projection_strikeout_ladder_is_clickable_and_actionable():

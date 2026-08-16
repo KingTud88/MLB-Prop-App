@@ -204,6 +204,10 @@ else:
         if col in user_archive.columns:
             user_archive[col] = pd.to_numeric(user_archive[col], errors="coerce")
     user_archive = user_archive.sort_values(["_archive_date", "player"], ascending=[False, True], na_position="last")
+    user_archive["archive_k_target"] = user_archive.get("projection", pd.Series(index=user_archive.index, dtype=float)).map(bettable_k_label)
+    user_archive["archive_k_result"] = user_archive.apply(
+        lambda row: bettable_k_result(row.get("projection"), row.get("actual_strikeouts")), axis=1
+    )
 
     archive_dates = user_archive["_archive_date"].dt.date.dropna()
     archived_slates = int(archive_dates.nunique())
@@ -222,8 +226,8 @@ else:
 
     archive_columns = [
         "player", "team", "opponent",
-        "manual_strikeout_line", "projection", "actual_strikeouts",
-        "manual_outs_line", "outs_projection", "actual_outs",
+        "projection", "archive_k_target", "actual_strikeouts", "archive_k_result", "manual_strikeout_line",
+        "outs_projection", "actual_outs", "manual_outs_line",
         "manual_hits_allowed_line", "hits_projection", "actual_hits_allowed",
         "confidence", "data_quality", "archive_source", "archive_committed_at_utc",
     ]
@@ -240,12 +244,21 @@ else:
         ):
             view = group.rename(columns={
                 "player": "Pitcher", "team": "Team", "opponent": "Opp",
-                "manual_strikeout_line": "K Line", "projection": "Projected K", "actual_strikeouts": "Actual K",
-                "manual_outs_line": "Outs Line", "outs_projection": "Projected Outs", "actual_outs": "Actual Outs",
+                "projection": "Projected K", "archive_k_target": "K Target", "actual_strikeouts": "Actual K", "archive_k_result": "K Result", "manual_strikeout_line": "K Line",
+                "outs_projection": "Projected Outs", "actual_outs": "Actual Outs", "manual_outs_line": "Outs Line",
                 "manual_hits_allowed_line": "Hits Line", "hits_projection": "Projected Hits", "actual_hits_allowed": "Actual Hits",
                 "confidence": "Confidence", "data_quality": "Quality",
                 "archive_source": "Archive Source", "archive_committed_at_utc": "Committed UTC",
             })
+            # Normalize placeholder strings and hide columns that are empty for this slate.
+            for col in view.columns:
+                if view[col].dtype == object:
+                    cleaned = view[col].astype(str).str.strip()
+                    empty_token = cleaned.str.lower().isin({"", "nan", "none", "null", "nat", "<na>"})
+                    view.loc[empty_token, col] = pd.NA
+            populated = [col for col in view.columns if bool(view[col].notna().any())]
+            view = view[populated]
+
             formatters = {}
             for col in ("K Line", "Outs Line", "Hits Line"):
                 if col in view.columns:
@@ -260,14 +273,22 @@ else:
             manual_cols = [col for col in ("K Line", "Outs Line", "Hits Line") if col in view.columns]
             projection_cols = [col for col in ("Projected K", "Projected Outs", "Projected Hits") if col in view.columns]
             actual_view_cols = [col for col in ("Actual K", "Actual Outs", "Actual Hits") if col in view.columns]
+            target_view_cols = [col for col in ("K Target",) if col in view.columns]
             if manual_cols:
                 styled = styled.map(lambda value: "color:#ff9f1c;font-weight:850;background-color:rgba(255,159,28,.10);" if pd.notna(value) else "", subset=manual_cols)
             if projection_cols:
                 styled = styled.map(lambda value: "color:#22c55e;font-weight:800;" if pd.notna(value) else "", subset=projection_cols)
             if actual_view_cols:
                 styled = styled.map(lambda value: "color:#facc15;font-weight:800;" if pd.notna(value) else "", subset=actual_view_cols)
+            if target_view_cols:
+                styled = styled.map(lambda value: "color:#38bdf8;font-weight:800;" if pd.notna(value) else "", subset=target_view_cols)
+            if "K Result" in view.columns:
+                styled = styled.map(
+                    lambda value: "color:#22c55e;font-weight:900;" if "WIN" in str(value) else "color:#ff6379;font-weight:900;" if "MISS" in str(value) else "color:#ffd166;font-weight:800;",
+                    subset=["K Result"],
+                )
             st.dataframe(styled, hide_index=True, width="stretch")
-            st.caption("Orange = your manually entered sportsbook line · Green = frozen projection · Gold = resolved MLB result.")
+            st.caption("Green = frozen projection · Blue = model-supported K target · Gold = resolved MLB result · K Result grades the target. Orange sportsbook lines appear only when you attached one.")
 
 st.divider()
 if st.button("Resolve completed games", type="primary"):
@@ -400,7 +421,7 @@ learn2.metric("5+ K calibration rows", f"{k5_obs}/30")
 learn3.metric("O5.5 Hits calibration rows", f"{h55_obs}/30")
 learn4.metric("O15.5 Outs calibration rows", f"{o155_obs}/30")
 st.caption(
-    f"Only rows tagged {HISTORY_SEMANTICS} feed these learning diagnostics. "
+    f"Only starter-only model rows tagged {HISTORY_SEMANTICS} feed these learning diagnostics. "
     "Each SIM/MATH blend stays at the protected 50/50 baseline until that exact line has at least 30 compatible resolved observations."
 )
 

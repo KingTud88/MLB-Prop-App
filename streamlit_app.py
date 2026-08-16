@@ -37,7 +37,7 @@ from engine.outs_calibration import calibrate_outs_blend
 from engine.starter_history import TARGET_STARTER_HISTORY, combine_starter_history, starter_only
 from engine.opposing_batters import get_opposing_batters, matchup_summary
 from engine.lineup_context import LINEUP_CONFIRMED, get_confirmed_lineup
-from engine.weather_risk import WeatherDelayRisk, fetch_weather_delay_risk
+from engine.weather_risk import WeatherDelayRisk, apply_roof_protection, fetch_weather_delay_risk
 from engine.workload_context import WorkloadContext, build_workload_context
 from engine.role_workload_gate import build_role_workload_decision
 from engine.team_leash import build_team_leash_context, candidate_workload_fields
@@ -51,14 +51,12 @@ from training.projection_storage import load_projection_archive, overlay_manual_
 APP_VERSION = "3.7.0"
 EASTERN = ZoneInfo("America/New_York")
 MLB_API = "https://statsapi.mlb.com/api/v1"
-ODDS_API = "https://api.the-odds-api.com/v4"
 APP_DIR = Path(__file__).resolve().parent
 BET_LOG = APP_DIR / "data" / "bet_log.csv"
 ARCHIVE_PATH = APP_DIR / "data" / "projection_archive.csv"
 OBS_LOG = APP_DIR / "data" / "starter_observation_log.csv"
 TEAM_ABBR = {108:"LAA",109:"ARI",110:"BAL",111:"BOS",112:"CHC",113:"CIN",114:"CLE",115:"COL",116:"DET",117:"HOU",118:"KCR",119:"LAD",120:"WSH",121:"NYM",133:"ATH",134:"PIT",135:"SDP",136:"SEA",137:"SFG",138:"STL",139:"TBR",140:"TEX",141:"TOR",142:"MIN",143:"PHI",144:"ATL",145:"CHW",146:"MIA",147:"NYY",158:"MIL"}
 TEAM_ID_BY_ABBR = {abbr: team_id for team_id, abbr in TEAM_ABBR.items()}
-TEAM_NAMES = {"LAA":"Los Angeles Angels","ARI":"Arizona Diamondbacks","BAL":"Baltimore Orioles","BOS":"Boston Red Sox","CHC":"Chicago Cubs","CIN":"Cincinnati Reds","CLE":"Cleveland Guardians","COL":"Colorado Rockies","DET":"Detroit Tigers","HOU":"Houston Astros","KCR":"Kansas City Royals","LAD":"Los Angeles Dodgers","WSH":"Washington Nationals","NYM":"New York Mets","ATH":"Athletics","PIT":"Pittsburgh Pirates","SDP":"San Diego Padres","SEA":"Seattle Mariners","SFG":"San Francisco Giants","STL":"St. Louis Cardinals","TBR":"Tampa Bay Rays","TEX":"Texas Rangers","TOR":"Toronto Blue Jays","MIN":"Minnesota Twins","PHI":"Philadelphia Phillies","ATL":"Atlanta Braves","CHW":"Chicago White Sox","MIA":"Miami Marlins","NYY":"New York Yankees","MIL":"Milwaukee Brewers"}
 PARK_K_FACTOR = {"Coors Field":.94,"T-Mobile Park":1.05,"Petco Park":1.03,"Oracle Park":1.02,"Dodger Stadium":1.01,"Yankee Stadium":.99,"Fenway Park":.98,"Wrigley Field":1.00}
 
 st.set_page_config(page_title="StrikeOut King 9000", page_icon="⚾", layout="wide", initial_sidebar_state="expanded")
@@ -447,6 +445,33 @@ def get_venue_coordinates(venue_id):
         pass
     return None
 
+@st.cache_data(ttl=21600,show_spinner=False)
+def get_venue_roof_type(venue_id):
+    if not venue_id:
+        return ""
+    target_id=int(venue_id)
+    try:
+        payload=MLBClient().get(f"venues/{target_id}",{"hydrate":"fieldInfo"})
+        venues=payload.get("venues") or []
+        field_info=(venues[0].get("fieldInfo") or {}) if venues else {}
+        roof=str(field_info.get("roofType") or "").strip()
+        if roof:
+            return roof
+    except Exception:
+        pass
+    try:
+        payload=MLBClient().get("teams",{"sportId":1,"hydrate":"venue(fieldInfo)"})
+        for team_node in payload.get("teams",[]) or []:
+            venue_node=team_node.get("venue",{}) or {}
+            if int(venue_node.get("id",0) or 0) != target_id:
+                continue
+            roof=str(((venue_node.get("fieldInfo") or {}).get("roofType")) or "").strip()
+            if roof:
+                return roof
+    except Exception:
+        pass
+    return ""
+
 @st.cache_data(ttl=900,show_spinner=False)
 def get_game_weather(venue_id,game_time,latitude=None,longitude=None):
     coords=None
@@ -459,7 +484,8 @@ def get_game_weather(venue_id,game_time,latitude=None,longitude=None):
         coords=get_venue_coordinates(venue_id)
     if not coords:
         return WeatherDelayRisk("UNKNOWN","",None,None,None,"Venue coordinates unavailable for weather risk.",False)
-    return fetch_weather_delay_risk(coords[0],coords[1],game_time)
+    risk=fetch_weather_delay_risk(coords[0],coords[1],game_time)
+    return apply_roof_protection(risk,get_venue_roof_type(venue_id))
 
 def load_projection_history():
     try:return pd.read_csv(APP_DIR / "data" / "projection_log.csv")
@@ -549,18 +575,22 @@ def save_projection_straight(*,game,game_date,market,line,side,projection,model_
     return price
 
 def render_add_bet_button(container,reco,market_label,market_keys,projection_mean,stake,game,game_date,odds_rows,confidence,data_quality,key):
-    side=str(reco.get("side","PASS"))
-    offer=best_market_offer(odds_rows,market_keys,reco.get("line"),side) if side in {"OVER","UNDER"} else None
+    side=str(reco.get("side","NO LINE")).upper()
+    no_line=reco.get("line") is None or side=="NO LINE"
+    tradable=side in {"OVER","UNDER"} and not no_line
+    offer=best_market_offer(odds_rows,market_keys,reco.get("line"),side) if tradable else None
     with container:
         if offer is not None:
             st.caption(f"Best posted: {offer.get('book','')} {float(offer.get('price')):+.0f}")
+        elif no_line:
+            st.caption("Projection shown · add an active sportsbook line on Daily Projection Run to quick-add this market")
         elif side=="PASS":
-            st.caption("No aligned model-side recommendation to track")
+            st.caption("Active line exists, but the model does not have an aligned play")
         else:
-            st.caption("Model leg available · sportsbook price optional")
+            st.caption("Active line loaded · sportsbook price optional")
         straight_col,parlay_col=st.columns(2)
-        straight_clicked=straight_col.button("➕ Straight",key=f"{key}_straight",use_container_width=True,disabled=(side=="PASS"))
-        parlay_clicked=parlay_col.button("🎟️ Parlay",key=f"{key}_parlay",use_container_width=True,disabled=(side=="PASS"))
+        straight_clicked=straight_col.button("➕ Straight",key=f"{key}_straight",use_container_width=True,disabled=not tradable)
+        parlay_clicked=parlay_col.button("🎟️ Parlay",key=f"{key}_parlay",use_container_width=True,disabled=not tradable)
         if straight_clicked:
             try:
                 price=save_projection_straight(
@@ -684,105 +714,56 @@ def apply_active_line_to_recommendation(reco,proj,market_key,line,hits_proj=None
     })
     return updated
 
-def _manual_line_options(market_key):
-    market=str(market_key)
-    # Important: "strikeouts" contains the substring "outs". Check the
-    # explicit strikeout market first so K props never inherit outs lines.
-    if "strikeouts" in market:
-        return tuple(x + 0.5 for x in range(2, 12))
-    if "pitcher_outs" in market:
-        return tuple(x + 0.5 for x in range(13, 19))
-    if "hits_allowed" in market:
-        return tuple(x + 0.5 for x in range(3, 9))
-    return tuple(x + 0.5 for x in range(2, 12))
-
-
-def _american_odds_options():
-    return tuple(list(range(-300, -99, 5)) + list(range(100, 305, 5)))
-
-
-def manual_market_recommendation(reco, key_prefix, market_key, proj, hits_proj=None):
-    if not st.session_state.get(f"{key_prefix}:enabled", False):
-        return dict(reco)
-    applied=st.session_state.get(f"{key_prefix}:applied")
-    if not isinstance(applied,dict):
-        return dict(reco)
-    line=float(applied.get("line",reco["line"]))
-    odds=float(applied.get("odds",-110))
-    over_model=float(market_model_probability(proj,market_key,line,hits_proj))
-    implied=implied_prob(odds)
-    decision=aligned_bet_lean(
-        float(reco.get("projection_mean",0.0)),line,over_model,
-        over_implied=implied,under_implied=implied,has_market=True,
-    )
-    updated=dict(reco)
-    updated.update({
-        "side":decision.side,
-        "line":line,
-        "model":decision.model_probability,
-        "edge":decision.edge,
-        "has_market":True,
-        "reason":decision.reason,
-        "manual":True,
-        "manual_odds":odds,
-        "manual_implied":implied,
-        "over_model":over_model,
-    })
-    return updated
-
-
-def render_reco(card,reco,*,key_prefix=None,market_key=None,proj=None,hits_proj=None):
-    effective=(manual_market_recommendation(reco,key_prefix,market_key,proj,hits_proj)
-               if key_prefix and market_key and proj is not None else dict(reco))
-    side=effective["side"]
-    cls="reco-warn" if side=="PASS" else "reco-under" if side=="UNDER" else "reco-good"
-    emblem_class=("whiff" if "STRIKEOUT" in str(effective.get("label","")) else "glove" if "OUTS" in str(effective.get("label","")) else "contact")
-    reason_labels={
-        "no_positive_aligned_edge":"EDGE BELOW 2%",
-        "probability_conflicts_with_projection":"PROJECTION / PROBABILITY DISAGREE",
-        "projection_on_line":"PROJECTION ON LINE",
-        "insufficient_model_confidence":"MODEL CONFIDENCE BELOW 58%",
-        "model_direction":"MODEL LEAN",
-        "aligned_positive_edge":"POSITIVE ALIGNED EDGE",
+def no_active_line_recommendation(label, projection_mean):
+    return {
+        "side":"NO LINE","line":None,"model":None,"edge":None,"confidence":0.0,
+        "has_market":False,"reason":"no_active_market_line","projection_mean":float(projection_mean),
+        "over_model":None,"label":label,"active_line":False,"active_line_source":"",
     }
-    if side=="PASS":
-        manual_price=(f" · {effective['manual_odds']:+.0f}" if effective.get("manual") else "")
-        meta=f"Proj {effective.get('projection_mean',float('nan')):.2f} vs {effective['line']:g}{manual_price} · {reason_labels.get(effective.get('reason'),'NO BET')}"
-    elif effective.get("manual"):
-        edge=f"EDGE {effective['edge']:+.1%}" if effective.get("edge") is not None else "EDGE —"
-        meta=f"Model {effective['model']:.1%} · {effective['manual_odds']:+.0f} · {edge}"
+
+
+def render_reco(card,reco):
+    side=str(reco.get("side","NO LINE")).upper()
+    line=reco.get("line")
+    no_line=line is None or side=="NO LINE"
+    projection_mean=pd.to_numeric(pd.Series([reco.get("projection_mean")]),errors="coerce").iloc[0]
+    projection_text="—" if pd.isna(projection_mean) else f"{float(projection_mean):.2f}"
+    active_source=str(reco.get("active_line_source","") or "").strip().upper()
+    if no_line:
+        cls="reco-neutral"
+        side_text="PROJECTION ONLY"
+        line_text="NO ACTIVE LINE"
+        meta=f"Projection {projection_text} · add line on Daily Projection Run"
+        line_class="reco-line"
     else:
-        edge=f"EDGE {effective['edge']:+.1%}" if effective["edge"] is not None else "MODEL LEAN"
-        meta=f"Model {effective['model']:.1%} · {edge}"
-    active_source=str(effective.get("active_line_source","") or "").strip().upper()
-    line_class="reco-line manual-active" if active_source=="MANUAL" else "reco-line"
-    if active_source=="MANUAL":
-        meta += " · MANUAL DAILY LINE"
+        cls="reco-warn" if side=="PASS" else "reco-under" if side=="UNDER" else "reco-good"
+        side_text=side
+        line_text=f"{float(line):g} LINE"
+        line_class="reco-line manual-active" if active_source=="MANUAL" else "reco-line"
+        reason_labels={
+            "no_positive_aligned_edge":"EDGE BELOW 2%",
+            "probability_conflicts_with_projection":"PROJECTION / PROBABILITY DISAGREE",
+            "projection_on_line":"PROJECTION ON LINE",
+            "insufficient_model_confidence":"MODEL CONFIDENCE BELOW 58%",
+            "model_direction":"MODEL LEAN",
+            "aligned_positive_edge":"POSITIVE ALIGNED EDGE",
+        }
+        model=reco.get("model")
+        edge=reco.get("edge")
+        if side=="PASS":
+            meta=f"Proj {projection_text} vs {float(line):g} · {reason_labels.get(reco.get('reason'),'NO BET')}"
+        else:
+            model_text="—" if model is None else f"{float(model):.1%}"
+            edge_text="MODEL LEAN" if edge is None else f"EDGE {float(edge):+.1%}"
+            meta=f"Model {model_text} · {edge_text}"
+        if active_source=="MANUAL":
+            meta += " · MANUAL · DAILY RUN"
+        elif active_source:
+            meta += f" · {active_source}"
+    emblem_class=("whiff" if "STRIKEOUT" in str(reco.get("label","")) else "glove" if "OUTS" in str(reco.get("label","")) else "contact")
     with card:
-        st.markdown(f'<div class="reco-card {cls}"><div class="cc-card-top"><div class="cc-card-icon cc-emblem {emblem_class}" aria-hidden="true"></div><div class="reco-label">{effective["label"]}</div></div><div class="reco-side {cls}">{side}</div><div class="{line_class}">{effective["line"]:g} LINE</div><div class="reco-meta">{meta}</div></div>',unsafe_allow_html=True)
-        if key_prefix and market_key and proj is not None:
-            with st.expander("✍️ MANUAL LINE / ODDS", expanded=False):
-                enabled=st.checkbox("Use manual market",key=f"{key_prefix}:enabled")
-                lines=_manual_line_options(market_key)
-                applied=st.session_state.get(f"{key_prefix}:applied")
-                applied_line=float(applied.get("line",reco["line"])) if isinstance(applied,dict) else float(reco["line"])
-                default_line=min(lines,key=lambda x:abs(float(x)-applied_line))
-                line=st.selectbox("Line",lines,index=lines.index(default_line),key=f"{key_prefix}:draft_line",disabled=not enabled)
-                odds_options=_american_odds_options()
-                applied_odds=int(applied.get("odds",-110)) if isinstance(applied,dict) else -110
-                default_odds=min(odds_options,key=lambda x:abs(int(x)-applied_odds))
-                odds=st.selectbox("American odds",odds_options,index=odds_options.index(default_odds),key=f"{key_prefix}:draft_odds",disabled=not enabled,format_func=lambda x:f"{int(x):+d}")
-                if st.button("✅ APPLY LINE / ODDS",key=f"{key_prefix}:apply",use_container_width=True,disabled=not enabled):
-                    st.session_state[f"{key_prefix}:applied"]={"line":float(line),"odds":float(odds)}
-                    st.rerun()
-                if isinstance(applied,dict) and enabled:
-                    st.caption(f"Applied market: {float(applied['line']):g} at {float(applied['odds']):+.0f}. The card above is recalculated from this line and price.")
-                    if st.button("↩️ CLEAR MANUAL MARKET",key=f"{key_prefix}:clear",use_container_width=True):
-                        st.session_state.pop(f"{key_prefix}:applied",None)
-                        st.session_state[f"{key_prefix}:enabled"]=False
-                        st.rerun()
-                else:
-                    st.caption("Choose a line and price, then press APPLY. The model will decide OVER, UNDER, or PASS; the controls never force the side.")
+        st.markdown(f'<div class="reco-card {cls}"><div class="cc-card-top"><div class="cc-card-icon cc-emblem {emblem_class}" aria-hidden="true"></div><div class="reco-label">{reco["label"]}</div></div><div class="reco-side {cls}">{side_text}</div><div class="{line_class}">{line_text}</div><div class="reco-meta">{meta}</div></div>',unsafe_allow_html=True)
+
 
 def render_calibration_dashboard():
     st.markdown("### Milestone Calibration Dashboard"); st.caption("Resolved pregame projections only. Sportsbook prices are excluded from training.")
@@ -796,77 +777,6 @@ def ladder(proj,max_line=10):
     for line in range(3,max_line+1):
         cal=calibrate_blend(history,line); sim=proj.engine.simulation_probabilities.get(float(line),0.0); analytic=proj.engine.mathematical_probabilities.get(float(line),0.0); w=cal.weight_simulation; blended=w*sim+(1-w)*analytic; rows.append({"Line":f"{line}+","Probability":blended,"Fair Odds":american(blended),"Simulation":sim,"Math":analytic,"Sim Weight":w})
     return pd.DataFrame(rows)
-
-def get_secret():
-    for k in ("ODDS_API_KEY","THE_ODDS_API_KEY","odds_api_key"):
-        try:
-            if k in st.secrets:return str(st.secrets[k])
-        except Exception:pass
-    return os.getenv("ODDS_API_KEY") or os.getenv("THE_ODDS_API_KEY")
-
-def safe_odds_error(exc):
-    response=getattr(exc,"response",None)
-    status=getattr(response,"status_code",None)
-    if status==401:
-        return "Odds API unavailable: authentication failed (401). Check or rotate the Odds API key in Streamlit secrets."
-    if status==403:
-        return "Odds API unavailable: request forbidden (403). Check the Odds API account/permissions."
-    if status==429:
-        return "Odds API unavailable: rate or credit limit reached (429)."
-    if status is not None:
-        return f"Odds API unavailable: HTTP {int(status)}."
-    return f"Odds API unavailable: {type(exc).__name__}."
-
-@st.cache_data(ttl=900,show_spinner=False)
-def get_odds_events():
-    key=get_secret()
-    if not key:return [],"Odds API key not found in Streamlit secrets."
-    try:
-        r=requests.get(f"{ODDS_API}/sports/baseball_mlb/events",params={"apiKey":key},timeout=15); r.raise_for_status(); return r.json(),None
-    except requests.RequestException as e:return [],safe_odds_error(e)
-
-MAIN_PROP_MARKETS="pitcher_strikeouts,pitcher_outs,pitcher_hits_allowed"
-
-@st.cache_data(ttl=900,show_spinner=False)
-def get_event_props(event_id):
-    key=get_secret()
-    if not key:return [],"Odds API key not found in Streamlit secrets.",{}
-    params={"apiKey":key,"regions":"us","markets":MAIN_PROP_MARKETS,"oddsFormat":"american"}
-    try:
-        r=requests.get(f"{ODDS_API}/sports/baseball_mlb/events/{event_id}/odds",params=params,timeout=15)
-        r.raise_for_status()
-        def _h(name):
-            value=r.headers.get(name)
-            try:return int(value) if value is not None else None
-            except (TypeError,ValueError):return None
-        quota={"remaining":_h("x-requests-remaining"),"used":_h("x-requests-used"),"last":_h("x-requests-last")}
-        return r.json(),None,quota
-    except requests.RequestException as e:return [],safe_odds_error(e),{}
-
-def normalize_team(value):
-    text=re.sub(r"[^a-z0-9]","",str(value).lower())
-    for abbr,name in TEAM_NAMES.items():
-        if text==re.sub(r"[^a-z0-9]","",abbr.lower()) or text==re.sub(r"[^a-z0-9]","",name.lower()): return abbr
-    aliases={"oaklandathletics":"ATH","oaklandas":"ATH","athletics":"ATH","washingtonnationals":"WSH","kansascityroyals":"KCR","tampabayrays":"TBR","sandiegopadres":"SDP","sanfranciscogiants":"SFG","stlouiscardinals":"STL","arizonadiamondbacks":"ARI","chicagowhitesox":"CHW","losangelesangels":"LAA","losangelesdodgers":"LAD","newyorkyankees":"NYY","newyorkmets":"NYM","torontobluejays":"TOR"}
-    return aliases.get(text,text)
-
-def find_odds_event(events,game):
-    wanted={normalize_team(game.team),normalize_team(game.opponent)}
-    for event in events if isinstance(events,list) else []:
-        teams={normalize_team(event.get("home_team","")),normalize_team(event.get("away_team",""))}
-        if teams==wanted or wanted.issubset(teams): return event.get("id")
-    return None
-
-def extract_player_odds(payload,pitcher_name):
-    rows=[]; target=" ".join(str(pitcher_name).lower().split()); allowed={"pitcher_strikeouts","pitcher_strikeouts_alternate","pitcher_outs","pitcher_outs_alternate","pitcher_hits_allowed","pitcher_hits_allowed_alternate"}
-    for bm in payload.get("bookmakers",[]) if isinstance(payload,dict) else []:
-        for m in bm.get("markets",[]):
-            if m.get("key") not in allowed: continue
-            for o in m.get("outcomes",[]):
-                desc=" ".join(str(o.get("description","")).lower().split())
-                if desc!=target: continue
-                rows.append({"book":bm.get("title",bm.get("key","")),"market":m["key"],"name":o.get("name"),"point":o.get("point"),"price":o.get("price")})
-    return rows
 
 def market_model_probability(proj,market,line,hits_proj=None):
     line=float(line); cutoff=int(math.floor(line)+1); history=load_projection_history()
@@ -981,12 +891,38 @@ hit_over_price=hit_over_offer.get("price") if hit_over_offer else None
 hit_under_price=hit_under_offer.get("price") if hit_under_offer else None
 hit_decision=aligned_bet_lean(hits_proj.ensemble_mean,hit_line,hit_over,over_implied=implied_prob(hit_over_price) if hit_over_price is not None else None,under_implied=implied_prob(hit_under_price) if hit_under_price is not None else None,has_market=bool(hit_rows))
 hit_reco={"side":hit_decision.side,"line":hit_line,"model":hit_decision.model_probability,"edge":hit_decision.edge,"confidence":abs(hit_decision.model_probability-.5)*2,"has_market":bool(hit_rows),"label":"HITS ALLOWED BET LEAN","reason":hit_decision.reason,"projection_mean":hits_proj.ensemble_mean,"over_model":hit_over}
+
 if manual_k_line is not None:
     k_reco=apply_active_line_to_recommendation(k_reco,proj,"pitcher_strikeouts",manual_k_line,hits_proj,manual_k_source or "MANUAL")
+elif k_reco.get("has_market"):
+    k_reco["active_line_source"]="PAID API · SAVED SNAPSHOT"
+else:
+    k_reco=no_active_line_recommendation("STRIKEOUT BET LEAN",proj.mean_k)
+
 if manual_outs_line is not None:
     out_reco=apply_active_line_to_recommendation(out_reco,proj,"pitcher_outs",manual_outs_line,hits_proj,manual_outs_source or "MANUAL")
+elif out_reco.get("has_market"):
+    out_reco["active_line_source"]="SAVED SNAPSHOT"
+else:
+    out_reco=no_active_line_recommendation("TOTAL OUTS BET LEAN",proj.mean_outs)
+
 if manual_hits_line is not None:
     hit_reco=apply_active_line_to_recommendation(hit_reco,proj,"pitcher_hits_allowed",manual_hits_line,hits_proj,manual_hits_source or "MANUAL")
+elif hit_reco.get("has_market"):
+    hit_reco["active_line_source"]="SAVED SNAPSHOT"
+else:
+    hit_reco=no_active_line_recommendation("HITS ALLOWED BET LEAN",hits_proj.ensemble_mean)
+
+def _active_line(reco):
+    value=pd.to_numeric(pd.Series([reco.get("line")]),errors="coerce").iloc[0]
+    return None if pd.isna(value) else float(value)
+
+active_k_line=_active_line(k_reco)
+active_outs_line=_active_line(out_reco)
+active_hits_line=_active_line(hit_reco)
+active_k_source=str(k_reco.get("active_line_source","") or "").strip().upper()
+active_outs_source=str(out_reco.get("active_line_source","") or "").strip().upper()
+active_hits_source=str(hit_reco.get("active_line_source","") or "").strip().upper()
 
 if nav=="Distribution":
     st.markdown('<div class="section-head">DISTRIBUTION</div>',unsafe_allow_html=True); st.caption(f"{game.pitcher_name} · {game.team} vs {game.opponent}"); a,b=st.columns(2)
@@ -1047,9 +983,9 @@ if not locked: st.info("Lock the pitcher in the left rail to freeze all projecti
 weather_marker=f" {weather_risk.icon}" if weather_risk.icon else ""
 _weather_level=str(weather_risk.level or "UNKNOWN").upper()
 _weather_icon=weather_risk.icon or ("☀️" if str(weather_risk.level or "").upper()=="NONE" else "✓" if weather_risk.available else "—")
-_weather_label={"HIGH":"DELAY RISK","ELEVATED":"RAIN WATCH","LOW":"LOW RAIN RISK","NONE":"CLEAR","UNKNOWN":"UNAVAILABLE"}.get(_weather_level,_weather_level)
-_weather_action={"HIGH":"AVOID · DELAY RISK","ELEVATED":"CAUTION · RECHECK","LOW":"MONITOR NEAR FIRST PITCH","NONE":"NO DELAY SIGNAL","UNKNOWN":"VERIFY WEATHER"}.get(_weather_level,"VERIFY WEATHER")
-_weather_class={"HIGH":"weather-high","ELEVATED":"weather-elevated","LOW":"weather-low","NONE":"weather-none"}.get(_weather_level,"weather-unknown")
+_weather_label={"HIGH":"DELAY RISK","ELEVATED":"RAIN WATCH","LOW":"LOW RAIN RISK","NONE":"CLEAR","ROOF":"ROOF PROTECTED","UNKNOWN":"UNAVAILABLE"}.get(_weather_level,_weather_level)
+_weather_action={"HIGH":"AVOID · DELAY RISK","ELEVATED":"CAUTION · RECHECK","LOW":"MONITOR NEAR FIRST PITCH","NONE":"NO DELAY SIGNAL","ROOF":"RAIN DELAY MITIGATED · VERIFY ROOF","UNKNOWN":"VERIFY WEATHER"}.get(_weather_level,"VERIFY WEATHER")
+_weather_class={"HIGH":"weather-high","ELEVATED":"weather-elevated","LOW":"weather-low","NONE":"weather-none","ROOF":"weather-none"}.get(_weather_level,"weather-unknown")
 _weather_prob="—" if weather_risk.precip_probability is None else f"{weather_risk.precip_probability:.0f}%"
 _weather_peak="—" if weather_risk.precipitation_mm is None else f"{weather_risk.precipitation_mm:.1f} mm/h"
 _weather_summary=re.sub(r"[<>]","",str(weather_risk.summary or "Weather forecast unavailable for this game window."))
@@ -1076,29 +1012,29 @@ st.markdown('<div class="section-head">ACTIVE SPORTSBOOK LINES</div>',unsafe_all
 _line_cols=st.columns(3)
 for _col,_label,_line,_source in zip(
     _line_cols,("STRIKEOUTS","TOTAL OUTS","HITS ALLOWED"),
-    (manual_k_line,manual_outs_line,manual_hits_line),(manual_k_source,manual_outs_source,manual_hits_source),
+    (active_k_line,active_outs_line,active_hits_line),(active_k_source,active_outs_source,active_hits_source),
 ):
     _manual=str(_source or "").upper()=="MANUAL"
     _cls="active-market-line manual" if _manual else "active-market-line"
     _value="—" if _line is None else f"{float(_line):g}"
-    _source_text="MANUAL · DAILY RUN" if _manual else (str(_source) if _source else "NO MANUAL LINE")
+    _source_text="MANUAL · DAILY RUN" if _manual else (str(_source) if _source else "NO ACTIVE LINE")
     with _col:
         st.markdown(f'<div class="{_cls}"><div class="label">{_label}</div><div class="value">{_value}</div><div class="source">{_source_text}</div></div>',unsafe_allow_html=True)
-st.caption("Orange = the durable sportsbook line you entered on Daily Projection Run. These execution lines do not alter the frozen baseball projection; they set the exact line used for the recommendation comparison.")
+st.caption("Manual Daily Run lines appear in orange; a saved paid K snapshot appears with its source label. No active line means the projection still shows, but the app will not manufacture a bet lean. Execution lines never alter the baseball projection.")
 st.markdown('<div class="section-head">PROJECTION SUMMARY</div>',unsafe_allow_html=True)
 alt_k_choice=best_alt_k([(int(str(row["Line"]).rstrip("+")),float(row["Probability"])) for _,row in kdf.iterrows()])
 alt_k_html=(f'<div class="alt-k-badge">BEST ALT K · {alt_k_choice.milestone}+ · {alt_k_choice.probability:.0%} HIT</div>' if alt_k_choice else '<div class="alt-k-badge">BEST ALT K · NO 70%+ ALT</div>')
 c1,c2,c3,c4=st.columns(4)
 with c1: st.markdown(f'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon cc-emblem whiff" aria-hidden="true"></div><div class="metric-label">PROJECTED STRIKEOUTS</div></div><div class="metric-value">{proj.mean_k:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(proj.k_samples,.1))}-{int(np.quantile(proj.k_samples,.9))}</span>{alt_k_html}</div>',unsafe_allow_html=True)
-render_reco(c2,k_reco,key_prefix=f"manual_k:{game.key}",market_key="pitcher_strikeouts",proj=proj,hits_proj=hits_proj)
+render_reco(c2,k_reco)
 with c3: st.markdown(f'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon cc-emblem glove" aria-hidden="true"></div><div class="metric-label">PROJECTED OUTS</div></div><div class="metric-value">{proj.mean_outs:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(proj.outs_samples,.1))}-{int(np.quantile(proj.outs_samples,.9))}</span></div>',unsafe_allow_html=True)
-render_reco(c4,out_reco,key_prefix=f"manual_outs:{game.key}",market_key="pitcher_outs",proj=proj,hits_proj=hits_proj)
+render_reco(c4,out_reco)
 h1,h2,h3=st.columns([1,1,2])
 with h1: st.markdown(f'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon cc-emblem contact" aria-hidden="true"></div><div class="metric-label">PROJECTED HITS ALLOWED</div></div><div class="metric-value">{hits_proj.ensemble_mean:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(hits_proj.simulation_samples,.1))}-{int(np.quantile(hits_proj.simulation_samples,.9))}</span></div>',unsafe_allow_html=True)
-render_reco(h2,hit_reco,key_prefix=f"manual_hits:{game.key}",market_key="pitcher_hits_allowed",proj=proj,hits_proj=hits_proj)
+render_reco(h2,hit_reco)
 with h3:
     st.markdown(
-        f'<div class="game-weather-card {_weather_class}"><div class="game-weather-head"><div><div class="game-weather-title">GAME WEATHER · DELAY RISK</div><div class="game-weather-risk">{_weather_label}</div><div class="game-weather-action">{_weather_action}</div></div><div class="game-weather-icon" aria-hidden="true">{_weather_icon}</div></div><div class="game-weather-grid"><div class="game-weather-stat"><span>Precip chance</span><strong>{_weather_prob}</strong></div><div class="game-weather-stat"><span>Peak precip</span><strong>{_weather_peak}</strong></div></div><div class="game-weather-reason">{_weather_summary}</div><div class="game-weather-note">Game window: 2h before first pitch → 4h after · Weather risk is informational and does not currently modify the projection.</div></div>',
+        f'<div class="game-weather-card {_weather_class}"><div class="game-weather-head"><div><div class="game-weather-title">GAME WEATHER · DELAY RISK</div><div class="game-weather-risk">{_weather_label}</div><div class="game-weather-action">{_weather_action}</div></div><div class="game-weather-icon" aria-hidden="true">{_weather_icon}</div></div><div class="game-weather-grid"><div class="game-weather-stat"><span>Precip chance</span><strong>{_weather_prob}</strong></div><div class="game-weather-stat"><span>Peak precip</span><strong>{_weather_peak}</strong></div></div><div class="game-weather-reason">{_weather_summary}</div><div class="game-weather-note">Game window: 2h before first pitch → 4h after · Roof-capable parks suppress false exterior-rain avoid signals; verify retractable-roof status near first pitch. Weather does not modify the projection.</div></div>',
         unsafe_allow_html=True,
     )
 
@@ -1138,7 +1074,7 @@ else:
 
 st.markdown('<div class="section-head">BET TRACKER / PARLAY ACTIONS</div>',unsafe_allow_html=True)
 action_panel=st.container(border=True,key="cc_bet_action_panel")
-action_panel.caption("Quick-add a model-aligned straight or parlay leg. Sportsbook price stays optional unless a saved market snapshot exists.")
+action_panel.caption("Quick-add uses the real active line shown above. A sportsbook price may remain unpriced, but the app will not quick-add a fabricated/default market line.")
 quick_add_stake=action_panel.number_input("Quick-add stake",min_value=0.0,value=1.0,step=0.5,key=f"projection_quick_stake_{game.key}")
 add1,add2,add3=action_panel.columns(3,gap="medium")
 render_add_bet_button(add1,k_reco,"Strikeouts",{"pitcher_strikeouts","pitcher_strikeouts_alternate"},proj.mean_k,quick_add_stake,game,selected_date.isoformat(),odds_rows,proj.confidence,proj.quality,f"add_k_{game.key}")

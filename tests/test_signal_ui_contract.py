@@ -3,7 +3,7 @@ from pathlib import Path
 
 def test_top_plays_attaches_signal_evidence_after_model_board():
     source = Path("pages/6_Top_Plays.py").read_text(encoding="utf-8")
-    build_pos = source.index("plays = build_model_board(slate, history, limit=5, market_health=health_map)")
+    build_pos = source.index("plays = build_model_board(slate, history, limit=5, market_health=health_map, require_market_lines=True)")
     attach_pos = source.index("plays = attach_signal_profiles(plays, history, signal_report)")
     assert attach_pos > build_pos
     assert "attached after ranking and cannot reorder or remove today's legs" in source
