@@ -46,6 +46,7 @@ from engine.alt_k import best_alt_k
 from engine.odds_snapshot import load_pitcher_strikeout_odds
 from engine.bet_tracker import make_bet_record, make_parlay_record
 from training.bet_storage import append_bet
+from training.projection_storage import load_projection_archive, overlay_manual_market_lines
 
 APP_VERSION = "3.7.0"
 EASTERN = ZoneInfo("America/New_York")
@@ -53,6 +54,7 @@ MLB_API = "https://statsapi.mlb.com/api/v1"
 ODDS_API = "https://api.the-odds-api.com/v4"
 APP_DIR = Path(__file__).resolve().parent
 BET_LOG = APP_DIR / "data" / "bet_log.csv"
+ARCHIVE_PATH = APP_DIR / "data" / "projection_archive.csv"
 OBS_LOG = APP_DIR / "data" / "starter_observation_log.csv"
 TEAM_ABBR = {108:"LAA",109:"ARI",110:"BAL",111:"BOS",112:"CHC",113:"CIN",114:"CLE",115:"COL",116:"DET",117:"HOU",118:"KCR",119:"LAD",120:"WSH",121:"NYM",133:"ATH",134:"PIT",135:"SDP",136:"SEA",137:"SFG",138:"STL",139:"TBR",140:"TEX",141:"TOR",142:"MIN",143:"PHI",144:"ATL",145:"CHW",146:"MIA",147:"NYY",158:"MIL"}
 TEAM_ID_BY_ABBR = {abbr: team_id for team_id, abbr in TEAM_ABBR.items()}
@@ -78,6 +80,7 @@ h1,h2,h3{letter-spacing:-.02em}
 .alt-k-badge{display:block;width:max-content;max-width:95%;margin:9px auto 0;background:#102d49;border:1px solid #2f6590;color:#dff3ff;border-radius:999px;padding:5px 11px;font-weight:900;font-size:.78rem;letter-spacing:.03em}
 .search-note{color:var(--muted);font-size:.82rem}
 .market-ok{color:#49efb0;font-weight:800}.market-empty{color:#8fa5b7}
+.active-market-line{padding:.72rem .78rem;border:1px solid #20425f;border-radius:12px;background:rgba(9,27,44,.94);text-align:center}.active-market-line .label{color:#9fb3c3;font-size:.72rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase}.active-market-line .value{margin-top:.18rem;color:#f2f6fa;font-size:1.5rem;font-weight:950}.active-market-line .source{margin-top:.14rem;color:#8fa5b7;font-size:.68rem;font-weight:850;letter-spacing:.04em}.active-market-line.manual{border-color:rgba(255,159,28,.66);background:rgba(255,159,28,.07)}.active-market-line.manual .value,.active-market-line.manual .source{color:#ff9f1c}.reco-line.manual-active{color:#ff9f1c;text-shadow:0 0 15px rgba(255,159,28,.18)}
 </style>""", unsafe_allow_html=True)
 
 @dataclass(frozen=True)
@@ -374,6 +377,21 @@ def market_recommendation(proj,odds_rows,market_key,default_line,kind):
     confidence=abs(decision.model_probability-.5)*2
     return {"side":decision.side,"line":line,"model":decision.model_probability,"edge":decision.edge,"confidence":confidence,"has_market":bool(rows),"reason":decision.reason,"projection_mean":projection_mean,"over_model":over_model}
 
+def apply_active_line_to_recommendation(reco,proj,market_key,line,hits_proj=None,source="MANUAL"):
+    if line is None:
+        return dict(reco)
+    line=float(line)
+    over_model=float(market_model_probability(proj,market_key,line,hits_proj))
+    projection_mean=float(reco.get("projection_mean",0.0))
+    decision=aligned_bet_lean(projection_mean,line,over_model,has_market=False)
+    updated=dict(reco)
+    updated.update({
+        "side":decision.side,"line":line,"model":decision.model_probability,"edge":decision.edge,
+        "confidence":abs(decision.model_probability-.5)*2,"has_market":True,"reason":decision.reason,
+        "projection_mean":projection_mean,"over_model":over_model,"active_line":True,"active_line_source":str(source or "MANUAL").upper(),
+    })
+    return updated
+
 def _manual_line_options(market_key):
     market=str(market_key)
     # Important: "strikeouts" contains the substring "outs". Check the
@@ -444,8 +462,12 @@ def render_reco(card,reco,*,key_prefix=None,market_key=None,proj=None,hits_proj=
     else:
         edge=f"EDGE {effective['edge']:+.1%}" if effective["edge"] is not None else "MODEL LEAN"
         meta=f"Model {effective['model']:.1%} · {edge}"
+    active_source=str(effective.get("active_line_source","") or "").strip().upper()
+    line_class="reco-line manual-active" if active_source=="MANUAL" else "reco-line"
+    if active_source=="MANUAL":
+        meta += " · MANUAL DAILY LINE"
     with card:
-        st.markdown(f'<div class="reco-card {cls}"><div class="cc-card-top"><div class="cc-card-icon">{icon}</div><div class="reco-label">{effective["label"]}</div></div><div class="reco-side {cls}">{side}</div><div class="reco-line">{effective["line"]:g} LINE</div><div class="reco-meta">{meta}</div></div>',unsafe_allow_html=True)
+        st.markdown(f'<div class="reco-card {cls}"><div class="cc-card-top"><div class="cc-card-icon">{icon}</div><div class="reco-label">{effective["label"]}</div></div><div class="reco-side {cls}">{side}</div><div class="{line_class}">{effective["line"]:g} LINE</div><div class="reco-meta">{meta}</div></div>',unsafe_allow_html=True)
         if key_prefix and market_key and proj is not None:
             with st.expander("✍️ MANUAL LINE / ODDS", expanded=False):
                 enabled=st.checkbox("Use manual market",key=f"{key_prefix}:enabled")
@@ -636,6 +658,23 @@ proj=calculate_projection(log,game,25000,float(opponent_matchup["k_rate"]),confi
 features_for_hits=build_engine_features(log,game,float(opponent_matchup["k_rate"]),confirmed_count,effective_workload_ctx)
 hits_seed=int(hashlib.sha256(f"hits|{game.key}|{game.game_time}|{APP_VERSION}".encode()).hexdigest()[:8],16)
 hits_proj=project_hits_allowed(log,expected_bf=features_for_hits["expected_bf"],bf_sd=workload_ctx.bf_sd,opponent_hit_rate=float(opponent_matchup.get("hit_rate",.235)),seed=hits_seed,draws=25000,lines=(3.5,4.5,5.5,6.5,7.5,8.5))
+# MAIN_PROJECTION_DURABLE_LINES_V1
+durable_archive=load_projection_archive(ARCHIVE_PATH,st.secrets)
+_manual_probe=pd.DataFrame([{"game_pk":game.game_pk,"pitcher_id":game.pitcher_id}])
+_manual_probe=overlay_manual_market_lines(_manual_probe,durable_archive)
+_manual_row=_manual_probe.iloc[0] if not _manual_probe.empty else pd.Series(dtype=object)
+def _durable_line(col):
+    value=pd.to_numeric(pd.Series([_manual_row.get(col)]),errors="coerce").iloc[0]
+    return None if pd.isna(value) else float(value)
+def _durable_source(col):
+    value=_manual_row.get(col,"")
+    return "" if pd.isna(value) else str(value).strip().upper()
+manual_k_line=_durable_line("active_strikeout_line")
+manual_outs_line=_durable_line("active_outs_line")
+manual_hits_line=_durable_line("active_hits_allowed_line")
+manual_k_source=_durable_source("active_strikeout_line_source")
+manual_outs_source=_durable_source("active_outs_line_source")
+manual_hits_source=_durable_source("active_hits_allowed_line_source")
 odds_rows=load_pitcher_strikeout_odds(game.pitcher_name,selected_date.isoformat())
 odds_err=("" if odds_rows else "No saved strikeout odds for this pitcher/slate yet. Use the paid manual button on Daily Projection Run; this page never calls the Odds API.")
 k_reco=market_recommendation(proj,odds_rows,"pitcher_strikeouts_alternate",5.5,"k"); k_reco["label"]="STRIKEOUT BET LEAN"
@@ -650,6 +689,12 @@ hit_over_price=hit_over_offer.get("price") if hit_over_offer else None
 hit_under_price=hit_under_offer.get("price") if hit_under_offer else None
 hit_decision=aligned_bet_lean(hits_proj.ensemble_mean,hit_line,hit_over,over_implied=implied_prob(hit_over_price) if hit_over_price is not None else None,under_implied=implied_prob(hit_under_price) if hit_under_price is not None else None,has_market=bool(hit_rows))
 hit_reco={"side":hit_decision.side,"line":hit_line,"model":hit_decision.model_probability,"edge":hit_decision.edge,"confidence":abs(hit_decision.model_probability-.5)*2,"has_market":bool(hit_rows),"label":"HITS ALLOWED BET LEAN","reason":hit_decision.reason,"projection_mean":hits_proj.ensemble_mean,"over_model":hit_over}
+if manual_k_line is not None:
+    k_reco=apply_active_line_to_recommendation(k_reco,proj,"pitcher_strikeouts",manual_k_line,hits_proj,manual_k_source or "MANUAL")
+if manual_outs_line is not None:
+    out_reco=apply_active_line_to_recommendation(out_reco,proj,"pitcher_outs",manual_outs_line,hits_proj,manual_outs_source or "MANUAL")
+if manual_hits_line is not None:
+    hit_reco=apply_active_line_to_recommendation(hit_reco,proj,"pitcher_hits_allowed",manual_hits_line,hits_proj,manual_hits_source or "MANUAL")
 
 if nav=="Distribution":
     st.markdown('<div class="section-head">DISTRIBUTION</div>',unsafe_allow_html=True); st.caption(f"{game.pitcher_name} · {game.team} vs {game.opponent}"); a,b=st.columns(2)
@@ -726,6 +771,19 @@ render_matchup_strip(
     weather_icon=weather_risk.icon or "",
     team_id=TEAM_ID_BY_ABBR.get(game.team,0),
 )
+st.markdown('<div class="section-head">ACTIVE SPORTSBOOK LINES</div>',unsafe_allow_html=True)
+_line_cols=st.columns(3)
+for _col,_label,_line,_source in zip(
+    _line_cols,("STRIKEOUTS","TOTAL OUTS","HITS ALLOWED"),
+    (manual_k_line,manual_outs_line,manual_hits_line),(manual_k_source,manual_outs_source,manual_hits_source),
+):
+    _manual=str(_source or "").upper()=="MANUAL"
+    _cls="active-market-line manual" if _manual else "active-market-line"
+    _value="—" if _line is None else f"{float(_line):g}"
+    _source_text="MANUAL · DAILY RUN" if _manual else (str(_source) if _source else "NO MANUAL LINE")
+    with _col:
+        st.markdown(f'<div class="{_cls}"><div class="label">{_label}</div><div class="value">{_value}</div><div class="source">{_source_text}</div></div>',unsafe_allow_html=True)
+st.caption("Orange = the durable sportsbook line you entered on Daily Projection Run. These execution lines do not alter the frozen baseball projection; they set the exact line used for the recommendation comparison.")
 if weather_risk.available and weather_risk.level in {"HIGH","ELEVATED"}:
     st.warning(f"{weather_risk.icon} {weather_risk.summary}. Weather risk is informational and does not currently modify the projection.")
 elif weather_risk.available and weather_risk.level == "LOW":
