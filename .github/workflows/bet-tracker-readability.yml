@@ -1,0 +1,53 @@
+name: Bet Tracker readability
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Improve Bet Tracker typography
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('pages/2_Bet_Tracker.py')
+          s = p.read_text()
+
+          replacements = {
+              '[data-testid="stMetricLabel"]{color:#dce7ef!important;font-size:.76rem!important;font-weight:850!important;letter-spacing:.025em!important;text-transform:uppercase!important}': '[data-testid="stMetricLabel"]{color:#f2f6f9!important;font-size:.84rem!important;font-weight:900!important;letter-spacing:.035em!important;text-transform:uppercase!important;line-height:1.15!important}',
+              '[data-testid="stMetricValue"]{font-family:Impact,"Arial Narrow",sans-serif!important;color:#f7f3ec!important;font-size:2rem!important}': '[data-testid="stMetricValue"]{font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif!important;color:#fff!important;font-size:1.72rem!important;font-weight:900!important;letter-spacing:.01em!important;line-height:1.08!important}',
+              'div[data-testid="stExpander"] summary{font-weight:900!important;color:#edf3f8!important}': 'div[data-testid="stExpander"] summary{font-size:.93rem!important;font-weight:900!important;color:#f5f8fb!important;letter-spacing:.01em!important}',
+              '.bt-ticket-state .name{color:#f7f3ec;font:900 1.02rem/1.15 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}': '.bt-ticket-state .name{color:#fff;font:900 1.10rem/1.2 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.005em}',
+              'div[data-testid="stProgress"]>div>div>div{background:#32e58d!important}': 'div[data-testid="stProgress"]>div>div>div{background:#32e58d!important}\n    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}\n    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}\n    .bt-ticket-state .status{font-size:.70rem!important}'
+          }
+
+          changed = False
+          for old, new in replacements.items():
+              if old in s:
+                  s = s.replace(old, new, 1)
+                  changed = True
+
+          if not changed:
+              raise SystemExit('No readability targets found')
+
+          p.write_text(s)
+          PY
+      - name: Commit typography pass
+        run: |
+          if git diff --quiet -- pages/2_Bet_Tracker.py; then
+            echo "No readability changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pages/2_Bet_Tracker.py
+          git commit -m "Improve Bet Tracker readability"
+          git push
