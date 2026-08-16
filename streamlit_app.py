@@ -80,52 +80,46 @@ h1,h2,h3{letter-spacing:-.02em}
 .alt-k-badge{display:block;width:max-content;max-width:95%;margin:9px auto 0;background:#102d49;border:1px solid #2f6590;color:#dff3ff;border-radius:999px;padding:5px 11px;font-weight:900;font-size:.78rem;letter-spacing:.03em}
 .search-note{color:var(--muted);font-size:.82rem}
 .market-ok{color:#49efb0;font-weight:800}.market-empty{color:#8fa5b7}
-/* PROJECTION_EMBLEMS_V1 · icon-only presentation pass */
-/* Replace the Main Projection radio dots with compact command-center glyphs. */
+/* PROJECTION_EMBLEMS_V2 · corrected placement + vector artwork only */
 [data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label{
+    display:flex!important;align-items:center!important;flex-direction:row!important;flex-wrap:nowrap!important;
     position:relative!important;gap:.52rem!important;min-height:2.42rem!important;padding:.26rem .38rem!important;
     border-radius:9px!important;transition:background .14s ease,border-color .14s ease,box-shadow .14s ease!important;
 }
-[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label>div:first-child{display:none!important}
+/* Remove Streamlit's native radio circle completely. The custom icon occupies that exact leading slot. */
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label input[type="radio"]{display:none!important}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label>div:has(input[type="radio"]){display:none!important;width:0!important;height:0!important;margin:0!important;padding:0!important}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label [role="radio"]{display:none!important}
 [data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label::before{
-    display:inline-flex;align-items:center;justify-content:center;width:1.72rem;height:1.72rem;flex:0 0 1.72rem;
-    border:1px solid rgba(236,22,56,.68);border-radius:7px;background:linear-gradient(145deg,#102b49,#061426);
-    color:#f6f8fb;font-family:Arial,sans-serif;font-size:1.02rem;font-weight:950;line-height:1;
-    box-shadow:inset 0 0 0 2px rgba(255,255,255,.025),0 4px 10px rgba(0,0,0,.25);text-shadow:0 0 8px rgba(236,22,56,.24);
+    content:""!important;display:inline-block!important;width:1.72rem!important;height:1.72rem!important;flex:0 0 1.72rem!important;
+    border:1px solid rgba(236,22,56,.68)!important;border-radius:7px!important;background-color:#0b2038!important;
+    background-repeat:no-repeat!important;background-position:center!important;background-size:1.20rem 1.20rem!important;
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.025),0 4px 10px rgba(0,0,0,.25)!important;
 }
 [data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:has(input:checked)::before{
-    color:#fff;border-color:#ff3553;background:linear-gradient(145deg,#5b1124,#16152a);
-    box-shadow:inset 0 0 0 2px rgba(255,255,255,.04),0 0 13px rgba(236,22,56,.42);
+    border-color:#ff3553!important;background-color:#411225!important;
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.04),0 0 13px rgba(236,22,56,.48)!important;
 }
-[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(1)::before{content:"⌖"}
-[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(2)::before{content:"▥"}
-[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(3)::before{content:"∿"}
-[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(4)::before{content:"⌘"}
-[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(5)::before{content:"▰"}
-[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(6)::before{content:"◷"}
-[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(7)::before{content:"ϟ"}
-[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(8)::before{content:"♛"}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(1)::before{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGcgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZjdmN2ZiIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCI+PGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMTQiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSI0IiBmaWxsPSIjZWMxNjM4IiBzdHJva2U9IiNlYzE2MzgiLz48cGF0aCBkPSJNMzIgNnYxMk0zMiA0NnYxMk02IDMyaDEyTTQ2IDMyaDEyIi8+PC9nPjwvc3ZnPg==")!important}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(2)::before{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGcgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZjdmN2ZiIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTEwIDU0aDQ0Ii8+PHJlY3QgeD0iMTMiIHk9IjM0IiB3aWR0aD0iOCIgaGVpZ2h0PSIxOCIgcng9IjIiLz48cmVjdCB4PSIyOCIgeT0iMjIiIHdpZHRoPSI4IiBoZWlnaHQ9IjMwIiByeD0iMiIgZmlsbD0iI2VjMTYzOCIgc3Ryb2tlPSIjZWMxNjM4Ii8+PHJlY3QgeD0iNDMiIHk9IjEyIiB3aWR0aD0iOCIgaGVpZ2h0PSI0MCIgcng9IjIiLz48L2c+PC9zdmc+")!important}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(3)::before{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTYgMzRoMTJsNi0xNCA5IDI4IDgtMjAgNSA2aDEyIiBmaWxsPSJub25lIiBzdHJva2U9IiNmN2Y3ZmIiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PGNpcmNsZSBjeD0iMzMiIGN5PSIzNCIgcj0iMyIgZmlsbD0iI2VjMTYzOCIvPjwvc3ZnPg==")!important}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(4)::before{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGcgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZjdmN2ZiIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCI+PHJlY3QgeD0iMTciIHk9IjE3IiB3aWR0aD0iMzAiIGhlaWdodD0iMzAiIHJ4PSI2Ii8+PHJlY3QgeD0iMjYiIHk9IjI2IiB3aWR0aD0iMTIiIGhlaWdodD0iMTIiIHJ4PSIyIiBmaWxsPSIjZWMxNjM4IiBzdHJva2U9IiNlYzE2MzgiLz48cGF0aCBkPSJNMjQgOHY5TTQwIDh2OU0yNCA0N3Y5TTQwIDQ3djlNOCAyNGg5TTggNDBoOU00NyAyNGg5TTQ3IDQwaDkiLz48L2c+PC9zdmc+")!important}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(5)::before{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTE0IDE0aDM2djEyYTcgNyAwIDAgMCAwIDEydjEySDE0VjM4YTcgNyAwIDAgMCAwLTEyVjE0WiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZjdmN2ZiIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48cGF0aCBkPSJNMjcgMjJ2MjAiIHN0cm9rZT0iI2VjMTYzOCIgc3Ryb2tlLXdpZHRoPSI0IiBzdHJva2UtZGFzaGFycmF5PSI0IDUiLz48L3N2Zz4=")!important}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(6)::before{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGcgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZjdmN2ZiIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTE4IDIwSDh2LTEwIi8+PHBhdGggZD0iTTEwIDIwYTI0IDI0IDAgMSAxLTIgMjIiLz48Y2lyY2xlIGN4PSIzNCIgY3k9IjM0IiByPSIxNiIvPjxwYXRoIGQ9Ik0zNCAyNHYxMWw4IDUiIHN0cm9rZT0iI2VjMTYzOCIvPjwvZz48L3N2Zz4=")!important}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(7)::before{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTM2IDYgMTYgMzZoMTVsLTMgMjIgMjAtMzFIMzRsMi0yMVoiIGZpbGw9IiNmN2Y3ZmIiIHN0cm9rZT0iI2VjMTYzOCIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+")!important}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(8)::before{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0ibTEwIDIyIDEyIDkgMTAtMTcgMTAgMTcgMTItOS01IDI4SDE1TDEwIDIyWiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZjdmN2ZiIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjM5IiByPSI0IiBmaWxsPSIjZWMxNjM4Ii8+PC9zdmc+")!important}
 
-/* Baseball emblems occupy the exact existing 48px card-icon slot. */
-.cc-card-icon.cc-emblem{position:relative;overflow:visible;font-size:0!important}
-.cc-card-icon.cc-emblem::before,.cc-card-icon.cc-emblem::after{position:absolute;display:block;pointer-events:none}
-/* K = bat passes above the ball: visible whiff gap. */
-.cc-card-icon.cc-emblem.whiff::before{
-    content:"";width:31px;height:7px;left:14px;top:13px;border-radius:7px 3px 3px 7px;
-    background:linear-gradient(90deg,#7a3b18,#d58a3f 64%,#f0b966);border:1px solid rgba(255,220,160,.32);
-    transform:rotate(-38deg);box-shadow:0 2px 6px rgba(0,0,0,.34),7px 7px 0 -5px rgba(255,255,255,.7);
+/* True vector baseball emblems inside the existing 48px circular card slot. */
+.cc-card-icon.cc-emblem{position:relative!important;overflow:hidden!important;font-size:0!important}
+.cc-card-icon.cc-emblem::before{
+    content:""!important;position:absolute!important;inset:2px!important;display:block!important;
+    background-repeat:no-repeat!important;background-position:center!important;background-size:42px 42px!important;
+    filter:drop-shadow(0 3px 4px rgba(0,0,0,.30));pointer-events:none!important;
 }
-.cc-card-icon.cc-emblem.whiff::after{content:"⚾";left:2px;bottom:2px;font-size:21px;line-height:1;filter:drop-shadow(0 3px 4px rgba(0,0,0,.35))}
-/* H = bat intersects the baseball; glow reads as contact/impact. */
-.cc-card-icon.cc-emblem.contact::before{
-    content:"";width:34px;height:8px;left:8px;top:21px;border-radius:8px 3px 3px 8px;
-    background:linear-gradient(90deg,#713416,#d88738 62%,#efb96a);border:1px solid rgba(255,220,160,.34);
-    transform:rotate(-34deg);box-shadow:0 2px 6px rgba(0,0,0,.34),0 0 9px rgba(255,159,28,.18);
-}
-.cc-card-icon.cc-emblem.contact::after{content:"⚾";right:2px;top:4px;font-size:22px;line-height:1;filter:drop-shadow(0 0 6px rgba(255,80,70,.62)) drop-shadow(0 3px 4px rgba(0,0,0,.35))}
-/* OUT = baseball seated in a glove. */
-.cc-card-icon.cc-emblem.glove::before{content:"🧤";left:5px;top:5px;font-size:31px;line-height:1;filter:drop-shadow(0 3px 4px rgba(0,0,0,.34))}
-.cc-card-icon.cc-emblem.glove::after{content:"⚾";right:3px;bottom:3px;font-size:17px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))}
+.cc-card-icon.cc-emblem::after{display:none!important;content:none!important}
+.cc-card-icon.cc-emblem.whiff::before{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5NiA5NiI+PGcgZmlsbD0ibm9uZSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNNjcgMTYgMzQgNDkiIHN0cm9rZT0iI2QwOGE0NSIgc3Ryb2tlLXdpZHRoPSIxMCIvPjxwYXRoIGQ9Ik03MiAxMSA2NCAyMCIgc3Ryb2tlPSIjZjNiZjc3IiBzdHJva2Utd2lkdGg9IjUiLz48cGF0aCBkPSJNMzEgNTIgMjUgNTgiIHN0cm9rZT0iIzdhM2IxOCIgc3Ryb2tlLXdpZHRoPSI4Ii8+PGNpcmNsZSBjeD0iMjUiIGN5PSI3MiIgcj0iMTMiIGZpbGw9IiNmN2YyZTgiIHN0cm9rZT0iI2Q0ZDlkZiIgc3Ryb2tlLXdpZHRoPSIyIi8+PHBhdGggZD0iTTE4IDY0YzUgMyA3IDggNyAxNk0zMiA2NGMtNSAzLTcgOC03IDE2IiBzdHJva2U9IiNkODIxM2YiIHN0cm9rZS13aWR0aD0iMi41Ii8+PHBhdGggZD0iTTEwIDM4YzExLTEwIDIzLTEzIDM1LTExTTkgNTBjMTAtNiAyMC03IDMwLTUiIHN0cm9rZT0iIzUzYTdmZiIgc3Ryb2tlLXdpZHRoPSIzIiBvcGFjaXR5PSIuODUiLz48cGF0aCBkPSJNNDMgNTljNSAyIDkgNiAxMiAxMCIgc3Ryb2tlPSIjZWMxNjM4IiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1kYXNoYXJyYXk9IjMgNiIvPjwvZz48L3N2Zz4=")!important}
+.cc-card-icon.cc-emblem.glove::before{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5NiA5NiI+PGcgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMjIgNzBjLTctMTAtNC0yMCA0LTI0bC0xLTE5YzAtNSA3LTYgOS0xbDMgMTQtMS0yM2MwLTUgOC02IDkgMGwyIDIxIDEtMjRjMC01IDgtNSA5IDBsMSAyNSA0LTE5YzEtNSA5LTMgOCAzbC00IDI1YzgtMiAxNCA2IDEwIDEzLTUgOS0xNiAxOS0yOCAyMC0xMiAxLTIxLTMtMjYtMTFaIiBmaWxsPSIjOGI0YTI4IiBzdHJva2U9IiNmMmE0NWIiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0zMyA0NWM3IDcgMTggMTEgMzEgOU0zOSAyN2wxIDIwTTUwIDE5bDEgMzFNNjEgMjVsLTIgMjciIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzViMmExNyIgc3Ryb2tlLXdpZHRoPSIzIi8+PGNpcmNsZSBjeD0iNTgiIGN5PSI2MCIgcj0iMTMiIGZpbGw9IiNmN2YyZTgiIHN0cm9rZT0iI2Q0ZDlkZiIgc3Ryb2tlLXdpZHRoPSIyIi8+PHBhdGggZD0iTTUxIDUyYzUgMyA3IDggNyAxNk02NSA1MmMtNSAzLTcgOC03IDE2IiBmaWxsPSJub25lIiBzdHJva2U9IiNkODIxM2YiIHN0cm9rZS13aWR0aD0iMi41Ii8+PC9nPjwvc3ZnPg==")!important}
+.cc-card-icon.cc-emblem.contact::before{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5NiA5NiI+PGcgZmlsbD0ibm9uZSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMTggNzYgNTggMzgiIHN0cm9rZT0iI2QwOGE0NSIgc3Ryb2tlLXdpZHRoPSIxMSIvPjxwYXRoIGQ9Ik0xMyA4MSAyMiA3MiIgc3Ryb2tlPSIjZjNiZjc3IiBzdHJva2Utd2lkdGg9IjUiLz48cGF0aCBkPSJNNTggMzggNjUgMzEiIHN0cm9rZT0iIzdhM2IxOCIgc3Ryb2tlLXdpZHRoPSI4Ii8+PGNpcmNsZSBjeD0iNjYiIGN5PSIzMCIgcj0iMTMiIGZpbGw9IiNmN2YyZTgiIHN0cm9rZT0iI2Q0ZDlkZiIgc3Ryb2tlLXdpZHRoPSIyIi8+PHBhdGggZD0iTTU5IDIyYzUgMyA3IDggNyAxNk03MyAyMmMtNSAzLTcgOC03IDE2IiBzdHJva2U9IiNkODIxM2YiIHN0cm9rZS13aWR0aD0iMi41Ii8+PHBhdGggZD0ibTY2IDcgMyAxME04NCAxNGwtOCA4TTkxIDMxSDgwTTgzIDQ4bC04LTgiIHN0cm9rZT0iI2ZmYjM0NyIgc3Ryb2tlLXdpZHRoPSI0Ii8+PHBhdGggZD0iTTQ0IDQ5YzQgNiA4IDEwIDE0IDE0IiBzdHJva2U9IiNlYzE2MzgiIHN0cm9rZS13aWR0aD0iMyIgb3BhY2l0eT0iLjg1Ii8+PC9nPjwvc3ZnPg==")!important}
 .active-market-line{padding:.72rem .78rem;border:1px solid #20425f;border-radius:12px;background:rgba(9,27,44,.94);text-align:center}.active-market-line .label{color:#9fb3c3;font-size:.72rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase}.active-market-line .value{margin-top:.18rem;color:#f2f6fa;font-size:1.5rem;font-weight:950}.active-market-line .source{margin-top:.14rem;color:#8fa5b7;font-size:.68rem;font-weight:850;letter-spacing:.04em}.active-market-line.manual{border-color:rgba(255,159,28,.66);background:rgba(255,159,28,.07)}.active-market-line.manual .value,.active-market-line.manual .source{color:#ff9f1c}.reco-line.manual-active{color:#ff9f1c;text-shadow:0 0 15px rgba(255,159,28,.18)}
 </style>""", unsafe_allow_html=True)
 
