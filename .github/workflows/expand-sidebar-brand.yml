@@ -13,30 +13,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Expand mascot and wordmark
+      - name: Widen sidebar and scale brand
         run: |
           python - <<'PY'
           from pathlib import Path
           p = Path('navigation.py')
           s = p.read_text()
           changes = [
-              ('height:126px;', 'height:174px;'),
-              ('margin:-.08rem 0 .2rem;', 'margin:-.2rem 0 -.12rem;'),
-              ('width:122px;', 'width:172px;'),
-              ('height:122px;', 'height:172px;'),
-              ('font-size:1.19rem;', 'font-size:1.52rem;'),
-              ('line-height:1;', 'line-height:.92;'),
-              ('.sk-nav-title span { color:#ff3655; }', '.sk-nav-title span { color:#ff3655; font-size:1.68rem; letter-spacing:.035em; }'),
-              ('font-size:.66rem;', 'font-size:.61rem;'),
-              ('margin:.48rem 0 .05rem;', 'margin:.52rem .2rem .05rem;'),
+              ('width: 218px !important;', 'width: 276px !important;'),
+              ('min-width: 218px !important;', 'min-width: 276px !important;'),
+              ('[data-testid="stSidebar"] > div:first-child { width:218px !important; }', '[data-testid="stSidebar"] > div:first-child { width:276px !important; }'),
+              ('height:174px;', 'height:216px;'),
+              ('margin:-.2rem 0 -.12rem;', 'margin:-.28rem 0 -.18rem;'),
+              ('width:172px;', 'width:214px;'),
+              ('height:172px;', 'height:214px;'),
+              ('font-size:1.52rem;', 'font-size:1.82rem;'),
+              ('line-height:.92;', 'line-height:.9;'),
+              ('.sk-nav-title span { color:#ff3655; font-size:1.68rem; letter-spacing:.035em; }', '.sk-nav-title span { color:#ff3655; font-size:2rem; letter-spacing:.04em; }'),
+              ('font-size:.61rem;', 'font-size:.68rem;'),
+              ('margin:.52rem .2rem .05rem;', 'margin:.58rem .45rem .08rem;'),
+              ('margin:.8rem .7rem .35rem;', 'margin:.9rem .95rem .38rem;'),
+              ('[data-testid="stSidebar"] .sk-page-link { margin:.1rem .16rem; }', '[data-testid="stSidebar"] .sk-page-link { margin:.11rem .28rem; }'),
+              ('padding:.48rem .6rem!important;', 'padding:.52rem .72rem!important;'),
           ]
           changed = False
           for old, new in changes:
               if old in s:
                   s = s.replace(old, new, 1)
                   changed = True
-          if changed:
-              p.write_text(s)
+          if not changed:
+              raise SystemExit('Expected sidebar values were not found')
+          p.write_text(s)
           PY
       - name: Commit patch
         run: |
@@ -47,5 +54,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add navigation.py
-          git commit -m "Expand sidebar mascot and wordmark"
+          git commit -m "Widen sidebar and scale brand block"
           git push
