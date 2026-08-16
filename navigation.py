@@ -12,14 +12,14 @@ def render_sidebar(active: str = "projection") -> None:
         """
         <style>
         [data-testid="stSidebar"] {
-            width: 218px !important;
-            min-width: 218px !important;
+            width: 276px !important;
+            min-width: 276px !important;
             background:
                 radial-gradient(circle at 50% 2%, rgba(227,25,55,.13), transparent 12rem),
                 linear-gradient(180deg, #07162a 0%, #050d19 100%) !important;
             border-right: 1px solid rgba(61,94,129,.45) !important;
         }
-        [data-testid="stSidebar"] > div:first-child { width:218px !important; }
+        [data-testid="stSidebar"] > div:first-child { width:276px !important; }
         .sk-nav-brand {
             margin: .1rem .15rem .75rem;
             padding: .72rem .5rem .75rem;
@@ -40,13 +40,13 @@ def render_sidebar(active: str = "projection") -> None:
             display:flex;
             justify-content:center;
             align-items:center;
-            height:174px;
-            margin:-.2rem 0 -.12rem;
+            height:216px;
+            margin:-.28rem 0 -.18rem;
             position: relative;
         }
         .sk-nav-mascot img {
-            width:172px;
-            height:172px;
+            width:214px;
+            height:214px;
             object-fit:contain;
             display:block;
             filter: drop-shadow(0 9px 18px rgba(0,0,0,.3));
@@ -69,20 +69,20 @@ def render_sidebar(active: str = "projection") -> None:
         .sk-nav-title {
             text-align:center;
             font-family:Impact,"Arial Narrow",sans-serif;
-            font-size:1.52rem;
-            line-height:.92;
+            font-size:1.82rem;
+            line-height:.9;
             color:#fff;
             letter-spacing:.015em;
         }
-        .sk-nav-title span { color:#ff3655; font-size:1.68rem; letter-spacing:.035em; }
+        .sk-nav-title span { color:#ff3655; font-size:2rem; letter-spacing:.04em; }
         .sk-nav-sub {
             text-align:center;
             color:#9eb1c6;
-            font-size:.61rem;
+            font-size:.68rem;
             font-weight:650;
             line-height:1.38;
             letter-spacing:.02em;
-            margin:.52rem .2rem .05rem;
+            margin:.58rem .45rem .08rem;
         }
         .sk-nav-section {
             color:#7790aa;
@@ -90,14 +90,14 @@ def render_sidebar(active: str = "projection") -> None:
             font-weight:900;
             text-transform:uppercase;
             letter-spacing:.16em;
-            margin:.8rem .7rem .35rem;
+            margin:.9rem .95rem .38rem;
         }
-        [data-testid="stSidebar"] .sk-page-link { margin:.1rem .16rem; }
+        [data-testid="stSidebar"] .sk-page-link { margin:.11rem .28rem; }
         [data-testid="stSidebar"] .sk-page-link a {
             font-family:Arial,sans-serif!important;
             font-weight:800!important;
             border-radius:10px!important;
-            padding:.48rem .6rem!important;
+            padding:.52rem .72rem!important;
             border:1px solid transparent!important;
             transition:background .14s ease,border-color .14s ease,transform .14s ease!important;
         }
