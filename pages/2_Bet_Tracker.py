@@ -567,7 +567,14 @@ with st.spinner("Checking saved bets against MLB pitching stats..."):
                     "Model Probability": _num(leg.get("model_probability")),
                 })
             grade = grade_parlay(leg_grades)
-            profit = profit_for(stake, odds, grade)
+            source_text = str(row.get("source", "") or "").strip()
+            legacy_model_line_ticket = (
+                source_text in {"Top Plays Model Parlay", "Projection Page Model Parlay"}
+                and bool(legs)
+                and all(not str(leg.get("line_source", "") or "").strip() for leg in legs)
+            )
+            result_text = "INVALID LINE" if legacy_model_line_ticket else grade.result
+            profit = None if legacy_model_line_ticket else profit_for(stake, odds, grade)
             resolved_rows.append({
                 "_BetKey": bet_row_key(row),
                 "Pitcher": f"{len(legs)}-leg parlay",
@@ -580,7 +587,7 @@ with st.spinner("Checking saved bets against MLB pitching stats..."):
                 "Stake": stake,
                 "Actual": "—",
                 "Game Status": " / ".join(sorted(set(statuses))) if statuses else "Pending",
-                "Result": grade.result,
+                "Result": result_text,
                 "Profit/Loss": profit,
                 "Projection": None,
                 "Model Probability": None,
@@ -646,13 +653,15 @@ _status_priority = {
     "LOSS": 2,
     "PUSH": 2,
     "PUSH LEG": 2,
+    "INVALID LINE": 3,
 }
 results["_StatusPriority"] = results["Result"].astype(str).str.upper().map(_status_priority).fillna(1).astype(int)
 results = results.sort_values(["_StatusPriority", "Date"], ascending=[True, False], kind="stable").reset_index(drop=True)
 wins = int((results["Result"] == "WIN").sum())
 losses = int((results["Result"] == "LOSS").sum())
 pushes = int(results["Result"].isin(["PUSH", "PUSH LEG"]).sum())
-pending = int((~results["Result"].isin(["WIN", "LOSS", "PUSH", "PUSH LEG"])).sum())
+invalid = int((results["Result"] == "INVALID LINE").sum())
+pending = int((~results["Result"].isin(["WIN", "LOSS", "PUSH", "PUSH LEG", "INVALID LINE"])).sum())
 profit_series = pd.to_numeric(results["Profit/Loss"], errors="coerce")
 stake_series = pd.to_numeric(results["Stake"], errors="coerce")
 graded_mask = results["Result"].isin(["WIN", "LOSS", "PUSH"]) & stake_series.notna()
@@ -667,6 +676,8 @@ m3.metric("Pending / Live", pending)
 m4.metric("Net P/L", f"{net:+.2f}" if profit_series.notna().any() else "—")
 m5.metric("ROI", f"{roi:+.1%}" if roi is not None else "—")
 
+if invalid:
+    st.warning(f"{invalid} legacy model-only ticket(s) are marked INVALID LINE and excluded from the real win/loss record because their saved legs used synthetic/default lines rather than verified sportsbook lines.")
 if stake_series.isna().any():
     st.caption("Older saved bets without a stake are still graded, but they are excluded from P/L and ROI calculations.")
 if "american_odds" in tracker.columns and pd.to_numeric(tracker["american_odds"], errors="coerce").isna().any():
@@ -734,6 +745,8 @@ def _ticket_icon(result: object) -> str:
         return "🟠"
     if state in {"PUSH", "PUSH LEG"}:
         return "🟡"
+    if state == "INVALID LINE":
+        return "⚠️"
     return "⏳"
 
 

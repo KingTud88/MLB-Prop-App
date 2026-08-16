@@ -167,6 +167,7 @@ def make_parlay_record(
             "market": normalize_market(leg.get("market")),
             "game_date": str(leg.get("game_date", game_date))[:10],
             "line": float(leg.get("line")),
+            "line_source": str(leg.get("line_source", "")),
             "side": side,
             "american_odds": "" if leg.get("american_odds") in {None, ""} else int(round(float(leg.get("american_odds")))) ,
             "game_pk": "" if leg.get("game_pk") in {None, ""} else int(float(leg.get("game_pk"))),

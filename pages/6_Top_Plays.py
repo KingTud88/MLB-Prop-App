@@ -482,12 +482,15 @@ health_map = market_health_map(health_report)
 decision_report = decision_tier_report(walk_forward)
 signal_report = paired_signal_report(history)
 
-plays = build_model_board(slate, history, limit=5, market_health=health_map)
+plays = build_model_board(slate, history, limit=5, market_health=health_map, require_market_lines=True)
 if plays.empty:
-    st.warning("No current market passed the starter-history, probability-path, and model-health eligibility guards. The app will not manufacture a Top Play when the validated board is empty.")
+    st.warning("No current market has both a valid model path and an active sportsbook line. Enter manual K / outs / hits lines on Daily Projection Run (or load the saved paid K snapshot) before Top Plays can rank a real bet.")
     st.stop()
 plays = attach_decision_profiles(plays, decision_report)
 plays = attach_signal_profiles(plays, history, signal_report)
+
+# TOP_PLAYS_REAL_LINE_GUARD_V1
+st.caption("Line integrity: every ranked leg below uses an active sportsbook line from Daily Run. MANUAL overrides the saved paid K snapshot; markets with no active line are excluded. Model-grid/default lines are diagnostics only and cannot become current Top Plays.")
 
 # The board exists before any paid sportsbook request. Credit Saver keeps paid
 # odds OFF by default and only asks for main markets represented in the Top 5.
@@ -648,6 +651,7 @@ for target_col, (_, play_row) in layout_slots:
     multi_market_count = int(pitcher_market_counts.get(pitcher_name, 1))
     multi_market_html = f'<div class="tp-multi-market">{multi_market_count} markets ranked</div>' if multi_market_count > 1 else ""
     matchup_text = " · ".join(v for v in [team, f"vs {opponent}" if opponent else "", weather_icon] if v)
+    line_source = str(play_row.get("Line Source", "ACTIVE MARKET LINE") or "ACTIVE MARKET LINE")
 
     with target_col:
         with st.container(border=False, key=f"top_play_card_{rank}"):
@@ -664,6 +668,7 @@ for target_col, (_, play_row) in layout_slots:
                   <div class="tp-market">{play_row['Market']}</div>
                   <div class="tp-side {side_class}">{side} {float(play_row['Line']):g}</div>
                 </div>
+                <div class="tp-card-note"><strong>Line source:</strong> {line_source}</div>
                 <div class="tp-stat-grid">
                   <div class="tp-stat"><div class="tp-stat-label">Projection</div><div class="tp-stat-value">{float(play_row['Projection']):.2f}</div></div>
                   <div class="tp-stat"><div class="tp-stat-label">Model Hit %</div><div class="tp-stat-value prob">{float(play_row['Model Probability']):.1%}</div></div>
@@ -769,6 +774,7 @@ if len(selected) >= 2:
                 "player": str(leg["Pitcher"]), "market": str(leg["Market"]),
                 "game_date": str(leg.get("Game Date", today))[:10],
                 "line": float(leg["Line"]), "side": str(leg["Side"]), "american_odds": None,
+                "line_source": str(leg.get("Line Source", "")),
                 "game_pk": None if game_pk is None else int(game_pk),
                 "pitcher_id": None if pitcher_id is None else int(pitcher_id),
                 "projection": numeric(leg.get("Projection")),

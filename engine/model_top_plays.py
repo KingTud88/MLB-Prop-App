@@ -21,6 +21,18 @@ PROJECTION_COLUMNS = {
     MARKET_HITS: "hits_projection",
 }
 
+MARKET_LINE_COLUMNS = {
+    MARKET_STRIKEOUTS: "active_strikeout_line",
+    MARKET_OUTS: "active_outs_line",
+    MARKET_HITS: "active_hits_allowed_line",
+}
+
+MARKET_LINE_SOURCE_COLUMNS = {
+    MARKET_STRIKEOUTS: "active_strikeout_line_source",
+    MARKET_OUTS: "active_outs_line_source",
+    MARKET_HITS: "active_hits_allowed_line_source",
+}
+
 LINE_GRIDS = {
     MARKET_STRIKEOUTS: tuple(x + 0.5 for x in range(2, 10)),
     MARKET_OUTS: tuple(x + 0.5 for x in range(13, 19)),
@@ -86,6 +98,8 @@ def build_model_candidate(
     market: str,
     history: pd.DataFrame,
     market_health: Mapping[str, str] | None = None,
+    *,
+    require_market_line: bool = False,
 ) -> dict[str, object] | None:
     """Build one model-first betting candidate without using sportsbook prices."""
     health_status = str((market_health or {}).get(market, "LEARNING")).upper()
@@ -100,9 +114,16 @@ def build_model_candidate(
     projection = _num(row.get(PROJECTION_COLUMNS[market]))
     if projection is None:
         return None
-    line = target_line(market, projection)
-    if abs(float(projection) - float(line)) > MAX_TARGET_DISTANCE[market]:
-        return None
+    if require_market_line:
+        line = _num(row.get(MARKET_LINE_COLUMNS[market]))
+        if line is None:
+            return None
+        line_source = str(row.get(MARKET_LINE_SOURCE_COLUMNS[market], "") or "").strip() or "ACTIVE MARKET LINE"
+    else:
+        line = target_line(market, projection)
+        if abs(float(projection) - float(line)) > MAX_TARGET_DISTANCE[market]:
+            return None
+        line_source = "MODEL GRID · DIAGNOSTIC ONLY"
     over_p = over_probability(row, market, line, history)
     if over_p is None:
         return None
@@ -125,6 +146,7 @@ def build_model_candidate(
         "Market": market,
         "Side": decision.side,
         "Line": line,
+        "Line Source": line_source,
         "Projection": projection,
         "Model Probability": probability,
         "Data Quality": int(round(quality)),
@@ -152,13 +174,15 @@ def build_model_board(
     history: pd.DataFrame,
     limit: int = 5,
     market_health: Mapping[str, str] | None = None,
+    *,
+    require_market_lines: bool = False,
 ) -> pd.DataFrame:
     """Rank the slate by model hit probability, with validated market-health blocking."""
     rows: list[dict[str, object]] = []
     for _, snapshot in slate.iterrows():
         row = snapshot.to_dict()
         for market in MARKETS:
-            candidate = build_model_candidate(row, market, history, market_health=market_health)
+            candidate = build_model_candidate(row, market, history, market_health=market_health, require_market_line=require_market_lines)
             if candidate is not None:
                 rows.append(candidate)
     if not rows:

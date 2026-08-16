@@ -209,6 +209,75 @@ def commit_projection_archive(slate: pd.DataFrame, manual_lines: dict[str, dict[
     return len(snapshot)
 
 
+def apply_active_market_lines(slate_day: str, manual_lines: dict[str, dict[str, float]]) -> int:
+    """Apply user-entered sportsbook lines to frozen rows used by current Top Plays."""
+    frame = load_log()
+    if frame.empty or "game_date" not in frame.columns:
+        return 0
+    for col in (
+        "active_strikeout_line", "active_outs_line", "active_hits_allowed_line",
+        "active_strikeout_line_source", "active_outs_line_source", "active_hits_allowed_line_source",
+    ):
+        if col not in frame.columns:
+            frame[col] = np.nan if col.endswith("_line") else ""
+
+    applied = 0
+    day_mask = frame["game_date"].astype(str).eq(str(slate_day))
+    for idx in frame.index[day_mask]:
+        row = frame.loc[idx]
+        values = manual_lines.get(_archive_row_key(row), {})
+        for key, line_col, source_col in (
+            ("k", "active_strikeout_line", "active_strikeout_line_source"),
+            ("outs", "active_outs_line", "active_outs_line_source"),
+            ("hits", "active_hits_allowed_line", "active_hits_allowed_line_source"),
+        ):
+            value = values.get(key, np.nan)
+            if pd.notna(value):
+                frame.at[idx, line_col] = float(value)
+                frame.at[idx, source_col] = "MANUAL"
+                applied += 1
+    save_log(frame)
+    return applied
+
+
+def apply_paid_strikeout_lines(odds_snapshot: pd.DataFrame, slate_day: str) -> int:
+    """Apply saved paid K lines without overwriting a deliberate manual line."""
+    if odds_snapshot.empty:
+        return 0
+    frame = load_log()
+    if frame.empty or "game_date" not in frame.columns:
+        return 0
+    for col, default in (("active_strikeout_line", np.nan), ("active_strikeout_line_source", "")):
+        if col not in frame.columns:
+            frame[col] = default
+
+    snap = odds_snapshot.copy()
+    snap["point"] = pd.to_numeric(snap.get("point"), errors="coerce")
+    snap = snap.dropna(subset=["point"])
+    snap["_name"] = snap.get("pitcher", pd.Series(index=snap.index, dtype=str)).fillna("").astype(str).map(lambda x: " ".join(x.lower().split()))
+    snap["_book"] = snap.get("book", pd.Series(index=snap.index, dtype=str)).fillna("").astype(str).str.lower()
+
+    applied = 0
+    day_mask = frame["game_date"].astype(str).eq(str(slate_day))
+    for idx in frame.index[day_mask]:
+        if str(frame.at[idx, "active_strikeout_line_source"] or "").upper() == "MANUAL":
+            continue
+        name = " ".join(str(frame.at[idx, "player"]).lower().split())
+        offers = snap.loc[snap["_name"].eq(name)]
+        if offers.empty:
+            continue
+        fanduel = offers.loc[offers["_book"].str.contains("fanduel", na=False)]
+        chosen = fanduel if not fanduel.empty else offers
+        mode = chosen["point"].mode()
+        if mode.empty:
+            continue
+        frame.at[idx, "active_strikeout_line"] = float(mode.iloc[0])
+        frame.at[idx, "active_strikeout_line_source"] = "PAID API · FANDUEL" if not fanduel.empty else "PAID API · CONSENSUS"
+        applied += 1
+    save_log(frame)
+    return applied
+
+
 def run_full_slate(day: str) -> tuple[pd.DataFrame, int, int, list[str], list[str]]:
     frame = load_log()
     announced = schedule(day)
@@ -432,7 +501,7 @@ if isinstance(slate, pd.DataFrame):
 
     if not slate.empty:
         st.markdown('<div class="daily-action-label">🎚️ Manual sportsbook lines</div>', unsafe_allow_html=True)
-        st.caption("Open each pitcher bar and enter the sportsbook lines you want attached to this frozen projection. Half-lines such as 4.5, 15.5, and 5.5 are supported. Blank markets are allowed.")
+        st.caption("Open each pitcher bar and enter the real sportsbook lines you want Top Plays to evaluate. Manual values override paid API lines. Half-lines such as 4.5, 15.5, and 5.5 are supported; a blank market is excluded from Top Plays unless a paid active line already exists.")
         manual_line_values: dict[str, dict[str, str]] = {}
         for _, manual_row in slate.reset_index(drop=True).iterrows():
             row_key = _archive_row_key(manual_row)
@@ -460,9 +529,12 @@ if isinstance(slate, pd.DataFrame):
                 filled_lines = sum(pd.notna(value) for values in parsed_lines.values() for value in values.values())
                 if filled_lines == 0:
                     raise ValueError("Enter at least one sportsbook line before adding the slate to the Projection Archive.")
+                applied = apply_active_market_lines(slate_date.isoformat(), parsed_lines)
                 archived = commit_projection_archive(slate, parsed_lines, slate_date.isoformat())
+                refreshed_log = load_log()
+                st.session_state["daily_slate"] = refreshed_log.loc[refreshed_log.get("game_date", pd.Series(dtype=str)).astype(str).eq(slate_date.isoformat())].copy()
                 st.session_state["daily_archive_saved_at"] = datetime.now(EASTERN).strftime("%b %d, %Y · %I:%M:%S %p ET")
-                st.success(f"Applied {filled_lines} manual market line(s) and added {archived} pitcher projection(s) to the Projection Archive.")
+                st.success(f"Applied {applied} active sportsbook line(s) to Top Plays and added {archived} pitcher projection(s) to the Projection Archive.")
             except ValueError as exc:
                 st.error(str(exc))
 
@@ -649,7 +721,8 @@ if st.button("💳 LOAD STRIKEOUT LINES · PAID API", use_container_width=True, 
         st.error(odds_error)
     else:
         pitchers=int(odds_snapshot.get("pitcher",pd.Series(dtype=str)).nunique()) if not odds_snapshot.empty else 0
-        st.success(f"Saved {len(odds_snapshot)} strikeout offers for {pitchers} pitchers. Main Projections will reuse this snapshot for free.")
+        active_lines = apply_paid_strikeout_lines(odds_snapshot, slate_date.isoformat())
+        st.success(f"Saved {len(odds_snapshot)} strikeout offers for {pitchers} pitchers and applied {active_lines} active K line(s) for Top Plays. Manual K lines override these paid lines.")
         if quota:
             st.caption(f"Last paid request: {quota.get('last','—')} credit(s) · {quota.get('remaining','—')} remaining · {quota.get('used','—')} used.")
 
