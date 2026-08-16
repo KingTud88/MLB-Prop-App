@@ -1,4 +1,4 @@
-name: Projection History Command UI
+name: Projection Persistence + History UI
 
 on:
   push:
@@ -19,22 +19,25 @@ jobs:
       - name: Keep manual line highlight applied
         run: python tools/highlight_manual_lines.py
 
-      - name: Rebuild Projection History command UI
+      - name: Keep Projection History command UI applied
         run: python tools/patch_projection_history_command.py
 
+      - name: Add restart-safe projection persistence
+        run: python tools/patch_projection_persistence.py
+
       - name: Validate Python syntax
-        run: python -m py_compile pages/4_Projection_History.py pages/5_Daily_Projection_Run.py
+        run: python -m py_compile training/projection_storage.py pages/4_Projection_History.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py
 
       - name: Commit safely
         run: |
-          if git diff --quiet -- pages/4_Projection_History.py pages/5_Daily_Projection_Run.py; then
-            echo "Projection History command UI already present"
+          if git diff --quiet -- pages/4_Projection_History.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py; then
+            echo "Projection persistence patch already present"
             exit 0
           fi
           git config user.name "KingTud88"
           git config user.email "jaxson0603@gmail.com"
-          git add pages/4_Projection_History.py pages/5_Daily_Projection_Run.py
-          git commit -m "Rebuild Projection History command UI"
+          git add pages/4_Projection_History.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py
+          git commit -m "Persist manual projection lines across app restarts"
           for attempt in 1 2 3 4; do
             git fetch origin main
             git rebase origin/main || { git rebase --abort || true; sleep 2; continue; }
@@ -43,5 +46,5 @@ jobs:
             fi
             sleep $((attempt * 2))
           done
-          echo "Could not push Projection History command UI after retries"
+          echo "Could not push projection persistence patch after retries"
           exit 1
