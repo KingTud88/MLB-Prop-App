@@ -246,13 +246,61 @@ def apply_command_center_theme() -> None:
         .cc-matchup-vs strong { color:var(--cc-red); }
         .cc-matchup-meta { margin-top:.32rem;color:#b7c6d3;font-family:var(--cc-ui-font);font-size:.90rem; }
         .cc-matchup-status {
+            display:grid;
+            grid-template-columns:minmax(0,1fr) 96px;
+            gap:.85rem;
+            align-items:center;
+            min-height:96px;
             padding-left:1.05rem;
             border-left:1px solid rgba(76,104,132,.54);
         }
+        .cc-matchup-status-copy { min-width:0; }
         .cc-matchup-status-label { color:var(--cc-green);font-family:var(--cc-ui-font);font-size:.86rem;font-weight:800;letter-spacing:.025em;text-transform:uppercase; }
         .cc-matchup-status-time { margin-top:.32rem;color:#fff;font-weight:900;font-size:1rem; }
         .cc-matchup-status-meta { margin-top:.28rem;color:#afc0cf;font-family:var(--cc-ui-font);font-size:.84rem; }
-        .cc-weather-status-icon { display:inline-flex;align-items:center;justify-content:center;margin-left:.34rem;min-width:1.25rem;font-size:1rem;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.28)); }
+        .cc-weather-status-hero {
+            width:92px;
+            height:92px;
+            justify-self:end;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            border-radius:50%;
+            font-size:3.55rem;
+            line-height:1;
+            border:1px solid rgba(91,119,146,.68);
+            background:radial-gradient(circle at 35% 28%,rgba(30,67,103,.94),rgba(5,22,39,.98) 68%);
+            box-shadow:inset 0 0 0 5px rgba(255,255,255,.025),0 12px 24px rgba(0,0,0,.30),0 0 24px rgba(71,126,174,.16);
+            filter:drop-shadow(0 3px 5px rgba(0,0,0,.28));
+        }
+        .cc-weather-status-hero.weather-high {
+            border-color:rgba(255,78,101,.82);
+            background:radial-gradient(circle at 35% 28%,rgba(125,24,47,.96),rgba(35,7,18,.98) 70%);
+            box-shadow:inset 0 0 0 5px rgba(255,255,255,.025),0 12px 24px rgba(0,0,0,.30),0 0 28px rgba(236,22,56,.36);
+        }
+        .cc-weather-status-hero.weather-elevated {
+            border-color:rgba(255,209,102,.78);
+            background:radial-gradient(circle at 35% 28%,rgba(108,77,14,.94),rgba(35,24,5,.98) 70%);
+            box-shadow:inset 0 0 0 5px rgba(255,255,255,.025),0 12px 24px rgba(0,0,0,.30),0 0 28px rgba(255,209,102,.24);
+        }
+        .cc-weather-status-hero.weather-low {
+            border-color:rgba(91,178,230,.74);
+            background:radial-gradient(circle at 35% 28%,rgba(20,76,112,.94),rgba(5,24,39,.98) 70%);
+            box-shadow:inset 0 0 0 5px rgba(255,255,255,.025),0 12px 24px rgba(0,0,0,.30),0 0 26px rgba(91,178,230,.22);
+        }
+        .cc-weather-status-hero.weather-none {
+            border-color:rgba(50,229,141,.66);
+            background:radial-gradient(circle at 35% 28%,rgba(16,88,62,.88),rgba(5,30,24,.98) 70%);
+            box-shadow:inset 0 0 0 5px rgba(255,255,255,.025),0 12px 24px rgba(0,0,0,.30),0 0 26px rgba(50,229,141,.20);
+        }
+        .cc-weather-status-hero.weather-unknown {
+            color:#9cb0c1;
+            border-color:rgba(91,119,146,.55);
+            background:radial-gradient(circle at 35% 28%,rgba(35,54,73,.88),rgba(7,20,34,.98) 70%);
+            font-family:var(--cc-ui-font);
+            font-size:2.6rem;
+            font-weight:900;
+        }
         .cc-lock-pill {
             display:inline-flex;
             align-items:center;
@@ -477,7 +525,8 @@ def apply_command_center_theme() -> None:
             .cc-hero-sub { justify-content:center; }
             .cc-matchup-strip { grid-template-columns:1fr;text-align:center; }
             .cc-team-mark { margin:0 auto; }
-            .cc-matchup-status { text-align:center; }
+            .cc-matchup-status { grid-template-columns:1fr;text-align:center;gap:.7rem; }
+            .cc-weather-status-hero { width:80px;height:80px;justify-self:center;font-size:3rem; }
         }
 
 
@@ -690,12 +739,26 @@ def render_matchup_strip(
     game_time: object,
     locked: bool,
     weather_icon: str = "",
+    weather_level: str = "UNKNOWN",
     team_id: int = 0,
 ) -> None:
     """Render the matchup strip without changing any projection state."""
     lock_class = "cc-lock-pill locked" if locked else "cc-lock-pill"
     lock_label = "🔒 Locked" if locked else "◇ Unlocked"
-    weather = f'<span class="cc-weather-status-icon" aria-label="Weather delay risk">{_safe(weather_icon)}</span>' if weather_icon else ""
+    level = str(weather_level or "UNKNOWN").upper()
+    weather_class = {
+        "HIGH": "weather-high",
+        "ELEVATED": "weather-elevated",
+        "LOW": "weather-low",
+        "NONE": "weather-none",
+    }.get(level, "weather-unknown")
+    weather_symbol = str(weather_icon or "").strip() or {
+        "HIGH": "⛈️",
+        "ELEVATED": "🌩️",
+        "LOW": "🌧️",
+        "NONE": "☀️",
+    }.get(level, "—")
+    weather = f'<div class="cc-weather-status-hero {weather_class}" aria-label="Weather delay risk">{_safe(weather_symbol)}</div>'
     logo = _team_logo_url(team_id)
     team_mark = (
         f'<div class="cc-team-mark cc-team-logo"><img src="{logo}" alt="{_safe(team)} logo" loading="lazy"></div>'
@@ -711,10 +774,13 @@ def render_matchup_strip(
             <div class="cc-matchup-meta">⚾ {_safe(venue)} · {_safe(side)}</div>
           </div>
           <div class="cc-matchup-status">
-            <div class="cc-matchup-status-label">Game Status{weather}</div>
-            <div class="cc-matchup-status-time">◫ {_safe(_game_time_text(game_time))}</div>
-            <div class="cc-matchup-status-meta">{_safe(status)} · {_safe(side)}</div>
-            <div class="{lock_class}">{_safe(lock_label)}</div>
+            <div class="cc-matchup-status-copy">
+              <div class="cc-matchup-status-label">Game Status</div>
+              <div class="cc-matchup-status-time">◫ {_safe(_game_time_text(game_time))}</div>
+              <div class="cc-matchup-status-meta">{_safe(status)} · {_safe(side)}</div>
+              <div class="{lock_class}">{_safe(lock_label)}</div>
+            </div>
+            {weather}
           </div>
         </div>
         """,

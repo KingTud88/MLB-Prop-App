@@ -1023,6 +1023,7 @@ render_matchup_strip(
     game_time=game.game_time,
     locked=locked,
     weather_icon=weather_risk.icon or "",
+    weather_level=_weather_level,
     team_id=TEAM_ID_BY_ABBR.get(game.team,0),
 )
 st.markdown('<div class="section-head">ACTIVE SPORTSBOOK LINES</div>',unsafe_allow_html=True)
