@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "streamlit_app.py"
@@ -17,23 +17,37 @@ NAMES = [
 ]
 
 
-def _split_sprite() -> None:
+def _load_valid_sprite() -> Image.Image:
     candidates = [
         ASSETS / "projection_summary_emblems_v2.webp",
         ASSETS / "projection_summary_emblems.webp",
     ]
-    sprite_path = next((p for p in candidates if p.exists()), None)
-    if sprite_path is None:
-        raise RuntimeError("Projection artwork sprite not found")
+    errors = []
+    for sprite_path in candidates:
+        if not sprite_path.exists():
+            continue
+        try:
+            image = Image.open(sprite_path)
+            image.load()
+            image = image.convert("RGBA")
+            width, height = image.size
+            if width < height * 3:
+                errors.append(f"{sprite_path.name}: unexpected {width}x{height}")
+                continue
+            print(f"Using valid Projection artwork source: {sprite_path.name} ({width}x{height})")
+            return image
+        except (UnidentifiedImageError, OSError, ValueError) as exc:
+            errors.append(f"{sprite_path.name}: {exc}")
+            print(f"Skipping invalid Projection artwork source {sprite_path.name}: {exc}")
+    raise RuntimeError("No valid Projection artwork sprite found. " + " | ".join(errors))
 
-    image = Image.open(sprite_path).convert("RGBA")
+
+def _split_sprite() -> None:
+    image = _load_valid_sprite()
     width, height = image.size
-    if width < height * 3:
-        raise RuntimeError(f"Unexpected projection artwork sprite size: {width}x{height}")
-
     cell_width = width // 6
     if cell_width <= 0:
-        raise RuntimeError("Invalid projection artwork cell width")
+        raise RuntimeError("Invalid Projection artwork cell width")
 
     for idx, name in enumerate(NAMES):
         left = idx * cell_width
@@ -48,6 +62,7 @@ def _split_sprite() -> None:
         canvas.alpha_composite(cell, ((side - cell.width) // 2 + pad, (side - cell.height) // 2 + pad))
         canvas.thumbnail((256, 256), Image.Resampling.LANCZOS)
         canvas.save(ASSETS / name, "WEBP", quality=92, method=6)
+        print(f"Wrote {name}: {canvas.size[0]}x{canvas.size[1]}")
 
 
 def _patch_app() -> None:
