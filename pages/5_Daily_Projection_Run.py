@@ -43,19 +43,36 @@ st.markdown(
     .daily-kicker { margin:1.35rem 0 .42rem; color:#aebfd2; font-size:.72rem; font-weight:900; letter-spacing:.13em; text-transform:uppercase; }
     .daily-kicker::before { content:''; display:inline-block; width:22px; height:2px; margin-right:.5rem; vertical-align:middle; background:#ff3655; box-shadow:0 0 11px rgba(227,25,55,.42); }
     .daily-paid-note { margin:.35rem 0 .8rem; padding:.72rem .85rem; border-radius:13px; border:1px solid rgba(250,204,21,.32); background:rgba(120,79,8,.08); color:#c9d7e5; font-size:.86rem; }
+    /* DAILY_COMMAND_UI_V3 */
+    .block-container{max-width:1540px!important;padding-top:2.05rem!important;padding-bottom:4rem!important}
+    .daily-command-hero{position:relative;overflow:hidden;margin:.1rem 0 .75rem;padding:1.05rem 1.2rem 1.1rem;border:1px solid rgba(80,108,136,.78);border-radius:18px;background:linear-gradient(112deg,rgba(8,28,50,.99),rgba(5,19,35,.99));box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 18px 42px rgba(0,0,0,.30)}
+    .daily-command-hero:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(#ff3655,#a60c29)}
+    .daily-command-kicker{font:900 .70rem/1.2 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.13em;color:#ff6a7d;text-transform:uppercase}
+    .daily-command-title{margin:.22rem 0 .28rem;font-family:Impact,"Arial Black","Arial Narrow",sans-serif;font-size:clamp(2.6rem,5vw,4.8rem);line-height:.86;letter-spacing:.012em;color:#f5f1e9;text-transform:uppercase;text-shadow:3px 4px 0 #07182b}
+    .daily-command-title span{color:#ec1638;-webkit-text-stroke:1px #f1eee7;paint-order:stroke fill}
+    .daily-command-sub{max-width:1180px;color:#c0ceda;font:650 .90rem/1.48 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+    .daily-command-rule{margin-top:.58rem;width:max-content;max-width:100%;padding:.25rem .58rem;border-top:1px solid rgba(236,22,56,.65);border-bottom:1px solid rgba(236,22,56,.65);color:#edf3f7;font:900 .67rem/1.2 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.09em;text-transform:uppercase}
+    .daily-section-head{width:max-content;min-width:240px;max-width:92%;margin:1.15rem auto .65rem;padding:.44rem 1.65rem;border:1px solid #ff3151;border-bottom-color:#790b1d;border-radius:8px;background:linear-gradient(180deg,#f21b3d,#b70d29);box-shadow:0 7px 16px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.22);color:#fff;font:900 .90rem/1.15 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.04em;text-align:center;text-transform:uppercase}
+    .daily-note{margin:.45rem 0 .78rem;padding:.78rem .88rem;border:1px solid rgba(73,111,151,.56);border-radius:13px;background:linear-gradient(110deg,rgba(10,34,59,.90),rgba(5,22,40,.92));color:#d2dde6;font:700 .84rem/1.45 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+    .daily-note.paid{border-color:rgba(250,204,21,.42);background:linear-gradient(110deg,rgba(88,65,8,.24),rgba(29,29,16,.52));color:#e9dfb4}
+    .daily-action-label{margin:.15rem 0 .32rem;color:#f4f7fa;font:900 1.12rem/1.2 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+    .daily-action-copy{margin:0 0 .62rem;color:#aebfd0;font:650 .83rem/1.42 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+    [data-testid="stMetric"]{min-height:108px;padding:.70rem .76rem!important;border:1px solid rgba(77,108,137,.72)!important;border-radius:14px!important;background:linear-gradient(145deg,rgba(9,31,55,.98),rgba(4,18,33,.98))!important}
+    [data-testid="stMetricLabel"]{color:#eef4f8!important;font-size:.78rem!important;font-weight:900!important;text-transform:uppercase!important}
+    [data-testid="stMetricValue"]{font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif!important;color:#fff!important;font-size:1.65rem!important;font-weight:900!important}
+    div[data-testid="stDataFrame"]{border:1px solid rgba(77,108,137,.62);border-radius:14px;overflow:hidden;box-shadow:0 12px 28px rgba(0,0,0,.20)}
+    div[data-testid="stButton"] button[kind="primary"]{min-height:48px!important;border:1px solid #ff4560!important;background:linear-gradient(180deg,#f31b3d,#bc0d2b)!important;font-weight:900!important;letter-spacing:.035em!important;text-transform:uppercase!important}
     @media (max-width:900px) { .daily-hero { padding:.78rem .85rem; } .daily-kicker { margin-top:1rem; } }
     </style>
     """,
     unsafe_allow_html=True,
 )
-st.title("📊 Daily Projection Run")
-st.caption(
-    "Run StrikeOut King 9000 across every announced MLB starter on the selected slate. "
-    "Each pitcher is captured as an immutable pregame strikeout + total-outs + hits-allowed snapshot for calibration."
-)
 st.markdown(
-    '<div class="daily-hero"><strong>Daily Control Deck · frozen pregame capture</strong>'
-    '<span>Run the slate first. Paid strikeout lines are a separate manual data pull and never drive the baseball projection.</span></div>',
+    '<div class="daily-command-hero"><div class="daily-command-kicker">StrikeOut King 9000 · Daily Command Board</div>'
+    '<div class="daily-command-title">DAILY <span>RUN</span></div>'
+    '<div class="daily-command-sub">Capture every announced MLB starter as a frozen pregame strikeout, total-outs, and hits-allowed snapshot. Market data stays isolated and never ranks or drives the baseball projection.</div>'
+    '<div class="daily-command-rule">MODEL FIRST · FROZEN PREGAME · MARKET DATA ISOLATED</div></div>'
+    '<div class="daily-section-head">Slate Control</div>',
     unsafe_allow_html=True,
 )
 
@@ -306,14 +323,11 @@ def render_projection_rationale(row: pd.Series, history: pd.DataFrame) -> None:
     )
 
 
-st.info(
-    "This page is for batch data capture. The normal Projection page remains the single-pitcher deep-dive workflow. "
-    "Existing game/pitcher snapshots stay frozen after first pitch; while still pregame, a roster-fallback row may upgrade once MLB posts a confirmed batting order."
-)
+st.markdown('<div class="daily-note">Batch capture only · the Projection page remains the single-pitcher deep dive. Existing snapshots stay frozen after first pitch; while still pregame, a roster-fallback row may upgrade once MLB posts a confirmed batting order.</div>', unsafe_allow_html=True)
 
-st.markdown('<div class="daily-kicker">Manual paid data</div>', unsafe_allow_html=True)
-st.markdown('<div class="daily-paid-note">Optional market-data pull · manual only · strikeout lines only · saved snapshot is reused elsewhere without another paid request.</div>', unsafe_allow_html=True)
-st.markdown("### 💳 Paid strikeout lines")
+st.markdown('<div class="daily-section-head">Manual Paid Data</div>', unsafe_allow_html=True)
+st.markdown('<div class="daily-note paid">Optional market-data pull · manual only · strikeout lines only · saved snapshot is reused elsewhere without another paid request.</div>', unsafe_allow_html=True)
+st.markdown('<div class="daily-action-label">💳 Paid strikeout lines</div>', unsafe_allow_html=True)
 st.caption("Manual only. This button is the ONLY paid Odds API path and requests pitcher_strikeouts only. The saved snapshot is reused by Main Projections without another API call.")
 if st.button("💳 LOAD STRIKEOUT LINES · PAID API", use_container_width=True, key="daily_paid_k_odds"):
     api_key=resolve_api_key(st.secrets)
@@ -327,7 +341,8 @@ if st.button("💳 LOAD STRIKEOUT LINES · PAID API", use_container_width=True, 
         if quota:
             st.caption(f"Last paid request: {quota.get('last','—')} credit(s) · {quota.get('remaining','—')} remaining · {quota.get('used','—')} used.")
 
-st.markdown('<div class="daily-kicker">Projection capture</div>', unsafe_allow_html=True)
+st.markdown('<div class="daily-section-head">Projection Capture</div>', unsafe_allow_html=True)
+st.markdown('<div class="daily-action-label">⚾ Run the full starter slate</div><div class="daily-action-copy">Primary daily action · capture new eligible starters, preserve frozen snapshots, and refresh only allowed pregame context.</div>', unsafe_allow_html=True)
 if st.button("⚾ RUN ALL TODAY'S PITCHERS", type="primary", use_container_width=True):
     with st.spinner("Simulating every announced starter and writing pregame snapshots..."):
         try:
@@ -343,7 +358,7 @@ if st.button("⚾ RUN ALL TODAY'S PITCHERS", type="primary", use_container_width
     st.session_state["daily_history_only"] = history_only
     st.session_state["daily_errors"] = errors
 
-st.markdown('<div class="daily-kicker">Slate output</div>', unsafe_allow_html=True)
+st.markdown('<div class="daily-section-head">Slate Output</div>', unsafe_allow_html=True)
 slate = st.session_state.get("daily_slate")
 if isinstance(slate, pd.DataFrame):
     added = int(st.session_state.get("daily_added", 0))
@@ -530,8 +545,7 @@ if isinstance(slate, pd.DataFrame):
         for error in errors:
             st.write(f"- {error}")
 
-st.divider()
-st.subheader("📚 Persistent history-only starter tracker")
+st.markdown('<div class="daily-section-head">Persistent History-Only Tracker</div>', unsafe_allow_html=True)
 st.caption(
     "These rows live in starter_observation_log.csv, separate from projection_log.csv. "
     "They are real starter observations collected specifically for pitchers who could not yet receive a legitimate projection."
@@ -573,8 +587,7 @@ else:
         "It never becomes a fake historical projection or calibration row."
     )
 
-st.divider()
-st.subheader("Resolve completed games")
+st.markdown('<div class="daily-section-head">Resolve Completed Games</div>', unsafe_allow_html=True)
 if st.button("Resolve completed projection outcomes"):
     frame = load_log()
     updated = 0
