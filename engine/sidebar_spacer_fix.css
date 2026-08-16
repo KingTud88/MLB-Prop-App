@@ -1,0 +1,4 @@
+/* Hide Streamlit's empty no-logo spacer while preserving the sidebar collapse control. */
+[data-testid="stLogoSpacer"] {
+    display: none !important;
+}
