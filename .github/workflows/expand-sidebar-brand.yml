@@ -1,4 +1,4 @@
-name: Starter Slate Manual Line Highlight
+name: Projection History Command UI
 
 on:
   push:
@@ -16,22 +16,25 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Highlight manual sportsbook lines
+      - name: Keep manual line highlight applied
         run: python tools/highlight_manual_lines.py
 
+      - name: Rebuild Projection History command UI
+        run: python tools/patch_projection_history_command.py
+
       - name: Validate Python syntax
-        run: python -m py_compile pages/5_Daily_Projection_Run.py
+        run: python -m py_compile pages/4_Projection_History.py pages/5_Daily_Projection_Run.py
 
       - name: Commit safely
         run: |
-          if git diff --quiet -- pages/5_Daily_Projection_Run.py; then
-            echo "Manual-line highlight already present"
+          if git diff --quiet -- pages/4_Projection_History.py pages/5_Daily_Projection_Run.py; then
+            echo "Projection History command UI already present"
             exit 0
           fi
           git config user.name "KingTud88"
           git config user.email "jaxson0603@gmail.com"
-          git add pages/5_Daily_Projection_Run.py
-          git commit -m "Highlight manual sportsbook lines in starter slate"
+          git add pages/4_Projection_History.py pages/5_Daily_Projection_Run.py
+          git commit -m "Rebuild Projection History command UI"
           for attempt in 1 2 3 4; do
             git fetch origin main
             git rebase origin/main || { git rebase --abort || true; sleep 2; continue; }
@@ -40,5 +43,5 @@ jobs:
             fi
             sleep $((attempt * 2))
           done
-          echo "Could not push manual-line highlight after retries"
+          echo "Could not push Projection History command UI after retries"
           exit 1
