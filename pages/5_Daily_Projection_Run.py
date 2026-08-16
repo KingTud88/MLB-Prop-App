@@ -62,6 +62,11 @@ st.markdown(
     [data-testid="stMetricValue"]{font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif!important;color:#fff!important;font-size:1.65rem!important;font-weight:900!important}
     div[data-testid="stDataFrame"]{border:1px solid rgba(77,108,137,.62);border-radius:14px;overflow:hidden;box-shadow:0 12px 28px rgba(0,0,0,.20)}
     div[data-testid="stButton"] button[kind="primary"]{min-height:48px!important;border:1px solid #ff4560!important;background:linear-gradient(180deg,#f31b3d,#bc0d2b)!important;font-weight:900!important;letter-spacing:.035em!important;text-transform:uppercase!important}
+    .daily-run-status{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:.1rem 0 .75rem;padding:.72rem .85rem;border-radius:12px;background:rgba(7,28,49,.86);border:1px solid rgba(69,102,132,.68)}
+    .daily-run-status.ok{border-color:rgba(50,229,141,.55)}
+    .daily-run-status.error{border-color:rgba(255,71,98,.60)}
+    .daily-run-status .main{color:#f5f8fb;font:900 .92rem/1.2 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+    .daily-run-status .meta{color:#aebfd0;font:700 .76rem/1.25 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;text-align:right}
     @media (max-width:900px) { .daily-hero { padding:.78rem .85rem; } .daily-kicker { margin-top:1rem; } }
     </style>
     """,
@@ -357,6 +362,7 @@ if st.button("⚾ RUN ALL TODAY'S PITCHERS", type="primary", use_container_width
     st.session_state["daily_skipped"] = skipped
     st.session_state["daily_history_only"] = history_only
     st.session_state["daily_errors"] = errors
+    st.session_state["daily_run_at"] = datetime.now(EASTERN).strftime("%b %d, %Y · %I:%M:%S %p ET")
 
 st.markdown('<div class="daily-section-head">Slate Output</div>', unsafe_allow_html=True)
 slate = st.session_state.get("daily_slate")
@@ -365,6 +371,14 @@ if isinstance(slate, pd.DataFrame):
     skipped = int(st.session_state.get("daily_skipped", 0))
     history_only = list(st.session_state.get("daily_history_only", []))
     errors = list(st.session_state.get("daily_errors", []))
+    # DAILY_RUN_STATUS_V1
+    run_at = str(st.session_state.get("daily_run_at", "Run timestamp unavailable"))
+    status_class = "error" if errors else "ok"
+    status_text = "Completed with capture errors" if errors else "Slate capture complete"
+    st.markdown(
+        f'<div class="daily-run-status {status_class}"><div class="main">{status_text}</div><div class="meta">{slate_date:%b %d, %Y} · {run_at}</div></div>',
+        unsafe_allow_html=True,
+    )
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     c1.metric("Projected starters", len(slate))
     c2.metric("New snapshots", added)
