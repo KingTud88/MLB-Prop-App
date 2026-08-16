@@ -154,7 +154,7 @@ h1,h2,h3{letter-spacing:-.02em}
     border:0!important;border-radius:0!important;background-color:transparent!important;
     background-repeat:no-repeat!important;background-position:center!important;background-size:contain!important;
     box-shadow:none!important;overflow:visible!important;
-    filter:drop-shadow(0 4px 8px rgba(0,0,0,.32)) drop-shadow(0 0 6px rgba(236,22,56,.22))!important;
+    filter:drop-shadow(0 3px 5px rgba(0,0,0,.28)) drop-shadow(0 0 3px rgba(236,22,56,.16))!important;
 }
 .cc-card-icon.cc-emblem::before,.cc-card-icon.cc-emblem::after{display:none!important;content:none!important}
 .metric-card .cc-emblem.whiff{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_k.webp?v=6")!important}
@@ -167,6 +167,10 @@ h1,h2,h3{letter-spacing:-.02em}
 
 /* PROJECTION_BADGE_POLISH_V6 · larger, tighter cleaned artwork only */
 .cc-card-top{gap:.72rem!important}
+
+/* PROJECTION_BADGE_POLISH_V7 · tighter fill + reduced blur */
+.cc-card-icon.cc-emblem{background-size:72px 72px!important}
+@media (max-width:900px){.cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{background-size:64px 64px!important}}
 </style>""", unsafe_allow_html=True)
 
 @dataclass(frozen=True)
