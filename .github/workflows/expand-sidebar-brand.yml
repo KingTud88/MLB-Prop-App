@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Scale visible mascot artwork
+      - name: Apply sidebar brand mockup treatment
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -21,23 +21,24 @@ jobs:
           p = Path('navigation.py')
           s = p.read_text()
           changes = [
-              ('width: 276px !important;', 'width: 252px !important;'),
-              ('min-width: 276px !important;', 'min-width: 252px !important;'),
-              ('[data-testid="stSidebar"] > div:first-child { width:276px !important; }', '[data-testid="stSidebar"] > div:first-child { width:252px !important; }'),
-              ('height:248px;', 'height:226px;'),
-              ('margin:-.45rem 0 -.42rem;', 'margin:-.52rem 0 -.55rem;'),
-              ('filter: drop-shadow(0 9px 18px rgba(0,0,0,.3));', 'filter: drop-shadow(0 9px 18px rgba(0,0,0,.3));\n            transform:scale(1.42);\n            transform-origin:50% 50%;'),
+              ('height:226px;', 'height:232px;'),
+              ('margin:-.52rem 0 -.55rem;', 'margin:-.72rem 0 -.95rem;'),
+              ('transform:scale(1.42);', 'transform:scale(2.15) translateY(1%);'),
+              ('font-size:2.05rem;', 'font-size:2.18rem;'),
+              ('line-height:.86;', 'line-height:.82;'),
+              ('.sk-nav-title span { color:#ff3655; font-size:2.28rem; letter-spacing:.045em; white-space:nowrap; }', '.sk-nav-title span { color:#ff2848; font-size:2.28rem; letter-spacing:.035em; white-space:nowrap; }\n        .sk-nav-title::after {\n            content:"✦";\n            display:block;\n            width:88%;\n            margin:.58rem auto .05rem;\n            border-top:2px solid rgba(236,22,56,.88);\n            color:#ff2848;\n            font-family:Arial,sans-serif;\n            font-size:.58rem;\n            line-height:0;\n            text-shadow:0 0 8px rgba(236,22,56,.7);\n        }'),
+              ('font-size:.72rem;', 'font-size:.75rem;'),
+              ('margin:.42rem .35rem .02rem;', 'margin:.38rem .28rem 0;'),
+              ('margin:.58rem .95rem .38rem;', 'margin:.42rem .95rem .3rem;'),
+              ('st.markdown(\'<div class="sk-nav-sub">CLEVELAND NIGHT MODE · MLB STARTER INTELLIGENCE</div>\', unsafe_allow_html=True)', 'st.markdown(\'<div class="sk-nav-sub">CLEVELAND NIGHT MODE · MLB<br>STARTER INTELLIGENCE</div>\', unsafe_allow_html=True)'),
           ]
           changed = False
           for old, new in changes:
               if old in s:
                   s = s.replace(old, new, 1)
                   changed = True
-          if 'height:226px;' in s and 'overflow:hidden;' not in s[s.find('.sk-nav-mascot {'):s.find('.sk-nav-mascot img {')]:
-              s = s.replace('            position: relative;\n        }\n        .sk-nav-mascot img {', '            position: relative;\n            overflow:hidden;\n        }\n        .sk-nav-mascot img {', 1)
-              changed = True
           if not changed:
-              raise SystemExit('Expected sidebar mascot values were not found')
+              raise SystemExit('Expected sidebar brand values were not found')
           p.write_text(s)
           PY
       - name: Commit patch
@@ -49,5 +50,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add navigation.py
-          git commit -m "Scale mascot artwork inside sidebar"
+          git commit -m "Apply sidebar brand mockup treatment"
           git push
