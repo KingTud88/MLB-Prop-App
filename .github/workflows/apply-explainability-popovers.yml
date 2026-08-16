@@ -1,0 +1,249 @@
+name: Apply app-wide explainability popovers
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/apply-explainability-popovers.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: explainability-popovers-v1
+  cancel-in-progress: false
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt pytest
+
+      - name: Attach explainability system to every page
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def rep(path, old, new, count=1):
+              p=Path(path); text=p.read_text(encoding="utf-8")
+              if old not in text:
+                  raise SystemExit(f"target missing in {path}: {old[:120]!r}")
+              p.write_text(text.replace(old,new,count),encoding="utf-8")
+
+          def add_import_and_theme(path, consistency_call=None):
+              p=Path(path); text=p.read_text(encoding="utf-8")
+              if "from engine.explainability_ui import" not in text:
+                  anchor="from engine.ui_theme import apply_page_theme\n"
+                  block=(
+                      anchor+
+                      "from engine.explainability_ui import (\n"
+                      "    Explanation, apply_explainability_theme, explain_popover, leg_explanation,\n"
+                      "    projection_metric_explanation, recommendation_explanation, static_explanation,\n"
+                      "    ticket_explanation, top_play_explanation, weather_explanation,\n"
+                      ")\n"
+                  )
+                  if anchor not in text: raise SystemExit(f"theme import missing in {path}")
+                  text=text.replace(anchor,block,1)
+              if "apply_explainability_theme()" not in text:
+                  if consistency_call and consistency_call in text:
+                      text=text.replace(consistency_call,consistency_call+"\napply_explainability_theme()",1)
+                  elif "apply_command_center_theme()" in text:
+                      text=text.replace("apply_command_center_theme()","apply_command_center_theme()\napply_explainability_theme()",1)
+                  else:
+                      text=text.replace("apply_page_theme()","apply_page_theme()\napply_explainability_theme()",1)
+              p.write_text(text,encoding="utf-8")
+
+          # ------------------------------------------------------------------
+          # Main Projection + embedded Distribution/Form/Model Card pages.
+          # ------------------------------------------------------------------
+          add_import_and_theme("streamlit_app.py")
+          rep(
+              "streamlit_app.py",
+              '    with a: st.markdown("### Strikeout probability distribution"); st.bar_chart(pd.DataFrame({"Probability":proj.k_probs},index=np.arange(len(proj.k_probs))))\n    with b: st.markdown("### Outs probability distribution"); st.bar_chart(pd.DataFrame({"Probability":proj.outs_probs},index=np.arange(len(proj.outs_probs))))',
+              '    with a:\n        st.markdown("### Strikeout probability distribution")\n        st.bar_chart(pd.DataFrame({"Probability":proj.k_probs},index=np.arange(len(proj.k_probs))))\n        explain_popover(static_explanation("distribution_k"),label="ⓘ EXPLAIN K DISTRIBUTION")\n    with b:\n        st.markdown("### Outs probability distribution")\n        st.bar_chart(pd.DataFrame({"Probability":proj.outs_probs},index=np.arange(len(proj.outs_probs))))\n        explain_popover(static_explanation("distribution_outs"),label="ⓘ EXPLAIN OUTS DISTRIBUTION")'
+          )
+          rep("streamlit_app.py", '    w6.metric("Recent leash",workload_ctx.leash_label)\n', '    w6.metric("Recent leash",workload_ctx.leash_label)\n    explain_popover(static_explanation("workload_primary"),label="ⓘ EXPLAIN WORKLOAD BLOCK")\n')
+          rep("streamlit_app.py", '    r5.metric("Candidate outs",f"{role_workload_decision.candidate.expected_outs:.1f}")\n', '    r5.metric("Candidate outs",f"{role_workload_decision.candidate.expected_outs:.1f}")\n    explain_popover(static_explanation("role_shadow"),label="ⓘ EXPLAIN ROLE SHADOW")\n')
+          rep("streamlit_app.py", '    t6.metric("Team leash",team_leash_ctx.label)\n', '    t6.metric("Team leash",team_leash_ctx.label)\n    explain_popover(static_explanation("team_leash"),label="ⓘ EXPLAIN TEAM LEASH")\n')
+          rep("streamlit_app.py", '    d=log.tail(15).copy(); st.line_chart(d.set_index("date")[["pitches","bf","outs","k"]]); st.dataframe(d.sort_values("date",ascending=False),use_container_width=True,hide_index=True); st.stop()', '    d=log.tail(15).copy(); st.line_chart(d.set_index("date")[["pitches","bf","outs","k"]]); st.dataframe(d.sort_values("date",ascending=False),use_container_width=True,hide_index=True); explain_popover(static_explanation("form_history"),label="ⓘ EXPLAIN RECENT STARTS"); st.stop()')
+          rep("streamlit_app.py", 'st.dataframe(path_df,use_container_width=True,hide_index=True); model_view=', 'st.dataframe(path_df,use_container_width=True,hide_index=True); explain_popover(static_explanation("model_paths"),label="ⓘ EXPLAIN MODEL PATHS"); model_view=')
+          rep("streamlit_app.py", 'st.dataframe(model_view,use_container_width=True,hide_index=True); st.markdown("### Calibration diagnostics")', 'st.dataframe(model_view,use_container_width=True,hide_index=True); explain_popover(static_explanation("model_ladder"),label="ⓘ EXPLAIN MILESTONE TABLE"); st.markdown("### Calibration diagnostics")')
+          rep("streamlit_app.py", 'render_calibration_dashboard(); st.dataframe(calibration_summary(load_projection_history()),use_container_width=True,hide_index=True); render_ml_shadow_dashboard(game); st.stop()', 'render_calibration_dashboard(); st.dataframe(calibration_summary(load_projection_history()),use_container_width=True,hide_index=True); explain_popover(static_explanation("calibration"),label="ⓘ EXPLAIN CALIBRATION"); render_ml_shadow_dashboard(game); explain_popover(static_explanation("ml_shadow"),label="ⓘ EXPLAIN ML SHADOW"); st.stop()')
+
+          rep("streamlit_app.py", 'st.caption("Manual Daily Run lines appear in orange; a saved paid K snapshot appears with its source label. No active line means the projection still shows, but the app will not manufacture a bet lean. Execution lines never alter the baseball projection.")', 'explain_popover(static_explanation("active_lines"),label="ⓘ EXPLAIN ACTIVE LINES")\nst.caption("Manual Daily Run lines appear in orange; a saved paid K snapshot appears with its source label. No active line means the projection still shows, but the app will not manufacture a bet lean. Execution lines never alter the baseball projection.")')
+
+          rep("streamlit_app.py", 'with c1: st.markdown(f\'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon cc-emblem whiff" aria-hidden="true"></div><div class="metric-label">PROJECTED STRIKEOUTS</div></div><div class="metric-value">{proj.mean_k:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(proj.k_samples,.1))}-{int(np.quantile(proj.k_samples,.9))}</span>{alt_k_html}</div>\',unsafe_allow_html=True)', 'with c1:\n    st.markdown(f\'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon cc-emblem whiff" aria-hidden="true"></div><div class="metric-label">PROJECTED STRIKEOUTS</div></div><div class="metric-value">{proj.mean_k:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(proj.k_samples,.1))}-{int(np.quantile(proj.k_samples,.9))}</span>{alt_k_html}</div>\',unsafe_allow_html=True)\n    explain_popover(projection_metric_explanation("Strikeouts",proj.mean_k,int(np.quantile(proj.k_samples,.1)),int(np.quantile(proj.k_samples,.9)),extra=(f"Best supported alt K: {alt_k_choice.milestone}+ at {alt_k_choice.probability:.0%}" if alt_k_choice else "No 70%+ alt K milestone",)),label="ⓘ WHY THIS K PROJECTION?")')
+          rep("streamlit_app.py", 'render_reco(c2,k_reco)\n', 'render_reco(c2,k_reco)\nwith c2:\n    explain_popover(recommendation_explanation(k_reco,"Strikeouts"),label="ⓘ WHY THIS K DECISION?")\n',1)
+          rep("streamlit_app.py", 'with c3: st.markdown(f\'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon cc-emblem glove" aria-hidden="true"></div><div class="metric-label">PROJECTED OUTS</div></div><div class="metric-value">{proj.mean_outs:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(proj.outs_samples,.1))}-{int(np.quantile(proj.outs_samples,.9))}</span></div>\',unsafe_allow_html=True)', 'with c3:\n    st.markdown(f\'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon cc-emblem glove" aria-hidden="true"></div><div class="metric-label">PROJECTED OUTS</div></div><div class="metric-value">{proj.mean_outs:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(proj.outs_samples,.1))}-{int(np.quantile(proj.outs_samples,.9))}</span></div>\',unsafe_allow_html=True)\n    explain_popover(projection_metric_explanation("Total Outs",proj.mean_outs,int(np.quantile(proj.outs_samples,.1)),int(np.quantile(proj.outs_samples,.9))),label="ⓘ WHY THIS OUTS PROJECTION?")')
+          rep("streamlit_app.py", 'render_reco(c4,out_reco)\n', 'render_reco(c4,out_reco)\nwith c4:\n    explain_popover(recommendation_explanation(out_reco,"Total Outs"),label="ⓘ WHY THIS OUTS DECISION?")\n',1)
+          rep("streamlit_app.py", 'with h1: st.markdown(f\'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon cc-emblem contact" aria-hidden="true"></div><div class="metric-label">PROJECTED HITS ALLOWED</div></div><div class="metric-value">{hits_proj.ensemble_mean:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(hits_proj.simulation_samples,.1))}-{int(np.quantile(hits_proj.simulation_samples,.9))}</span></div>\',unsafe_allow_html=True)', 'with h1:\n    st.markdown(f\'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon cc-emblem contact" aria-hidden="true"></div><div class="metric-label">PROJECTED HITS ALLOWED</div></div><div class="metric-value">{hits_proj.ensemble_mean:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(hits_proj.simulation_samples,.1))}-{int(np.quantile(hits_proj.simulation_samples,.9))}</span></div>\',unsafe_allow_html=True)\n    explain_popover(projection_metric_explanation("Hits Allowed",hits_proj.ensemble_mean,int(np.quantile(hits_proj.simulation_samples,.1)),int(np.quantile(hits_proj.simulation_samples,.9))),label="ⓘ WHY THIS HITS PROJECTION?")')
+          rep("streamlit_app.py", 'render_reco(h2,hit_reco)\n', 'render_reco(h2,hit_reco)\nwith h2:\n    explain_popover(recommendation_explanation(hit_reco,"Hits Allowed"),label="ⓘ WHY THIS HITS DECISION?")\n',1)
+          rep("streamlit_app.py", '        unsafe_allow_html=True,\n    )\n\nst.markdown(\'<div class="section-head">OPPOSING BATTER BOX</div>\'', '        unsafe_allow_html=True,\n    )\n    explain_popover(weather_explanation(level=weather_risk.level,precip_probability=weather_risk.precip_probability,precipitation_mm=weather_risk.precipitation_mm,summary=weather_risk.summary),label="ⓘ WHY THIS WEATHER STATUS?")\n\nst.markdown(\'<div class="section-head">OPPOSING BATTER BOX</div>\'',1)
+          rep("streamlit_app.py", '    b5.metric("ELEVATED K hitters",int(opponent_matchup["elevated"]))\n', '    b5.metric("ELEVATED K hitters",int(opponent_matchup["elevated"]))\n    explain_popover(static_explanation("opposing_batters"),label="ⓘ EXPLAIN BATTER MATCHUP")\n')
+          rep("streamlit_app.py", 'action_panel.caption("Quick-add uses the real active line shown above. A sportsbook price may remain unpriced, but the app will not quick-add a fabricated/default market line.")\n', 'action_panel.caption("Quick-add uses the real active line shown above. A sportsbook price may remain unpriced, but the app will not quick-add a fabricated/default market line.")\nwith action_panel:\n    explain_popover(static_explanation("projection_actions"),label="ⓘ EXPLAIN BET ACTIONS")\n')
+
+          # ------------------------------------------------------------------
+          # Bet Tracker.
+          # ------------------------------------------------------------------
+          add_import_and_theme("pages/2_Bet_Tracker.py", 'apply_command_center_consistency("bet_tracker")')
+          rep("pages/2_Bet_Tracker.py", 'with st.expander("➕ Add a bet", expanded=False):\n', 'with st.expander("➕ Add a bet", expanded=False):\n    explain_popover(Explanation("Add a tracked bet","This form saves a sportsbook or model ticket into the persistent Bet Tracker ledger.","The selected pitcher/market supplies identifying information; side, line, odds, stake and book are saved exactly as entered. A frozen projection is attached when available.",note="Manual bet entry is tracking-only and never feeds the projection model."),label="ⓘ EXPLAIN BET ENTRY")\n')
+          rep("pages/2_Bet_Tracker.py", 'm5.metric("ROI", f"{roi:+.1%}" if roi is not None else "—")\n', 'm5.metric("ROI", f"{roi:+.1%}" if roi is not None else "—")\nexplain_popover(static_explanation("tracker_summary"),label="ⓘ EXPLAIN TRACKER SUMMARY")\n')
+          rep("pages/2_Bet_Tracker.py", '        st.markdown(\n            f\'<div class="bt-ticket-state {state_class}"><div class="name">{ticket_pitcher} · {ticket_market}</div><div class="status">{ticket_result}</div></div>\',\n            unsafe_allow_html=True,\n        )\n', '        st.markdown(\n            f\'<div class="bt-ticket-state {state_class}"><div class="name">{ticket_pitcher} · {ticket_market}</div><div class="status">{ticket_result}</div></div>\',\n            unsafe_allow_html=True,\n        )\n        explain_popover(ticket_explanation(ticket),label="ⓘ WHY THIS TICKET STATUS?")\n')
+          rep("pages/2_Bet_Tracker.py", '            st.caption(f"{_ticket_icon(leg_result)} {leg_result} · {status} · {progress_text}")\n', '            st.caption(f"{_ticket_icon(leg_result)} {leg_result} · {status} · {progress_text}")\n            explain_popover(leg_explanation(leg),label="ⓘ EXPLAIN THIS LEG")\n')
+
+          # ------------------------------------------------------------------
+          # Daily Projection Run.
+          # ------------------------------------------------------------------
+          add_import_and_theme("pages/5_Daily_Projection_Run.py", 'apply_command_center_consistency("daily_run")')
+          rep("pages/5_Daily_Projection_Run.py", 'slate_date = st.date_input("Slate date", value=today)\n', 'slate_date = st.date_input("Slate date", value=today)\nexplain_popover(Explanation("Slate date","This selects which MLB starter slate Daily Projection Run will capture, inspect or resolve.","The date scopes MLB schedule lookup, frozen projection rows, manual line overlays and result resolution. It does not change model formulas."),label="ⓘ EXPLAIN SLATE CONTROL")\n')
+          rep("pages/5_Daily_Projection_Run.py", 'st.markdown(\'<div class="daily-action-label">⚾ Run the full starter slate</div><div class="daily-action-copy">Primary daily action · capture new eligible starters, preserve frozen snapshots, and refresh only allowed pregame context.</div>\', unsafe_allow_html=True)\n', 'st.markdown(\'<div class="daily-action-label">⚾ Run the full starter slate</div><div class="daily-action-copy">Primary daily action · capture new eligible starters, preserve frozen snapshots, and refresh only allowed pregame context.</div>\', unsafe_allow_html=True)\nexplain_popover(static_explanation("daily_capture"),label="ⓘ EXPLAIN PROJECTION CAPTURE")\n')
+          rep("pages/5_Daily_Projection_Run.py", '    c6.metric("Confirmed lineups", confirmed_lineups)\n', '    c6.metric("Confirmed lineups", confirmed_lineups)\n    explain_popover(static_explanation("daily_status"),label="ⓘ EXPLAIN SLATE STATUS")\n')
+          rep("pages/5_Daily_Projection_Run.py", '        st.caption("Open each pitcher bar and enter the real sportsbook lines you want Top Plays to evaluate. Manual values override paid API lines. Half-lines such as 4.5, 15.5, and 5.5 are supported; a blank market is excluded from Top Plays unless a paid active line already exists. Saved manual lines reload automatically after an app restart.")\n', '        st.caption("Open each pitcher bar and enter the real sportsbook lines you want Top Plays to evaluate. Manual values override paid API lines. Half-lines such as 4.5, 15.5, and 5.5 are supported; a blank market is excluded from Top Plays unless a paid active line already exists. Saved manual lines reload automatically after an app restart.")\n        explain_popover(static_explanation("manual_lines"),label="ⓘ EXPLAIN MANUAL LINES")\n')
+          # Primary slate table: attach explainer immediately after the main dataframe call.
+          rep("pages/5_Daily_Projection_Run.py", '        st.dataframe(styled, hide_index=True, use_container_width=True)\n', '        st.dataframe(styled, hide_index=True, use_container_width=True)\n        explain_popover(static_explanation("daily_table"),label="ⓘ EXPLAIN DAILY TABLE")\n',1)
+          rep("pages/5_Daily_Projection_Run.py", 'quota_note.caption(\n    "Saved from the response headers of the last paid pull"\n    + (f" · checked {checked_at}" if checked_at else " · no paid pull recorded yet")\n    + ". This meter never calls the Odds API by itself."\n)\n', 'quota_note.caption(\n    "Saved from the response headers of the last paid pull"\n    + (f" · checked {checked_at}" if checked_at else " · no paid pull recorded yet")\n    + ". This meter never calls the Odds API by itself."\n)\nexplain_popover(static_explanation("odds_credits"),label="ⓘ EXPLAIN ODDS CREDITS")\n')
+          rep("pages/5_Daily_Projection_Run.py", 'st.markdown(\'<div class="daily-section-head">📚 Persistent history-only starter tracker</div>\', unsafe_allow_html=True)\n', 'st.markdown(\'<div class="daily-section-head">📚 Persistent history-only starter tracker</div>\', unsafe_allow_html=True)\nexplain_popover(Explanation("History-only starter tracker","This preserves real starter outcomes for pitchers who did not yet have enough legitimate history to receive a model projection.","The row is stored separately from projection history, then resolved with actual MLB starter statistics. Future starts may use it as fallback starter history, but it never becomes a fake historical projection or calibration row."),label="ⓘ EXPLAIN HISTORY-ONLY TRACKER")\n')
+          rep("pages/5_Daily_Projection_Run.py", 'st.markdown(\'<div class="daily-section-head">Resolve Completed Games</div>\', unsafe_allow_html=True)\n', 'st.markdown(\'<div class="daily-section-head">Resolve Completed Games</div>\', unsafe_allow_html=True)\nexplain_popover(Explanation("Resolve completed games","This attaches real final MLB pitcher outcomes to previously frozen projection and history-only rows.","The resolver looks up completed game pitching stats and fills actual strikeouts, hits allowed, outs, batters faced and pitches without changing any stored pregame prediction."),label="ⓘ EXPLAIN RESULT RESOLUTION")\n')
+
+          # ------------------------------------------------------------------
+          # Projection History.
+          # ------------------------------------------------------------------
+          add_import_and_theme("pages/4_Projection_History.py", 'apply_command_center_consistency("projection_history")')
+          rep("pages/4_Projection_History.py", 'st.markdown(\'<div class="history-primary-note">Every frozen daily projection slate appears here automatically. Your sportsbook lines are a durable execution overlay saved separately, so a reboot cannot remove the slate or detach previously saved manual lines.</div>\', unsafe_allow_html=True)\n', 'st.markdown(\'<div class="history-primary-note">Every frozen daily projection slate appears here automatically. Your sportsbook lines are a durable execution overlay saved separately, so a reboot cannot remove the slate or detach previously saved manual lines.</div>\', unsafe_allow_html=True)\nexplain_popover(static_explanation("history_archive"),label="ⓘ EXPLAIN PROJECTION ARCHIVE")\n')
+          rep("pages/4_Projection_History.py", '    a4.metric("Latest slate", latest_archive_date)\n', '    a4.metric("Latest slate", latest_archive_date)\n    explain_popover(static_explanation("history_archive"),label="ⓘ EXPLAIN ARCHIVE COUNTERS")\n')
+          rep("pages/4_Projection_History.py", 'st.caption("80% range HIT means the final result landed inside that market\'s frozen pregame interval. Range coverage is calibration evidence, not directional win/loss grading.")\n', 'st.caption("80% range HIT means the final result landed inside that market\'s frozen pregame interval. Range coverage is calibration evidence, not directional win/loss grading.")\nexplain_popover(Explanation("Evidence performance scoreboard","This block measures projection error and whether final results landed inside the frozen central 80% ranges.","Range hit rate counts resolved outcomes inside the saved 10th–90th percentile interval. MAE is the average absolute difference between frozen projection and final MLB result.",note="Range coverage is calibration evidence, not sportsbook win/loss grading."),label="ⓘ EXPLAIN EVIDENCE SCOREBOARD")\n')
+          rep("pages/4_Projection_History.py", '    kw4.metric("Consistent crushers", _crusher_count)\n', '    kw4.metric("Consistent crushers", _crusher_count)\n    explain_popover(Explanation("Bettable K Wins & Crushers","This block grades the model-supported whole-K milestone derived from each frozen strikeout projection and identifies pitchers who have repeatedly cleared those targets.","K Target is floor(Projected K) inside the supported 3+–12+ ladder. Crushers require the existing minimum resolved-call count, win-rate threshold and average margin above target.",note="This is descriptive model tracking. It does not retroactively change old projections or create a new live ranking rule."),label="ⓘ EXPLAIN K RESULTS")\n')
+          rep("pages/4_Projection_History.py", 'learn4.metric("O15.5 Outs calibration rows", f"{o155_obs}/30")\n', 'learn4.metric("O15.5 Outs calibration rows", f"{o155_obs}/30")\nexplain_popover(static_explanation("history_learning"),label="ⓘ EXPLAIN LEARNING STATUS")\n')
+          rep("pages/4_Projection_History.py", 'st.subheader("⚙️ Workload intelligence audit")\n', 'st.subheader("⚙️ Workload intelligence audit")\nexplain_popover(Explanation("Workload intelligence audit","This checks whether the pregame workload forecast is accurately estimating the pitch count, batters faced and outs opportunities that drive starter projections.","Frozen expected workload values are compared with later actual MLB BF/pitches/outs using compatible starter-only rows. The audit is separate from sportsbook results."),label="ⓘ EXPLAIN WORKLOAD AUDIT")\n')
+
+          # ------------------------------------------------------------------
+          # Top Plays.
+          # ------------------------------------------------------------------
+          add_import_and_theme("pages/6_Top_Plays.py", 'apply_command_center_consistency("top_plays")')
+          rep("pages/6_Top_Plays.py", 'c5.metric("Exact live prices found", f"{live_offers}/{len(plays)}")\n', 'c5.metric("Exact live prices found", f"{live_offers}/{len(plays)}")\nexplain_popover(static_explanation("top_summary"),label="ⓘ EXPLAIN TOP 5 SUMMARY")\n')
+          rep("pages/6_Top_Plays.py", '                unsafe_allow_html=True,\n            )\n            if live_offer:', '                unsafe_allow_html=True,\n            )\n            explain_popover(top_play_explanation(play_row),label=f"ⓘ WHY IS THIS #{rank}?")\n            if live_offer:',1)
+          rep("pages/6_Top_Plays.py", 'st.subheader("🎟️ Parlay Builder")\n', 'st.subheader("🎟️ Parlay Builder")\nexplain_popover(static_explanation("top_parlay"),label="ⓘ EXPLAIN PARLAY BUILDER")\n')
+          rep("pages/6_Top_Plays.py", 'st.subheader("🧪 Model diagnostics")\n', 'st.subheader("🧪 Model diagnostics")\nexplain_popover(static_explanation("top_diagnostics"),label="ⓘ EXPLAIN DIAGNOSTICS")\n')
+          PY
+
+      - name: Write explainability contracts
+        run: |
+          cat > tests/test_explainability_ui.py <<'PY'
+          from pathlib import Path
+
+          from engine.explainability_ui import (
+              EXPLAINABILITY_UI_VERSION,
+              recommendation_explanation,
+              static_explanation,
+              top_play_explanation,
+          )
+
+          ROOT = Path(__file__).resolve().parents[1]
+
+
+          def test_shared_explainability_is_attached_to_every_page():
+              files = [
+                  "streamlit_app.py",
+                  "pages/2_Bet_Tracker.py",
+                  "pages/4_Projection_History.py",
+                  "pages/5_Daily_Projection_Run.py",
+                  "pages/6_Top_Plays.py",
+              ]
+              for filename in files:
+                  source = (ROOT / filename).read_text(encoding="utf-8")
+                  assert "apply_explainability_theme()" in source
+                  assert "explain_popover(" in source
+              assert EXPLAINABILITY_UI_VERSION == "explainability-popovers-v1"
+
+
+          def test_projection_summary_has_metric_decision_and_weather_explainers():
+              source = (ROOT / "streamlit_app.py").read_text(encoding="utf-8")
+              assert source.count("projection_metric_explanation(") >= 3
+              assert source.count("recommendation_explanation(") >= 3
+              assert "weather_explanation(" in source
+              assert "static_explanation(\"opposing_batters\")" in source
+              assert "static_explanation(\"active_lines\")" in source
+
+
+          def test_secondary_pages_cover_dynamic_decision_blocks():
+              tracker = (ROOT / "pages/2_Bet_Tracker.py").read_text(encoding="utf-8")
+              daily = (ROOT / "pages/5_Daily_Projection_Run.py").read_text(encoding="utf-8")
+              history = (ROOT / "pages/4_Projection_History.py").read_text(encoding="utf-8")
+              top = (ROOT / "pages/6_Top_Plays.py").read_text(encoding="utf-8")
+              assert "ticket_explanation(ticket)" in tracker
+              assert "leg_explanation(leg)" in tracker
+              assert "static_explanation(\"manual_lines\")" in daily
+              assert "static_explanation(\"odds_credits\")" in daily
+              assert "static_explanation(\"history_archive\")" in history
+              assert "top_play_explanation(play_row)" in top
+              assert "static_explanation(\"top_parlay\")" in top
+
+
+          def test_no_line_explanation_refuses_synthetic_decision():
+              explanation = recommendation_explanation(
+                  {"side": "NO LINE", "line": None, "projection_mean": 4.8, "reason": "no_active_market_line"},
+                  "Strikeouts",
+              )
+              assert "refuses to manufacture" in explanation.decision
+              assert any("4.80" in item for item in explanation.current)
+
+
+          def test_top_play_explanation_uses_existing_action_gate():
+              explanation = top_play_explanation({
+                  "Rank": 1,
+                  "Pitcher": "Example",
+                  "Market": "Strikeouts",
+                  "Side": "OVER",
+                  "Line": 4.5,
+                  "Projection": 5.2,
+                  "Model Probability": 0.61,
+                  "Data Quality": 79,
+                  "Line Source": "MANUAL",
+                  "Decision Evidence": "SUPPORTED",
+              })
+              assert "at least 55%" in explanation.decision
+              assert "at least 60/100" in explanation.decision
+              assert static_explanation("ml_shadow").note
+          PY
+
+      - name: Syntax validation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for path in [
+              "engine/explainability_ui.py",
+              "streamlit_app.py",
+              "pages/2_Bet_Tracker.py",
+              "pages/4_Projection_History.py",
+              "pages/5_Daily_Projection_Run.py",
+              "pages/6_Top_Plays.py",
+              "tests/test_explainability_ui.py",
+          ]:
+              compile(Path(path).read_text(encoding="utf-8"),path,"exec")
+          print("syntax_ok")
+          PY
+
+      - name: Full regression suite
+        run: pytest -q
+
+      - name: Commit verified explainability rollout
+        run: |
+          rm -rf .pytest_cache
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add streamlit_app.py pages/2_Bet_Tracker.py pages/4_Projection_History.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py tests/test_explainability_ui.py
+          git diff --cached --check
+          git commit -m "Add app-wide explainability popovers"
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
