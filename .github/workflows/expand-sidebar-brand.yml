@@ -1,56 +1,131 @@
-name: Projection Badge Polish
+name: Projection Summary Layout
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  polish:
+  layout:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Sharpen Projection Summary badges
+      - name: Recompose Projection Summary cards
         run: |
           python - <<'PY'
           from pathlib import Path
+
           p = Path('streamlit_app.py')
           text = p.read_text(encoding='utf-8')
-          marker = 'PROJECTION_BADGE_POLISH_V7'
+          marker = 'PROJECTION_SUMMARY_LAYOUT_V8'
           if marker in text:
-              print('Projection badge sharpening already active')
+              print('Projection Summary V8 layout already active')
               raise SystemExit(0)
-          start = text.find('PROJECTION_ARTWORK_INDIVIDUAL_V5')
-          if start < 0:
-              raise SystemExit('Individual Projection artwork block not found')
-          end = text.find('</style>', start)
-          if end < 0:
-              raise SystemExit('Projection style close not found')
-          before, block, after = text[:start], text[start:end], text[end:]
-          old_filter = 'filter:drop-shadow(0 4px 8px rgba(0,0,0,.32)) drop-shadow(0 0 6px rgba(236,22,56,.22))!important;'
-          new_filter = 'filter:drop-shadow(0 3px 5px rgba(0,0,0,.28)) drop-shadow(0 0 3px rgba(236,22,56,.16))!important;'
-          block = block.replace(old_filter, new_filter)
-          block += '\n/* PROJECTION_BADGE_POLISH_V7 · tighter fill + reduced blur */\n.cc-card-icon.cc-emblem{background-size:72px 72px!important}\n@media (max-width:900px){.cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{background-size:64px 64px!important}}\n'
-          p.write_text(before + block + after, encoding='utf-8')
+
+          anchor = '''/* PROJECTION_BADGE_POLISH_V7 · tighter fill + reduced blur */
+          .cc-card-icon.cc-emblem{background-size:72px 72px!important}
+          @media (max-width:900px){.cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{background-size:64px 64px!important}}'''.replace('          ', '')
+          if anchor not in text:
+              raise SystemExit('Projection badge V7 anchor not found; refusing to change unrelated code')
+
+          override = r'''
+
+          /* PROJECTION_SUMMARY_LAYOUT_V8 · title top, value left, large emblem right */
+          .metric-card,.reco-card{
+              position:relative!important;
+              min-height:184px!important;
+              padding:16px 108px 16px 16px!important;
+              text-align:left!important;
+              overflow:hidden!important;
+          }
+          .metric-card .cc-card-top,.reco-card .cc-card-top{
+              display:block!important;
+              margin:0 0 .55rem!important;
+              min-height:1.3rem!important;
+          }
+          .metric-card .metric-label,.reco-card .reco-label{
+              display:block!important;
+              width:100%!important;
+              margin:0!important;
+              padding:0!important;
+              text-align:left!important;
+              white-space:normal!important;
+              position:relative!important;
+              z-index:2!important;
+          }
+          .metric-card .cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{
+              position:absolute!important;
+              right:14px!important;
+              top:50px!important;
+              width:88px!important;
+              height:88px!important;
+              min-width:88px!important;
+              flex:0 0 88px!important;
+              margin:0!important;
+              background-size:86px 86px!important;
+              background-position:center!important;
+              z-index:1!important;
+          }
+          .metric-card .metric-value{
+              margin:.05rem 0 .38rem!important;
+              text-align:left!important;
+              position:relative!important;
+              z-index:2!important;
+          }
+          .metric-card .badge,.metric-card .alt-k-badge{
+              margin-left:0!important;
+              margin-right:0!important;
+              position:relative!important;
+              z-index:2!important;
+          }
+          .reco-card .reco-side{
+              margin:.08rem 0 .30rem!important;
+              position:relative!important;
+              z-index:2!important;
+          }
+          .reco-card .reco-line,.reco-card .reco-meta{
+              text-align:left!important;
+              position:relative!important;
+              z-index:2!important;
+          }
+          @media (max-width:900px){
+              .metric-card,.reco-card{padding-right:92px!important;min-height:176px!important}
+              .metric-card .cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{
+                  right:10px!important;top:52px!important;width:76px!important;height:76px!important;min-width:76px!important;flex-basis:76px!important;background-size:74px 74px!important
+              }
+          }
+          @media (max-width:620px){
+              .metric-card,.reco-card{padding:14px 82px 14px 14px!important;min-height:166px!important}
+              .metric-card .cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{
+                  right:8px!important;top:50px!important;width:68px!important;height:68px!important;min-width:68px!important;flex-basis:68px!important;background-size:66px 66px!important
+              }
+          }
+          '''.replace('          ', '')
+
+          text = text.replace(anchor, anchor + override, 1)
+          p.write_text(text, encoding='utf-8')
+          print('Applied Projection Summary V8 presentation-only layout')
           PY
 
       - name: Validate Python syntax
         run: python -m py_compile streamlit_app.py
 
-      - name: Commit badge cleanup safely
+      - name: Commit layout safely
         run: |
           if git diff --quiet -- streamlit_app.py; then
-            echo "Badge cleanup already applied"
+            echo "Projection Summary layout already applied"
             exit 0
           fi
           git config user.name "KingTud88"
           git config user.email "jaxson0603@gmail.com"
           git add streamlit_app.py
-          git commit -m "Sharpen Projection Summary badges"
+          git commit -m "Recompose Projection Summary cards"
           for attempt in 1 2 3 4; do
             git fetch origin main
             git rebase origin/main || { git rebase --abort || true; sleep 2; continue; }
@@ -59,5 +134,5 @@ jobs:
             fi
             sleep $((attempt * 2))
           done
-          echo "Could not push badge cleanup after retries"
+          echo "Could not push Projection Summary layout after retries"
           exit 1
