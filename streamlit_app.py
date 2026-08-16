@@ -80,6 +80,52 @@ h1,h2,h3{letter-spacing:-.02em}
 .alt-k-badge{display:block;width:max-content;max-width:95%;margin:9px auto 0;background:#102d49;border:1px solid #2f6590;color:#dff3ff;border-radius:999px;padding:5px 11px;font-weight:900;font-size:.78rem;letter-spacing:.03em}
 .search-note{color:var(--muted);font-size:.82rem}
 .market-ok{color:#49efb0;font-weight:800}.market-empty{color:#8fa5b7}
+/* PROJECTION_EMBLEMS_V1 · icon-only presentation pass */
+/* Replace the Main Projection radio dots with compact command-center glyphs. */
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label{
+    position:relative!important;gap:.52rem!important;min-height:2.42rem!important;padding:.26rem .38rem!important;
+    border-radius:9px!important;transition:background .14s ease,border-color .14s ease,box-shadow .14s ease!important;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label>div:first-child{display:none!important}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label::before{
+    display:inline-flex;align-items:center;justify-content:center;width:1.72rem;height:1.72rem;flex:0 0 1.72rem;
+    border:1px solid rgba(236,22,56,.68);border-radius:7px;background:linear-gradient(145deg,#102b49,#061426);
+    color:#f6f8fb;font-family:Arial,sans-serif;font-size:1.02rem;font-weight:950;line-height:1;
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.025),0 4px 10px rgba(0,0,0,.25);text-shadow:0 0 8px rgba(236,22,56,.24);
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:has(input:checked)::before{
+    color:#fff;border-color:#ff3553;background:linear-gradient(145deg,#5b1124,#16152a);
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.04),0 0 13px rgba(236,22,56,.42);
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(1)::before{content:"⌖"}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(2)::before{content:"▥"}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(3)::before{content:"∿"}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(4)::before{content:"⌘"}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(5)::before{content:"▰"}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(6)::before{content:"◷"}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(7)::before{content:"ϟ"}
+[data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(8)::before{content:"♛"}
+
+/* Baseball emblems occupy the exact existing 48px card-icon slot. */
+.cc-card-icon.cc-emblem{position:relative;overflow:visible;font-size:0!important}
+.cc-card-icon.cc-emblem::before,.cc-card-icon.cc-emblem::after{position:absolute;display:block;pointer-events:none}
+/* K = bat passes above the ball: visible whiff gap. */
+.cc-card-icon.cc-emblem.whiff::before{
+    content:"";width:31px;height:7px;left:14px;top:13px;border-radius:7px 3px 3px 7px;
+    background:linear-gradient(90deg,#7a3b18,#d58a3f 64%,#f0b966);border:1px solid rgba(255,220,160,.32);
+    transform:rotate(-38deg);box-shadow:0 2px 6px rgba(0,0,0,.34),7px 7px 0 -5px rgba(255,255,255,.7);
+}
+.cc-card-icon.cc-emblem.whiff::after{content:"⚾";left:2px;bottom:2px;font-size:21px;line-height:1;filter:drop-shadow(0 3px 4px rgba(0,0,0,.35))}
+/* H = bat intersects the baseball; glow reads as contact/impact. */
+.cc-card-icon.cc-emblem.contact::before{
+    content:"";width:34px;height:8px;left:8px;top:21px;border-radius:8px 3px 3px 8px;
+    background:linear-gradient(90deg,#713416,#d88738 62%,#efb96a);border:1px solid rgba(255,220,160,.34);
+    transform:rotate(-34deg);box-shadow:0 2px 6px rgba(0,0,0,.34),0 0 9px rgba(255,159,28,.18);
+}
+.cc-card-icon.cc-emblem.contact::after{content:"⚾";right:2px;top:4px;font-size:22px;line-height:1;filter:drop-shadow(0 0 6px rgba(255,80,70,.62)) drop-shadow(0 3px 4px rgba(0,0,0,.35))}
+/* OUT = baseball seated in a glove. */
+.cc-card-icon.cc-emblem.glove::before{content:"🧤";left:5px;top:5px;font-size:31px;line-height:1;filter:drop-shadow(0 3px 4px rgba(0,0,0,.34))}
+.cc-card-icon.cc-emblem.glove::after{content:"⚾";right:3px;bottom:3px;font-size:17px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))}
 .active-market-line{padding:.72rem .78rem;border:1px solid #20425f;border-radius:12px;background:rgba(9,27,44,.94);text-align:center}.active-market-line .label{color:#9fb3c3;font-size:.72rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase}.active-market-line .value{margin-top:.18rem;color:#f2f6fa;font-size:1.5rem;font-weight:950}.active-market-line .source{margin-top:.14rem;color:#8fa5b7;font-size:.68rem;font-weight:850;letter-spacing:.04em}.active-market-line.manual{border-color:rgba(255,159,28,.66);background:rgba(255,159,28,.07)}.active-market-line.manual .value,.active-market-line.manual .source{color:#ff9f1c}.reco-line.manual-active{color:#ff9f1c;text-shadow:0 0 15px rgba(255,159,28,.18)}
 </style>""", unsafe_allow_html=True)
 
@@ -444,7 +490,7 @@ def render_reco(card,reco,*,key_prefix=None,market_key=None,proj=None,hits_proj=
                if key_prefix and market_key and proj is not None else dict(reco))
     side=effective["side"]
     cls="reco-warn" if side=="PASS" else "reco-under" if side=="UNDER" else "reco-good"
-    icon=("K+" if "STRIKEOUT" in str(effective.get("label","")) else "OUT" if "OUTS" in str(effective.get("label","")) else "H")
+    emblem_class=("whiff" if "STRIKEOUT" in str(effective.get("label","")) else "glove" if "OUTS" in str(effective.get("label","")) else "contact")
     reason_labels={
         "no_positive_aligned_edge":"EDGE BELOW 2%",
         "probability_conflicts_with_projection":"PROJECTION / PROBABILITY DISAGREE",
@@ -467,7 +513,7 @@ def render_reco(card,reco,*,key_prefix=None,market_key=None,proj=None,hits_proj=
     if active_source=="MANUAL":
         meta += " · MANUAL DAILY LINE"
     with card:
-        st.markdown(f'<div class="reco-card {cls}"><div class="cc-card-top"><div class="cc-card-icon">{icon}</div><div class="reco-label">{effective["label"]}</div></div><div class="reco-side {cls}">{side}</div><div class="{line_class}">{effective["line"]:g} LINE</div><div class="reco-meta">{meta}</div></div>',unsafe_allow_html=True)
+        st.markdown(f'<div class="reco-card {cls}"><div class="cc-card-top"><div class="cc-card-icon cc-emblem {emblem_class}" aria-hidden="true"></div><div class="reco-label">{effective["label"]}</div></div><div class="reco-side {cls}">{side}</div><div class="{line_class}">{effective["line"]:g} LINE</div><div class="reco-meta">{meta}</div></div>',unsafe_allow_html=True)
         if key_prefix and market_key and proj is not None:
             with st.expander("✍️ MANUAL LINE / ODDS", expanded=False):
                 enabled=st.checkbox("Use manual market",key=f"{key_prefix}:enabled")
@@ -792,12 +838,12 @@ st.markdown('<div class="section-head">PROJECTION SUMMARY</div>',unsafe_allow_ht
 alt_k_choice=best_alt_k([(int(str(row["Line"]).rstrip("+")),float(row["Probability"])) for _,row in kdf.iterrows()])
 alt_k_html=(f'<div class="alt-k-badge">BEST ALT K · {alt_k_choice.milestone}+ · {alt_k_choice.probability:.0%} HIT</div>' if alt_k_choice else '<div class="alt-k-badge">BEST ALT K · NO 70%+ ALT</div>')
 c1,c2,c3,c4=st.columns(4)
-with c1: st.markdown(f'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon">K</div><div class="metric-label">PROJECTED STRIKEOUTS</div></div><div class="metric-value">{proj.mean_k:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(proj.k_samples,.1))}-{int(np.quantile(proj.k_samples,.9))}</span>{alt_k_html}</div>',unsafe_allow_html=True)
+with c1: st.markdown(f'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon cc-emblem whiff" aria-hidden="true"></div><div class="metric-label">PROJECTED STRIKEOUTS</div></div><div class="metric-value">{proj.mean_k:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(proj.k_samples,.1))}-{int(np.quantile(proj.k_samples,.9))}</span>{alt_k_html}</div>',unsafe_allow_html=True)
 render_reco(c2,k_reco,key_prefix=f"manual_k:{game.key}",market_key="pitcher_strikeouts",proj=proj,hits_proj=hits_proj)
-with c3: st.markdown(f'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon ball">⚾</div><div class="metric-label">PROJECTED OUTS</div></div><div class="metric-value">{proj.mean_outs:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(proj.outs_samples,.1))}-{int(np.quantile(proj.outs_samples,.9))}</span></div>',unsafe_allow_html=True)
+with c3: st.markdown(f'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon cc-emblem glove" aria-hidden="true"></div><div class="metric-label">PROJECTED OUTS</div></div><div class="metric-value">{proj.mean_outs:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(proj.outs_samples,.1))}-{int(np.quantile(proj.outs_samples,.9))}</span></div>',unsafe_allow_html=True)
 render_reco(c4,out_reco,key_prefix=f"manual_outs:{game.key}",market_key="pitcher_outs",proj=proj,hits_proj=hits_proj)
 h1,h2=st.columns(2)
-with h1: st.markdown(f'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon hit">H</div><div class="metric-label">PROJECTED HITS ALLOWED</div></div><div class="metric-value">{hits_proj.ensemble_mean:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(hits_proj.simulation_samples,.1))}-{int(np.quantile(hits_proj.simulation_samples,.9))}</span></div>',unsafe_allow_html=True)
+with h1: st.markdown(f'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon cc-emblem contact" aria-hidden="true"></div><div class="metric-label">PROJECTED HITS ALLOWED</div></div><div class="metric-value">{hits_proj.ensemble_mean:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(hits_proj.simulation_samples,.1))}-{int(np.quantile(hits_proj.simulation_samples,.9))}</span></div>',unsafe_allow_html=True)
 render_reco(h2,hit_reco,key_prefix=f"manual_hits:{game.key}",market_key="pitcher_hits_allowed",proj=proj,hits_proj=hits_proj)
 
 st.markdown('<div class="section-head">OPPOSING BATTER BOX</div>',unsafe_allow_html=True)
