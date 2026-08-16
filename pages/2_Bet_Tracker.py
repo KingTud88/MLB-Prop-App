@@ -36,9 +36,48 @@ EASTERN = ZoneInfo("America/New_York")
 st.set_page_config(page_title="Bet Tracker", page_icon="📊", layout="wide")
 apply_page_theme()
 render_sidebar("bets")
-st.markdown("<style>.block-container{padding-top:3.25rem!important}</style>", unsafe_allow_html=True)
-st.title("📊 Bet Tracker")
-st.caption("Your saved pitcher bets — Strikeouts, Total Outs, and Hits Allowed — graded against live/final MLB pitching stats.")
+# BET_TRACKER_COMMAND_UI_V1
+st.markdown(
+    """
+    <style>
+    .block-container{max-width:1520px!important;padding-top:2.15rem!important;padding-bottom:4rem!important}
+    .bt-hero{position:relative;overflow:hidden;margin:.1rem 0 .7rem;padding:1rem 1.15rem 1.05rem;border:1px solid rgba(80,108,136,.76);border-radius:18px;background:linear-gradient(110deg,rgba(8,28,50,.98),rgba(5,20,37,.98));box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 18px 42px rgba(0,0,0,.3)}
+    .bt-hero:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(#ff3655,#a60c29)}
+    .bt-kicker{font:900 .7rem/1.2 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.12em;color:#ff6a7d;text-transform:uppercase}
+    .bt-title{margin:.22rem 0 .28rem;font-family:Impact,"Arial Black","Arial Narrow",sans-serif;font-size:clamp(2.6rem,5vw,4.7rem);line-height:.86;letter-spacing:.012em;color:#f5f1e9;text-transform:uppercase;text-shadow:3px 4px 0 #07182b}
+    .bt-title span{color:#ec1638;-webkit-text-stroke:1px #f1eee7;paint-order:stroke fill}
+    .bt-sub{max-width:1120px;color:#b6c6d5;font:650 .88rem/1.45 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+    .bt-rule{margin-top:.55rem;width:max-content;max-width:100%;padding:.25rem .58rem;border-top:1px solid rgba(236,22,56,.65);border-bottom:1px solid rgba(236,22,56,.65);color:#e6edf3;font:900 .67rem/1.2 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.09em;text-transform:uppercase}
+    [data-testid="stMetric"]{position:relative;overflow:hidden;min-height:112px;padding:.75rem .8rem!important;border:1px solid rgba(77,108,137,.72)!important;border-radius:14px!important;background:linear-gradient(145deg,rgba(9,31,55,.98),rgba(4,18,33,.98))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 12px 28px rgba(0,0,0,.25)!important}
+    [data-testid="stMetric"]:after{content:"";position:absolute;left:9%;right:9%;bottom:0;height:2px;background:linear-gradient(90deg,transparent,#ec1638,transparent);opacity:.72}
+    [data-testid="stMetricLabel"]{color:#dce7ef!important;font-size:.76rem!important;font-weight:850!important;letter-spacing:.025em!important;text-transform:uppercase!important}
+    [data-testid="stMetricValue"]{font-family:Impact,"Arial Narrow",sans-serif!important;color:#f7f3ec!important;font-size:2rem!important}
+    .bt-section{width:max-content;min-width:245px;max-width:92%;margin:1.15rem auto .65rem;padding:.45rem 1.7rem;border:1px solid #ff3151;border-bottom-color:#790b1d;border-radius:8px;background:linear-gradient(180deg,#f21b3d,#b70d29);box-shadow:0 7px 16px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.22);color:#fff;font:900 .92rem/1.15 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.035em;text-align:center;text-transform:uppercase}
+    div[data-testid="stExpander"]{margin:.58rem 0!important;border:1px solid rgba(77,106,135,.72)!important;border-radius:14px!important;background:linear-gradient(145deg,rgba(8,28,50,.97),rgba(4,17,31,.98))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 12px 28px rgba(0,0,0,.21)!important}
+    div[data-testid="stExpander"] summary{font-weight:900!important;color:#edf3f8!important}
+    div[data-testid="stExpander"]:has(.bt-ticket-state.win){border-color:rgba(50,229,141,.62)!important;box-shadow:0 0 0 1px rgba(50,229,141,.08),0 12px 30px rgba(0,0,0,.24)!important}
+    div[data-testid="stExpander"]:has(.bt-ticket-state.loss){border-color:rgba(255,71,98,.62)!important;box-shadow:0 0 0 1px rgba(255,71,98,.08),0 12px 30px rgba(0,0,0,.24)!important}
+    div[data-testid="stExpander"]:has(.bt-ticket-state.live){border-color:rgba(74,191,230,.72)!important;box-shadow:0 0 0 1px rgba(74,191,230,.09),0 14px 34px rgba(0,0,0,.27)!important}
+    div[data-testid="stExpander"]:has(.bt-ticket-state.pending){border-color:rgba(255,209,102,.58)!important}
+    .bt-ticket-state{display:flex;align-items:center;justify-content:space-between;gap:.8rem;margin:.1rem 0 .65rem;padding:.58rem .68rem;border-radius:10px;background:rgba(5,23,42,.72);border:1px solid rgba(66,99,130,.62)}
+    .bt-ticket-state .name{color:#f7f3ec;font:900 1.02rem/1.15 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+    .bt-ticket-state .status{white-space:nowrap;border-radius:999px;padding:.25rem .52rem;font:900 .65rem/1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.05em;text-transform:uppercase}
+    .bt-ticket-state.win .status{color:#58efad;border:1px solid rgba(50,229,141,.55);background:rgba(8,79,52,.38)}
+    .bt-ticket-state.loss .status{color:#ff7085;border:1px solid rgba(255,71,98,.55);background:rgba(125,13,36,.34)}
+    .bt-ticket-state.live .status{color:#8eddf4;border:1px solid rgba(74,191,230,.55);background:rgba(10,65,83,.38)}
+    .bt-ticket-state.pending .status{color:#ffe08a;border:1px solid rgba(255,209,102,.5);background:rgba(98,71,8,.28)}
+    div[data-testid="stProgress"]>div>div>div{background:#32e58d!important}
+    @media (max-width:760px){.block-container{padding-top:1rem!important}.bt-hero{padding:.8rem}.bt-title{font-size:2.7rem}.bt-section{min-width:180px;padding:.4rem 1rem;font-size:.82rem}.bt-ticket-state{align-items:flex-start;flex-direction:column}}
+    </style>
+    <div class="bt-hero">
+      <div class="bt-kicker">StrikeOut King 9000 · Wager Command Center</div>
+      <div class="bt-title">BET <span>TRACKER</span></div>
+      <div class="bt-sub">Open and live tickets stay first. Every saved pitcher prop is graded against MLB live/final pitching stats while sportsbook inputs remain recordkeeping-only.</div>
+      <div class="bt-rule">OPEN FIRST · LIVE PROGRESS · SETTLED P/L</div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 
 def _fresh_params(**kwargs):
@@ -570,6 +609,19 @@ with st.spinner("Checking saved bets against MLB pitching stats..."):
         })
 
 results = pd.DataFrame(resolved_rows)
+# BET_TRACKER_STATUS_ORDER_V1
+_status_priority = {
+    "LIVE AHEAD": 0,
+    "LIVE BEHIND": 0,
+    "PENDING": 1,
+    "WAITING": 1,
+    "WIN": 2,
+    "LOSS": 2,
+    "PUSH": 2,
+    "PUSH LEG": 2,
+}
+results["_StatusPriority"] = results["Result"].astype(str).str.upper().map(_status_priority).fillna(1).astype(int)
+results = results.sort_values(["_StatusPriority", "Date"], ascending=[True, False], kind="stable").reset_index(drop=True)
 wins = int((results["Result"] == "WIN").sum())
 losses = int((results["Result"] == "LOSS").sum())
 pushes = int(results["Result"].isin(["PUSH", "PUSH LEG"]).sum())
@@ -593,7 +645,7 @@ if stake_series.isna().any():
 if "american_odds" in tracker.columns and pd.to_numeric(tracker["american_odds"], errors="coerce").isna().any():
     st.caption("Unpriced model tickets are still graded WIN/LOSS from MLB results, but they stay excluded from P/L and ROI because no sportsbook price was assumed.")
 
-st.subheader("Tracked bets")
+st.markdown('<div class="bt-section">Tracked Tickets</div>', unsafe_allow_html=True)
 
 ticket_labels: dict[str, str] = {}
 for _, ticket in results.iterrows():
@@ -674,14 +726,26 @@ for ticket_index, (_, ticket) in enumerate(results.iterrows()):
     ticket_market = str(ticket.get("Market", ""))
     label = f"{_ticket_icon(ticket_result)} {ticket_date} · {ticket_pitcher} · {ticket_market} · {ticket_result}"
     with st.expander(label, expanded=ticket_result in {"LIVE AHEAD", "LIVE BEHIND"}):
-        h1, h2, h3, h4, h5 = st.columns(5)
+        # BET_TRACKER_POTENTIAL_WIN_V1
+        state_upper = ticket_result.upper()
+        state_class = "win" if state_upper == "WIN" else "loss" if state_upper == "LOSS" else "live" if state_upper.startswith("LIVE") else "pending"
+        st.markdown(
+            f'<div class="bt-ticket-state {state_class}"><div class="name">{ticket_pitcher} · {ticket_market}</div><div class="status">{ticket_result}</div></div>',
+            unsafe_allow_html=True,
+        )
+        h1, h2, h3, h4, h5, h6 = st.columns(6)
         h1.metric("Book", str(ticket.get("Book", "") or "—"))
         stake_value = _num(ticket.get("Stake"))
         h2.metric("Stake", "—" if stake_value is None else f"{stake_value:.2f}u")
+        odds_value = _num(str(ticket.get("Odds", "")).replace("+", ""))
         h3.metric("Odds", str(ticket.get("Odds", "—")))
+        potential_win = None
+        if stake_value is not None and odds_value not in (None, 0):
+            potential_win = stake_value * (odds_value / 100.0) if odds_value > 0 else stake_value * (100.0 / abs(odds_value))
+        h4.metric("Potential Win", "—" if potential_win is None else f"+{potential_win:.2f}u")
         profit_value = _num(ticket.get("Profit/Loss"))
-        h4.metric("P/L", "—" if profit_value is None else f"{profit_value:+.2f}u")
-        h5.metric("Ticket", ticket_result)
+        h5.metric("P/L", "—" if profit_value is None else f"{profit_value:+.2f}u")
+        h6.metric("Status", ticket_result)
 
         legs = ticket.get("_Legs", [])
         if not isinstance(legs, list) or not legs:
@@ -724,7 +788,7 @@ for ticket_index, (_, ticket) in enumerate(results.iterrows()):
 
 st.download_button(
     "Download bet tracker CSV",
-    results.drop(columns=["_BetKey"], errors="ignore").to_csv(index=False),
+    results.drop(columns=["_BetKey", "_StatusPriority"], errors="ignore").to_csv(index=False),
     file_name="bet_tracker.csv",
     mime="text/csv",
 )
