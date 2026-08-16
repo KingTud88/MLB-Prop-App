@@ -33,9 +33,90 @@ from training.bet_storage import append_bet
 st.set_page_config(page_title="Top Plays", page_icon="👑", layout="wide")
 apply_page_theme()
 render_sidebar("top")
-st.markdown("<style>.block-container{padding-top:3.25rem!important}</style>", unsafe_allow_html=True)
-st.title("👑 Top Plays")
-st.caption("The five pitcher-prop legs our calibrated projections rate most likely to hit across strikeouts, total outs, and hits allowed. Sportsbook lines/odds are execution info only and never rank the board or feed the forecast.")
+st.markdown(
+    """
+    <style>
+    .block-container{padding-top:2.15rem!important}
+
+    /* Reliable sidebar mascot fallback for this page; clean asset is known-good. */
+    [data-testid="stSidebar"] .sk-nav-mascot img{display:none!important}
+    [data-testid="stSidebar"] .sk-nav-mascot::before{
+        content:"";display:block;width:104px;height:104px;background:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000_clean.png") center/contain no-repeat;
+        filter:drop-shadow(0 8px 16px rgba(0,0,0,.3));
+    }
+
+    .tp-page-hero{
+        position:relative;overflow:hidden;margin:.1rem 0 .9rem;padding:1rem 1.2rem 1.05rem;border:1px solid rgba(80,108,136,.76);border-radius:18px;
+        background:linear-gradient(110deg,rgba(8,28,50,.98),rgba(5,20,37,.98));box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 18px 42px rgba(0,0,0,.3)
+    }
+    .tp-page-hero::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(#ff3655,#a60c29)}
+    .tp-page-kicker{font:900 .72rem/1.2 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.12em;color:#ff6a7d;text-transform:uppercase}
+    .tp-page-title{margin:.28rem 0 .3rem;font-family:Impact,"Arial Black","Arial Narrow",sans-serif;font-size:clamp(2.7rem,5vw,4.8rem);line-height:.86;letter-spacing:.012em;color:#f5f1e9;text-transform:uppercase;text-shadow:3px 4px 0 #07182b}
+    .tp-page-title span{color:#ec1638;-webkit-text-stroke:1px #f1eee7;paint-order:stroke fill}
+    .tp-page-sub{max-width:1120px;color:#b6c6d5;font:650 .9rem/1.5 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+    .tp-page-rule{margin-top:.65rem;width:max-content;max-width:100%;padding:.28rem .62rem;border-top:1px solid rgba(236,22,56,.65);border-bottom:1px solid rgba(236,22,56,.65);color:#e6edf3;font:900 .69rem/1.2 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.09em;text-transform:uppercase}
+
+    .tp-section-ribbon{width:max-content;min-width:245px;max-width:92%;margin:1.3rem auto .8rem;padding:.46rem 1.8rem;border:1px solid #ff3151;border-bottom-color:#790b1d;border-radius:8px;background:linear-gradient(180deg,#f21b3d,#b70d29);box-shadow:0 7px 16px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.22);color:#fff;font:900 .92rem/1.15 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.035em;text-align:center;text-transform:uppercase}
+
+    /* Explicit card containers: no DOM-key guessing required for their contents. */
+    [class*="st-key-top_play_card_"]{
+        position:relative;padding:.9rem!important;border:1px solid rgba(82,112,141,.78)!important;border-radius:16px!important;
+        background:linear-gradient(150deg,rgba(10,34,59,.99),rgba(4,18,33,.99))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.045),0 15px 34px rgba(0,0,0,.29)!important;overflow:hidden
+    }
+    [class*="st-key-top_play_card_"]::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:linear-gradient(90deg,transparent,#ec1638 18%,#ec1638 82%,transparent);box-shadow:0 0 14px rgba(236,22,56,.32)}
+    .st-key-top_play_card_1{border-color:rgba(255,73,98,.78)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.055),0 0 0 1px rgba(236,22,56,.12),0 20px 42px rgba(0,0,0,.34)!important}
+
+    .tp-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:.7rem;margin-bottom:.68rem}
+    .tp-rank-wrap{display:flex;align-items:center;gap:.62rem;min-width:0}
+    .tp-rank{display:flex;align-items:center;justify-content:center;width:42px;height:42px;flex:0 0 42px;border-radius:50%;border:2px solid rgba(236,22,56,.78);background:radial-gradient(circle at 35% 30%,#173e69,#07182b 66%);color:#fff;font:900 1rem/1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;box-shadow:0 8px 18px rgba(0,0,0,.26)}
+    .st-key-top_play_card_1 .tp-rank{width:48px;height:48px;flex-basis:48px;font-size:1.12rem;background:radial-gradient(circle at 35% 30%,#7d1730,#250815 70%)}
+    .tp-pitcher{color:#f7f3ec;font:900 1.16rem/1.12 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.002em;overflow-wrap:anywhere}
+    .st-key-top_play_card_1 .tp-pitcher{font-size:1.42rem}
+    .tp-matchup{margin-top:.15rem;color:#93a9bc;font:750 .76rem/1.3 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;text-transform:uppercase;letter-spacing:.025em}
+    .tp-status{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;border-radius:999px;padding:.23rem .52rem;font:900 .66rem/1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.05em;text-transform:uppercase}
+    .tp-status.model{border:1px solid rgba(50,229,141,.55);background:rgba(8,79,52,.38);color:#5cf0ae}
+    .tp-status.watch{border:1px solid rgba(255,209,102,.55);background:rgba(98,71,8,.34);color:#ffe08a}
+
+    .tp-market-row{display:flex;align-items:center;justify-content:space-between;gap:.55rem;margin:.2rem 0 .72rem;padding:.52rem .58rem;border:1px solid rgba(66,99,130,.68);border-radius:11px;background:rgba(5,23,42,.72)}
+    .tp-market{color:#dce6ee;font:850 .8rem/1.25 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;text-transform:uppercase;letter-spacing:.025em}
+    .tp-side{display:inline-flex;align-items:center;border-radius:8px;padding:.26rem .48rem;font:950 .78rem/1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.035em;white-space:nowrap}
+    .tp-side.over{color:#50f2aa;border:1px solid rgba(50,229,141,.55);background:rgba(12,91,61,.34)}
+    .tp-side.under{color:#ff6379;border:1px solid rgba(255,71,98,.58);background:rgba(125,13,36,.36)}
+    .tp-side.pass{color:#ffe08a;border:1px solid rgba(255,209,102,.55);background:rgba(111,82,15,.3)}
+
+    .tp-stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.45rem;margin-bottom:.62rem}
+    .tp-stat{min-height:70px;padding:.52rem .55rem;border:1px solid rgba(66,100,133,.68);border-radius:10px;background:linear-gradient(145deg,rgba(12,39,67,.94),rgba(6,23,41,.96));text-align:center}
+    .tp-stat-label{color:#91a8bb;font:850 .63rem/1.15 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.055em;text-transform:uppercase}
+    .tp-stat-value{margin-top:.28rem;color:#f7f3ec;font:950 1.42rem/1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+    .tp-stat-value.prob{color:#50f2aa}.tp-stat-value.quality{font-size:1.2rem}.tp-stat-value.tier{font-size:1.18rem}
+    .st-key-top_play_card_1 .tp-stat-value{font-size:1.62rem}
+    .tp-card-note{margin:.15rem 0 .58rem;color:#9fb3c6;font:650 .74rem/1.38 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+    .tp-card-note strong{color:#dfe8ef}
+
+    [class*="st-key-top_play_card_"] div[data-testid="stButton"] button{min-height:2.55rem!important;border-radius:9px!important;font-weight:900!important}
+    [class*="st-key-top_play_card_"] [data-testid="stCaptionContainer"]{font-size:.75rem!important;line-height:1.35!important}
+
+    /* Remove the old purple visual language everywhere on Top Plays. */
+    div[style*="#8b4fc7"],div[style*="93,48,128"],div[style*="139,79,199"]{border-color:rgba(70,105,139,.86)!important;background:linear-gradient(145deg,rgba(12,39,67,.98),rgba(6,23,41,.98))!important}
+    div[style*="#8b4fc7"] span,div[style*="139,79,199"] span{border-color:rgba(77,108,137,.72)!important}
+
+    @media (max-width:1050px){.tp-page-title{font-size:3.25rem}.tp-pitcher{font-size:1.06rem}.st-key-top_play_card_1 .tp-pitcher{font-size:1.3rem}}
+    @media (max-width:760px){.block-container{padding-top:1rem!important}.tp-page-hero{padding:.85rem}.tp-page-title{font-size:2.7rem}.tp-page-rule{font-size:.62rem;letter-spacing:.06em}.tp-section-ribbon{min-width:180px;padding:.42rem 1rem;font-size:.84rem}.tp-market-row{align-items:flex-start;flex-direction:column}.tp-stat{min-height:64px}}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+st.markdown(
+    """
+    <div class="tp-page-hero">
+      <div class="tp-page-kicker">StrikeOut King 9000 · Daily Command Board</div>
+      <div class="tp-page-title">TOP <span>PLAYS</span></div>
+      <div class="tp-page-sub">The five pitcher-prop legs our calibrated projections rate most likely to hit across strikeouts, total outs, and hits allowed. Sportsbook lines and odds are execution information only and never rank the board or feed the forecast.</div>
+      <div class="tp-page-rule">Model first · market second · frozen pregame evidence</div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 EASTERN = ZoneInfo("America/New_York")
 ODDS_API = "https://api.the-odds-api.com/v4"
@@ -258,6 +339,7 @@ def collect_legs(row: pd.Series, payload: dict, history: pd.DataFrame) -> list[d
             "Opponent": row.get("opponent"), "Market Key": market,
         })
     return legs
+
 
 def find_snapshot(history: pd.DataFrame, play: pd.Series) -> pd.Series | None:
     if history.empty:
@@ -512,63 +594,102 @@ c3.metric("Decision-supported legs", decision_supported)
 c4.metric("Signal-supported legs", signal_supported)
 c5.metric("Exact live prices found", f"{live_offers}/{len(plays)}")
 
-st.markdown("#### Top Play actions")
+st.markdown('<div class="tp-section-ribbon">Top Play Actions</div>', unsafe_allow_html=True)
 st.caption("Straight-bet stake is the amount recorded for one individual leg. It does not place a sportsbook wager and it does not affect the projection model.")
 quick_stake = st.number_input("Straight-bet stake (units)", min_value=0.0, value=1.0, step=0.5, key="top_plays_quick_stake")
-button_cols = st.columns(len(plays))
-for button_idx, (_, play_row) in enumerate(plays.iterrows()):
+
+# Presentation-only layout: the plays dataframe and rank order are unchanged.
+play_records = list(plays.iterrows())
+layout_slots: list[tuple[object, tuple[object, pd.Series]]] = []
+if len(play_records) <= 3:
+    cols = st.columns(len(play_records))
+    layout_slots.extend(zip(cols, play_records))
+else:
+    top_count = min(3, len(play_records))
+    top_cols = st.columns([1.35, 1, 1][:top_count])
+    layout_slots.extend(zip(top_cols, play_records[:top_count]))
+    remaining = play_records[top_count:]
+    if remaining:
+        bottom_cols = st.columns(len(remaining))
+        layout_slots.extend(zip(bottom_cols, remaining))
+
+for target_col, (_, play_row) in layout_slots:
     snapshot = find_snapshot(history, play_row)
     snapshot_dict = snapshot.to_dict() if snapshot is not None else None
     projection_value = projection_for_market(snapshot_dict, play_row.get("Market")) if snapshot_dict else numeric(play_row.get("Projection"))
     model_ok = float(play_row["Model Probability"]) >= 0.55 and int(play_row["Data Quality"]) >= 60
     live_offer = bool(play_row.get("Live Offer", False)) and numeric(play_row.get("Odds")) is not None
-    with button_cols[button_idx]:
-        rank = int(play_row["Rank"])
-        weather_raw = play_row.get("Weather Icon", "")
-        weather_icon = "" if pd.isna(weather_raw) else str(weather_raw or "")
-        team_raw = play_row.get("Team", "")
-        team = "" if pd.isna(team_raw) else str(team_raw or "")
-        st.markdown(f"### #{rank} · {play_row['Pitcher']} {weather_icon}".strip())
-        if team:
-            st.caption(team)
-        st.markdown(f"**{play_row['Market']} · {play_row['Side']} {float(play_row['Line']):g}**")
-        st.markdown(
-            f'<div style="border:1px solid #8b4fc7;border-radius:8px;background:rgba(93,48,128,.18);padding:9px 6px;margin:7px 0;text-align:center">'
-            f'<span style="font-size:.72rem;font-weight:800;letter-spacing:.04em">PROJECTION</span><br>'
-            f'<span style="font-size:1.35rem;font-weight:900;color:#fff">{float(play_row["Projection"]):.2f}</span>'
-            f'<span style="display:inline-block;width:1px;height:30px;background:#8b4fc7;margin:0 12px;vertical-align:middle"></span>'
-            f'<span style="font-size:.72rem;font-weight:800;letter-spacing:.04em">MODEL %</span> '
-            f'<span style="font-size:1.35rem;font-weight:900;color:#37e58c">{float(play_row["Model Probability"]):.1%}</span>'
-            f'</div>', unsafe_allow_html=True,
-        )
-        tier_hit = numeric(play_row.get("Tier Hit Rate"))
-        st.caption(f"Tier Hit Rate: {'—' if tier_hit is None else f'{tier_hit:.1%}'}")
-        if st.button("🔎 View details", key=f"view_top_play_{rank}", use_container_width=True):
-            st.session_state["top_play_detail_rank"] = rank
-        if st.button("➕ Add as bet", key=f"add_top_play_{rank}", use_container_width=True, disabled=not (model_ok and live_offer)):
-            try:
-                game_pk = numeric(play_row.get("Game PK")); pitcher_id = numeric(play_row.get("Pitcher ID"))
-                implied_p = numeric(play_row.get("No-Vig Implied")); live_edge = numeric(play_row.get("Edge"))
-                record = make_bet_record(
-                    player=str(play_row["Pitcher"]), market=play_row["Market"],
-                    game_date=str(play_row.get("Game Date", today))[:10], line=float(play_row["Line"]),
-                    side=str(play_row["Side"]), american_odds=float(play_row["Odds"]), stake=float(quick_stake),
-                    book=str(play_row.get("Book", "")), projection=projection_value,
-                    model_probability=float(play_row["Model Probability"]), implied_probability=implied_p, edge=live_edge,
-                    confidence=(snapshot.get("confidence", "") if snapshot is not None else ""),
-                    game_pk=None if game_pk is None else int(game_pk), pitcher_id=None if pitcher_id is None else int(pitcher_id),
-                    source="Top Plays", data_quality=float(play_row["Data Quality"]),
-                    app_version=str(play_row.get("App Version", "")), probability_semantics=str(play_row.get("Probability Semantics", "")),
-                    snapshot_captured_at_utc=str(play_row.get("Captured At UTC", "")),
-                )
-                append_bet(BET_LOG, record, st.secrets)
-                st.success("Added to Bet Tracker")
-            except Exception as exc:
-                st.error(f"Could not add bet: {exc}")
-        if not model_ok:
-            st.caption("WATCH · model/data quality below action threshold")
-        elif not live_offer:
-            st.caption("Model play · waiting for exact live line/price")
+    rank = int(play_row["Rank"])
+    weather_raw = play_row.get("Weather Icon", "")
+    weather_icon = "" if pd.isna(weather_raw) else str(weather_raw or "")
+    team_raw = play_row.get("Team", "")
+    team = "" if pd.isna(team_raw) else str(team_raw or "")
+    opponent_raw = play_row.get("Opponent", "")
+    opponent = "" if pd.isna(opponent_raw) else str(opponent_raw or "")
+    side = str(play_row.get("Side", "PASS") or "PASS").upper()
+    side_class = "over" if side == "OVER" else "under" if side == "UNDER" else "pass"
+    status = str(play_row.get("Status", "WATCH") or "WATCH").upper()
+    status_class = "model" if status == "MODEL PLAY" else "watch"
+    tier_hit = numeric(play_row.get("Tier Hit Rate"))
+    tier_text = "—" if tier_hit is None else f"{tier_hit:.1%}"
+    quality = int(play_row.get("Data Quality", 0))
+    matchup_text = " · ".join(v for v in [team, f"vs {opponent}" if opponent else "", weather_icon] if v)
+
+    with target_col:
+        with st.container(border=False, key=f"top_play_card_{rank}"):
+            st.markdown(
+                f"""
+                <div class="tp-card-head">
+                  <div class="tp-rank-wrap">
+                    <div class="tp-rank">#{rank}</div>
+                    <div><div class="tp-pitcher">{play_row['Pitcher']}</div><div class="tp-matchup">{matchup_text or 'Pregame snapshot'}</div></div>
+                  </div>
+                  <div class="tp-status {status_class}">{status}</div>
+                </div>
+                <div class="tp-market-row">
+                  <div class="tp-market">{play_row['Market']}</div>
+                  <div class="tp-side {side_class}">{side} {float(play_row['Line']):g}</div>
+                </div>
+                <div class="tp-stat-grid">
+                  <div class="tp-stat"><div class="tp-stat-label">Projection</div><div class="tp-stat-value">{float(play_row['Projection']):.2f}</div></div>
+                  <div class="tp-stat"><div class="tp-stat-label">Model Hit %</div><div class="tp-stat-value prob">{float(play_row['Model Probability']):.1%}</div></div>
+                  <div class="tp-stat"><div class="tp-stat-label">Data Quality</div><div class="tp-stat-value quality">{quality}/100</div></div>
+                  <div class="tp-stat"><div class="tp-stat-label">Tier Hit Rate</div><div class="tp-stat-value tier">{tier_text}</div></div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            if live_offer:
+                odds_value = int(float(play_row["Odds"]))
+                book_value = str(play_row.get("Book", "") or "Live book")
+                st.markdown(f'<div class="tp-card-note"><strong>Execution:</strong> {book_value} · {odds_value:+d}</div>', unsafe_allow_html=True)
+            elif model_ok:
+                st.markdown('<div class="tp-card-note"><strong>Execution:</strong> Model play · waiting for exact live line/price</div>', unsafe_allow_html=True)
+            else:
+                st.markdown('<div class="tp-card-note"><strong>Action:</strong> WATCH · model/data quality below straight-bet threshold</div>', unsafe_allow_html=True)
+
+            if st.button("🔎 View details", key=f"view_top_play_{rank}", use_container_width=True):
+                st.session_state["top_play_detail_rank"] = rank
+            if st.button("➕ Add as bet", key=f"add_top_play_{rank}", use_container_width=True, disabled=not (model_ok and live_offer)):
+                try:
+                    game_pk = numeric(play_row.get("Game PK")); pitcher_id = numeric(play_row.get("Pitcher ID"))
+                    implied_p = numeric(play_row.get("No-Vig Implied")); live_edge = numeric(play_row.get("Edge"))
+                    record = make_bet_record(
+                        player=str(play_row["Pitcher"]), market=play_row["Market"],
+                        game_date=str(play_row.get("Game Date", today))[:10], line=float(play_row["Line"]),
+                        side=str(play_row["Side"]), american_odds=float(play_row["Odds"]), stake=float(quick_stake),
+                        book=str(play_row.get("Book", "")), projection=projection_value,
+                        model_probability=float(play_row["Model Probability"]), implied_probability=implied_p, edge=live_edge,
+                        confidence=(snapshot.get("confidence", "") if snapshot is not None else ""),
+                        game_pk=None if game_pk is None else int(game_pk), pitcher_id=None if pitcher_id is None else int(pitcher_id),
+                        source="Top Plays", data_quality=float(play_row["Data Quality"]),
+                        app_version=str(play_row.get("App Version", "")), probability_semantics=str(play_row.get("Probability Semantics", "")),
+                        snapshot_captured_at_utc=str(play_row.get("Captured At UTC", "")),
+                    )
+                    append_bet(BET_LOG, record, st.secrets)
+                    st.success("Added to Bet Tracker")
+                except Exception as exc:
+                    st.error(f"Could not add bet: {exc}")
 
 st.caption("ⓘ Projections are model estimates at the listed line. They are not guaranteed outcomes.")
 
@@ -717,4 +838,3 @@ with st.expander("🧪 Signal accountability", expanded=False):
             signal_view[col] = signal_view[col].map(lambda x: "—" if pd.isna(x) else f"{float(x):+.1%}" if col == "Relative MAE Improvement" else f"{float(x):.1%}")
         st.dataframe(signal_view[["Signal", "Market", "Resolved Pairs", "Pre MAE", "Post MAE", "Relative MAE Improvement", "Improved Share", "Status", "Reason"]], hide_index=True, width="stretch")
     st.caption("Signals remain LEARNING below 20 resolved pairs. HELPING/MIXED/HURTING are evidence labels only; sportsbook data is excluded.")
-
