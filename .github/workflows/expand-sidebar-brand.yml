@@ -13,43 +13,46 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Isolate mascot artwork component
+      - name: Crop mascot by red and white artwork
         run: |
           python -m pip install --quiet pillow
           python - <<'PY'
           from collections import deque
           from pathlib import Path
-          from PIL import Image, ImageChops, ImageFilter
+          from PIL import Image, ImageFilter
           import re
 
           src = Path('assets/strikeout_king_9000_clean.png')
           out = Path('assets/strikeout_king_9000_sidebar.png')
           im = Image.open(src).convert('RGBA')
-          rgb = im.convert('RGB')
-          alpha = im.getchannel('A')
-          r, g, b = rgb.split()
-          max_rgb = ImageChops.lighter(ImageChops.lighter(r, g), b)
-          min_rgb = ImageChops.darker(ImageChops.darker(r, g), b)
-          chroma = ImageChops.subtract(max_rgb, min_rgb)
+          w, h = im.size
+          px = im.load()
 
-          bright = max_rgb.point(lambda p: 255 if p >= 52 else 0)
-          colored = chroma.point(lambda p: 255 if p >= 28 else 0)
-          light_neutral = max_rgb.point(lambda p: 255 if p >= 105 else 0)
-          mask = ImageChops.lighter(ImageChops.multiply(bright, colored), light_neutral)
-          mask = ImageChops.multiply(mask, alpha.point(lambda p: 255 if p > 24 else 0))
-          mask = mask.filter(ImageFilter.MaxFilter(5))
-
-          w, h = mask.size
-          pix = mask.load()
-          seen = bytearray(w * h)
-          components = []
+          # Build a mask from the mascot's distinctive red + bright white/gray artwork.
+          mask = Image.new('L', (w, h), 0)
+          mp = mask.load()
           for y in range(h):
               for x in range(w):
-                  idx = y * w + x
-                  if seen[idx] or pix[x, y] == 0:
+                  r, g, b, a = px[x, y]
+                  if a <= 20:
+                      continue
+                  is_red = r >= 105 and r >= g + 32 and r >= b + 18
+                  is_light = r >= 135 and g >= 135 and b >= 135
+                  is_bright_bluegray = b >= 95 and r >= 55 and g >= 60 and max(r, g, b) - min(r, g, b) <= 80
+                  if is_red or is_light or is_bright_bluegray:
+                      mp[x, y] = 255
+
+          mask = mask.filter(ImageFilter.MaxFilter(3))
+          pix = mask.load()
+          seen = bytearray(w * h)
+          comps = []
+          for y in range(h):
+              for x in range(w):
+                  i = y * w + x
+                  if seen[i] or pix[x, y] == 0:
                       continue
                   q = deque([(x, y)])
-                  seen[idx] = 1
+                  seen[i] = 1
                   area = 0
                   x0 = x1 = x
                   y0 = y1 = y
@@ -64,27 +67,34 @@ jobs:
                               if not seen[ni] and pix[nx, ny] != 0:
                                   seen[ni] = 1
                                   q.append((nx, ny))
-                  components.append((area, (x0, y0, x1 + 1, y1 + 1)))
+                  if area >= 8:
+                      comps.append((area, (x0, y0, x1 + 1, y1 + 1)))
 
-          if not components:
-              raise SystemExit('No mascot component detected')
-          components.sort(reverse=True)
-          area, bbox = components[0]
-          x0, y0, x1, y1 = bbox
-          pad = max(7, round(max(x1 - x0, y1 - y0) * 0.11))
+          if not comps:
+              raise SystemExit('No red/white mascot components found')
+          comps.sort(reverse=True)
+          # Union the main meaningful components so detached feather/highlights stay included,
+          # while tiny canvas noise is ignored.
+          keep = [c for c in comps if c[0] >= max(12, comps[0][0] * 0.015)]
+          x0 = min(c[1][0] for c in keep)
+          y0 = min(c[1][1] for c in keep)
+          x1 = max(c[1][2] for c in keep)
+          y1 = max(c[1][3] for c in keep)
+          pad = max(6, round(max(x1-x0, y1-y0) * 0.09))
           bbox = (max(0, x0-pad), max(0, y0-pad), min(w, x1+pad), min(h, y1+pad))
           cropped = im.crop(bbox)
           cropped.save(out, optimize=True)
-          print(f'source={im.size} components_top5={components[:5]} selected={bbox} output={cropped.size}')
+          print(f'source={im.size} top_components={comps[:8]} kept={keep[:8]} bbox={bbox} output={cropped.size}')
 
           p = Path('navigation.py')
           s = p.read_text()
           base = 'https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000_sidebar.png'
-          s = re.sub(re.escape(base) + r'(?:\?v=\d+)?', base + '?v=5', s, count=1)
-          # Only mascot dimensions; all approved sidebar styling stays untouched.
+          s = re.sub(re.escape(base) + r'(?:\?v=\d+)?', base + '?v=6', s, count=1)
+          # Keep all approved sidebar styling; only force the mascot to fill its slot.
           s = re.sub(r'(\.sk-nav-mascot \{[\s\S]*?height:)\d+px;', r'\g<1>238px;', s, count=1)
           s = re.sub(r'(\.sk-nav-mascot img \{[\s\S]*?width:)\d+px;', r'\g<1>236px;', s, count=1)
           s = re.sub(r'(\.sk-nav-mascot img \{[\s\S]*?height:)\d+px;', r'\g<1>236px;', s, count=1)
+          s = s.replace('object-fit:contain;', 'object-fit:contain;\n            max-width:none !important;\n            min-width:236px !important;', 1)
           p.write_text(s)
           PY
       - name: Commit patch
@@ -96,5 +106,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add navigation.py assets/strikeout_king_9000_sidebar.png
-          git commit -m "Isolate mascot artwork for sidebar"
+          git commit -m "Crop mascot to red white artwork"
           git push
