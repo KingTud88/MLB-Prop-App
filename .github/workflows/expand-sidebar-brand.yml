@@ -34,19 +34,22 @@ jobs:
       - name: Polish Projection Summary emblems to match mockup
         run: python tools/polish_projection_summary_emblems.py
 
+      - name: Split Projection artwork into individual badges
+        run: python tools/fix_projection_artwork_individual.py
+
       - name: Validate Python syntax
         run: python -m py_compile training/projection_storage.py pages/4_Projection_History.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py streamlit_app.py
 
       - name: Commit safely
         run: |
-          if git diff --quiet -- pages/4_Projection_History.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py streamlit_app.py; then
+          if git diff --quiet -- pages/4_Projection_History.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py streamlit_app.py assets/projection_k.webp assets/projection_k_plus.webp assets/projection_outs.webp assets/projection_outs_plus.webp assets/projection_hits.webp assets/projection_hits_plus.webp; then
             echo "Projection persistence / emblem patches already present"
             exit 0
           fi
           git config user.name "KingTud88"
           git config user.email "jaxson0603@gmail.com"
-          git add pages/4_Projection_History.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py streamlit_app.py
-          git commit -m "Match Projection Summary emblems to mockup"
+          git add pages/4_Projection_History.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py streamlit_app.py assets/projection_k.webp assets/projection_k_plus.webp assets/projection_outs.webp assets/projection_outs_plus.webp assets/projection_hits.webp assets/projection_hits_plus.webp
+          git commit -m "Render Projection artwork as individual badges"
           for attempt in 1 2 3 4; do
             git fetch origin main
             git rebase origin/main || { git rebase --abort || true; sleep 2; continue; }
