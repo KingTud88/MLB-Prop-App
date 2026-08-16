@@ -3,7 +3,7 @@ from __future__ import annotations
 import streamlit as st
 
 # MASCOT_PATH compatibility marker: mascot is browser-rendered to avoid Pillow codec crashes.
-MASCOT_URL = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000_sidebar.png?v=4"
+MASCOT_URL = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000_sidebar.png?v=5"
 
 
 def render_sidebar(active: str = "projection") -> None:
@@ -46,8 +46,8 @@ def render_sidebar(active: str = "projection") -> None:
             overflow:hidden;
         }
         .sk-nav-mascot img {
-            width:234px;
-            height:234px;
+            width:236px;
+            height:236px;
             object-fit:contain;
             display:block;
             filter: drop-shadow(0 9px 18px rgba(0,0,0,.3));
