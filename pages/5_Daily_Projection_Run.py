@@ -28,6 +28,7 @@ from engine.hits_calibration import calibrate_hits_blend
 from engine.outs_calibration import calibrate_outs_blend
 from engine.odds_snapshot import refresh_strikeout_snapshot, resolve_api_key
 from navigation import render_sidebar
+from training.projection_storage import load_projection_archive, overlay_manual_market_lines, save_projection_archive
 
 st.set_page_config(page_title="Daily Projection Run", page_icon="📊", layout="wide")
 apply_page_theme()
@@ -168,6 +169,13 @@ def _parse_market_line(value: object) -> float:
         raise ValueError(f"Invalid market line: {text}") from exc
 
 
+def _manual_input_default(row: pd.Series, line_col: str, source_col: str) -> str:
+    if str(row.get(source_col, "") or "").strip().upper() != "MANUAL":
+        return ""
+    value = pd.to_numeric(pd.Series([row.get(line_col)]), errors="coerce").iloc[0]
+    return "" if pd.isna(value) else f"{float(value):g}"
+
+
 def commit_projection_archive(slate: pd.DataFrame, manual_lines: dict[str, dict[str, float]], slate_day: str) -> int:
     if slate.empty:
         return 0
@@ -178,12 +186,8 @@ def commit_projection_archive(slate: pd.DataFrame, manual_lines: dict[str, dict[
     snapshot["archive_source"] = "DAILY_RUN_MANUAL"
     snapshot["archive_committed_at_utc"] = datetime.now(ZoneInfo("UTC")).isoformat()
 
-    if ARCHIVE_PATH.exists():
-        try:
-            existing = pd.read_csv(ARCHIVE_PATH)
-        except Exception:
-            existing = pd.DataFrame()
-    else:
+    existing = load_projection_archive(ARCHIVE_PATH, st.secrets)
+    if existing.empty:
         existing = load_log()
         if not existing.empty and "game_date" in existing.columns:
             cutoff = pd.Timestamp(slate_day).date()
@@ -204,8 +208,7 @@ def commit_projection_archive(slate: pd.DataFrame, manual_lines: dict[str, dict[
         existing = existing.loc[keep_mask].copy()
 
     archive = pd.concat([existing, snapshot], ignore_index=True, sort=False)
-    ARCHIVE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    archive.to_csv(ARCHIVE_PATH, index=False)
+    save_projection_archive(ARCHIVE_PATH, archive, st.secrets)
     return len(snapshot)
 
 
@@ -468,7 +471,10 @@ if st.button("⚾ RUN ALL TODAY'S PITCHERS", type="primary", use_container_width
             added = skipped = 0
             history_only = []
             errors = [f"Slate run failed: {type(exc).__name__}: {exc}"]
+    durable_archive = load_projection_archive(ARCHIVE_PATH, st.secrets)
+    slate = overlay_manual_market_lines(slate, durable_archive)
     st.session_state["daily_slate"] = slate
+    st.session_state["daily_slate_date"] = slate_date.isoformat()
     st.session_state["daily_added"] = added
     st.session_state["daily_skipped"] = skipped
     st.session_state["daily_history_only"] = history_only
@@ -476,6 +482,26 @@ if st.button("⚾ RUN ALL TODAY'S PITCHERS", type="primary", use_container_width
     st.session_state["daily_run_at"] = datetime.now(EASTERN).strftime("%b %d, %Y · %I:%M:%S %p ET")
 
 st.markdown('<div class="daily-section-head">Slate Output</div>', unsafe_allow_html=True)
+# PROJECTION_RESTART_PERSISTENCE_V1
+if st.session_state.get("daily_slate_date") != slate_date.isoformat():
+    persisted_log = load_log()
+    recovered = persisted_log.loc[
+        persisted_log.get("game_date", pd.Series(index=persisted_log.index, dtype=str)).astype(str).eq(slate_date.isoformat())
+    ].copy() if not persisted_log.empty else pd.DataFrame()
+    if not recovered.empty:
+        durable_archive = load_projection_archive(ARCHIVE_PATH, st.secrets)
+        recovered = overlay_manual_market_lines(recovered, durable_archive)
+        st.session_state["daily_slate"] = recovered
+        st.session_state["daily_added"] = 0
+        st.session_state["daily_skipped"] = len(recovered)
+        st.session_state["daily_history_only"] = []
+        st.session_state["daily_errors"] = []
+        st.session_state["daily_run_at"] = "Recovered from frozen projection log"
+    else:
+        for key in ("daily_slate", "daily_added", "daily_skipped", "daily_history_only", "daily_errors", "daily_run_at"):
+            st.session_state.pop(key, None)
+    st.session_state["daily_slate_date"] = slate_date.isoformat()
+
 slate = st.session_state.get("daily_slate")
 if isinstance(slate, pd.DataFrame):
     added = int(st.session_state.get("daily_added", 0))
@@ -501,7 +527,10 @@ if isinstance(slate, pd.DataFrame):
 
     if not slate.empty:
         st.markdown('<div class="daily-action-label">🎚️ Manual sportsbook lines</div>', unsafe_allow_html=True)
-        st.caption("Open each pitcher bar and enter the real sportsbook lines you want Top Plays to evaluate. Manual values override paid API lines. Half-lines such as 4.5, 15.5, and 5.5 are supported; a blank market is excluded from Top Plays unless a paid active line already exists.")
+        st.caption("Open each pitcher bar and enter the real sportsbook lines you want Top Plays to evaluate. Manual values override paid API lines. Half-lines such as 4.5, 15.5, and 5.5 are supported; a blank market is excluded from Top Plays unless a paid active line already exists. Saved manual lines reload automatically after an app restart.")
+        durable_archive = load_projection_archive(ARCHIVE_PATH, st.secrets)
+        slate = overlay_manual_market_lines(slate, durable_archive)
+        st.session_state["daily_slate"] = slate
         manual_line_values: dict[str, dict[str, str]] = {}
         for _, manual_row in slate.reset_index(drop=True).iterrows():
             row_key = _archive_row_key(manual_row)
@@ -510,9 +539,9 @@ if isinstance(slate, pd.DataFrame):
             opponent = str(manual_row.get("opponent", "—"))
             with st.expander(f"⚾ {player} · {team} vs {opponent}", expanded=False):
                 l1, l2, l3 = st.columns(3)
-                k_raw = l1.text_input("Strikeout line", placeholder="e.g. 4.5", key=f"daily_manual_k_{row_key}")
-                outs_raw = l2.text_input("Total outs line", placeholder="e.g. 15.5", key=f"daily_manual_outs_{row_key}")
-                hits_raw = l3.text_input("Hits allowed line", placeholder="e.g. 5.5", key=f"daily_manual_hits_{row_key}")
+                k_raw = l1.text_input("Strikeout line", value=_manual_input_default(manual_row, "active_strikeout_line", "active_strikeout_line_source"), placeholder="e.g. 4.5", key=f"daily_manual_k_{row_key}")
+                outs_raw = l2.text_input("Total outs line", value=_manual_input_default(manual_row, "active_outs_line", "active_outs_line_source"), placeholder="e.g. 15.5", key=f"daily_manual_outs_{row_key}")
+                hits_raw = l3.text_input("Hits allowed line", value=_manual_input_default(manual_row, "active_hits_allowed_line", "active_hits_allowed_line_source"), placeholder="e.g. 5.5", key=f"daily_manual_hits_{row_key}")
                 st.caption(f"Model: {float(manual_row.get('projection', float('nan'))):.2f} K · {float(manual_row.get('outs_projection', float('nan'))):.2f} outs · {float(manual_row.get('hits_projection', float('nan'))):.2f} hits allowed")
             manual_line_values[row_key] = {"k": k_raw, "outs": outs_raw, "hits": hits_raw}
 
@@ -529,12 +558,15 @@ if isinstance(slate, pd.DataFrame):
                 filled_lines = sum(pd.notna(value) for values in parsed_lines.values() for value in values.values())
                 if filled_lines == 0:
                     raise ValueError("Enter at least one sportsbook line before adding the slate to the Projection Archive.")
-                applied = apply_active_market_lines(slate_date.isoformat(), parsed_lines)
                 archived = commit_projection_archive(slate, parsed_lines, slate_date.isoformat())
+                applied = filled_lines
                 refreshed_log = load_log()
-                st.session_state["daily_slate"] = refreshed_log.loc[refreshed_log.get("game_date", pd.Series(dtype=str)).astype(str).eq(slate_date.isoformat())].copy()
+                refreshed_slate = refreshed_log.loc[refreshed_log.get("game_date", pd.Series(dtype=str)).astype(str).eq(slate_date.isoformat())].copy()
+                durable_archive = load_projection_archive(ARCHIVE_PATH, st.secrets)
+                st.session_state["daily_slate"] = overlay_manual_market_lines(refreshed_slate, durable_archive)
+                st.session_state["daily_slate_date"] = slate_date.isoformat()
                 st.session_state["daily_archive_saved_at"] = datetime.now(EASTERN).strftime("%b %d, %Y · %I:%M:%S %p ET")
-                st.success(f"Applied {applied} active sportsbook line(s) to Top Plays and added {archived} pitcher projection(s) to the Projection Archive.")
+                st.success(f"Persisted {applied} manual sportsbook line(s) for Top Plays and saved {archived} pitcher projection row(s) to restart-safe storage.")
             except ValueError as exc:
                 st.error(str(exc))
 

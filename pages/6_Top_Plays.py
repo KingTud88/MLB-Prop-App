@@ -29,6 +29,7 @@ from engine.bet_tracker import (
 )
 from navigation import render_sidebar
 from training.bet_storage import append_bet
+from training.projection_storage import load_projection_archive, overlay_manual_market_lines
 
 st.set_page_config(page_title="Top Plays", page_icon="👑", layout="wide")
 apply_page_theme()
@@ -144,6 +145,7 @@ MAIN_MARKET_KEYS = {
 }
 ROOT = Path(__file__).resolve().parents[1]
 BET_LOG = ROOT / "data" / "bet_log.csv"
+ARCHIVE_PATH = ROOT / "data" / "projection_archive.csv"
 
 
 def secret() -> str | None:
@@ -468,6 +470,9 @@ if not LOG_PATH.exists():
 history = pd.read_csv(LOG_PATH)
 today = datetime.now(EASTERN).date().isoformat()
 slate = history.loc[history.get("game_date", pd.Series(dtype=str)).astype(str).eq(today)].copy()
+# TOP_PLAYS_DURABLE_MANUAL_LINES_V1
+durable_archive = load_projection_archive(ARCHIVE_PATH, st.secrets)
+slate = overlay_manual_market_lines(slate, durable_archive)
 if slate.empty:
     st.info("No pregame projection snapshots are available for today's slate yet. Run Daily Projection Run first.")
     st.stop()

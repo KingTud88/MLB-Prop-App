@@ -8,6 +8,7 @@ import streamlit as st
 
 from engine.ui_theme import apply_page_theme
 from navigation import render_sidebar
+from training.projection_storage import build_projection_archive_view, load_projection_archive
 
 from automation.resolve_projection_log import main as resolve_projection_log
 from engine.calibration import milestone_calibration_report
@@ -100,23 +101,9 @@ def load_projection_history() -> pd.DataFrame:
 
 
 def load_user_archive(evidence: pd.DataFrame) -> pd.DataFrame:
-    if ARCHIVE_PATH.exists():
-        try:
-            return pd.read_csv(ARCHIVE_PATH)
-        except Exception:
-            return pd.DataFrame()
-    if evidence.empty or "game_date" not in evidence.columns:
-        return pd.DataFrame()
-    today_eastern = pd.Timestamp.now(tz="America/New_York").date()
-    dates = pd.to_datetime(evidence["game_date"], errors="coerce").dt.date
-    legacy = evidence.loc[dates < today_eastern].copy()
-    if not legacy.empty:
-        legacy["manual_strikeout_line"] = np.nan
-        legacy["manual_outs_line"] = np.nan
-        legacy["manual_hits_allowed_line"] = np.nan
-        legacy["archive_source"] = "LEGACY_PRE_MANUAL_ARCHIVE"
-        legacy["archive_committed_at_utc"] = legacy.get("captured_at_utc", "")
-    return legacy
+    # PROJECTION_HISTORY_DURABLE_ARCHIVE_V1
+    durable_manual = load_projection_archive(ARCHIVE_PATH, st.secrets)
+    return build_projection_archive_view(evidence, durable_manual)
 
 
 def load_observation_history() -> pd.DataFrame:
@@ -202,10 +189,10 @@ for col in [
 
 # PROJECTION_HISTORY_ARCHIVE_COMMAND_V2
 st.markdown('<div class="history-section-head">Projection Archive</div>', unsafe_allow_html=True)
-st.markdown('<div class="history-primary-note">This is the day-to-day archive you approve from Daily Projection Run. Your entered sportsbook lines are execution data attached to the frozen projections; automatic background captures stay out of this primary view.</div>', unsafe_allow_html=True)
+st.markdown('<div class="history-primary-note">Every frozen daily projection slate appears here automatically. Your sportsbook lines are a durable execution overlay saved separately, so a reboot cannot remove the slate or detach previously saved manual lines.</div>', unsafe_allow_html=True)
 user_archive = load_user_archive(df)
 if user_archive.empty:
-    st.info("No manually committed projection slates yet. Run Daily Projection Run, enter the sportsbook lines, then use Apply Lines + Add to Projection Archive.")
+    st.info("No frozen projection slates are available yet. Daily Projection Run or the automatic capture job will populate this archive.")
 else:
     user_archive = user_archive.copy()
     user_archive["_archive_date"] = pd.to_datetime(user_archive.get("game_date"), errors="coerce")
