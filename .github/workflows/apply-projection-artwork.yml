@@ -1,0 +1,90 @@
+name: Apply Projection Artwork
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install illustrated Projection Summary badges
+        run: |
+          if grep -q "PROJECTION_ARTWORK_V1" streamlit_app.py; then
+            echo "Artwork already installed"
+          else
+            cat tools/projection_emblem_chunk_*.b64 | base64 -d > assets/projection_summary_emblems.webp
+            python - <<'PY'
+          from pathlib import Path
+
+          path = Path("streamlit_app.py")
+          text = path.read_text(encoding="utf-8")
+          marker = "/* PROJECTION_ARTWORK_V1 · actual illustrated mockup badges */"
+          css = r'''
+          /* PROJECTION_ARTWORK_V1 · actual illustrated mockup badges */
+          .cc-card-icon.cc-emblem{
+              width:64px!important;
+              height:64px!important;
+              flex:0 0 64px!important;
+              border:0!important;
+              border-radius:0!important;
+              background-color:transparent!important;
+              background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_summary_emblems.webp?v=1")!important;
+              background-repeat:no-repeat!important;
+              background-size:600% 100%!important;
+              box-shadow:none!important;
+              overflow:visible!important;
+              filter:drop-shadow(0 4px 8px rgba(0,0,0,.32)) drop-shadow(0 0 5px rgba(236,22,56,.18));
+          }
+          .cc-card-icon.cc-emblem::before,
+          .cc-card-icon.cc-emblem::after{display:none!important;content:none!important}
+          .metric-card .cc-emblem.whiff{background-position:0% 50%!important}
+          .reco-card .cc-emblem.whiff{background-position:20% 50%!important}
+          .metric-card .cc-emblem.glove{background-position:40% 50%!important}
+          .reco-card .cc-emblem.glove{background-position:60% 50%!important}
+          .metric-card .cc-emblem.contact{background-position:80% 50%!important}
+          .reco-card .cc-emblem.contact{background-position:100% 50%!important}
+          '''
+          anchor = '</style>""", unsafe_allow_html=True)'
+          if marker not in text:
+              if anchor not in text:
+                  raise SystemExit("Projection CSS anchor not found")
+              text = text.replace(anchor, css + "\n" + anchor, 1)
+              path.write_text(text, encoding="utf-8")
+          PY
+          fi
+
+      - name: Validate Python syntax
+        run: python -m py_compile streamlit_app.py
+
+      - name: Clean one-shot helpers
+        run: rm -f tools/projection_emblem_chunk_*.b64 .github/workflows/apply-projection-artwork.yml
+
+      - name: Commit safely
+        run: |
+          git config user.name "KingTud88"
+          git config user.email "jaxson0603@gmail.com"
+          git add -A streamlit_app.py assets/projection_summary_emblems.webp tools .github/workflows/apply-projection-artwork.yml
+          if git diff --cached --quiet; then
+            echo "Nothing to commit"
+            exit 0
+          fi
+          git commit -m "Use illustrated Projection Summary badges"
+          for attempt in 1 2 3 4; do
+            git fetch origin main
+            git rebase origin/main || { git rebase --abort || true; sleep 2; continue; }
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            sleep $((attempt * 2))
+          done
+          echo "Could not push artwork patch after retries"
+          exit 1
