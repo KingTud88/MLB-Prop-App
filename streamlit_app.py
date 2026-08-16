@@ -300,7 +300,7 @@ h1,h2,h3{letter-spacing:-.02em}
 
 @dataclass(frozen=True)
 class GamePitcher:
-    key:str; pitcher_id:int; pitcher_name:str; team:str; opponent:str; side:str; venue_id:int; venue:str; game_pk:int; game_time:str; status:str
+    key:str; pitcher_id:int; pitcher_name:str; team:str; opponent:str; side:str; venue_id:int; venue:str; game_pk:int; game_time:str; status:str; venue_latitude:float|None=None; venue_longitude:float|None=None
 
 @dataclass
 class Projection:
@@ -315,18 +315,21 @@ class MLBClient:
         return data
 
 def get_schedule(day):
-    try:p=MLBClient().get("schedule",{"sportId":1,"date":day,"hydrate":"probablePitcher,team,venue"})
+    try:p=MLBClient().get("schedule",{"sportId":1,"date":day,"hydrate":"probablePitcher,team,venue(location)"})
     except Exception as e:return [],str(e)
     rows=[]
     for block in p.get("dates",[]):
         for game in block.get("games",[]):
             teams=game.get("teams",{}); pk=int(game.get("gamePk",0)); venue_node=game.get("venue",{}) or {}; venue=venue_node.get("name","Unknown"); venue_id=int(venue_node.get("id",0) or 0)
+            venue_location=venue_node.get("location",{}) or {}; venue_coords=venue_location.get("defaultCoordinates",{}) or {}
+            venue_latitude=pd.to_numeric(pd.Series([venue_coords.get("latitude")]),errors="coerce").iloc[0]; venue_longitude=pd.to_numeric(pd.Series([venue_coords.get("longitude")]),errors="coerce").iloc[0]
+            venue_latitude=None if pd.isna(venue_latitude) else float(venue_latitude); venue_longitude=None if pd.isna(venue_longitude) else float(venue_longitude)
             for side,other in (("away","home"),("home","away")):
                 node=teams.get(side,{}) or {}; opp=teams.get(other,{}) or {}; pit=node.get("probablePitcher") or {}
                 if not pit.get("id"): continue
                 tn=node.get("team",{}); on=opp.get("team",{})
                 team=TEAM_ABBR.get(tn.get("id"),tn.get("abbreviation","UNK")); opponent=TEAM_ABBR.get(on.get("id"),on.get("abbreviation","UNK"))
-                rows.append(GamePitcher(f"{pk}:{pit['id']}",int(pit["id"]),pit.get("fullName","Unknown"),team,opponent,side.title(),venue_id,venue,pk,game.get("gameDate",""),game.get("status",{}).get("detailedState","Scheduled")))
+                rows.append(GamePitcher(f"{pk}:{pit['id']}",int(pit["id"]),pit.get("fullName","Unknown"),team,opponent,side.title(),venue_id,venue,pk,game.get("gameDate",""),game.get("status",{}).get("detailedState","Scheduled"),venue_latitude=venue_latitude,venue_longitude=venue_longitude))
     return rows,None
 
 def parse_ip(v):
@@ -368,18 +371,46 @@ def get_pitcher_hand(pid):
 @st.cache_data(ttl=21600,show_spinner=False)
 def get_venue_coordinates(venue_id):
     if not venue_id: return None
+    target_id=int(venue_id)
+
+    # Primary fallback: ask MLB's venue endpoint explicitly for location data.
     try:
-        payload=MLBClient().get(f"venues/{int(venue_id)}",{})
+        payload=MLBClient().get(f"venues/{target_id}",{"hydrate":"location"})
         venues=payload.get("venues") or []
         coords=((venues[0].get("location") or {}).get("defaultCoordinates") or {}) if venues else {}
         lat=coords.get("latitude"); lon=coords.get("longitude")
-        return (float(lat),float(lon)) if lat is not None and lon is not None else None
+        if lat is not None and lon is not None:
+            return float(lat),float(lon)
     except Exception:
-        return None
+        pass
+
+    # Secondary fallback for current MLB home parks: resolve the same venue ID
+    # through the live team directory with hydrated venue location data. This
+    # avoids a stale hard-coded stadium table when parks/names change.
+    try:
+        payload=MLBClient().get("teams",{"sportId":1,"hydrate":"venue(location)"})
+        for team_node in payload.get("teams",[]) or []:
+            venue_node=team_node.get("venue",{}) or {}
+            if int(venue_node.get("id",0) or 0) != target_id:
+                continue
+            coords=((venue_node.get("location") or {}).get("defaultCoordinates") or {})
+            lat=coords.get("latitude"); lon=coords.get("longitude")
+            if lat is not None and lon is not None:
+                return float(lat),float(lon)
+    except Exception:
+        pass
+    return None
 
 @st.cache_data(ttl=900,show_spinner=False)
-def get_game_weather(venue_id,game_time):
-    coords=get_venue_coordinates(venue_id)
+def get_game_weather(venue_id,game_time,latitude=None,longitude=None):
+    coords=None
+    try:
+        if latitude is not None and longitude is not None and pd.notna(latitude) and pd.notna(longitude):
+            coords=(float(latitude),float(longitude))
+    except (TypeError,ValueError):
+        coords=None
+    if not coords:
+        coords=get_venue_coordinates(venue_id)
     if not coords:
         return WeatherDelayRisk("UNKNOWN","",None,None,None,"Venue coordinates unavailable for weather risk.",False)
     return fetch_weather_delay_risk(coords[0],coords[1],game_time)
@@ -859,7 +890,7 @@ opposing_batters=get_opposing_batters(
     lineup_context.spots if lineup_context.confirmed else (),
 )
 opponent_matchup=matchup_summary(opposing_batters,confirmed_lineup=lineup_context.confirmed)
-weather_risk=get_game_weather(game.venue_id,game.game_time)
+weather_risk=get_game_weather(game.venue_id,game.game_time,game.venue_latitude,game.venue_longitude)
 confirmed_count=lineup_context.batter_count if lineup_context.confirmed else 0
 workload_ctx=build_workload_context(log,game.game_time)
 role_workload_decision=build_role_workload_decision(
