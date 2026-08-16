@@ -293,7 +293,7 @@ def venue_coordinates(venue_id: int) -> tuple[float, float] | None:
     if not venue_id:
         return None
     try:
-        data = get_json(f"venues/{int(venue_id)}", {})
+        data = get_json(f"venues/{int(venue_id)}", {"hydrate": "location"})
         venues = data.get("venues") or []
         coords = ((venues[0].get("location") or {}).get("defaultCoordinates") or {}) if venues else {}
         lat, lon = coords.get("latitude"), coords.get("longitude")
@@ -303,15 +303,32 @@ def venue_coordinates(venue_id: int) -> tuple[float, float] | None:
 
 
 @lru_cache(maxsize=128)
-def game_weather(venue_id: int, game_time: str) -> WeatherDelayRisk:
-    coords = venue_coordinates(int(venue_id or 0))
+def game_weather(
+    venue_id: int,
+    game_time: str,
+    latitude: float | None = None,
+    longitude: float | None = None,
+) -> WeatherDelayRisk:
+    coords = None
+    try:
+        if latitude is not None and longitude is not None and pd.notna(latitude) and pd.notna(longitude):
+            coords = (float(latitude), float(longitude))
+    except (TypeError, ValueError):
+        coords = None
+    if not coords:
+        coords = venue_coordinates(int(venue_id or 0))
     if not coords:
         return WeatherDelayRisk("UNKNOWN", "", None, None, None, "Venue coordinates unavailable for weather risk.", False)
     return fetch_weather_delay_risk(coords[0], coords[1], str(game_time or ""))
 
 
-def weather_snapshot_fields(venue_id: int, game_time: str) -> dict[str, object]:
-    risk = game_weather(int(venue_id or 0), str(game_time or ""))
+def weather_snapshot_fields(
+    venue_id: int,
+    game_time: str,
+    latitude: float | None = None,
+    longitude: float | None = None,
+) -> dict[str, object]:
+    risk = game_weather(int(venue_id or 0), str(game_time or ""), latitude, longitude)
     return {
         "weather_delay_risk": risk.level,
         "weather_icon": risk.icon,
@@ -413,6 +430,12 @@ def schedule(day: str) -> list[dict]:
         for game in block.get("games", []):
             teams = game.get("teams", {})
             venue_node = game.get("venue", {}) or {}
+            venue_location = venue_node.get("location", {}) or {}
+            venue_coords = venue_location.get("defaultCoordinates", {}) or {}
+            venue_latitude = pd.to_numeric(pd.Series([venue_coords.get("latitude")]), errors="coerce").iloc[0]
+            venue_longitude = pd.to_numeric(pd.Series([venue_coords.get("longitude")]), errors="coerce").iloc[0]
+            venue_latitude = None if pd.isna(venue_latitude) else float(venue_latitude)
+            venue_longitude = None if pd.isna(venue_longitude) else float(venue_longitude)
             for side, other in (("away", "home"), ("home", "away")):
                 node = teams.get(side, {}) or {}
                 opp = teams.get(other, {}) or {}
@@ -432,6 +455,8 @@ def schedule(day: str) -> list[dict]:
                     "opponent_team_id": int(on.get("id")) if on.get("id") else None,
                     "venue_id": int(venue_node.get("id", 0) or 0),
                     "venue": venue_node.get("name", "Unknown"),
+                    "venue_latitude": venue_latitude,
+                    "venue_longitude": venue_longitude,
                     "game_time": game.get("gameDate", ""),
                     "status": game.get("status", {}).get("detailedState", "Scheduled"),
                 })
@@ -498,7 +523,12 @@ def project(row: dict, matchup_override: dict[str, object] | None = None) -> dic
         lines=(13.5, 14.5, 15.5, 16.5, 17.5, 18.5),
     )
     now = datetime.now(timezone.utc).isoformat()
-    weather = weather_snapshot_fields(int(row.get("venue_id", 0) or 0), str(row.get("game_time", "")))
+    weather = weather_snapshot_fields(
+        int(row.get("venue_id", 0) or 0),
+        str(row.get("game_time", "")),
+        row.get("venue_latitude"),
+        row.get("venue_longitude"),
+    )
     raw_sim = result.metadata.get("raw_simulation_probabilities", result.simulation_probabilities)
     raw_math = result.metadata.get("raw_mathematical_probabilities", result.mathematical_probabilities)
     out = {
@@ -640,7 +670,12 @@ def attach_pregame_weather(frame: pd.DataFrame, announced: list[dict]) -> int:
         scheduled = lookup.get(key)
         if not scheduled:
             continue
-        fields = weather_snapshot_fields(int(scheduled.get("venue_id", 0) or 0), str(scheduled.get("game_time", "")))
+        fields = weather_snapshot_fields(
+            int(scheduled.get("venue_id", 0) or 0),
+            str(scheduled.get("game_time", "")),
+            scheduled.get("venue_latitude"),
+            scheduled.get("venue_longitude"),
+        )
         changed = False
         venue_id = int(scheduled.get("venue_id", 0) or 0)
         old_venue = pd.to_numeric(pd.Series([row.get("venue_id")]), errors="coerce").iloc[0]

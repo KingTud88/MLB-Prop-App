@@ -543,9 +543,10 @@ if isinstance(slate, pd.DataFrame):
         # Audit/context fields (weather, starter sample, workload) stay available
         # but live farther right so they do not separate the pitcher from Projection K.
         display_cols = [
-            "player", "team", "opponent", "projection", "k_range_low", "k_range_high", "sim_5p", "math_5p",
-            "hits_projection", "hits_range_low", "hits_range_high", "hits_sim_over_5_5", "hits_math_over_5_5",
-            "outs_projection", "outs_range_low", "outs_range_high", "outs_sim_over_15_5", "outs_math_over_15_5",
+            "player", "team", "opponent",
+            "active_strikeout_line", "active_strikeout_line_source", "projection", "k_range_low", "k_range_high", "sim_5p", "math_5p",
+            "active_outs_line", "active_outs_line_source", "outs_projection", "outs_range_low", "outs_range_high", "outs_sim_over_15_5", "outs_math_over_15_5",
+            "active_hits_allowed_line", "active_hits_allowed_line_source", "hits_projection", "hits_range_low", "hits_range_high", "hits_sim_over_5_5", "hits_math_over_5_5",
             "confidence", "data_quality", "opponent_k_pct",
             "lineup_source", "lineup_batters", "lineup_projection_delta",
             "weather_icon", "weather_delay_risk", "weather_precip_probability",
@@ -608,9 +609,15 @@ if isinstance(slate, pd.DataFrame):
                 "lineup_projection_delta": "Lineup K Δ",
                 "team": "Team",
                 "opponent": "Opp",
+                "active_strikeout_line": "K Line",
+                "active_strikeout_line_source": "K Source",
                 "projection": "Projection K",
-                "hits_projection": "Projection Hits",
+                "active_outs_line": "Outs Line",
+                "active_outs_line_source": "Outs Source",
                 "outs_projection": "Projection Outs",
+                "active_hits_allowed_line": "Hits Line",
+                "active_hits_allowed_line_source": "Hits Source",
+                "hits_projection": "Projection Hits",
                 "confidence": "Confidence",
                 "data_quality": "Quality",
                 "opponent_k_pct": "Opp K%",
@@ -640,6 +647,9 @@ if isinstance(slate, pd.DataFrame):
         formatters: dict[str, str] = {}
         for col in projection_highlight_cols:
             formatters[col] = "{:.2f}"
+        for col in ("K Line", "Outs Line", "Hits Line"):
+            if col in display.columns:
+                formatters[col] = "{:.1f}"
         for col in probability_cols:
             formatters[col] = "{:.1%}"
         for col in ("Exp Pitches", "Exp BF", "Exp Outs", "Team Avg Pitches"):
@@ -675,8 +685,8 @@ if isinstance(slate, pd.DataFrame):
 
         st.subheader(f"{slate_date:%B %d, %Y} starter slate")
         st.caption(
-            "How to read: Projection = expected average outcome · 80% Range = one central simulated interval (10th–90th percentile), not an 80% chance at each endpoint · "
-            "SIM/MATH = the probability from each independent model path. Click a pitcher row for the full breakdown. Headline projections are green."
+            "How to read: Line = active sportsbook execution line attached after projection capture · Projection = frozen expected average outcome · 80% Range = one central simulated interval (10th–90th percentile), not an 80% chance at each endpoint · "
+            "SIM/MATH = the probability from each independent model path. MANUAL/PAID API source labels show exactly where each line came from. Adding or changing a line never changes the frozen projection. Click a pitcher row for the full breakdown. Headline projections are green."
         )
         event = st.dataframe(
             styled_display,
