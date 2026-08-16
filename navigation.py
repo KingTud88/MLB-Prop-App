@@ -28,6 +28,14 @@ def render_sidebar(active: str = "projection") -> None:
             background: linear-gradient(145deg, rgba(14,35,64,.78), rgba(7,20,38,.72));
             box-shadow: 0 13px 32px rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.025);
         }
+        .sk-nav-brand:empty {
+            display:none !important;
+            margin:0 !important;
+            padding:0 !important;
+            border:0 !important;
+            background:none !important;
+            box-shadow:none !important;
+        }
         .sk-nav-mascot {
             display:flex;
             justify-content:center;
