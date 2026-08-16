@@ -83,6 +83,7 @@ st.markdown(
 
 EASTERN = ZoneInfo("America/New_York")
 today = datetime.now(EASTERN).date()
+ARCHIVE_PATH = LOG_PATH.parent / "projection_archive.csv"
 slate_date = st.date_input("Slate date", value=today)
 
 
@@ -149,6 +150,63 @@ def save_log(frame: pd.DataFrame) -> None:
     if "resolved_at_utc" not in frame.columns:
         frame["resolved_at_utc"] = ""
     frame.to_csv(LOG_PATH, index=False)
+
+
+def _archive_row_key(row: pd.Series) -> str:
+    game_pk = str(row.get("game_pk", "")).split(".")[0]
+    pitcher_id = str(row.get("pitcher_id", "")).split(".")[0]
+    return f"{game_pk}:{pitcher_id}"
+
+
+def _parse_market_line(value: object) -> float:
+    text = str(value or "").strip()
+    if not text:
+        return np.nan
+    try:
+        return float(text)
+    except ValueError as exc:
+        raise ValueError(f"Invalid market line: {text}") from exc
+
+
+def commit_projection_archive(slate: pd.DataFrame, manual_lines: dict[str, dict[str, float]], slate_day: str) -> int:
+    if slate.empty:
+        return 0
+    snapshot = slate.copy().reset_index(drop=True)
+    snapshot["manual_strikeout_line"] = [manual_lines.get(_archive_row_key(row), {}).get("k", np.nan) for _, row in snapshot.iterrows()]
+    snapshot["manual_outs_line"] = [manual_lines.get(_archive_row_key(row), {}).get("outs", np.nan) for _, row in snapshot.iterrows()]
+    snapshot["manual_hits_allowed_line"] = [manual_lines.get(_archive_row_key(row), {}).get("hits", np.nan) for _, row in snapshot.iterrows()]
+    snapshot["archive_source"] = "DAILY_RUN_MANUAL"
+    snapshot["archive_committed_at_utc"] = datetime.now(ZoneInfo("UTC")).isoformat()
+
+    if ARCHIVE_PATH.exists():
+        try:
+            existing = pd.read_csv(ARCHIVE_PATH)
+        except Exception:
+            existing = pd.DataFrame()
+    else:
+        existing = load_log()
+        if not existing.empty and "game_date" in existing.columns:
+            cutoff = pd.Timestamp(slate_day).date()
+            legacy_dates = pd.to_datetime(existing["game_date"], errors="coerce").dt.date
+            existing = existing.loc[legacy_dates < cutoff].copy()
+            if not existing.empty:
+                existing["manual_strikeout_line"] = np.nan
+                existing["manual_outs_line"] = np.nan
+                existing["manual_hits_allowed_line"] = np.nan
+                existing["archive_source"] = "LEGACY_PRE_MANUAL_ARCHIVE"
+                existing["archive_committed_at_utc"] = existing.get("captured_at_utc", "")
+        else:
+            existing = pd.DataFrame()
+
+    if not existing.empty and {"game_pk", "pitcher_id"}.issubset(existing.columns) and {"game_pk", "pitcher_id"}.issubset(snapshot.columns):
+        new_keys = set(zip(snapshot["game_pk"].astype(str), snapshot["pitcher_id"].astype(str)))
+        keep_mask = [key not in new_keys for key in zip(existing["game_pk"].astype(str), existing["pitcher_id"].astype(str))]
+        existing = existing.loc[keep_mask].copy()
+
+    archive = pd.concat([existing, snapshot], ignore_index=True, sort=False)
+    ARCHIVE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    archive.to_csv(ARCHIVE_PATH, index=False)
+    return len(snapshot)
 
 
 def run_full_slate(day: str) -> tuple[pd.DataFrame, int, int, list[str], list[str]]:
@@ -330,22 +388,6 @@ def render_projection_rationale(row: pd.Series, history: pd.DataFrame) -> None:
 
 st.markdown('<div class="daily-note">Batch capture only · the Projection page remains the single-pitcher deep dive. Existing snapshots stay frozen after first pitch; while still pregame, a roster-fallback row may upgrade once MLB posts a confirmed batting order.</div>', unsafe_allow_html=True)
 
-st.markdown('<div class="daily-section-head">Manual Paid Data</div>', unsafe_allow_html=True)
-st.markdown('<div class="daily-note paid">Optional market-data pull · manual only · strikeout lines only · saved snapshot is reused elsewhere without another paid request.</div>', unsafe_allow_html=True)
-st.markdown('<div class="daily-action-label">💳 Paid strikeout lines</div>', unsafe_allow_html=True)
-st.caption("Manual only. This button is the ONLY paid Odds API path and requests pitcher_strikeouts only. The saved snapshot is reused by Main Projections without another API call.")
-if st.button("💳 LOAD STRIKEOUT LINES · PAID API", use_container_width=True, key="daily_paid_k_odds"):
-    api_key=resolve_api_key(st.secrets)
-    with st.spinner("Loading today's main pitcher strikeout lines once and saving the snapshot..."):
-        odds_snapshot,quota,odds_error=refresh_strikeout_snapshot(api_key,slate_date.isoformat())
-    if odds_error:
-        st.error(odds_error)
-    else:
-        pitchers=int(odds_snapshot.get("pitcher",pd.Series(dtype=str)).nunique()) if not odds_snapshot.empty else 0
-        st.success(f"Saved {len(odds_snapshot)} strikeout offers for {pitchers} pitchers. Main Projections will reuse this snapshot for free.")
-        if quota:
-            st.caption(f"Last paid request: {quota.get('last','—')} credit(s) · {quota.get('remaining','—')} remaining · {quota.get('used','—')} used.")
-
 st.markdown('<div class="daily-section-head">Projection Capture</div>', unsafe_allow_html=True)
 st.markdown('<div class="daily-action-label">⚾ Run the full starter slate</div><div class="daily-action-copy">Primary daily action · capture new eligible starters, preserve frozen snapshots, and refresh only allowed pregame context.</div>', unsafe_allow_html=True)
 if st.button("⚾ RUN ALL TODAY'S PITCHERS", type="primary", use_container_width=True):
@@ -387,6 +429,42 @@ if isinstance(slate, pd.DataFrame):
     c5.metric("Errors", len(errors))
     confirmed_lineups = int(slate.get("lineup_source", pd.Series(index=slate.index, dtype=str)).astype(str).eq("CONFIRMED_LINEUP").sum()) if not slate.empty else 0
     c6.metric("Confirmed lineups", confirmed_lineups)
+
+    if not slate.empty:
+        st.markdown('<div class="daily-action-label">🎚️ Manual sportsbook lines</div>', unsafe_allow_html=True)
+        st.caption("Open each pitcher bar and enter the sportsbook lines you want attached to this frozen projection. Half-lines such as 4.5, 15.5, and 5.5 are supported. Blank markets are allowed.")
+        manual_line_values: dict[str, dict[str, str]] = {}
+        for _, manual_row in slate.reset_index(drop=True).iterrows():
+            row_key = _archive_row_key(manual_row)
+            player = str(manual_row.get("player", "Unknown"))
+            team = str(manual_row.get("team", "—"))
+            opponent = str(manual_row.get("opponent", "—"))
+            with st.expander(f"⚾ {player} · {team} vs {opponent}", expanded=False):
+                l1, l2, l3 = st.columns(3)
+                k_raw = l1.text_input("Strikeout line", placeholder="e.g. 4.5", key=f"daily_manual_k_{row_key}")
+                outs_raw = l2.text_input("Total outs line", placeholder="e.g. 15.5", key=f"daily_manual_outs_{row_key}")
+                hits_raw = l3.text_input("Hits allowed line", placeholder="e.g. 5.5", key=f"daily_manual_hits_{row_key}")
+                st.caption(f"Model: {float(manual_row.get('projection', float('nan'))):.2f} K · {float(manual_row.get('outs_projection', float('nan'))):.2f} outs · {float(manual_row.get('hits_projection', float('nan'))):.2f} hits allowed")
+            manual_line_values[row_key] = {"k": k_raw, "outs": outs_raw, "hits": hits_raw}
+
+        if st.button("✅ APPLY LINES + ADD TO PROJECTION ARCHIVE", type="primary", use_container_width=True, key="daily_apply_archive"):
+            try:
+                parsed_lines = {
+                    key: {
+                        "k": _parse_market_line(values.get("k")),
+                        "outs": _parse_market_line(values.get("outs")),
+                        "hits": _parse_market_line(values.get("hits")),
+                    }
+                    for key, values in manual_line_values.items()
+                }
+                filled_lines = sum(pd.notna(value) for values in parsed_lines.values() for value in values.values())
+                if filled_lines == 0:
+                    raise ValueError("Enter at least one sportsbook line before adding the slate to the Projection Archive.")
+                archived = commit_projection_archive(slate, parsed_lines, slate_date.isoformat())
+                st.session_state["daily_archive_saved_at"] = datetime.now(EASTERN).strftime("%b %d, %Y · %I:%M:%S %p ET")
+                st.success(f"Applied {filled_lines} manual market line(s) and added {archived} pitcher projection(s) to the Projection Archive.")
+            except ValueError as exc:
+                st.error(str(exc))
 
     if not slate.empty:
         # Keep the primary projection scan tight: pitcher/matchup first, then Ks.
@@ -558,6 +636,23 @@ if isinstance(slate, pd.DataFrame):
         st.warning("Some announced starters hit real capture errors:")
         for error in errors:
             st.write(f"- {error}")
+
+st.markdown('<div class="daily-section-head">Manual Paid Data</div>', unsafe_allow_html=True)
+st.markdown('<div class="daily-note paid">Optional market-data pull · manual only · strikeout lines only · saved snapshot is reused elsewhere without another paid request.</div>', unsafe_allow_html=True)
+st.markdown('<div class="daily-action-label">💳 Paid strikeout lines</div>', unsafe_allow_html=True)
+st.caption("Manual only. This button is the ONLY paid Odds API path and requests pitcher_strikeouts only. The saved snapshot is reused by Main Projections without another API call.")
+if st.button("💳 LOAD STRIKEOUT LINES · PAID API", use_container_width=True, key="daily_paid_k_odds"):
+    api_key=resolve_api_key(st.secrets)
+    with st.spinner("Loading today's main pitcher strikeout lines once and saving the snapshot..."):
+        odds_snapshot,quota,odds_error=refresh_strikeout_snapshot(api_key,slate_date.isoformat())
+    if odds_error:
+        st.error(odds_error)
+    else:
+        pitchers=int(odds_snapshot.get("pitcher",pd.Series(dtype=str)).nunique()) if not odds_snapshot.empty else 0
+        st.success(f"Saved {len(odds_snapshot)} strikeout offers for {pitchers} pitchers. Main Projections will reuse this snapshot for free.")
+        if quota:
+            st.caption(f"Last paid request: {quota.get('last','—')} credit(s) · {quota.get('remaining','—')} remaining · {quota.get('used','—')} used.")
+
 
 st.markdown('<div class="daily-section-head">Persistent History-Only Tracker</div>', unsafe_allow_html=True)
 st.caption(

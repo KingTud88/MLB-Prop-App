@@ -26,6 +26,7 @@ from engine.projection_crushers import bettable_k_label, bettable_k_result, bett
 
 ROOT = Path(__file__).resolve().parents[1]
 LOG_PATH = ROOT / "data" / "projection_log.csv"
+ARCHIVE_PATH = ROOT / "data" / "projection_archive.csv"
 OBS_LOG_PATH = ROOT / "data" / "starter_observation_log.csv"
 ROLLING_WINDOW = 20
 
@@ -67,7 +68,7 @@ st.caption(
 )
 st.markdown(
     '<div class="history-hero"><strong>Performance archive · frozen pregame evidence</strong>'
-    '<span>Scoreboard first, K wins and crushers next, deeper learning diagnostics below.</span></div>',
+    '<span>Projection Archive first, then performance and deeper learning diagnostics below.</span></div>',
     unsafe_allow_html=True,
 )
 
@@ -79,6 +80,26 @@ def load_projection_history() -> pd.DataFrame:
         return pd.read_csv(LOG_PATH)
     except Exception:
         return pd.DataFrame()
+
+
+def load_user_archive(evidence: pd.DataFrame) -> pd.DataFrame:
+    if ARCHIVE_PATH.exists():
+        try:
+            return pd.read_csv(ARCHIVE_PATH)
+        except Exception:
+            return pd.DataFrame()
+    if evidence.empty or "game_date" not in evidence.columns:
+        return pd.DataFrame()
+    today_eastern = pd.Timestamp.now(tz="America/New_York").date()
+    dates = pd.to_datetime(evidence["game_date"], errors="coerce").dt.date
+    legacy = evidence.loc[dates < today_eastern].copy()
+    if not legacy.empty:
+        legacy["manual_strikeout_line"] = np.nan
+        legacy["manual_outs_line"] = np.nan
+        legacy["manual_hits_allowed_line"] = np.nan
+        legacy["archive_source"] = "LEGACY_PRE_MANUAL_ARCHIVE"
+        legacy["archive_committed_at_utc"] = legacy.get("captured_at_utc", "")
+    return legacy
 
 
 def load_observation_history() -> pd.DataFrame:
@@ -137,15 +158,6 @@ def rolling_learning_frame(frame: pd.DataFrame) -> pd.DataFrame:
     return current
 
 
-if st.button("Resolve completed games", type="primary"):
-    with st.spinner("Checking MLB results and attaching completed pitcher outcomes..."):
-        try:
-            resolve_projection_log()
-            st.success("Completed-game resolution finished. History refreshed below.")
-        except Exception as exc:
-            st.error(f"Could not resolve completed projection outcomes: {exc}")
-
-
 df = load_projection_history()
 if df.empty:
     st.info("No archived projections yet. Use Daily Projection Run to capture the announced starter slate before first pitch.")
@@ -171,6 +183,62 @@ for col in [
     if col not in df.columns:
         df[col] = pd.NA
 
+# MANUAL_PROJECTION_ARCHIVE_V1
+st.markdown('<div class="history-kicker">Primary workflow</div>', unsafe_allow_html=True)
+st.subheader("📋 Projection Archive")
+st.caption("This is the archive you manually approve from Daily Projection Run. Automatic background captures stay in the evidence log lower on this page and do not appear here until you add the slate.")
+user_archive = load_user_archive(df)
+if user_archive.empty:
+    st.info("No manually committed projection slates yet. Run Daily Projection Run, enter the sportsbook lines, then use Apply Lines + Add to Projection Archive.")
+else:
+    archive_dates = pd.to_datetime(user_archive.get("game_date"), errors="coerce")
+    user_archive = user_archive.copy()
+    user_archive["_archive_date"] = archive_dates
+    user_archive = user_archive.sort_values(["_archive_date", "player"], ascending=[False, True], na_position="last")
+    archive_columns = [
+        "player", "team", "opponent",
+        "manual_strikeout_line", "projection", "actual_strikeouts",
+        "manual_outs_line", "outs_projection", "actual_outs",
+        "manual_hits_allowed_line", "hits_projection", "actual_hits_allowed",
+        "confidence", "data_quality", "archive_source", "archive_committed_at_utc",
+    ]
+    archive_columns = [col for col in archive_columns if col in user_archive.columns]
+    unique_dates = user_archive["_archive_date"].dt.date.dropna().drop_duplicates().tolist()
+    for idx, archive_date in enumerate(unique_dates):
+        group = user_archive.loc[user_archive["_archive_date"].dt.date.eq(archive_date), archive_columns].copy()
+        date_label = pd.Timestamp(archive_date).strftime("%B %-d, %Y")
+        with st.expander(f"📅 {date_label} · {len(group)} pitcher{'s' if len(group) != 1 else ''}", expanded=(idx == 0)):
+            st.dataframe(
+                group,
+                hide_index=True,
+                width="stretch",
+                column_config={
+                    "player": st.column_config.TextColumn("Pitcher"),
+                    "team": st.column_config.TextColumn("Team"),
+                    "opponent": st.column_config.TextColumn("Opp"),
+                    "manual_strikeout_line": st.column_config.NumberColumn("K Line", format="%.1f"),
+                    "projection": st.column_config.NumberColumn("Projected K", format="%.2f"),
+                    "actual_strikeouts": st.column_config.NumberColumn("Actual K", format="%.0f"),
+                    "manual_outs_line": st.column_config.NumberColumn("Outs Line", format="%.1f"),
+                    "outs_projection": st.column_config.NumberColumn("Projected Outs", format="%.2f"),
+                    "actual_outs": st.column_config.NumberColumn("Actual Outs", format="%.0f"),
+                    "manual_hits_allowed_line": st.column_config.NumberColumn("Hits Line", format="%.1f"),
+                    "hits_projection": st.column_config.NumberColumn("Projected Hits", format="%.2f"),
+                    "actual_hits_allowed": st.column_config.NumberColumn("Actual Hits", format="%.0f"),
+                    "archive_source": st.column_config.TextColumn("Archive Source"),
+                },
+            )
+
+st.divider()
+if st.button("Resolve completed games", type="primary"):
+    with st.spinner("Checking MLB results and attaching completed pitcher outcomes..."):
+        try:
+            resolve_projection_log()
+            st.success("Completed-game resolution finished. History refreshed below.")
+        except Exception as exc:
+            st.error(f"Could not resolve completed projection outcomes: {exc}")
+
+
 k_resolved = df["actual_strikeouts"].notna()
 k_ready = k_resolved & df["k_range_low"].notna() & df["k_range_high"].notna()
 k_hit = k_ready & (df["actual_strikeouts"] >= df["k_range_low"]) & (df["actual_strikeouts"] <= df["k_range_high"])
@@ -185,7 +253,7 @@ o_hit = o_ready & (df["actual_outs"] >= df["outs_range_low"]) & (df["actual_outs
 
 st.markdown('<div class="history-kicker">Performance scoreboard</div>', unsafe_allow_html=True)
 col1, col2, col3, col4, col5, col6 = st.columns(6)
-col1.metric("Archived projections", len(df))
+col1.metric("Evidence snapshots", len(df))
 col2.metric("Resolved games", int((k_resolved | h_resolved | o_resolved).sum()))
 col3.metric("K range hits", int(k_hit.sum()))
 col4.metric("K hit rate", f"{float(k_hit.sum() / k_ready.sum()):.1%}" if k_ready.any() else "—")
@@ -616,8 +684,9 @@ else:
     )
 
 st.divider()
-st.markdown('<div class="history-kicker">Resolved & pending slates</div>', unsafe_allow_html=True)
-st.subheader("📋 Projection archive")
+st.markdown('<div class="history-kicker">Automatic model evidence</div>', unsafe_allow_html=True)
+st.subheader("🧪 Automatic Evidence Log")
+st.caption("This lower log is populated by scheduled background capture for calibration and diagnostics, so today can appear here even if you never manually ran or archived the slate.")
 display = df.sort_values(["game_date", "captured_at_utc"], ascending=[False, False]).copy()
 display["status"] = display.apply(
     lambda r: "Resolved" if pd.notna(r.get("actual_strikeouts")) or pd.notna(r.get("actual_hits_allowed")) or pd.notna(r.get("actual_outs")) else "Pending",
