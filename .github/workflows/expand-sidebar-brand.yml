@@ -34,6 +34,9 @@ jobs:
       - name: Polish Projection Summary emblems to match mockup
         run: python tools/polish_projection_summary_emblems.py
 
+      - name: Install Pillow for Projection artwork
+        run: python -m pip install --quiet pillow
+
       - name: Split Projection artwork into individual badges
         run: python tools/fix_projection_artwork_individual.py
 
