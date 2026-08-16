@@ -1,0 +1,180 @@
+name: Apply secondary-page command-center consistency
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/apply-command-center-consistency.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: command-center-consistency-sweep
+  cancel-in-progress: false
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest
+
+      - name: Attach shared consistency layer and clean presentation drift
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          pages = {
+              "pages/2_Bet_Tracker.py": ("bets", "bet_tracker"),
+              "pages/4_Projection_History.py": ("history", "projection_history"),
+              "pages/5_Daily_Projection_Run.py": ("daily", "daily_run"),
+              "pages/6_Top_Plays.py": ("top", "top_plays"),
+          }
+
+          for path, (sidebar_key, page_key) in pages.items():
+              p = Path(path)
+              text = p.read_text(encoding="utf-8")
+              import_old = "from engine.ui_theme import apply_page_theme\n"
+              import_new = (
+                  "from engine.ui_theme import apply_page_theme\n"
+                  "from engine.command_center_consistency import apply_command_center_consistency\n"
+              )
+              if "from engine.command_center_consistency import apply_command_center_consistency" not in text:
+                  if import_old not in text:
+                      raise SystemExit(f"UI theme import anchor missing in {path}")
+                  text = text.replace(import_old, import_new, 1)
+
+              call = f'apply_command_center_consistency("{page_key}")'
+              if call not in text:
+                  anchor = f'render_sidebar("{sidebar_key}")\n'
+                  if anchor not in text:
+                      raise SystemExit(f"Sidebar anchor missing in {path}")
+                  text = text.replace(anchor, anchor + call + "\n", 1)
+
+              p.write_text(text, encoding="utf-8")
+
+          # Bet Tracker accumulated the exact same three presentation rules many
+          # times during prior UI patch passes. Collapse them without touching logic.
+          bet_path = Path("pages/2_Bet_Tracker.py")
+          bet = bet_path.read_text(encoding="utf-8")
+          triplet = (
+              '    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}\n'
+              '    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}\n'
+              '    .bt-ticket-state .status{font-size:.70rem!important}\n'
+          )
+          while triplet + triplet in bet:
+              bet = bet.replace(triplet + triplet, triplet)
+          bet_path.write_text(bet, encoding="utf-8")
+
+          # Top Plays used an older page-local mascot fallback. The shared
+          # navigation now owns the current mascot/wordmark for every page.
+          top_path = Path("pages/6_Top_Plays.py")
+          top = top_path.read_text(encoding="utf-8")
+          old_mascot = '''    /* Reliable sidebar mascot fallback for this page; clean asset is known-good. */
+              [data-testid="stSidebar"] .sk-nav-mascot img{display:none!important}
+              [data-testid="stSidebar"] .sk-nav-mascot::before{
+                  content:"";display:block;width:190px;height:190px;background:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000_clean.png?v=10") center/contain no-repeat;
+                  filter:drop-shadow(0 8px 16px rgba(0,0,0,.3));
+              }
+
+          '''
+          if old_mascot in top:
+              top = top.replace(old_mascot, "", 1)
+          top_path.write_text(top, encoding="utf-8")
+
+          Path("tests/test_command_center_consistency.py").write_text('''from pathlib import Path
+
+from engine.command_center_consistency import COMMAND_CENTER_UI_VERSION, SUPPORTED_PAGES
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_all_secondary_pages_use_shared_command_center_consistency():
+    pages = {
+        "pages/2_Bet_Tracker.py": "bet_tracker",
+        "pages/4_Projection_History.py": "projection_history",
+        "pages/5_Daily_Projection_Run.py": "daily_run",
+        "pages/6_Top_Plays.py": "top_plays",
+    }
+    assert set(pages.values()) == SUPPORTED_PAGES
+    for path, page_key in pages.items():
+        source = (ROOT / path).read_text(encoding="utf-8")
+        assert "from engine.command_center_consistency import apply_command_center_consistency" in source
+        assert f'apply_command_center_consistency("{page_key}")' in source
+
+
+def test_consistency_layer_is_presentation_only():
+    source = (ROOT / "engine" / "command_center_consistency.py").read_text(encoding="utf-8")
+    assert COMMAND_CENTER_UI_VERSION == "command-center-consistency-v1"
+    assert "requests" not in source
+    assert "ProjectionEngine" not in source
+    assert "append_bet" not in source
+    assert "projection_log" not in source
+    assert "odds" not in source.lower()
+    assert "COMMAND_CENTER_CONSISTENCY_V1" in source
+
+
+def test_old_top_plays_mascot_override_is_removed():
+    source = (ROOT / "pages" / "6_Top_Plays.py").read_text(encoding="utf-8")
+    assert "Reliable sidebar mascot fallback for this page" not in source
+    assert 'sk-nav-mascot img{display:none!important}' not in source
+
+
+def test_bet_tracker_duplicate_style_triplet_is_collapsed():
+    source = (ROOT / "pages" / "2_Bet_Tracker.py").read_text(encoding="utf-8")
+    marker = '[data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}'
+    assert source.count(marker) == 1
+''', encoding="utf-8")
+          PY
+
+      - name: Syntax validation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for path in [
+              "engine/command_center_consistency.py",
+              "pages/2_Bet_Tracker.py",
+              "pages/4_Projection_History.py",
+              "pages/5_Daily_Projection_Run.py",
+              "pages/6_Top_Plays.py",
+              "tests/test_command_center_consistency.py",
+          ]:
+              compile(Path(path).read_text(encoding="utf-8"), path, "exec")
+          print("syntax_ok")
+          PY
+
+      - name: Full regression suite
+        run: pytest -q
+
+      - name: Commit verified presentation changes
+        run: |
+          rm -rf .pytest_cache
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pages/2_Bet_Tracker.py pages/4_Projection_History.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py tests/test_command_center_consistency.py
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "No page changes to commit."
+            exit 0
+          fi
+          git commit -m "Unify secondary command-center pages"
+          git status --porcelain
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
