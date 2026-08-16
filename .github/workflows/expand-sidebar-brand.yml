@@ -1,13 +1,15 @@
-name: Game Status Weather Hero
+name: Projection Weather Card Hero
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  game-status-weather-hero:
+  projection-weather-card-hero:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,46 +23,47 @@ jobs:
         run: pip install -r requirements.txt pytest
 
       - name: Validate patch script
-        run: python -m py_compile .github/scripts/game_status_weather_hero_v12.py
+        run: python -m py_compile .github/scripts/weather_card_hero_v13.py
 
-      - name: Apply Game Status weather hero
-        run: python .github/scripts/game_status_weather_hero_v12.py
+      - name: Apply Projection weather card hero
+        run: python .github/scripts/weather_card_hero_v13.py
 
       - name: Validate app syntax
-        run: python -m py_compile streamlit_app.py engine/ui_command_center.py
+        run: python -m py_compile streamlit_app.py
 
-      - name: Validate Game Status UI contracts
+      - name: Validate weather card UI contracts
         run: |
           python - <<'PY'
           from pathlib import Path
-          ui = Path("engine/ui_command_center.py").read_text(encoding="utf-8")
-          app = Path("streamlit_app.py").read_text(encoding="utf-8")
-          required_ui = [
-              'grid-template-columns:minmax(0,1fr) 96px',
-              'cc-weather-status-hero',
-              'weather_level: str = "UNKNOWN"',
-              '"NONE": "☀️"',
-              'cc-matchup-status-copy',
+          source = Path("streamlit_app.py").read_text(encoding="utf-8")
+          required = [
+              'WEATHER_CARD_HERO_V13',
+              'grid-template-columns:minmax(0,1fr) 100px',
+              '.weather-high .game-weather-icon',
+              '.weather-elevated .game-weather-icon',
+              '.weather-low .game-weather-icon',
+              '.weather-none .game-weather-icon',
+              'width:92px;',
+              'height:92px;',
+              '"☀️" if str(weather_risk.level or "").upper()=="NONE"',
           ]
-          missing = [token for token in required_ui if token not in ui]
-          if 'weather_level=_weather_level' not in app:
-              missing.append('weather_level=_weather_level')
+          missing = [token for token in required if token not in source]
           if missing:
-              raise SystemExit(f"Missing Game Status weather hero contracts: {missing}")
-          print("Game Status weather hero contracts present")
+              raise SystemExit(f"Missing weather card hero contracts: {missing}")
+          print("Projection weather card hero contracts present")
           PY
-          python -m pytest -q tests/test_ui_command_center_contract.py tests/test_projection_weather_batter_contract.py tests/test_weather_risk.py
+          python -m pytest -q tests/test_projection_weather_batter_contract.py tests/test_weather_risk.py
 
-      - name: Commit Game Status weather hero safely
+      - name: Commit weather card hero safely
         run: |
-          if git diff --quiet -- streamlit_app.py engine/ui_command_center.py; then
-            echo "Game Status weather hero already applied"
+          if git diff --quiet -- streamlit_app.py; then
+            echo "Projection weather card hero already applied"
             exit 0
           fi
           git config user.name "KingTud88"
           git config user.email "jaxson0603@gmail.com"
-          git add streamlit_app.py engine/ui_command_center.py
-          git commit -m "Enlarge Game Status weather symbol"
+          git add streamlit_app.py
+          git commit -m "Enlarge Projection weather card symbol"
           for attempt in 1 2 3 4; do
             git fetch origin main
             git rebase origin/main || { git rebase --abort || true; sleep 2; continue; }
@@ -69,5 +72,5 @@ jobs:
             fi
             sleep $((attempt * 2))
           done
-          echo "Could not push Game Status weather hero after retries"
+          echo "Could not push Projection weather card hero after retries"
           exit 1
