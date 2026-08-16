@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Patch Daily Run and Projection History
         run: |
           python - <<'PY'
@@ -100,7 +102,7 @@ jobs:
           PY
       - name: Validate Python syntax
         run: python -m py_compile pages/5_Daily_Projection_Run.py pages/4_Projection_History.py
-      - name: Commit workflow changes
+      - name: Commit workflow changes safely
         run: |
           if git diff --quiet -- pages/5_Daily_Projection_Run.py pages/4_Projection_History.py; then
             echo "No manual archive changes to commit"
@@ -110,4 +112,17 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add pages/5_Daily_Projection_Run.py pages/4_Projection_History.py
           git commit -m "Add manual projection archive workflow"
-          git push
+          for attempt in 1 2 3 4; do
+            git fetch origin main
+            if git rebase origin/main; then
+              if git push origin HEAD:main; then
+                exit 0
+              fi
+            else
+              git rebase --abort || true
+            fi
+            echo "Push race on attempt ${attempt}; retrying"
+            sleep $((attempt * 2))
+          done
+          echo "Manual archive patch push failed after retries"
+          exit 1
