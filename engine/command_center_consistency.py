@@ -350,6 +350,98 @@ def apply_command_center_consistency(page: str) -> None:
             .stApp .bt-ticket-state{align-items:flex-start!important;flex-direction:column!important}
             .stApp .tp-market-row{align-items:flex-start!important;flex-direction:column!important}
         }
+
+        /* COMMAND_CENTER_MOBILE_V2 · deliberate phone/tablet reflow */
+        @media (max-width:640px){
+            .stApp [data-testid="stHorizontalBlock"]{
+                flex-wrap:wrap!important;
+                gap:.55rem!important;
+            }
+            .stApp [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]{
+                width:100%!important;
+                min-width:100%!important;
+                flex:1 1 100%!important;
+            }
+            .stApp div[data-testid="stButton"],
+            .stApp div[data-testid="stDownloadButton"]{width:100%!important}
+            .stApp div[data-testid="stButton"] button,
+            .stApp div[data-testid="stDownloadButton"] button{
+                width:100%!important;
+                min-height:2.95rem!important;
+            }
+            .stApp [data-testid="stForm"]{padding:.72rem!important}
+            .stApp .daily-run-status{
+                align-items:flex-start!important;
+                flex-direction:column!important;
+                gap:.38rem!important;
+            }
+            .stApp .daily-run-status .meta{text-align:left!important}
+            .stApp .bt-ticket-state .name,
+            .stApp .tp-pitcher{overflow-wrap:anywhere!important}
+            .stApp .bt-sub,
+            .stApp .ph-command-sub,
+            .stApp .daily-command-sub,
+            .stApp .tp-page-sub{
+                font-size:.84rem!important;
+                line-height:1.43!important;
+            }
+            .stApp .history-primary-note,
+            .stApp .daily-note{padding:.70rem .76rem!important}
+            .stApp .tp-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+            .stApp div[data-testid="stExpander"] summary{min-height:3.05rem!important}
+        }
+        @media (max-width:480px){
+            .stApp .block-container{
+                padding-left:.62rem!important;
+                padding-right:.62rem!important;
+            }
+            .stApp .bt-hero,
+            .stApp .ph-command-hero,
+            .stApp .daily-command-hero,
+            .stApp .tp-page-hero{
+                padding:.72rem .74rem!important;
+                margin-bottom:.66rem!important;
+            }
+            .stApp .bt-kicker,
+            .stApp .ph-command-kicker,
+            .stApp .daily-command-kicker,
+            .stApp .tp-page-kicker{
+                font-size:.62rem!important;
+                letter-spacing:.095em!important;
+            }
+            .stApp .bt-title,
+            .stApp .ph-command-title,
+            .stApp .daily-command-title,
+            .stApp .tp-page-title{
+                font-size:2.28rem!important;
+                line-height:.90!important;
+            }
+            .stApp .bt-rule,
+            .stApp .ph-command-rule,
+            .stApp .daily-command-rule,
+            .stApp .tp-page-rule{
+                width:100%!important;
+                font-size:.58rem!important;
+                line-height:1.35!important;
+                letter-spacing:.045em!important;
+                white-space:normal!important;
+            }
+            .stApp .bt-section,
+            .stApp .history-section-head,
+            .stApp .daily-section-head,
+            .stApp .tp-section-ribbon{
+                width:100%!important;
+                min-width:0!important;
+                max-width:100%!important;
+                padding:.40rem .68rem!important;
+            }
+            .stApp [data-testid="stMetric"]{min-height:92px!important}
+            .stApp [data-testid="stMetricLabel"]{font-size:.73rem!important}
+            .stApp [data-testid="stMetricValue"]{font-size:1.48rem!important}
+            .stApp [data-testid="stCaptionContainer"]{font-size:.76rem!important}
+            .stApp .tp-stat-grid{grid-template-columns:1fr!important}
+            .stApp .tp-market-row{gap:.28rem!important}
+        }
         </style>
         """,
         unsafe_allow_html=True,

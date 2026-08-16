@@ -41,3 +41,11 @@ def test_bet_tracker_duplicate_style_triplet_is_collapsed():
     source = (ROOT / "pages" / "2_Bet_Tracker.py").read_text(encoding="utf-8")
     marker = '[data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}'
     assert source.count(marker) == 1
+
+
+def test_secondary_pages_have_deliberate_mobile_reflow():
+    source = (ROOT / "engine" / "command_center_consistency.py").read_text(encoding="utf-8")
+    assert "COMMAND_CENTER_MOBILE_V2" in source
+    assert "@media (max-width:640px)" in source
+    assert "@media (max-width:480px)" in source
+    assert 'flex:1 1 100%!important' in source
