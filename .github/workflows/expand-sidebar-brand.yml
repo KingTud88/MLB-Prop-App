@@ -28,6 +28,9 @@ jobs:
       - name: Replace Projection icons and emblems only
         run: python tools/patch_projection_emblems.py
 
+      - name: Correct Projection icon placement and vector emblems
+        run: python tools/fix_projection_emblems_v2.py
+
       - name: Validate Python syntax
         run: python -m py_compile training/projection_storage.py pages/4_Projection_History.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py streamlit_app.py
 
@@ -40,7 +43,7 @@ jobs:
           git config user.name "KingTud88"
           git config user.email "jaxson0603@gmail.com"
           git add pages/4_Projection_History.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py streamlit_app.py
-          git commit -m "Polish Projection sidebar and card emblems"
+          git commit -m "Correct Projection icon placement and emblems"
           for attempt in 1 2 3 4; do
             git fetch origin main
             git rebase origin/main || { git rebase --abort || true; sleep 2; continue; }
