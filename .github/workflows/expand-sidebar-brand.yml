@@ -1,8 +1,6 @@
 name: Projection Weather Venue Resolver
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
