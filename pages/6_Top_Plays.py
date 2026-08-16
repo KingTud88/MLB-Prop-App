@@ -36,7 +36,7 @@ render_sidebar("top")
 st.markdown(
     """
     <style>
-    .block-container{padding-top:2.15rem!important}
+    .block-container{padding-top:1.7rem!important;padding-bottom:3.25rem!important}
 
     /* Reliable sidebar mascot fallback for this page; clean asset is known-good. */
     [data-testid="stSidebar"] .sk-nav-mascot img{display:none!important}
@@ -46,62 +46,69 @@ st.markdown(
     }
 
     .tp-page-hero{
-        position:relative;overflow:hidden;margin:.1rem 0 .9rem;padding:1rem 1.2rem 1.05rem;border:1px solid rgba(80,108,136,.76);border-radius:18px;
+        position:relative;overflow:hidden;margin:.1rem 0 .62rem;padding:.9rem 1.15rem .95rem;border:1px solid rgba(80,108,136,.76);border-radius:18px;
         background:linear-gradient(110deg,rgba(8,28,50,.98),rgba(5,20,37,.98));box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 18px 42px rgba(0,0,0,.3)
     }
     .tp-page-hero::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(#ff3655,#a60c29)}
-    .tp-page-kicker{font:900 .72rem/1.2 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.12em;color:#ff6a7d;text-transform:uppercase}
-    .tp-page-title{margin:.28rem 0 .3rem;font-family:Impact,"Arial Black","Arial Narrow",sans-serif;font-size:clamp(2.7rem,5vw,4.8rem);line-height:.86;letter-spacing:.012em;color:#f5f1e9;text-transform:uppercase;text-shadow:3px 4px 0 #07182b}
+    .tp-page-kicker{font:900 .7rem/1.2 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.12em;color:#ff6a7d;text-transform:uppercase}
+    .tp-page-title{margin:.22rem 0 .26rem;font-family:Impact,"Arial Black","Arial Narrow",sans-serif;font-size:clamp(2.7rem,5vw,4.8rem);line-height:.86;letter-spacing:.012em;color:#f5f1e9;text-transform:uppercase;text-shadow:3px 4px 0 #07182b}
     .tp-page-title span{color:#ec1638;-webkit-text-stroke:1px #f1eee7;paint-order:stroke fill}
-    .tp-page-sub{max-width:1120px;color:#b6c6d5;font:650 .9rem/1.5 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
-    .tp-page-rule{margin-top:.65rem;width:max-content;max-width:100%;padding:.28rem .62rem;border-top:1px solid rgba(236,22,56,.65);border-bottom:1px solid rgba(236,22,56,.65);color:#e6edf3;font:900 .69rem/1.2 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.09em;text-transform:uppercase}
+    .tp-page-sub{max-width:1120px;color:#b6c6d5;font:650 .87rem/1.45 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+    .tp-page-rule{margin-top:.52rem;width:max-content;max-width:100%;padding:.25rem .58rem;border-top:1px solid rgba(236,22,56,.65);border-bottom:1px solid rgba(236,22,56,.65);color:#e6edf3;font:900 .67rem/1.2 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.09em;text-transform:uppercase}
 
-    .tp-section-ribbon{width:max-content;min-width:245px;max-width:92%;margin:1.3rem auto .8rem;padding:.46rem 1.8rem;border:1px solid #ff3151;border-bottom-color:#790b1d;border-radius:8px;background:linear-gradient(180deg,#f21b3d,#b70d29);box-shadow:0 7px 16px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.22);color:#fff;font:900 .92rem/1.15 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.035em;text-align:center;text-transform:uppercase}
+    .tp-section-ribbon{width:max-content;min-width:245px;max-width:92%;margin:.92rem auto .48rem;padding:.42rem 1.7rem;border:1px solid #ff3151;border-bottom-color:#790b1d;border-radius:8px;background:linear-gradient(180deg,#f21b3d,#b70d29);box-shadow:0 7px 16px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.22);color:#fff;font:900 .9rem/1.15 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.035em;text-align:center;text-transform:uppercase}
 
     /* Explicit card containers: no DOM-key guessing required for their contents. */
     [class*="st-key-top_play_card_"]{
-        position:relative;padding:.9rem!important;border:1px solid rgba(82,112,141,.78)!important;border-radius:16px!important;
-        background:linear-gradient(150deg,rgba(10,34,59,.99),rgba(4,18,33,.99))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.045),0 15px 34px rgba(0,0,0,.29)!important;overflow:hidden
+        position:relative;padding:.8rem!important;border:1px solid rgba(82,112,141,.78)!important;border-radius:16px!important;
+        background:linear-gradient(150deg,rgba(10,34,59,.99),rgba(4,18,33,.99))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.045),0 13px 30px rgba(0,0,0,.27)!important;overflow:hidden
     }
     [class*="st-key-top_play_card_"]::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:linear-gradient(90deg,transparent,#ec1638 18%,#ec1638 82%,transparent);box-shadow:0 0 14px rgba(236,22,56,.32)}
-    .st-key-top_play_card_1{border-color:rgba(255,73,98,.78)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.055),0 0 0 1px rgba(236,22,56,.12),0 20px 42px rgba(0,0,0,.34)!important}
+    [class*="st-key-top_play_card_"]:has(.tp-status.watch){opacity:.82;border-color:rgba(68,94,119,.62)!important;background:linear-gradient(150deg,rgba(8,28,49,.96),rgba(4,17,31,.98))!important}
+    [class*="st-key-top_play_card_"]:has(.tp-status.model){border-color:rgba(50,229,141,.5)!important}
+    .st-key-top_play_card_1{box-shadow:inset 0 1px 0 rgba(255,255,255,.055),0 0 0 1px rgba(236,22,56,.12),0 18px 38px rgba(0,0,0,.32)!important}
 
-    .tp-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:.7rem;margin-bottom:.68rem}
-    .tp-rank-wrap{display:flex;align-items:center;gap:.62rem;min-width:0}
-    .tp-rank{display:flex;align-items:center;justify-content:center;width:42px;height:42px;flex:0 0 42px;border-radius:50%;border:2px solid rgba(236,22,56,.78);background:radial-gradient(circle at 35% 30%,#173e69,#07182b 66%);color:#fff;font:900 1rem/1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;box-shadow:0 8px 18px rgba(0,0,0,.26)}
-    .st-key-top_play_card_1 .tp-rank{width:48px;height:48px;flex-basis:48px;font-size:1.12rem;background:radial-gradient(circle at 35% 30%,#7d1730,#250815 70%)}
-    .tp-pitcher{color:#f7f3ec;font:900 1.16rem/1.12 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.002em;overflow-wrap:anywhere}
-    .st-key-top_play_card_1 .tp-pitcher{font-size:1.42rem}
-    .tp-matchup{margin-top:.15rem;color:#93a9bc;font:750 .76rem/1.3 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;text-transform:uppercase;letter-spacing:.025em}
-    .tp-status{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;border-radius:999px;padding:.23rem .52rem;font:900 .66rem/1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.05em;text-transform:uppercase}
+    .tp-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:.65rem;margin-bottom:.52rem}
+    .tp-rank-wrap{display:flex;align-items:center;gap:.58rem;min-width:0}
+    .tp-rank{display:flex;align-items:center;justify-content:center;width:40px;height:40px;flex:0 0 40px;border-radius:50%;border:2px solid rgba(236,22,56,.78);background:radial-gradient(circle at 35% 30%,#173e69,#07182b 66%);color:#fff;font:900 .96rem/1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;box-shadow:0 8px 18px rgba(0,0,0,.26)}
+    .st-key-top_play_card_1 .tp-rank{width:46px;height:46px;flex-basis:46px;font-size:1.08rem;background:radial-gradient(circle at 35% 30%,#7d1730,#250815 70%)}
+    .tp-pitcher{color:#f7f3ec;font:900 1.14rem/1.1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.002em;overflow-wrap:anywhere}
+    .st-key-top_play_card_1 .tp-pitcher{font-size:1.35rem}
+    .tp-matchup{margin-top:.12rem;color:#93a9bc;font:750 .73rem/1.25 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;text-transform:uppercase;letter-spacing:.025em}
+    .tp-multi-market{display:inline-flex;margin-top:.26rem;padding:.16rem .4rem;border:1px solid rgba(126,162,194,.45);border-radius:999px;background:rgba(17,47,76,.6);color:#bdd0df;font:850 .61rem/1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.04em;text-transform:uppercase}
+    .tp-status-stack{display:flex;flex-direction:column;align-items:flex-end;gap:.28rem}
+    .tp-status{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;border-radius:999px;padding:.23rem .52rem;font:900 .64rem/1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.05em;text-transform:uppercase}
     .tp-status.model{border:1px solid rgba(50,229,141,.55);background:rgba(8,79,52,.38);color:#5cf0ae}
-    .tp-status.watch{border:1px solid rgba(255,209,102,.55);background:rgba(98,71,8,.34);color:#ffe08a}
+    .tp-status.watch{border:1px solid rgba(255,209,102,.5);background:rgba(98,71,8,.28);color:#ffe08a}
+    .tp-evidence{display:inline-flex;white-space:nowrap;border-radius:999px;padding:.18rem .42rem;border:1px solid rgba(101,145,183,.45);background:rgba(14,42,69,.58);color:#a9c5dc;font:850 .57rem/1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.045em;text-transform:uppercase}
+    .tp-evidence.strong{border-color:rgba(74,191,230,.5);color:#8eddf4;background:rgba(10,65,83,.38)}
 
-    .tp-market-row{display:flex;align-items:center;justify-content:space-between;gap:.55rem;margin:.2rem 0 .72rem;padding:.52rem .58rem;border:1px solid rgba(66,99,130,.68);border-radius:11px;background:rgba(5,23,42,.72)}
-    .tp-market{color:#dce6ee;font:850 .8rem/1.25 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;text-transform:uppercase;letter-spacing:.025em}
-    .tp-side{display:inline-flex;align-items:center;border-radius:8px;padding:.26rem .48rem;font:950 .78rem/1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.035em;white-space:nowrap}
+    .tp-market-row{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin:.15rem 0 .58rem;padding:.46rem .54rem;border:1px solid rgba(66,99,130,.68);border-radius:11px;background:rgba(5,23,42,.72)}
+    .tp-market{color:#dce6ee;font:850 .78rem/1.22 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;text-transform:uppercase;letter-spacing:.025em}
+    .tp-side{display:inline-flex;align-items:center;border-radius:8px;padding:.24rem .46rem;font:950 .76rem/1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.035em;white-space:nowrap}
     .tp-side.over{color:#50f2aa;border:1px solid rgba(50,229,141,.55);background:rgba(12,91,61,.34)}
     .tp-side.under{color:#ff6379;border:1px solid rgba(255,71,98,.58);background:rgba(125,13,36,.36)}
     .tp-side.pass{color:#ffe08a;border:1px solid rgba(255,209,102,.55);background:rgba(111,82,15,.3)}
 
-    .tp-stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.45rem;margin-bottom:.62rem}
-    .tp-stat{min-height:70px;padding:.52rem .55rem;border:1px solid rgba(66,100,133,.68);border-radius:10px;background:linear-gradient(145deg,rgba(12,39,67,.94),rgba(6,23,41,.96));text-align:center}
-    .tp-stat-label{color:#91a8bb;font:850 .63rem/1.15 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.055em;text-transform:uppercase}
-    .tp-stat-value{margin-top:.28rem;color:#f7f3ec;font:950 1.42rem/1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
-    .tp-stat-value.prob{color:#50f2aa}.tp-stat-value.quality{font-size:1.2rem}.tp-stat-value.tier{font-size:1.18rem}
-    .st-key-top_play_card_1 .tp-stat-value{font-size:1.62rem}
-    .tp-card-note{margin:.15rem 0 .58rem;color:#9fb3c6;font:650 .74rem/1.38 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+    .tp-stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.4rem;margin-bottom:.5rem}
+    .tp-stat{min-height:62px;padding:.46rem .5rem;border:1px solid rgba(66,100,133,.68);border-radius:10px;background:linear-gradient(145deg,rgba(12,39,67,.94),rgba(6,23,41,.96));text-align:center}
+    .tp-stat-label{color:#91a8bb;font:850 .6rem/1.1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.055em;text-transform:uppercase}
+    .tp-stat-value{margin-top:.24rem;color:#f7f3ec;font:950 1.32rem/1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+    .tp-stat-value.prob{color:#50f2aa}.tp-stat-value.quality{font-size:1.12rem}.tp-stat-value.tier{font-size:1.1rem}
+    .st-key-top_play_card_1 .tp-stat-value{font-size:1.5rem}
+    .tp-card-note{margin:.1rem 0 .48rem;color:#9fb3c6;font:650 .71rem/1.32 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
     .tp-card-note strong{color:#dfe8ef}
 
-    [class*="st-key-top_play_card_"] div[data-testid="stButton"] button{min-height:2.55rem!important;border-radius:9px!important;font-weight:900!important}
-    [class*="st-key-top_play_card_"] [data-testid="stCaptionContainer"]{font-size:.75rem!important;line-height:1.35!important}
+    [class*="st-key-top_play_card_"] div[data-testid="stButton"] button{min-height:2.35rem!important;border-radius:9px!important;font-weight:900!important}
+    [class*="st-key-top_play_card_"] [data-testid="stCaptionContainer"]{font-size:.73rem!important;line-height:1.3!important}
+    [data-testid="stNumberInput"]{margin-bottom:.2rem!important}
 
     /* Remove the old purple visual language everywhere on Top Plays. */
     div[style*="#8b4fc7"],div[style*="93,48,128"],div[style*="139,79,199"]{border-color:rgba(70,105,139,.86)!important;background:linear-gradient(145deg,rgba(12,39,67,.98),rgba(6,23,41,.98))!important}
     div[style*="#8b4fc7"] span,div[style*="139,79,199"] span{border-color:rgba(77,108,137,.72)!important}
 
-    @media (max-width:1050px){.tp-page-title{font-size:3.25rem}.tp-pitcher{font-size:1.06rem}.st-key-top_play_card_1 .tp-pitcher{font-size:1.3rem}}
-    @media (max-width:760px){.block-container{padding-top:1rem!important}.tp-page-hero{padding:.85rem}.tp-page-title{font-size:2.7rem}.tp-page-rule{font-size:.62rem;letter-spacing:.06em}.tp-section-ribbon{min-width:180px;padding:.42rem 1rem;font-size:.84rem}.tp-market-row{align-items:flex-start;flex-direction:column}.tp-stat{min-height:64px}}
+    @media (max-width:1050px){.tp-page-title{font-size:3.25rem}.tp-pitcher{font-size:1.04rem}.st-key-top_play_card_1 .tp-pitcher{font-size:1.26rem}}
+    @media (max-width:760px){.block-container{padding-top:1rem!important}.tp-page-hero{padding:.8rem}.tp-page-title{font-size:2.7rem}.tp-page-rule{font-size:.62rem;letter-spacing:.06em}.tp-section-ribbon{min-width:180px;padding:.4rem 1rem;font-size:.82rem}.tp-market-row{align-items:flex-start;flex-direction:column}.tp-stat{min-height:60px}.tp-status-stack{align-items:flex-start}}
     </style>
     """,
     unsafe_allow_html=True,
@@ -589,7 +596,7 @@ decision_supported = int(plays["Decision Evidence"].isin(["SUPPORTED", "STRONG E
 signal_supported = int(plays["Signal Evidence"].eq("SUPPORTED").sum())
 c1, c2, c3, c4, c5 = st.columns(5)
 c1.metric("Highest model hit probability", f"{plays['Model Probability'].max():.1%}")
-c2.metric("Model-qualified Top 5", model_plays)
+c2.metric("Actionable model plays", model_plays)
 c3.metric("Decision-supported legs", decision_supported)
 c4.metric("Signal-supported legs", signal_supported)
 c5.metric("Exact live prices found", f"{live_offers}/{len(plays)}")
@@ -600,6 +607,7 @@ quick_stake = st.number_input("Straight-bet stake (units)", min_value=0.0, value
 
 # Presentation-only layout: the plays dataframe and rank order are unchanged.
 play_records = list(plays.iterrows())
+pitcher_market_counts = plays["Pitcher"].astype(str).value_counts().to_dict()
 layout_slots: list[tuple[object, tuple[object, pd.Series]]] = []
 if len(play_records) <= 3:
     cols = st.columns(len(play_records))
@@ -628,11 +636,17 @@ for target_col, (_, play_row) in layout_slots:
     opponent = "" if pd.isna(opponent_raw) else str(opponent_raw or "")
     side = str(play_row.get("Side", "PASS") or "PASS").upper()
     side_class = "over" if side == "OVER" else "under" if side == "UNDER" else "pass"
-    status = str(play_row.get("Status", "WATCH") or "WATCH").upper()
-    status_class = "model" if status == "MODEL PLAY" else "watch"
+    action_status = "MODEL PLAY" if model_ok else "WATCH"
+    status_class = "model" if model_ok else "watch"
+    decision_evidence = str(play_row.get("Decision Evidence", "LEARNING") or "LEARNING").upper()
+    evidence_class = "strong" if "STRONG" in decision_evidence else ""
+    evidence_label = f"Evidence · {decision_evidence}"
     tier_hit = numeric(play_row.get("Tier Hit Rate"))
     tier_text = "—" if tier_hit is None else f"{tier_hit:.1%}"
     quality = int(play_row.get("Data Quality", 0))
+    pitcher_name = str(play_row["Pitcher"])
+    multi_market_count = int(pitcher_market_counts.get(pitcher_name, 1))
+    multi_market_html = f'<div class="tp-multi-market">{multi_market_count} markets ranked</div>' if multi_market_count > 1 else ""
     matchup_text = " · ".join(v for v in [team, f"vs {opponent}" if opponent else "", weather_icon] if v)
 
     with target_col:
@@ -642,9 +656,9 @@ for target_col, (_, play_row) in layout_slots:
                 <div class="tp-card-head">
                   <div class="tp-rank-wrap">
                     <div class="tp-rank">#{rank}</div>
-                    <div><div class="tp-pitcher">{play_row['Pitcher']}</div><div class="tp-matchup">{matchup_text or 'Pregame snapshot'}</div></div>
+                    <div><div class="tp-pitcher">{pitcher_name}</div><div class="tp-matchup">{matchup_text or 'Pregame snapshot'}</div>{multi_market_html}</div>
                   </div>
-                  <div class="tp-status {status_class}">{status}</div>
+                  <div class="tp-status-stack"><div class="tp-status {status_class}">{action_status}</div><div class="tp-evidence {evidence_class}">{evidence_label}</div></div>
                 </div>
                 <div class="tp-market-row">
                   <div class="tp-market">{play_row['Market']}</div>
@@ -704,17 +718,17 @@ option_map = {}
 for idx, leg in plays.iterrows():
     label = (
         f"#{int(leg['Rank'])} {leg['Pitcher']} {'' if pd.isna(leg.get('Weather Icon')) else str(leg.get('Weather Icon') or '')} · {leg['Market']} · {leg['Side']} {float(leg['Line']):g} · "
-        f"{float(leg['Model Probability']):.1%} · {leg['Status']}"
+        f"{float(leg['Model Probability']):.1%} · {'MODEL PLAY' if float(leg['Model Probability']) >= 0.55 and int(leg['Data Quality']) >= 60 else 'WATCH'}"
     )
     option_map[label] = idx
 
 selected_labels = st.multiselect(
     "Parlay legs (2–5)",
     list(option_map),
-    default=list(option_map),
+    default=[],
     max_selections=5,
-    key="top_plays_parlay_legs",
-    help="These choices come only from our model Top 5. Sportsbook availability does not filter the list.",
+    key="top_plays_parlay_legs_v2",
+    help="Start empty and intentionally choose 2–5 model legs. Sportsbook availability never filters this list.",
 )
 selected = plays.iloc[[option_map[label] for label in selected_labels]].copy() if selected_labels else plays.iloc[0:0].copy()
 parlay_stake = st.number_input("Parlay stake (units)", min_value=0.0, value=1.0, step=0.5, key="top_plays_parlay_stake")
@@ -739,7 +753,8 @@ parlay_book = st.selectbox(
 parlay_book_value = "" if parlay_book == "Not tracked" else parlay_book
 
 if len(selected) >= 2:
-    watch_count = int((selected["Status"].astype(str) == "WATCH").sum())
+    selected_model_ok = (selected["Model Probability"].astype(float) >= 0.55) & (selected["Data Quality"].astype(int) >= 60)
+    watch_count = int((~selected_model_ok).sum())
     duplicate_pitchers = selected["Pitcher"].astype(str).value_counts()
     correlated = duplicate_pitchers[duplicate_pitchers > 1]
     if not correlated.empty:
@@ -762,7 +777,7 @@ if len(selected) >= 2:
                 "app_version": str(leg.get("App Version", "")),
                 "probability_semantics": str(leg.get("Probability Semantics", "")),
                 "snapshot_captured_at_utc": str(leg.get("Captured At UTC", "")),
-                "status": str(leg.get("Status", "")),
+                "status": "MODEL PLAY" if float(leg.get("Model Probability", 0)) >= 0.55 and int(leg.get("Data Quality", 0)) >= 60 else "WATCH",
             })
         try:
             record = make_parlay_record(
@@ -777,7 +792,7 @@ if len(selected) >= 2:
         except Exception as exc:
             st.error(f"Could not save parlay: {exc}")
 else:
-    st.info("Select at least two of our Top 5 model legs to build a parlay.")
+    st.info("Choose at least two Top 5 legs to build a parlay. Nothing is preselected for you.")
 
 selected_rank = st.session_state.get("top_play_detail_rank")
 
