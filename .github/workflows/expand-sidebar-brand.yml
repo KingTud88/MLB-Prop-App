@@ -1,4 +1,4 @@
-name: Daily Projection Run status
+name: Manual Projection Archive UX
 
 on:
   push:
@@ -13,60 +13,101 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Add Daily Run status strip
+      - name: Patch Daily Run and Projection History
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          p = Path('pages/5_Daily_Projection_Run.py')
-          s = p.read_text()
+          daily = Path('pages/5_Daily_Projection_Run.py')
+          s = daily.read_text()
 
-          if '.daily-run-status{' not in s:
-              anchor = '    @media (max-width:900px) { .daily-hero { padding:.78rem .85rem; } .daily-kicker { margin-top:1rem; } }'
-              rules = [
-                  '    .daily-run-status{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:.1rem 0 .75rem;padding:.72rem .85rem;border-radius:12px;background:rgba(7,28,49,.86);border:1px solid rgba(69,102,132,.68)}',
-                  '    .daily-run-status.ok{border-color:rgba(50,229,141,.55)}',
-                  '    .daily-run-status.error{border-color:rgba(255,71,98,.60)}',
-                  '    .daily-run-status .main{color:#f5f8fb;font:900 .92rem/1.2 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}',
-                  '    .daily-run-status .meta{color:#aebfd0;font:700 .76rem/1.25 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;text-align:right}',
-              ]
+          if 'ARCHIVE_PATH = LOG_PATH.parent / "projection_archive.csv"' not in s:
+              anchor = 'today = datetime.now(EASTERN).date()\nslate_date = st.date_input("Slate date", value=today)'
+              repl = 'today = datetime.now(EASTERN).date()\nARCHIVE_PATH = LOG_PATH.parent / "projection_archive.csv"\nslate_date = st.date_input("Slate date", value=today)'
               if anchor not in s:
-                  raise SystemExit('Daily responsive CSS anchor not found')
-              s = s.replace(anchor, '\n'.join(rules) + '\n' + anchor, 1)
+                  raise SystemExit('Daily archive path anchor not found')
+              s = s.replace(anchor, repl, 1)
 
-          state_line = '    st.session_state["daily_errors"] = errors\n'
-          if 'daily_run_at' not in s:
-              if state_line not in s:
-                  raise SystemExit('Daily session state target not found')
-              s = s.replace(state_line, state_line + '    st.session_state["daily_run_at"] = datetime.now(EASTERN).strftime("%b %d, %Y · %I:%M:%S %p ET")\n', 1)
+          if 'def commit_projection_archive(' not in s:
+              anchor = '    frame.to_csv(LOG_PATH, index=False)\n\n\ndef run_full_slate'
+              helper = '''    frame.to_csv(LOG_PATH, index=False)\n\n\ndef _archive_row_key(row: pd.Series) -> str:\n    game_pk = str(row.get("game_pk", "")).split(".")[0]\n    pitcher_id = str(row.get("pitcher_id", "")).split(".")[0]\n    return f"{game_pk}:{pitcher_id}"\n\n\ndef _parse_market_line(value: object) -> float:\n    text = str(value or "").strip()\n    if not text:\n        return np.nan\n    try:\n        return float(text)\n    except ValueError as exc:\n        raise ValueError(f"Invalid market line: {text}") from exc\n\n\ndef commit_projection_archive(slate: pd.DataFrame, manual_lines: dict[str, dict[str, float]], slate_day: str) -> int:\n    if slate.empty:\n        return 0\n    snapshot = slate.copy().reset_index(drop=True)\n    snapshot["manual_strikeout_line"] = [manual_lines.get(_archive_row_key(row), {}).get("k", np.nan) for _, row in snapshot.iterrows()]\n    snapshot["manual_outs_line"] = [manual_lines.get(_archive_row_key(row), {}).get("outs", np.nan) for _, row in snapshot.iterrows()]\n    snapshot["manual_hits_allowed_line"] = [manual_lines.get(_archive_row_key(row), {}).get("hits", np.nan) for _, row in snapshot.iterrows()]\n    snapshot["archive_source"] = "DAILY_RUN_MANUAL"\n    snapshot["archive_committed_at_utc"] = datetime.now(ZoneInfo("UTC")).isoformat()\n\n    if ARCHIVE_PATH.exists():\n        try:\n            existing = pd.read_csv(ARCHIVE_PATH)\n        except Exception:\n            existing = pd.DataFrame()\n    else:\n        existing = load_log()\n        if not existing.empty and "game_date" in existing.columns:\n            cutoff = pd.Timestamp(slate_day).date()\n            legacy_dates = pd.to_datetime(existing["game_date"], errors="coerce").dt.date\n            existing = existing.loc[legacy_dates < cutoff].copy()\n            if not existing.empty:\n                existing["manual_strikeout_line"] = np.nan\n                existing["manual_outs_line"] = np.nan\n                existing["manual_hits_allowed_line"] = np.nan\n                existing["archive_source"] = "LEGACY_PRE_MANUAL_ARCHIVE"\n                existing["archive_committed_at_utc"] = existing.get("captured_at_utc", "")\n        else:\n            existing = pd.DataFrame()\n\n    if not existing.empty and {"game_pk", "pitcher_id"}.issubset(existing.columns) and {"game_pk", "pitcher_id"}.issubset(snapshot.columns):\n        new_keys = set(zip(snapshot["game_pk"].astype(str), snapshot["pitcher_id"].astype(str)))\n        keep_mask = [key not in new_keys for key in zip(existing["game_pk"].astype(str), existing["pitcher_id"].astype(str))]\n        existing = existing.loc[keep_mask].copy()\n\n    archive = pd.concat([existing, snapshot], ignore_index=True, sort=False)\n    ARCHIVE_PATH.parent.mkdir(parents=True, exist_ok=True)\n    archive.to_csv(ARCHIVE_PATH, index=False)\n    return len(snapshot)\n\n\ndef run_full_slate'''
+              if anchor not in s:
+                  raise SystemExit('Daily helper anchor not found')
+              s = s.replace(anchor, helper, 1)
 
-          load_line = '    errors = list(st.session_state.get("daily_errors", []))\n'
-          if 'DAILY_RUN_STATUS_V1' not in s:
-              if load_line not in s:
-                  raise SystemExit('Daily output target not found')
-              insert = (
-                  '    errors = list(st.session_state.get("daily_errors", []))\n'
-                  '    # DAILY_RUN_STATUS_V1\n'
-                  '    run_at = str(st.session_state.get("daily_run_at", "Run timestamp unavailable"))\n'
-                  '    status_class = "error" if errors else "ok"\n'
-                  '    status_text = "Completed with capture errors" if errors else "Slate capture complete"\n'
-                  '    st.markdown(\n'
-                  '        f\'<div class="daily-run-status {status_class}"><div class="main">{status_text}</div><div class="meta">{slate_date:%b %d, %Y} · {run_at}</div></div>\',\n'
-                  '        unsafe_allow_html=True,\n'
-                  '    )\n'
-              )
-              s = s.replace(load_line, insert, 1)
+          paid_start_marker = 'st.markdown(\'<div class="daily-section-head">Manual Paid Data</div>\', unsafe_allow_html=True)'
+          projection_marker = 'st.markdown(\'<div class="daily-section-head">Projection Capture</div>\', unsafe_allow_html=True)'
+          history_marker = 'st.markdown(\'<div class="daily-section-head">Persistent History-Only Tracker</div>\', unsafe_allow_html=True)'
+          if paid_start_marker in s and projection_marker in s and history_marker in s:
+              paid_start = s.index(paid_start_marker)
+              projection_start = s.index(projection_marker)
+              if paid_start < projection_start:
+                  paid_block = s[paid_start:projection_start]
+                  s = s[:paid_start] + s[projection_start:]
+                  history_pos = s.index(history_marker)
+                  s = s[:history_pos] + paid_block + '\n' + s[history_pos:]
 
-          p.write_text(s)
+          if 'APPLY LINES + ADD TO PROJECTION ARCHIVE' not in s:
+              anchor = '    c6.metric("Confirmed lineups", confirmed_lineups)\n\n    if not slate.empty:'
+              manual_ui = '''    c6.metric("Confirmed lineups", confirmed_lineups)\n\n    if not slate.empty:\n        st.markdown('<div class="daily-action-label">🎚️ Manual sportsbook lines</div>', unsafe_allow_html=True)\n        st.caption("Open each pitcher bar and enter the sportsbook lines you want attached to this frozen projection. Half-lines such as 4.5, 15.5, and 5.5 are supported. Blank markets are allowed.")\n        manual_line_values: dict[str, dict[str, str]] = {}\n        for _, manual_row in slate.reset_index(drop=True).iterrows():\n            row_key = _archive_row_key(manual_row)\n            player = str(manual_row.get("player", "Unknown"))\n            team = str(manual_row.get("team", "—"))\n            opponent = str(manual_row.get("opponent", "—"))\n            with st.expander(f"⚾ {player} · {team} vs {opponent}", expanded=False):\n                l1, l2, l3 = st.columns(3)\n                k_raw = l1.text_input("Strikeout line", placeholder="e.g. 4.5", key=f"daily_manual_k_{row_key}")\n                outs_raw = l2.text_input("Total outs line", placeholder="e.g. 15.5", key=f"daily_manual_outs_{row_key}")\n                hits_raw = l3.text_input("Hits allowed line", placeholder="e.g. 5.5", key=f"daily_manual_hits_{row_key}")\n                st.caption(f"Model: {float(manual_row.get('projection', float('nan'))):.2f} K · {float(manual_row.get('outs_projection', float('nan'))):.2f} outs · {float(manual_row.get('hits_projection', float('nan'))):.2f} hits allowed")\n            manual_line_values[row_key] = {"k": k_raw, "outs": outs_raw, "hits": hits_raw}\n\n        if st.button("✅ APPLY LINES + ADD TO PROJECTION ARCHIVE", type="primary", use_container_width=True, key="daily_apply_archive"):\n            try:\n                parsed_lines = {\n                    key: {\n                        "k": _parse_market_line(values.get("k")),\n                        "outs": _parse_market_line(values.get("outs")),\n                        "hits": _parse_market_line(values.get("hits")),\n                    }\n                    for key, values in manual_line_values.items()\n                }\n                filled_lines = sum(pd.notna(value) for values in parsed_lines.values() for value in values.values())\n                if filled_lines == 0:\n                    raise ValueError("Enter at least one sportsbook line before adding the slate to the Projection Archive.")\n                archived = commit_projection_archive(slate, parsed_lines, slate_date.isoformat())\n                st.session_state["daily_archive_saved_at"] = datetime.now(EASTERN).strftime("%b %d, %Y · %I:%M:%S %p ET")\n                st.success(f"Applied {filled_lines} manual market line(s) and added {archived} pitcher projection(s) to the Projection Archive.")\n            except ValueError as exc:\n                st.error(str(exc))\n\n    if not slate.empty:'''
+              if anchor not in s:
+                  raise SystemExit('Daily manual line UI anchor not found')
+              s = s.replace(anchor, manual_ui, 1)
+
+          daily.write_text(s)
+
+          history = Path('pages/4_Projection_History.py')
+          h = history.read_text()
+
+          if 'ARCHIVE_PATH = ROOT / "data" / "projection_archive.csv"' not in h:
+              anchor = 'LOG_PATH = ROOT / "data" / "projection_log.csv"\nOBS_LOG_PATH = ROOT / "data" / "starter_observation_log.csv"'
+              repl = 'LOG_PATH = ROOT / "data" / "projection_log.csv"\nARCHIVE_PATH = ROOT / "data" / "projection_archive.csv"\nOBS_LOG_PATH = ROOT / "data" / "starter_observation_log.csv"'
+              if anchor not in h:
+                  raise SystemExit('History archive path anchor not found')
+              h = h.replace(anchor, repl, 1)
+
+          h = h.replace('Scoreboard first, K wins and crushers next, deeper learning diagnostics below.', 'Projection Archive first, then performance and deeper learning diagnostics below.', 1)
+
+          if 'def load_user_archive(' not in h:
+              anchor = 'def load_observation_history() -> pd.DataFrame:'
+              helper = '''def load_user_archive(evidence: pd.DataFrame) -> pd.DataFrame:\n    if ARCHIVE_PATH.exists():\n        try:\n            return pd.read_csv(ARCHIVE_PATH)\n        except Exception:\n            return pd.DataFrame()\n    if evidence.empty or "game_date" not in evidence.columns:\n        return pd.DataFrame()\n    today_eastern = pd.Timestamp.now(tz="America/New_York").date()\n    dates = pd.to_datetime(evidence["game_date"], errors="coerce").dt.date\n    legacy = evidence.loc[dates < today_eastern].copy()\n    if not legacy.empty:\n        legacy["manual_strikeout_line"] = np.nan\n        legacy["manual_outs_line"] = np.nan\n        legacy["manual_hits_allowed_line"] = np.nan\n        legacy["archive_source"] = "LEGACY_PRE_MANUAL_ARCHIVE"\n        legacy["archive_committed_at_utc"] = legacy.get("captured_at_utc", "")\n    return legacy\n\n\n'''
+              if anchor not in h:
+                  raise SystemExit('History user archive helper anchor not found')
+              h = h.replace(anchor, helper + anchor, 1)
+
+          resolve_start_marker = 'if st.button("Resolve completed games", type="primary"):'
+          df_marker = 'df = load_projection_history()'
+          resolve_block = ''
+          if resolve_start_marker in h and df_marker in h:
+              rstart = h.index(resolve_start_marker)
+              dstart = h.index(df_marker)
+              if rstart < dstart:
+                  resolve_block = h[rstart:dstart]
+                  h = h[:rstart] + h[dstart:]
+
+          if 'MANUAL_PROJECTION_ARCHIVE_V1' not in h:
+              anchor = 'k_resolved = df["actual_strikeouts"].notna()'
+              top_archive = '''# MANUAL_PROJECTION_ARCHIVE_V1\nst.markdown('<div class="history-kicker">Primary workflow</div>', unsafe_allow_html=True)\nst.subheader("📋 Projection Archive")\nst.caption("This is the archive you manually approve from Daily Projection Run. Automatic background captures stay in the evidence log lower on this page and do not appear here until you add the slate.")\nuser_archive = load_user_archive(df)\nif user_archive.empty:\n    st.info("No manually committed projection slates yet. Run Daily Projection Run, enter the sportsbook lines, then use Apply Lines + Add to Projection Archive.")\nelse:\n    archive_dates = pd.to_datetime(user_archive.get("game_date"), errors="coerce")\n    user_archive = user_archive.copy()\n    user_archive["_archive_date"] = archive_dates\n    user_archive = user_archive.sort_values(["_archive_date", "player"], ascending=[False, True], na_position="last")\n    archive_columns = [\n        "player", "team", "opponent",\n        "manual_strikeout_line", "projection", "actual_strikeouts",\n        "manual_outs_line", "outs_projection", "actual_outs",\n        "manual_hits_allowed_line", "hits_projection", "actual_hits_allowed",\n        "confidence", "data_quality", "archive_source", "archive_committed_at_utc",\n    ]\n    archive_columns = [col for col in archive_columns if col in user_archive.columns]\n    unique_dates = user_archive["_archive_date"].dt.date.dropna().drop_duplicates().tolist()\n    for idx, archive_date in enumerate(unique_dates):\n        group = user_archive.loc[user_archive["_archive_date"].dt.date.eq(archive_date), archive_columns].copy()\n        date_label = pd.Timestamp(archive_date).strftime("%B %-d, %Y")\n        with st.expander(f"📅 {date_label} · {len(group)} pitcher{'s' if len(group) != 1 else ''}", expanded=(idx == 0)):\n            st.dataframe(\n                group,\n                hide_index=True,\n                width="stretch",\n                column_config={\n                    "player": st.column_config.TextColumn("Pitcher"),\n                    "team": st.column_config.TextColumn("Team"),\n                    "opponent": st.column_config.TextColumn("Opp"),\n                    "manual_strikeout_line": st.column_config.NumberColumn("K Line", format="%.1f"),\n                    "projection": st.column_config.NumberColumn("Projected K", format="%.2f"),\n                    "actual_strikeouts": st.column_config.NumberColumn("Actual K", format="%.0f"),\n                    "manual_outs_line": st.column_config.NumberColumn("Outs Line", format="%.1f"),\n                    "outs_projection": st.column_config.NumberColumn("Projected Outs", format="%.2f"),\n                    "actual_outs": st.column_config.NumberColumn("Actual Outs", format="%.0f"),\n                    "manual_hits_allowed_line": st.column_config.NumberColumn("Hits Line", format="%.1f"),\n                    "hits_projection": st.column_config.NumberColumn("Projected Hits", format="%.2f"),\n                    "actual_hits_allowed": st.column_config.NumberColumn("Actual Hits", format="%.0f"),\n                    "archive_source": st.column_config.TextColumn("Archive Source"),\n                },\n            )\n\nst.divider()\n'''
+              if anchor not in h:
+                  raise SystemExit('History top archive anchor not found')
+              h = h.replace(anchor, top_archive + (resolve_block if resolve_block else '') + anchor, 1)
+
+          h = h.replace('col1.metric("Archived projections", len(df))', 'col1.metric("Evidence snapshots", len(df))', 1)
+          h = h.replace('<div class="history-kicker">Resolved & pending slates</div>', '<div class="history-kicker">Automatic model evidence</div>', 1)
+          h = h.replace('st.subheader("📋 Projection archive")', 'st.subheader("🧪 Automatic Evidence Log")\nst.caption("This lower log is populated by scheduled background capture for calibration and diagnostics, so today can appear here even if you never manually ran or archived the slate.")', 1)
+
+          history.write_text(h)
           PY
-      - name: Commit Daily Run status
+      - name: Validate Python syntax
+        run: python -m py_compile pages/5_Daily_Projection_Run.py pages/4_Projection_History.py
+      - name: Commit workflow changes
         run: |
-          if git diff --quiet -- pages/5_Daily_Projection_Run.py; then
-            echo "No Daily Run status changes to commit"
+          if git diff --quiet -- pages/5_Daily_Projection_Run.py pages/4_Projection_History.py; then
+            echo "No manual archive changes to commit"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pages/5_Daily_Projection_Run.py
-          git commit -m "Add Daily Projection run status"
+          git add pages/5_Daily_Projection_Run.py pages/4_Projection_History.py
+          git commit -m "Add manual projection archive workflow"
           git push
