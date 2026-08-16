@@ -1,74 +1,170 @@
-name: Projection Summary Emblem Crispness
+name: Projection Weather Summary Layout
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  crisp:
+  weather-layout:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Switch Summary emblems to high-resolution master sheet
+      - name: Add weather card and rebalance Hits row
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          p = Path('streamlit_app.py')
-          text = p.read_text(encoding='utf-8')
-          marker = 'PROJECTION_EMBLEM_MASTER_V9'
-          if marker in text:
-              print('Projection emblem master V9 already active')
-              raise SystemExit(0)
+          app_path = Path('streamlit_app.py')
+          app = app_path.read_text(encoding='utf-8')
+          marker = 'PROJECTION_WEATHER_SUMMARY_V10'
 
-          anchor = '/* PROJECTION_SUMMARY_LAYOUT_V8 · title top, value left, large emblem right */'
-          start = text.find(anchor)
-          if start < 0:
-              raise SystemExit('Projection Summary V8 anchor not found; refusing to change unrelated code')
-          end = text.find('</style>', start)
-          if end < 0:
-              raise SystemExit('Projection style close not found; refusing to patch')
+          if marker not in app:
+              anchor = '/* PROJECTION_EMBLEM_MASTER_V9 · 128px master tiles rendered down for sharper edges */'
+              start = app.find(anchor)
+              if start < 0:
+                  raise SystemExit('Projection emblem V9 anchor not found; refusing to patch unrelated CSS')
+              style_end = app.find('</style>', start)
+              if style_end < 0:
+                  raise SystemExit('Projection style close not found')
+              css = r'''
 
-          override = '''
-          /* PROJECTION_EMBLEM_MASTER_V9 · 128px master tiles rendered down for sharper edges */
-          .cc-card-icon.cc-emblem{
-              background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_summary_emblems_v2.webp?v=9")!important;
-              background-size:600% 100%!important;
-              background-repeat:no-repeat!important;
-              filter:drop-shadow(0 2px 2px rgba(0,0,0,.28)) drop-shadow(0 0 2px rgba(236,22,56,.12))!important;
-              image-rendering:auto!important;
-          }
-          .metric-card .cc-emblem.whiff{background-position:0% 50%!important}
-          .reco-card .cc-emblem.whiff{background-position:20% 50%!important}
-          .metric-card .cc-emblem.glove{background-position:40% 50%!important}
-          .reco-card .cc-emblem.glove{background-position:60% 50%!important}
-          .metric-card .cc-emblem.contact{background-position:80% 50%!important}
-          .reco-card .cc-emblem.contact{background-position:100% 50%!important}
-          '''
+/* PROJECTION_WEATHER_SUMMARY_V10 · compact Hits pair + game delay-risk command card */
+.game-weather-card{
+    position:relative!important;
+    min-height:184px!important;
+    padding:16px 18px!important;
+    border:1px solid rgba(80,108,136,.72)!important;
+    border-radius:15px!important;
+    background:linear-gradient(145deg,rgba(9,31,55,.98),rgba(4,18,33,.98))!important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 14px 32px rgba(0,0,0,.28)!important;
+    overflow:hidden!important;
+}
+.game-weather-card::after{
+    content:"";position:absolute;left:0;right:0;bottom:0;height:2px;
+    background:linear-gradient(90deg,transparent,#ec1638,transparent);opacity:.72;
+}
+.game-weather-card.weather-none{border-color:rgba(36,230,155,.58)!important}
+.game-weather-card.weather-low{border-color:rgba(85,170,255,.62)!important}
+.game-weather-card.weather-elevated{border-color:rgba(255,190,78,.72)!important}
+.game-weather-card.weather-high{border-color:rgba(255,71,98,.80)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 0 24px rgba(236,22,56,.12),0 14px 32px rgba(0,0,0,.28)!important}
+.game-weather-card.weather-unknown{border-color:rgba(122,143,164,.58)!important}
+.game-weather-head{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:.26rem}
+.game-weather-title{color:#eef3f7;font-size:.92rem;line-height:1.3;font-weight:900;letter-spacing:.035em}
+.game-weather-icon{font-size:2.55rem;line-height:1;filter:drop-shadow(0 3px 5px rgba(0,0,0,.30))}
+.game-weather-risk{font-family:Impact,"Arial Narrow",sans-serif;font-size:2.15rem;line-height:1;color:#f5f1e9;letter-spacing:.02em;margin:.08rem 0 .34rem}
+.game-weather-action{display:inline-flex;align-items:center;border:1px solid rgba(93,126,158,.68);border-radius:999px;padding:.25rem .58rem;background:rgba(12,38,65,.82);color:#dce9f5;font-size:.76rem;font-weight:900;letter-spacing:.035em;text-transform:uppercase}
+.weather-high .game-weather-action{border-color:rgba(255,71,98,.58);color:#ff7f91;background:rgba(121,15,37,.30)}
+.weather-elevated .game-weather-action{border-color:rgba(255,190,78,.58);color:#ffd36f;background:rgba(101,73,11,.30)}
+.weather-none .game-weather-action{border-color:rgba(36,230,155,.48);color:#5ceeb0;background:rgba(8,80,54,.30)}
+.game-weather-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem;margin-top:.62rem}
+.game-weather-stat{padding:.38rem .52rem;border:1px solid rgba(65,96,128,.58);border-radius:9px;background:rgba(4,18,33,.55)}
+.game-weather-stat span{display:block;color:#8fa5b7;font-size:.68rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.game-weather-stat strong{display:block;margin-top:.08rem;color:#f4f7fa;font-size:1rem;font-weight:900}
+.game-weather-reason{margin-top:.5rem;color:#a9bdce;font-size:.76rem;line-height:1.28}
+.game-weather-note{margin-top:.32rem;color:#7690a6;font-size:.67rem;line-height:1.2}
+@media (max-width:900px){.game-weather-card{min-height:176px!important}}
+@media (max-width:620px){.game-weather-card{min-height:166px!important;padding:14px!important}.game-weather-grid{grid-template-columns:1fr}.game-weather-risk{font-size:1.85rem}}
+'''
+              app = app[:style_end] + css + app[style_end:]
 
-          text = text[:end] + override + text[end:]
-          p.write_text(text, encoding='utf-8')
-          print('Applied higher-resolution Projection Summary master artwork')
+          weather_line = 'weather_marker=f" {weather_risk.icon}" if weather_risk.icon else ""'
+          weather_vars = '''weather_marker=f" {weather_risk.icon}" if weather_risk.icon else ""
+_weather_level=str(weather_risk.level or "UNKNOWN").upper()
+_weather_icon=weather_risk.icon or ("✓" if weather_risk.available else "—")
+_weather_label={"HIGH":"DELAY RISK","ELEVATED":"RAIN WATCH","LOW":"LOW RAIN RISK","NONE":"CLEAR","UNKNOWN":"UNAVAILABLE"}.get(_weather_level,_weather_level)
+_weather_action={"HIGH":"AVOID · DELAY RISK","ELEVATED":"CAUTION · RECHECK","LOW":"MONITOR NEAR FIRST PITCH","NONE":"NO DELAY SIGNAL","UNKNOWN":"VERIFY WEATHER"}.get(_weather_level,"VERIFY WEATHER")
+_weather_class={"HIGH":"weather-high","ELEVATED":"weather-elevated","LOW":"weather-low","NONE":"weather-none"}.get(_weather_level,"weather-unknown")
+_weather_prob="—" if weather_risk.precip_probability is None else f"{weather_risk.precip_probability:.0f}%"
+_weather_peak="—" if weather_risk.precipitation_mm is None else f"{weather_risk.precipitation_mm:.1f} mm/h"
+_weather_summary=re.sub(r"[<>]","",str(weather_risk.summary or "Weather forecast unavailable for this game window."))'''
+          if '_weather_action={"HIGH":"AVOID · DELAY RISK"' not in app:
+              if weather_line not in app:
+                  raise SystemExit('Weather marker anchor not found')
+              app = app.replace(weather_line, weather_vars, 1)
+
+          old_alert = '''if weather_risk.available and weather_risk.level in {"HIGH","ELEVATED"}:
+    st.warning(f"{weather_risk.icon} {weather_risk.summary}. Weather risk is informational and does not currently modify the projection.")
+elif weather_risk.available and weather_risk.level == "LOW":
+    st.caption(f"{weather_risk.icon} {weather_risk.summary}. Informational only.")
+'''
+          if old_alert in app:
+              app = app.replace(old_alert, '', 1)
+
+          old_hits = '''h1,h2=st.columns(2)
+with h1: st.markdown(f'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon cc-emblem contact" aria-hidden="true"></div><div class="metric-label">PROJECTED HITS ALLOWED</div></div><div class="metric-value">{hits_proj.ensemble_mean:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(hits_proj.simulation_samples,.1))}-{int(np.quantile(hits_proj.simulation_samples,.9))}</span></div>',unsafe_allow_html=True)
+render_reco(h2,hit_reco,key_prefix=f"manual_hits:{game.key}",market_key="pitcher_hits_allowed",proj=proj,hits_proj=hits_proj)
+'''
+          new_hits = '''h1,h2,h3=st.columns([1,1,2])
+with h1: st.markdown(f'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon cc-emblem contact" aria-hidden="true"></div><div class="metric-label">PROJECTED HITS ALLOWED</div></div><div class="metric-value">{hits_proj.ensemble_mean:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(hits_proj.simulation_samples,.1))}-{int(np.quantile(hits_proj.simulation_samples,.9))}</span></div>',unsafe_allow_html=True)
+render_reco(h2,hit_reco,key_prefix=f"manual_hits:{game.key}",market_key="pitcher_hits_allowed",proj=proj,hits_proj=hits_proj)
+with h3:
+    st.markdown(
+        f'<div class="game-weather-card {_weather_class}"><div class="game-weather-head"><div><div class="game-weather-title">GAME WEATHER · DELAY RISK</div><div class="game-weather-risk">{_weather_label}</div><div class="game-weather-action">{_weather_action}</div></div><div class="game-weather-icon" aria-hidden="true">{_weather_icon}</div></div><div class="game-weather-grid"><div class="game-weather-stat"><span>Precip chance</span><strong>{_weather_prob}</strong></div><div class="game-weather-stat"><span>Peak precip</span><strong>{_weather_peak}</strong></div></div><div class="game-weather-reason">{_weather_summary}</div><div class="game-weather-note">Game window: 2h before first pitch → 4h after · Weather risk is informational and does not currently modify the projection.</div></div>',
+        unsafe_allow_html=True,
+    )
+'''
+          if 'h1,h2,h3=st.columns([1,1,2])' not in app:
+              if old_hits not in app:
+                  raise SystemExit('Hits Allowed two-column block not found; refusing to guess')
+              app = app.replace(old_hits, new_hits, 1)
+
+          app_path.write_text(app, encoding='utf-8')
+
+          ui_path = Path('engine/ui_command_center.py')
+          ui = ui_path.read_text(encoding='utf-8')
+          if 'cc-weather-status-icon' not in ui:
+              css_anchor = '        .cc-matchup-status-meta { margin-top:.28rem;color:#afc0cf;font-family:var(--cc-ui-font);font-size:.84rem; }'
+              css_add = css_anchor + '\n        .cc-weather-status-icon { display:inline-flex;align-items:center;justify-content:center;margin-left:.34rem;min-width:1.25rem;font-size:1rem;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.28)); }'
+              if css_anchor not in ui:
+                  raise SystemExit('Matchup status CSS anchor not found')
+              ui = ui.replace(css_anchor, css_add, 1)
+
+          old_weather = '    weather = f" {_safe(weather_icon)}" if weather_icon else ""'
+          new_weather = '    weather = f\'<span class="cc-weather-status-icon" aria-label="Weather delay risk">{_safe(weather_icon)}</span>\' if weather_icon else ""'
+          if 'aria-label="Weather delay risk"' not in ui:
+              if old_weather not in ui:
+                  raise SystemExit('Matchup weather variable anchor not found')
+              ui = ui.replace(old_weather, new_weather, 1)
+
+          old_name = '<div class="cc-matchup-name">{_safe(pitcher_name)}{weather}</div>'
+          new_name = '<div class="cc-matchup-name">{_safe(pitcher_name)}</div>'
+          if old_name in ui:
+              ui = ui.replace(old_name, new_name, 1)
+
+          old_status = '<div class="cc-matchup-status-label">Game Status</div>'
+          new_status = '<div class="cc-matchup-status-label">Game Status{weather}</div>'
+          if new_status not in ui:
+              if old_status not in ui:
+                  raise SystemExit('Game Status label anchor not found')
+              ui = ui.replace(old_status, new_status, 1)
+
+          ui_path.write_text(ui, encoding='utf-8')
+          print('Applied compact Hits row, weather delay-risk card, and Game Status weather signal.')
           PY
 
       - name: Validate Python syntax
-        run: python -m py_compile streamlit_app.py
+        run: python -m py_compile streamlit_app.py engine/ui_command_center.py
 
-      - name: Commit emblem crispness safely
+      - name: Run weather and UI contract tests
+        run: python -m pytest -q tests/test_weather_risk.py tests/test_projection_weather_batter_contract.py tests/test_matchup_weather_integrity.py tests/test_ui_command_center_contract.py tests/test_hits_allowed_ui_contract.py
+
+      - name: Commit weather layout safely
         run: |
-          if git diff --quiet -- streamlit_app.py; then
-            echo "Projection emblem crispness already applied"
+          if git diff --quiet -- streamlit_app.py engine/ui_command_center.py; then
+            echo "Weather Summary layout already applied"
             exit 0
           fi
           git config user.name "KingTud88"
           git config user.email "jaxson0603@gmail.com"
-          git add streamlit_app.py
-          git commit -m "Sharpen Projection Summary emblems"
+          git add streamlit_app.py engine/ui_command_center.py
+          git commit -m "Add Projection Summary weather warning card"
           for attempt in 1 2 3 4; do
             git fetch origin main
             git rebase origin/main || { git rebase --abort || true; sleep 2; continue; }
@@ -77,5 +173,5 @@ jobs:
             fi
             sleep $((attempt * 2))
           done
-          echo "Could not push emblem crispness after retries"
+          echo "Could not push weather layout after retries"
           exit 1
