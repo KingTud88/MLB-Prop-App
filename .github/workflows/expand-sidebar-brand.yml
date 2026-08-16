@@ -1,4 +1,4 @@
-name: Market Line Integrity Fix
+name: Starter Slate + Weather Fix
 
 on:
   push:
@@ -16,25 +16,28 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply market-line integrity patch
+      - name: Keep market-line integrity patch applied
         run: |
           python tools/fix_market_line_patch_anchor.py
           python tools/patch_market_line_integrity.py
+          git restore tools/patch_market_line_integrity.py
+
+      - name: Add starter slate lines and repair weather coordinates
+        run: python tools/patch_starter_slate_weather.py
 
       - name: Validate Python syntax
-        run: python -m py_compile engine/model_top_plays.py engine/bet_tracker.py pages/2_Bet_Tracker.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py
+        run: python -m py_compile automation/daily_projection_runner.py pages/5_Daily_Projection_Run.py engine/model_top_plays.py engine/bet_tracker.py pages/2_Bet_Tracker.py pages/6_Top_Plays.py
 
       - name: Commit safely
         run: |
-          git restore tools/patch_market_line_integrity.py
-          if git diff --quiet -- engine/model_top_plays.py engine/bet_tracker.py pages/2_Bet_Tracker.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py; then
-            echo "No market-line integrity changes to commit"
+          if git diff --quiet -- automation/daily_projection_runner.py pages/5_Daily_Projection_Run.py engine/model_top_plays.py engine/bet_tracker.py pages/2_Bet_Tracker.py pages/6_Top_Plays.py; then
+            echo "No starter-slate/weather changes to commit"
             exit 0
           fi
           git config user.name "KingTud88"
           git config user.email "jaxson0603@gmail.com"
-          git add engine/model_top_plays.py engine/bet_tracker.py pages/2_Bet_Tracker.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py
-          git commit -m "Use verified market lines for Top Plays"
+          git add automation/daily_projection_runner.py pages/5_Daily_Projection_Run.py engine/model_top_plays.py engine/bet_tracker.py pages/2_Bet_Tracker.py pages/6_Top_Plays.py
+          git commit -m "Show active lines in starter slate and repair weather"
           for attempt in 1 2 3 4; do
             git fetch origin main
             git rebase origin/main || { git rebase --abort || true; sleep 2; continue; }
@@ -43,5 +46,5 @@ jobs:
             fi
             sleep $((attempt * 2))
           done
-          echo "Could not push market-line integrity patch after retries"
+          echo "Could not push starter-slate/weather patch after retries"
           exit 1
