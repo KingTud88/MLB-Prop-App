@@ -7,6 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from engine.ui_theme import apply_page_theme
+from navigation import render_sidebar
 
 from automation.resolve_projection_log import main as resolve_projection_log
 from engine.calibration import milestone_calibration_report
@@ -32,6 +33,7 @@ ROLLING_WINDOW = 20
 
 st.set_page_config(page_title="Projection History", page_icon="📚", layout="wide")
 apply_page_theme()
+render_sidebar("history")
 st.markdown(
     """
     <style>
@@ -57,20 +59,35 @@ st.markdown(
         .history-hero { padding:.78rem .85rem; }
         .history-kicker { margin-top:1rem; }
     }
+    /* PROJECTION_HISTORY_COMMAND_UI_V2 */
+    .block-container{max-width:1540px!important;padding-top:2.05rem!important;padding-bottom:4rem!important}
+    .ph-command-hero{position:relative;overflow:hidden;margin:.1rem 0 .85rem;padding:1.05rem 1.2rem 1.1rem;border:1px solid rgba(80,108,136,.78);border-radius:18px;background:linear-gradient(112deg,rgba(8,28,50,.99),rgba(5,19,35,.99));box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 18px 42px rgba(0,0,0,.30)}
+    .ph-command-hero:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:linear-gradient(#ff3655,#a60c29)}
+    .ph-command-kicker{font:900 .70rem/1.2 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.13em;color:#ff6a7d;text-transform:uppercase}
+    .ph-command-title{margin:.22rem 0 .28rem;font-family:Impact,"Arial Black","Arial Narrow",sans-serif;font-size:clamp(2.6rem,5vw,4.8rem);line-height:.86;letter-spacing:.012em;color:#f5f1e9;text-transform:uppercase;text-shadow:3px 4px 0 #07182b}
+    .ph-command-title span{color:#ec1638;-webkit-text-stroke:1px #f1eee7;paint-order:stroke fill}
+    .ph-command-sub{max-width:1180px;color:#c0ceda;font:650 .90rem/1.48 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+    .ph-command-rule{margin-top:.58rem;width:max-content;max-width:100%;padding:.25rem .58rem;border-top:1px solid rgba(236,22,56,.65);border-bottom:1px solid rgba(236,22,56,.65);color:#edf3f7;font:900 .67rem/1.2 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.09em;text-transform:uppercase}
+    .history-section-head{width:max-content;min-width:260px;max-width:92%;margin:1.05rem auto .65rem;padding:.44rem 1.65rem;border:1px solid #ff3151;border-bottom-color:#790b1d;border-radius:8px;background:linear-gradient(180deg,#f21b3d,#b70d29);box-shadow:0 7px 16px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.22);color:#fff;font:900 .90rem/1.15 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.04em;text-align:center;text-transform:uppercase}
+    .history-primary-note{margin:.3rem 0 .8rem;padding:.78rem .9rem;border:1px solid rgba(73,111,151,.56);border-left:3px solid #ff3655;border-radius:13px;background:linear-gradient(110deg,rgba(10,34,59,.90),rgba(5,22,40,.92));color:#d2dde6;font:700 .84rem/1.45 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+    .history-secondary-zone{margin:1.5rem 0 .5rem;padding:.72rem .9rem;border:1px solid rgba(73,111,151,.42);border-radius:12px;background:rgba(5,20,37,.72);color:#8fa6ba;font:900 .68rem/1.3 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.12em;text-align:center;text-transform:uppercase}
+    [data-testid="stMetric"]{min-height:108px;padding:.70rem .76rem!important;border:1px solid rgba(77,108,137,.72)!important;border-radius:14px!important;background:linear-gradient(145deg,rgba(9,31,55,.98),rgba(4,18,33,.98))!important}
+    [data-testid="stMetricLabel"]{color:#eef4f8!important;font-size:.78rem!important;font-weight:900!important;text-transform:uppercase!important}
+    [data-testid="stMetricValue"]{font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif!important;color:#fff!important;font-size:1.65rem!important;font-weight:900!important}
+    div[data-testid="stDataFrame"]{border:1px solid rgba(77,108,137,.62);border-radius:14px;overflow:hidden;box-shadow:0 12px 28px rgba(0,0,0,.20)}
+    div[data-testid="stExpander"]{border:1px solid rgba(72,103,134,.60)!important;border-radius:13px!important;background:rgba(5,21,39,.68)!important}
     </style>
     """,
     unsafe_allow_html=True,
 )
-st.title("📚 Projection History")
-st.caption(
-    "Frozen pregame StrikeOut King 9000 projections, resolved against final MLB strikeouts, "
-    "total outs, and hits allowed. Current learning diagnostics only use starter-only model rows."
-)
 st.markdown(
-    '<div class="history-hero"><strong>Performance archive · frozen pregame evidence</strong>'
-    '<span>Projection Archive first, then performance and deeper learning diagnostics below.</span></div>',
+    '<div class="ph-command-hero"><div class="ph-command-kicker">StrikeOut King 9000 · Frozen Evidence Vault</div>'
+    '<div class="ph-command-title">PROJECTION <span>HISTORY</span></div>'
+    '<div class="ph-command-sub">Your manually approved Projection Archive stays first. Frozen model evidence, resolved MLB outcomes, calibration, workload audits, and learning diagnostics remain underneath for deeper review.</div>'
+    '<div class="ph-command-rule">ARCHIVE FIRST · REAL LINES · FROZEN MODEL EVIDENCE</div></div>',
     unsafe_allow_html=True,
 )
+
 
 
 def load_projection_history() -> pd.DataFrame:
@@ -183,18 +200,39 @@ for col in [
     if col not in df.columns:
         df[col] = pd.NA
 
-# MANUAL_PROJECTION_ARCHIVE_V1
-st.markdown('<div class="history-kicker">Primary workflow</div>', unsafe_allow_html=True)
-st.subheader("📋 Projection Archive")
-st.caption("This is the archive you manually approve from Daily Projection Run. Automatic background captures stay in the evidence log lower on this page and do not appear here until you add the slate.")
+# PROJECTION_HISTORY_ARCHIVE_COMMAND_V2
+st.markdown('<div class="history-section-head">Projection Archive</div>', unsafe_allow_html=True)
+st.markdown('<div class="history-primary-note">This is the day-to-day archive you approve from Daily Projection Run. Your entered sportsbook lines are execution data attached to the frozen projections; automatic background captures stay out of this primary view.</div>', unsafe_allow_html=True)
 user_archive = load_user_archive(df)
 if user_archive.empty:
     st.info("No manually committed projection slates yet. Run Daily Projection Run, enter the sportsbook lines, then use Apply Lines + Add to Projection Archive.")
 else:
-    archive_dates = pd.to_datetime(user_archive.get("game_date"), errors="coerce")
     user_archive = user_archive.copy()
-    user_archive["_archive_date"] = archive_dates
+    user_archive["_archive_date"] = pd.to_datetime(user_archive.get("game_date"), errors="coerce")
+    for col in (
+        "manual_strikeout_line", "projection", "actual_strikeouts",
+        "manual_outs_line", "outs_projection", "actual_outs",
+        "manual_hits_allowed_line", "hits_projection", "actual_hits_allowed",
+    ):
+        if col in user_archive.columns:
+            user_archive[col] = pd.to_numeric(user_archive[col], errors="coerce")
     user_archive = user_archive.sort_values(["_archive_date", "player"], ascending=[False, True], na_position="last")
+
+    archive_dates = user_archive["_archive_date"].dt.date.dropna()
+    archived_slates = int(archive_dates.nunique())
+    line_cols = [col for col in ("manual_strikeout_line", "manual_outs_line", "manual_hits_allowed_line") if col in user_archive.columns]
+    manual_lines = int(sum(user_archive[col].notna().sum() for col in line_cols))
+    actual_cols = [col for col in ("actual_strikeouts", "actual_outs", "actual_hits_allowed") if col in user_archive.columns]
+    resolved_pitchers = int(user_archive[actual_cols].notna().any(axis=1).sum()) if actual_cols else 0
+    latest_archive_date = max(archive_dates).strftime("%b %d") if len(archive_dates) else "—"
+
+    a1, a2, a3, a4 = st.columns(4)
+    a1.metric("Archived slates", archived_slates)
+    a2.metric("Archived pitchers", len(user_archive))
+    a3.metric("Manual lines attached", manual_lines)
+    a4.metric("Latest slate", latest_archive_date)
+    st.caption(f"{resolved_pitchers} archived pitcher row(s) currently have at least one resolved MLB outcome attached.")
+
     archive_columns = [
         "player", "team", "opponent",
         "manual_strikeout_line", "projection", "actual_strikeouts",
@@ -207,27 +245,42 @@ else:
     for idx, archive_date in enumerate(unique_dates):
         group = user_archive.loc[user_archive["_archive_date"].dt.date.eq(archive_date), archive_columns].copy()
         date_label = pd.Timestamp(archive_date).strftime("%B %-d, %Y")
-        with st.expander(f"📅 {date_label} · {len(group)} pitcher{'s' if len(group) != 1 else ''}", expanded=(idx == 0)):
-            st.dataframe(
-                group,
-                hide_index=True,
-                width="stretch",
-                column_config={
-                    "player": st.column_config.TextColumn("Pitcher"),
-                    "team": st.column_config.TextColumn("Team"),
-                    "opponent": st.column_config.TextColumn("Opp"),
-                    "manual_strikeout_line": st.column_config.NumberColumn("K Line", format="%.1f"),
-                    "projection": st.column_config.NumberColumn("Projected K", format="%.2f"),
-                    "actual_strikeouts": st.column_config.NumberColumn("Actual K", format="%.0f"),
-                    "manual_outs_line": st.column_config.NumberColumn("Outs Line", format="%.1f"),
-                    "outs_projection": st.column_config.NumberColumn("Projected Outs", format="%.2f"),
-                    "actual_outs": st.column_config.NumberColumn("Actual Outs", format="%.0f"),
-                    "manual_hits_allowed_line": st.column_config.NumberColumn("Hits Line", format="%.1f"),
-                    "hits_projection": st.column_config.NumberColumn("Projected Hits", format="%.2f"),
-                    "actual_hits_allowed": st.column_config.NumberColumn("Actual Hits", format="%.0f"),
-                    "archive_source": st.column_config.TextColumn("Archive Source"),
-                },
-            )
+        day_line_count = int(sum(group[col].notna().sum() for col in line_cols if col in group.columns))
+        day_resolved = int(group[[col for col in actual_cols if col in group.columns]].notna().any(axis=1).sum()) if actual_cols else 0
+        with st.expander(
+            f"📅 {date_label} · {len(group)} pitcher{'s' if len(group) != 1 else ''} · {day_line_count} manual lines · {day_resolved} resolved",
+            expanded=(idx == 0),
+        ):
+            view = group.rename(columns={
+                "player": "Pitcher", "team": "Team", "opponent": "Opp",
+                "manual_strikeout_line": "K Line", "projection": "Projected K", "actual_strikeouts": "Actual K",
+                "manual_outs_line": "Outs Line", "outs_projection": "Projected Outs", "actual_outs": "Actual Outs",
+                "manual_hits_allowed_line": "Hits Line", "hits_projection": "Projected Hits", "actual_hits_allowed": "Actual Hits",
+                "confidence": "Confidence", "data_quality": "Quality",
+                "archive_source": "Archive Source", "archive_committed_at_utc": "Committed UTC",
+            })
+            formatters = {}
+            for col in ("K Line", "Outs Line", "Hits Line"):
+                if col in view.columns:
+                    formatters[col] = "{:.1f}"
+            for col in ("Projected K", "Projected Outs", "Projected Hits"):
+                if col in view.columns:
+                    formatters[col] = "{:.2f}"
+            for col in ("Actual K", "Actual Outs", "Actual Hits", "Quality"):
+                if col in view.columns:
+                    formatters[col] = "{:.0f}"
+            styled = view.style.format(formatters, na_rep="—")
+            manual_cols = [col for col in ("K Line", "Outs Line", "Hits Line") if col in view.columns]
+            projection_cols = [col for col in ("Projected K", "Projected Outs", "Projected Hits") if col in view.columns]
+            actual_view_cols = [col for col in ("Actual K", "Actual Outs", "Actual Hits") if col in view.columns]
+            if manual_cols:
+                styled = styled.map(lambda value: "color:#ff9f1c;font-weight:850;background-color:rgba(255,159,28,.10);" if pd.notna(value) else "", subset=manual_cols)
+            if projection_cols:
+                styled = styled.map(lambda value: "color:#22c55e;font-weight:800;" if pd.notna(value) else "", subset=projection_cols)
+            if actual_view_cols:
+                styled = styled.map(lambda value: "color:#facc15;font-weight:800;" if pd.notna(value) else "", subset=actual_view_cols)
+            st.dataframe(styled, hide_index=True, width="stretch")
+            st.caption("Orange = your manually entered sportsbook line · Green = frozen projection · Gold = resolved MLB result.")
 
 st.divider()
 if st.button("Resolve completed games", type="primary"):
@@ -251,9 +304,10 @@ o_resolved = df["actual_outs"].notna()
 o_ready = o_resolved & df["outs_range_low"].notna() & df["outs_range_high"].notna()
 o_hit = o_ready & (df["actual_outs"] >= df["outs_range_low"]) & (df["actual_outs"] <= df["outs_range_high"])
 
-st.markdown('<div class="history-kicker">Performance scoreboard</div>', unsafe_allow_html=True)
+st.markdown('<div class="history-secondary-zone">Automatic Evidence + Model Diagnostics</div>', unsafe_allow_html=True)
+st.markdown('<div class="history-kicker">Evidence performance scoreboard</div>', unsafe_allow_html=True)
 col1, col2, col3, col4, col5, col6 = st.columns(6)
-col1.metric("Evidence snapshots", len(df))
+col1.metric("Automatic evidence rows", len(df))
 col2.metric("Resolved games", int((k_resolved | h_resolved | o_resolved).sum()))
 col3.metric("K range hits", int(k_hit.sum()))
 col4.metric("K hit rate", f"{float(k_hit.sum() / k_ready.sum()):.1%}" if k_ready.any() else "—")
