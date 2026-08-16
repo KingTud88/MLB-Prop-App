@@ -3,7 +3,7 @@ from __future__ import annotations
 import streamlit as st
 
 # MASCOT_PATH compatibility marker: mascot is browser-rendered to avoid Pillow codec crashes.
-MASCOT_URL = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000_sidebar.png?v=6"
+MASCOT_URL = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000_sidebar.png?v=7"
 
 
 def render_sidebar(active: str = "projection") -> None:
@@ -46,8 +46,8 @@ def render_sidebar(active: str = "projection") -> None:
             overflow:hidden;
         }
         .sk-nav-mascot img {
-            width:236px;
-            height:236px;
+            width:236px !important;
+            height:236px !important;
             object-fit:contain;
             max-width:none !important;
             min-width:236px !important;
@@ -426,7 +426,7 @@ def render_sidebar(active: str = "projection") -> None:
     with st.sidebar:
         st.markdown('<div class="sk-nav-brand">', unsafe_allow_html=True)
         st.markdown(
-            f'<div class="sk-nav-mascot"><img src="{MASCOT_URL}" alt="StrikeOut King 9000 mascot" onerror="this.style.display=\'none\';this.parentElement.classList.add(\'sk-logo-fallback\')"></div>',
+            f'<div class="sk-nav-mascot"><img src="{MASCOT_URL}" alt="StrikeOut King 9000 mascot" style="width:236px !important;height:236px !important;min-width:236px !important;max-width:236px !important;object-fit:contain !important;display:block !important;" onerror="this.style.display=\'none\';this.parentElement.classList.add(\'sk-logo-fallback\')"></div>',
             unsafe_allow_html=True,
         )
         st.markdown('<div class="sk-nav-title">STRIKEOUT<br><span>KING 9000</span></div>', unsafe_allow_html=True)
