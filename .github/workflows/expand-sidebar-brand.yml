@@ -13,37 +13,56 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build cropped sidebar mascot and wire it in
+      - name: Crop mascot to actual artwork and force fresh asset
         run: |
           python -m pip install --quiet pillow
           python - <<'PY'
           from pathlib import Path
-          from PIL import Image, ImageOps
+          from PIL import Image, ImageChops, ImageFilter, ImageOps
 
           src = Path('assets/strikeout_king_9000_clean.png')
           out = Path('assets/strikeout_king_9000_sidebar.png')
           im = Image.open(src).convert('RGBA')
+
+          # Detect the actual mascot artwork against the surrounding canvas,
+          # rather than trusting alpha alone.
+          rgb = im.convert('RGB')
+          corners = [rgb.getpixel((0, 0)), rgb.getpixel((im.width - 1, 0)), rgb.getpixel((0, im.height - 1)), rgb.getpixel((im.width - 1, im.height - 1))]
+          bg = tuple(sum(px[i] for px in corners) // len(corners) for i in range(3))
+          bg_im = Image.new('RGB', im.size, bg)
+          diff = ImageChops.difference(rgb, bg_im).convert('L')
           alpha = im.getchannel('A')
-          bbox = alpha.getbbox()
+
+          # Keep pixels that are meaningfully different from the canvas and visible.
+          mask = diff.point(lambda p: 255 if p > 24 else 0)
+          mask = ImageChops.multiply(mask, alpha.point(lambda p: 255 if p > 20 else 0))
+          mask = mask.filter(ImageFilter.MaxFilter(5))
+          bbox = mask.getbbox()
+          alpha_bbox = alpha.getbbox()
           if not bbox:
-              raise SystemExit('Mascot asset has no visible pixels')
+              bbox = alpha_bbox
+          if not bbox:
+              raise SystemExit('Mascot asset has no detectable artwork')
+
+          # Small safety pad so feathers/headset are never clipped.
+          x0, y0, x1, y1 = bbox
+          pad = max(3, round(max(x1 - x0, y1 - y0) * 0.025))
+          bbox = (max(0, x0 - pad), max(0, y0 - pad), min(im.width, x1 + pad), min(im.height, y1 + pad))
           cropped = im.crop(bbox)
-          pad = max(4, round(max(cropped.size) * 0.035))
-          cropped = ImageOps.expand(cropped, border=pad, fill=(0, 0, 0, 0))
           cropped.save(out, optimize=True)
+          print(f'source={im.size} background={bg} alpha_bbox={alpha_bbox} artwork_bbox={bbox} output={cropped.size}')
 
           p = Path('navigation.py')
           s = p.read_text()
-          s = s.replace(
-              'assets/strikeout_king_9000_clean.png',
-              'assets/strikeout_king_9000_sidebar.png',
-              1,
-          )
-          s = s.replace('height:232px;', 'height:224px;', 1)
-          s = s.replace('margin:-.72rem 0 -.95rem;', 'margin:-.42rem 0 -.52rem;', 1)
-          s = s.replace('width:246px;', 'width:220px;', 1)
-          s = s.replace('height:246px;', 'height:220px;', 1)
-          s = s.replace('transform:scale(2.15) translateY(1%);', 'transform:none;', 1)
+          old_url = 'https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000_sidebar.png'
+          new_url = 'https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000_sidebar.png?v=3'
+          s = s.replace(old_url + '?v=2', new_url)
+          s = s.replace(old_url, new_url)
+          s = s.replace('height:224px;', 'height:236px;', 1)
+          s = s.replace('margin:-.42rem 0 -.52rem;', 'margin:-.48rem 0 -.60rem;', 1)
+          s = s.replace('width:220px;', 'width:232px;', 1)
+          s = s.replace('height:220px;', 'height:232px;', 1)
+          s = s.replace('transform:none;', 'transform:none;', 1)
           p.write_text(s)
           PY
       - name: Commit patch
@@ -55,5 +74,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add navigation.py assets/strikeout_king_9000_sidebar.png
-          git commit -m "Use tightly cropped sidebar mascot"
+          git commit -m "Make sidebar mascot visibly larger"
           git push
