@@ -1,39 +1,57 @@
-name: Projection Persistence + History UI
+name: Projection Badge Polish
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  patch:
+  polish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Add restart-safe projection persistence
-        run: python tools/patch_projection_persistence.py
-
-      - name: Fix manual line prefill missing values
-        run: python tools/fix_manual_prefill_na.py
-
-      - name: Add manual lines to Main Projection
-        run: python tools/patch_main_projection_manual_lines.py
+      - name: Enlarge and tighten Projection Summary badges
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('streamlit_app.py')
+          text = p.read_text(encoding='utf-8')
+          marker = 'PROJECTION_BADGE_POLISH_V6'
+          if marker in text:
+              print('Projection badge polish already active')
+              raise SystemExit(0)
+          start = text.find('PROJECTION_ARTWORK_INDIVIDUAL_V5')
+          if start < 0:
+              raise SystemExit('Individual Projection artwork block not found')
+          end = text.find('</style>', start)
+          if end < 0:
+              raise SystemExit('Projection style close not found')
+          before, block, after = text[:start], text[start:end], text[end:]
+          block = block.replace('width:64px!important;height:64px!important;flex:0 0 64px!important;', 'width:74px!important;height:74px!important;flex:0 0 74px!important;')
+          block = block.replace('width:56px!important;height:56px!important;flex-basis:56px!important', 'width:66px!important;height:66px!important;flex-basis:66px!important')
+          block = block.replace('?v=5', '?v=6')
+          block += '\n/* PROJECTION_BADGE_POLISH_V6 · larger, tighter cleaned artwork only */\n.cc-card-top{gap:.72rem!important}\n'
+          p.write_text(before + block + after, encoding='utf-8')
+          PY
 
       - name: Validate Python syntax
-        run: python -m py_compile training/projection_storage.py pages/4_Projection_History.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py streamlit_app.py
+        run: python -m py_compile streamlit_app.py
 
-      - name: Commit safely
+      - name: Commit badge sizing safely
         run: |
-          if git diff --quiet -- pages/4_Projection_History.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py streamlit_app.py; then
-            echo "Projection persistence patches already present"
+          if git diff --quiet -- streamlit_app.py; then
+            echo "Badge sizing already applied"
             exit 0
           fi
           git config user.name "KingTud88"
           git config user.email "jaxson0603@gmail.com"
-          git add pages/4_Projection_History.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py streamlit_app.py
-          git commit -m "Maintain projection persistence"
+          git add streamlit_app.py
+          git commit -m "Polish Projection Summary badge sizing"
+          git pull --rebase origin main
           git push origin HEAD:main
