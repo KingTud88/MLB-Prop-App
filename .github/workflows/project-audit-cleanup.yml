@@ -1,0 +1,411 @@
+name: Project audit cleanup
+
+on:
+  push:
+    paths:
+      - ".github/workflows/project-audit-cleanup.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt pytest
+      - name: Apply project audit fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          def read(path):
+              return Path(path).read_text(encoding="utf-8")
+
+          def write(path, text):
+              Path(path).write_text(text, encoding="utf-8")
+
+          def replace_once(path, old, new):
+              text = read(path)
+              if old not in text:
+                  raise SystemExit(f"Target not found in {path}: {old[:120]!r}")
+              write(path, text.replace(old, new, 1))
+
+          def regex_once(path, pattern, replacement, flags=re.S):
+              text = read(path)
+              new, count = re.subn(pattern, replacement, text, count=1, flags=flags)
+              if count != 1:
+                  raise SystemExit(f"Regex target count {count} in {path}: {pattern}")
+              write(path, new)
+
+          # ------------------------------------------------------------------
+          # Roof-aware weather: exterior rain must not look like an automatic
+          # pitcher-avoid signal at a dome/retractable-roof venue.
+          # ------------------------------------------------------------------
+          replace_once(
+              "engine/weather_risk.py",
+              '''def _empty(summary: str = "Weather forecast unavailable for this game window.") -> WeatherDelayRisk:\n    return WeatherDelayRisk("UNKNOWN", "", None, None, None, summary, False)\n\n\ndef assess_delay_risk''',
+              '''def _empty(summary: str = "Weather forecast unavailable for this game window.") -> WeatherDelayRisk:\n    return WeatherDelayRisk("UNKNOWN", "", None, None, None, summary, False)\n\n\ndef roof_protected(roof_type: object) -> bool:\n    """Return whether MLB venue metadata describes a covered/closable roof."""\n    text = str(roof_type or "").strip().lower()\n    if not text or text == "open":\n        return False\n    return any(token in text for token in ("retract", "dome", "fixed roof", "closed roof"))\n\n\ndef apply_roof_protection(risk: WeatherDelayRisk, roof_type: object) -> WeatherDelayRisk:\n    """Keep exterior weather visible while preventing false delay alarms under a roof.\n\n    Retractable-roof parks still require a near-game roof-status check, so this\n    is an informational protection label rather than a claim that the roof is\n    definitely closed.\n    """\n    if not roof_protected(roof_type):\n        return risk\n    label = str(roof_type or "roof-capable").strip()\n    exterior = str(risk.level or "UNKNOWN").upper()\n    summary = (\n        f"Roof-capable venue ({label}). Exterior weather is {exterior.lower()} but is not treated "\n        "as an automatic pitcher-avoid delay signal; verify roof status near first pitch."\n    )\n    return WeatherDelayRisk(\n        "ROOF", "🏟️", risk.precip_probability, risk.precipitation_mm, risk.weather_code, summary, True\n    )\n\n\ndef assess_delay_risk'''
+          )
+
+          # ------------------------------------------------------------------
+          # Main Projection: real-line integrity, no local manual market editor,
+          # no dormant paid Odds API request path, and roof-aware weather.
+          # ------------------------------------------------------------------
+          replace_once(
+              "streamlit_app.py",
+              "from engine.weather_risk import WeatherDelayRisk, fetch_weather_delay_risk",
+              "from engine.weather_risk import WeatherDelayRisk, apply_roof_protection, fetch_weather_delay_risk",
+          )
+          text = read("streamlit_app.py")
+          text = text.replace('ODDS_API = "https://api.the-odds-api.com/v4"\n', '', 1)
+          text = re.sub(r'^TEAM_NAMES = .*\n', '', text, count=1, flags=re.M)
+          write("streamlit_app.py", text)
+
+          replace_once(
+              "streamlit_app.py",
+              '''    except Exception:\n        pass\n    return None\n\n@st.cache_data(ttl=900,show_spinner=False)\ndef get_game_weather(venue_id,game_time,latitude=None,longitude=None):''',
+              '''    except Exception:\n        pass\n    return None\n\n@st.cache_data(ttl=21600,show_spinner=False)\ndef get_venue_roof_type(venue_id):\n    if not venue_id:\n        return ""\n    target_id=int(venue_id)\n    try:\n        payload=MLBClient().get(f"venues/{target_id}",{"hydrate":"fieldInfo"})\n        venues=payload.get("venues") or []\n        field_info=(venues[0].get("fieldInfo") or {}) if venues else {}\n        roof=str(field_info.get("roofType") or "").strip()\n        if roof:\n            return roof\n    except Exception:\n        pass\n    try:\n        payload=MLBClient().get("teams",{"sportId":1,"hydrate":"venue(fieldInfo)"})\n        for team_node in payload.get("teams",[]) or []:\n            venue_node=team_node.get("venue",{}) or {}\n            if int(venue_node.get("id",0) or 0) != target_id:\n                continue\n            roof=str(((venue_node.get("fieldInfo") or {}).get("roofType")) or "").strip()\n            if roof:\n                return roof\n    except Exception:\n        pass\n    return ""\n\n@st.cache_data(ttl=900,show_spinner=False)\ndef get_game_weather(venue_id,game_time,latitude=None,longitude=None):'''
+          )
+          replace_once(
+              "streamlit_app.py",
+              '    return fetch_weather_delay_risk(coords[0],coords[1],game_time)\n\ndef load_projection_history():',
+              '    risk=fetch_weather_delay_risk(coords[0],coords[1],game_time)\n    return apply_roof_protection(risk,get_venue_roof_type(venue_id))\n\ndef load_projection_history():',
+          )
+
+          # Quick-add cards must have a real active line. The model ladder remains
+          # independently actionable because selecting a milestone is explicit.
+          replace_once(
+              "streamlit_app.py",
+              '''def render_add_bet_button(container,reco,market_label,market_keys,projection_mean,stake,game,game_date,odds_rows,confidence,data_quality,key):\n    side=str(reco.get("side","PASS"))\n    offer=best_market_offer(odds_rows,market_keys,reco.get("line"),side) if side in {"OVER","UNDER"} else None\n    with container:\n        if offer is not None:\n            st.caption(f"Best posted: {offer.get('book','')} {float(offer.get('price')):+.0f}")\n        elif side=="PASS":\n            st.caption("No aligned model-side recommendation to track")\n        else:\n            st.caption("Model leg available · sportsbook price optional")\n        straight_col,parlay_col=st.columns(2)\n        straight_clicked=straight_col.button("➕ Straight",key=f"{key}_straight",use_container_width=True,disabled=(side=="PASS"))\n        parlay_clicked=parlay_col.button("🎟️ Parlay",key=f"{key}_parlay",use_container_width=True,disabled=(side=="PASS"))''',
+              '''def render_add_bet_button(container,reco,market_label,market_keys,projection_mean,stake,game,game_date,odds_rows,confidence,data_quality,key):\n    side=str(reco.get("side","NO LINE")).upper()\n    no_line=reco.get("line") is None or side=="NO LINE"\n    tradable=side in {"OVER","UNDER"} and not no_line\n    offer=best_market_offer(odds_rows,market_keys,reco.get("line"),side) if tradable else None\n    with container:\n        if offer is not None:\n            st.caption(f"Best posted: {offer.get('book','')} {float(offer.get('price')):+.0f}")\n        elif no_line:\n            st.caption("Projection shown · add an active sportsbook line on Daily Projection Run to quick-add this market")\n        elif side=="PASS":\n            st.caption("Active line exists, but the model does not have an aligned play")\n        else:\n            st.caption("Active line loaded · sportsbook price optional")\n        straight_col,parlay_col=st.columns(2)\n        straight_clicked=straight_col.button("➕ Straight",key=f"{key}_straight",use_container_width=True,disabled=not tradable)\n        parlay_clicked=parlay_col.button("🎟️ Parlay",key=f"{key}_parlay",use_container_width=True,disabled=not tradable)'''
+          )
+
+          # Remove Projection-page what-if manual controls and replace the card
+          # renderer with a line-integrity-aware display.
+          regex_once(
+              "streamlit_app.py",
+              r'def _manual_line_options\(market_key\):.*?\ndef render_calibration_dashboard\(\):',
+              '''def no_active_line_recommendation(label, projection_mean):\n    return {\n        "side":"NO LINE","line":None,"model":None,"edge":None,"confidence":0.0,\n        "has_market":False,"reason":"no_active_market_line","projection_mean":float(projection_mean),\n        "over_model":None,"label":label,"active_line":False,"active_line_source":"",\n    }\n\n\ndef render_reco(card,reco):\n    side=str(reco.get("side","NO LINE")).upper()\n    line=reco.get("line")\n    no_line=line is None or side=="NO LINE"\n    projection_mean=pd.to_numeric(pd.Series([reco.get("projection_mean")]),errors="coerce").iloc[0]\n    projection_text="—" if pd.isna(projection_mean) else f"{float(projection_mean):.2f}"\n    active_source=str(reco.get("active_line_source","") or "").strip().upper()\n    if no_line:\n        cls="reco-neutral"\n        side_text="PROJECTION ONLY"\n        line_text="NO ACTIVE LINE"\n        meta=f"Projection {projection_text} · add line on Daily Projection Run"\n        line_class="reco-line"\n    else:\n        cls="reco-warn" if side=="PASS" else "reco-under" if side=="UNDER" else "reco-good"\n        side_text=side\n        line_text=f"{float(line):g} LINE"\n        line_class="reco-line manual-active" if active_source=="MANUAL" else "reco-line"\n        reason_labels={\n            "no_positive_aligned_edge":"EDGE BELOW 2%",\n            "probability_conflicts_with_projection":"PROJECTION / PROBABILITY DISAGREE",\n            "projection_on_line":"PROJECTION ON LINE",\n            "insufficient_model_confidence":"MODEL CONFIDENCE BELOW 58%",\n            "model_direction":"MODEL LEAN",\n            "aligned_positive_edge":"POSITIVE ALIGNED EDGE",\n        }\n        model=reco.get("model")\n        edge=reco.get("edge")\n        if side=="PASS":\n            meta=f"Proj {projection_text} vs {float(line):g} · {reason_labels.get(reco.get('reason'),'NO BET')}"\n        else:\n            model_text="—" if model is None else f"{float(model):.1%}"\n            edge_text="MODEL LEAN" if edge is None else f"EDGE {float(edge):+.1%}"\n            meta=f"Model {model_text} · {edge_text}"\n        if active_source=="MANUAL":\n            meta += " · MANUAL · DAILY RUN"\n        elif active_source:\n            meta += f" · {active_source}"\n    emblem_class=("whiff" if "STRIKEOUT" in str(reco.get("label","")) else "glove" if "OUTS" in str(reco.get("label","")) else "contact")\n    with card:\n        st.markdown(f'<div class="reco-card {cls}"><div class="cc-card-top"><div class="cc-card-icon cc-emblem {emblem_class}" aria-hidden="true"></div><div class="reco-label">{reco["label"]}</div></div><div class="reco-side {cls}">{side_text}</div><div class="{line_class}">{line_text}</div><div class="reco-meta">{meta}</div></div>',unsafe_allow_html=True)\n\n\ndef render_calibration_dashboard():'''
+          )
+
+          # Remove all dormant direct paid-Odds request helpers from Main
+          # Projection. It may only read the disk snapshot produced by Daily Run.
+          regex_once(
+              "streamlit_app.py",
+              r'def get_secret\(\):.*?\ndef market_model_probability',
+              'def market_model_probability',
+          )
+
+          # Replace recommendation setup with real-line-aware semantics. Daily
+          # manual line wins; otherwise a saved paid K snapshot may supply the line.
+          regex_once(
+              "streamlit_app.py",
+              r'k_reco=market_recommendation\(proj,odds_rows,"pitcher_strikeouts_alternate",5\.5,"k"\); k_reco\["label"\]="STRIKEOUT BET LEAN".*?\n\nif nav=="Distribution":',
+              '''k_reco=market_recommendation(proj,odds_rows,"pitcher_strikeouts_alternate",5.5,"k"); k_reco["label"]="STRIKEOUT BET LEAN"\nout_reco=market_recommendation(proj,odds_rows,"pitcher_outs_alternate",15.5,"outs"); out_reco["label"]="TOTAL OUTS BET LEAN"\nhit_rows=[r for r in odds_rows if r.get("market") in {"pitcher_hits_allowed","pitcher_hits_allowed_alternate"} and r.get("point") is not None]\nhit_line=min([float(r["point"]) for r in hit_rows],key=lambda x:abs(x-5.5)) if hit_rows else 5.5\nhit_sim=float(hits_proj.simulation_probabilities.get(float(hit_line),0.0)); hit_math=float(hits_proj.mathematical_probabilities.get(float(hit_line),0.0))\nhit_cal=calibrate_hits_blend(load_projection_history(),float(hit_line)); hit_over=hit_cal.weight_simulation*hit_sim+hit_cal.weight_math*hit_math\nhit_over_offer=best_market_offer(odds_rows,{"pitcher_hits_allowed","pitcher_hits_allowed_alternate"},hit_line,"OVER")\nhit_under_offer=best_market_offer(odds_rows,{"pitcher_hits_allowed","pitcher_hits_allowed_alternate"},hit_line,"UNDER")\nhit_over_price=hit_over_offer.get("price") if hit_over_offer else None\nhit_under_price=hit_under_offer.get("price") if hit_under_offer else None\nhit_decision=aligned_bet_lean(hits_proj.ensemble_mean,hit_line,hit_over,over_implied=implied_prob(hit_over_price) if hit_over_price is not None else None,under_implied=implied_prob(hit_under_price) if hit_under_price is not None else None,has_market=bool(hit_rows))\nhit_reco={"side":hit_decision.side,"line":hit_line,"model":hit_decision.model_probability,"edge":hit_decision.edge,"confidence":abs(hit_decision.model_probability-.5)*2,"has_market":bool(hit_rows),"label":"HITS ALLOWED BET LEAN","reason":hit_decision.reason,"projection_mean":hits_proj.ensemble_mean,"over_model":hit_over}\n\nif manual_k_line is not None:\n    k_reco=apply_active_line_to_recommendation(k_reco,proj,"pitcher_strikeouts",manual_k_line,hits_proj,manual_k_source or "MANUAL")\nelif k_reco.get("has_market"):\n    k_reco["active_line_source"]="PAID API · SAVED SNAPSHOT"\nelse:\n    k_reco=no_active_line_recommendation("STRIKEOUT BET LEAN",proj.mean_k)\n\nif manual_outs_line is not None:\n    out_reco=apply_active_line_to_recommendation(out_reco,proj,"pitcher_outs",manual_outs_line,hits_proj,manual_outs_source or "MANUAL")\nelif out_reco.get("has_market"):\n    out_reco["active_line_source"]="SAVED SNAPSHOT"\nelse:\n    out_reco=no_active_line_recommendation("TOTAL OUTS BET LEAN",proj.mean_outs)\n\nif manual_hits_line is not None:\n    hit_reco=apply_active_line_to_recommendation(hit_reco,proj,"pitcher_hits_allowed",manual_hits_line,hits_proj,manual_hits_source or "MANUAL")\nelif hit_reco.get("has_market"):\n    hit_reco["active_line_source"]="SAVED SNAPSHOT"\nelse:\n    hit_reco=no_active_line_recommendation("HITS ALLOWED BET LEAN",hits_proj.ensemble_mean)\n\ndef _active_line(reco):\n    value=pd.to_numeric(pd.Series([reco.get("line")]),errors="coerce").iloc[0]\n    return None if pd.isna(value) else float(value)\n\nactive_k_line=_active_line(k_reco)\nactive_outs_line=_active_line(out_reco)\nactive_hits_line=_active_line(hit_reco)\nactive_k_source=str(k_reco.get("active_line_source","") or "").strip().upper()\nactive_outs_source=str(out_reco.get("active_line_source","") or "").strip().upper()\nactive_hits_source=str(hit_reco.get("active_line_source","") or "").strip().upper()\n\nif nav=="Distribution":'''
+          )
+
+          replace_once(
+              "streamlit_app.py",
+              '''    (manual_k_line,manual_outs_line,manual_hits_line),(manual_k_source,manual_outs_source,manual_hits_source),''',
+              '''    (active_k_line,active_outs_line,active_hits_line),(active_k_source,active_outs_source,active_hits_source),''',
+          )
+          replace_once(
+              "streamlit_app.py",
+              '_source_text="MANUAL · DAILY RUN" if _manual else (str(_source) if _source else "NO MANUAL LINE")',
+              '_source_text="MANUAL · DAILY RUN" if _manual else (str(_source) if _source else "NO ACTIVE LINE")',
+          )
+          replace_once(
+              "streamlit_app.py",
+              'st.caption("Orange = the durable sportsbook line you entered on Daily Projection Run. These execution lines do not alter the frozen baseball projection; they set the exact line used for the recommendation comparison.")',
+              'st.caption("Manual Daily Run lines appear in orange; a saved paid K snapshot appears with its source label. No active line means the projection still shows, but the app will not manufacture a bet lean. Execution lines never alter the baseball projection.")',
+          )
+          replace_once("streamlit_app.py", 'render_reco(c2,k_reco,key_prefix=f"manual_k:{game.key}",market_key="pitcher_strikeouts",proj=proj,hits_proj=hits_proj)', 'render_reco(c2,k_reco)')
+          replace_once("streamlit_app.py", 'render_reco(c4,out_reco,key_prefix=f"manual_outs:{game.key}",market_key="pitcher_outs",proj=proj,hits_proj=hits_proj)', 'render_reco(c4,out_reco)')
+          replace_once("streamlit_app.py", 'render_reco(h2,hit_reco,key_prefix=f"manual_hits:{game.key}",market_key="pitcher_hits_allowed",proj=proj,hits_proj=hits_proj)', 'render_reco(h2,hit_reco)')
+          replace_once(
+              "streamlit_app.py",
+              'action_panel.caption("Quick-add a model-aligned straight or parlay leg. Sportsbook price stays optional unless a saved market snapshot exists.")',
+              'action_panel.caption("Quick-add uses the real active line shown above. A sportsbook price may remain unpriced, but the app will not quick-add a fabricated/default market line.")',
+          )
+
+          # Roof state in the Projection weather command card.
+          replace_once(
+              "streamlit_app.py",
+              '_weather_label={"HIGH":"DELAY RISK","ELEVATED":"RAIN WATCH","LOW":"LOW RAIN RISK","NONE":"CLEAR","UNKNOWN":"UNAVAILABLE"}.get(_weather_level,_weather_level)',
+              '_weather_label={"HIGH":"DELAY RISK","ELEVATED":"RAIN WATCH","LOW":"LOW RAIN RISK","NONE":"CLEAR","ROOF":"ROOF PROTECTED","UNKNOWN":"UNAVAILABLE"}.get(_weather_level,_weather_level)',
+          )
+          replace_once(
+              "streamlit_app.py",
+              '_weather_action={"HIGH":"AVOID · DELAY RISK","ELEVATED":"CAUTION · RECHECK","LOW":"MONITOR NEAR FIRST PITCH","NONE":"NO DELAY SIGNAL","UNKNOWN":"VERIFY WEATHER"}.get(_weather_level,"VERIFY WEATHER")',
+              '_weather_action={"HIGH":"AVOID · DELAY RISK","ELEVATED":"CAUTION · RECHECK","LOW":"MONITOR NEAR FIRST PITCH","NONE":"NO DELAY SIGNAL","ROOF":"RAIN DELAY MITIGATED · VERIFY ROOF","UNKNOWN":"VERIFY WEATHER"}.get(_weather_level,"VERIFY WEATHER")',
+          )
+          replace_once(
+              "streamlit_app.py",
+              '_weather_class={"HIGH":"weather-high","ELEVATED":"weather-elevated","LOW":"weather-low","NONE":"weather-none"}.get(_weather_level,"weather-unknown")',
+              '_weather_class={"HIGH":"weather-high","ELEVATED":"weather-elevated","LOW":"weather-low","NONE":"weather-none","ROOF":"weather-none"}.get(_weather_level,"weather-unknown")',
+          )
+          replace_once(
+              "streamlit_app.py",
+              'Game window: 2h before first pitch → 4h after · Weather risk is informational and does not currently modify the projection.',
+              'Game window: 2h before first pitch → 4h after · Roof-capable parks suppress false exterior-rain avoid signals; verify retractable-roof status near first pitch. Weather does not modify the projection.',
+          )
+
+          # ------------------------------------------------------------------
+          # Daily runner roof context + backwards-compatible weather refresher.
+          # ------------------------------------------------------------------
+          replace_once(
+              "automation/daily_projection_runner.py",
+              "from engine.weather_risk import WeatherDelayRisk, fetch_weather_delay_risk",
+              "from engine.weather_risk import WeatherDelayRisk, apply_roof_protection, fetch_weather_delay_risk",
+          )
+          replace_once(
+              "automation/daily_projection_runner.py",
+              '''    except (requests.RequestException, ValueError, TypeError, IndexError):\n        return None\n\n\n@lru_cache(maxsize=128)\ndef game_weather(''',
+              '''    except (requests.RequestException, ValueError, TypeError, IndexError):\n        return None\n\n\n@lru_cache(maxsize=64)\ndef venue_roof_type(venue_id: int) -> str:\n    if not venue_id:\n        return ""\n    try:\n        data = get_json(f"venues/{int(venue_id)}", {"hydrate": "fieldInfo"})\n        venues = data.get("venues") or []\n        field_info = (venues[0].get("fieldInfo") or {}) if venues else {}\n        roof = str(field_info.get("roofType") or "").strip()\n        if roof:\n            return roof\n    except (requests.RequestException, ValueError, TypeError, IndexError):\n        pass\n    try:\n        data = get_json("teams", {"sportId": 1, "hydrate": "venue(fieldInfo)"})\n        for team in data.get("teams", []) or []:\n            venue = team.get("venue", {}) or {}\n            if int(venue.get("id", 0) or 0) != int(venue_id):\n                continue\n            roof = str(((venue.get("fieldInfo") or {}).get("roofType")) or "").strip()\n            if roof:\n                return roof\n    except (requests.RequestException, ValueError, TypeError, IndexError):\n        pass\n    return ""\n\n\n@lru_cache(maxsize=128)\ndef game_weather('''
+          )
+          replace_once(
+              "automation/daily_projection_runner.py",
+              '    return fetch_weather_delay_risk(coords[0], coords[1], str(game_time or ""))',
+              '    risk = fetch_weather_delay_risk(coords[0], coords[1], str(game_time or ""))\n    return apply_roof_protection(risk, venue_roof_type(int(venue_id or 0)))',
+          )
+          replace_once(
+              "automation/daily_projection_runner.py",
+              '''        "weather_summary": risk.summary,\n    }''',
+              '''        "weather_summary": risk.summary,\n        "weather_roof_type": venue_roof_type(int(venue_id or 0)),\n    }''',
+          )
+          replace_once(
+              "automation/daily_projection_runner.py",
+              '''        fields = weather_snapshot_fields(\n            int(scheduled.get("venue_id", 0) or 0),\n            str(scheduled.get("game_time", "")),\n            scheduled.get("venue_latitude"),\n            scheduled.get("venue_longitude"),\n        )''',
+              '''        venue_id = int(scheduled.get("venue_id", 0) or 0)\n        game_time = str(scheduled.get("game_time", ""))\n        latitude = scheduled.get("venue_latitude")\n        longitude = scheduled.get("venue_longitude")\n        # Preserve the original two-argument weather helper contract when\n        # coordinates are unavailable; pass coordinates only when both exist.\n        if latitude is None or longitude is None:\n            fields = weather_snapshot_fields(venue_id, game_time)\n        else:\n            fields = weather_snapshot_fields(venue_id, game_time, latitude, longitude)'''
+          )
+          replace_once(
+              "automation/daily_projection_runner.py",
+              '        venue_id = int(scheduled.get("venue_id", 0) or 0)\n        old_venue =',
+              '        old_venue =',
+          )
+
+          # ------------------------------------------------------------------
+          # Persist last paid Odds API quota headers locally so Daily Run can
+          # display remaining credits without spending another request.
+          # ------------------------------------------------------------------
+          replace_once("engine/odds_snapshot.py", "import os\n", "import json\nimport os\n")
+          replace_once(
+              "engine/odds_snapshot.py",
+              'SNAPSHOT_PATH = ROOT / "data" / "odds_strikeout_snapshot.csv"',
+              'SNAPSHOT_PATH = ROOT / "data" / "odds_strikeout_snapshot.csv"\nQUOTA_PATH = ROOT / "data" / "odds_api_quota.json"',
+          )
+          replace_once(
+              "engine/odds_snapshot.py",
+              '''def _parse_event(event: dict, payload: dict, slate_date: str, fetched_at: str) -> list[dict[str, object]]:''',
+              '''def save_quota_status(quota: dict[str, int | None], checked_at_utc: str | None = None) -> None:\n    if not quota or not any(value is not None for value in quota.values()):\n        return\n    payload = {\n        "remaining": quota.get("remaining"),\n        "used": quota.get("used"),\n        "last": quota.get("last"),\n        "checked_at_utc": checked_at_utc or datetime.now(timezone.utc).isoformat(),\n    }\n    QUOTA_PATH.parent.mkdir(parents=True, exist_ok=True)\n    QUOTA_PATH.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")\n\n\ndef load_quota_status() -> dict[str, object]:\n    if not QUOTA_PATH.exists():\n        return {}\n    try:\n        payload = json.loads(QUOTA_PATH.read_text(encoding="utf-8"))\n    except (OSError, ValueError, TypeError):\n        return {}\n    return payload if isinstance(payload, dict) else {}\n\n\ndef _parse_event(event: dict, payload: dict, slate_date: str, fetched_at: str) -> list[dict[str, object]]:'''
+          )
+          replace_once(
+              "engine/odds_snapshot.py",
+              '''    http = session or requests.Session()\n    try:\n        response = http.get(f"{ODDS_API}/sports/baseball_mlb/events", params={"apiKey": key}, timeout=15)\n        response.raise_for_status()\n        events = response.json()''',
+              '''    http = session or requests.Session()\n    quota: dict[str, int | None] = {}\n    try:\n        response = http.get(f"{ODDS_API}/sports/baseball_mlb/events", params={"apiKey": key}, timeout=15)\n        response.raise_for_status()\n        quota = _quota(response.headers)\n        events = response.json()'''
+          )
+          replace_once(
+              "engine/odds_snapshot.py",
+              '''    rows: list[dict[str, object]] = []\n    quota: dict[str, int | None] = {}\n    fetched_at = datetime.now(timezone.utc).isoformat()''',
+              '''    rows: list[dict[str, object]] = []\n    fetched_at = datetime.now(timezone.utc).isoformat()'''
+          )
+          replace_once(
+              "engine/odds_snapshot.py",
+              '''    combined.to_csv(SNAPSHOT_PATH, index=False)\n    return fresh, quota, None''',
+              '''    combined.to_csv(SNAPSHOT_PATH, index=False)\n    save_quota_status(quota, fetched_at)\n    return fresh, quota, None'''
+          )
+
+          # ------------------------------------------------------------------
+          # Daily page: model-first column order, quota meter, roof metadata,
+          # and restore useful CI contract wording.
+          # ------------------------------------------------------------------
+          replace_once(
+              "pages/5_Daily_Projection_Run.py",
+              "from engine.odds_snapshot import refresh_strikeout_snapshot, resolve_api_key",
+              "from engine.odds_snapshot import load_quota_status, refresh_strikeout_snapshot, resolve_api_key",
+          )
+          replace_once(
+              "pages/5_Daily_Projection_Run.py",
+              '"active_strikeout_line", "active_strikeout_line_source", "projection", "k_range_low", "k_range_high", "sim_5p", "math_5p",\n            "active_outs_line", "active_outs_line_source", "outs_projection", "outs_range_low", "outs_range_high", "outs_sim_over_15_5", "outs_math_over_15_5",\n            "active_hits_allowed_line", "active_hits_allowed_line_source", "hits_projection", "hits_range_low", "hits_range_high", "hits_sim_over_5_5", "hits_math_over_5_5",',
+              '"projection", "k_range_low", "k_range_high", "sim_5p", "math_5p", "active_strikeout_line", "active_strikeout_line_source",\n            "outs_projection", "outs_range_low", "outs_range_high", "outs_sim_over_15_5", "outs_math_over_15_5", "active_outs_line", "active_outs_line_source",\n            "hits_projection", "hits_range_low", "hits_range_high", "hits_sim_over_5_5", "hits_math_over_5_5", "active_hits_allowed_line", "active_hits_allowed_line_source",',
+          )
+          replace_once(
+              "pages/5_Daily_Projection_Run.py",
+              '"weather_icon", "weather_delay_risk", "weather_precip_probability",',
+              '"weather_icon", "weather_delay_risk", "weather_roof_type", "weather_precip_probability",',
+          )
+          replace_once(
+              "pages/5_Daily_Projection_Run.py",
+              '"weather_delay_risk": "Weather",\n                "weather_precip_probability": "Rain %",',
+              '"weather_delay_risk": "Weather",\n                "weather_roof_type": "Roof",\n                "weather_precip_probability": "Rain %",',
+          )
+          replace_once(
+              "pages/5_Daily_Projection_Run.py",
+              '"How to read: Line = active sportsbook execution line attached after projection capture · Projection = frozen expected average outcome · 80% Range = one central simulated interval (10th–90th percentile), not an 80% chance at each endpoint · "',
+              '"How to read: Projection = frozen expected average outcome · Line = active sportsbook execution line attached after projection capture · 80% Range = one central simulated interval (10th–90th percentile), not an 80% chance at each endpoint · "',
+          )
+          replace_once(
+              "pages/5_Daily_Projection_Run.py",
+              '<div class="daily-section-head">Persistent History-Only Tracker</div>',
+              '<div class="daily-section-head">📚 Persistent history-only starter tracker</div>',
+          )
+
+          regex_once(
+              "pages/5_Daily_Projection_Run.py",
+              r'st\.markdown\(\'<div class="daily-section-head">Manual Paid Data</div>\'.*?\n\n\nst\.markdown\(\'<div class="daily-section-head">📚 Persistent history-only starter tracker</div>\'',
+              '''st.markdown('<div class="daily-section-head">Manual Paid Data</div>', unsafe_allow_html=True)\nst.markdown('<div class="daily-note paid">Optional market-data pull · manual only · strikeout lines only · saved snapshot is reused elsewhere without another paid request.</div>', unsafe_allow_html=True)\nst.markdown('<div class="daily-action-label">💳 Paid strikeout lines</div>', unsafe_allow_html=True)\nst.caption("Manual only. This button is the ONLY paid Odds API path and requests pitcher_strikeouts only. The saved snapshot is reused by Main Projections without another API call.")\npaid_quota = load_quota_status()\nif st.button("💳 LOAD STRIKEOUT LINES · PAID API", use_container_width=True, key="daily_paid_k_odds"):\n    api_key=resolve_api_key(st.secrets)\n    with st.spinner("Loading today's main pitcher strikeout lines once and saving the snapshot..."):\n        odds_snapshot,quota,odds_error=refresh_strikeout_snapshot(api_key,slate_date.isoformat())\n    if odds_error:\n        st.error(odds_error)\n    else:\n        pitchers=int(odds_snapshot.get("pitcher",pd.Series(dtype=str)).nunique()) if not odds_snapshot.empty else 0\n        active_lines = apply_paid_strikeout_lines(odds_snapshot, slate_date.isoformat())\n        st.success(f"Saved {len(odds_snapshot)} strikeout offers for {pitchers} pitchers and applied {active_lines} active K line(s) for Top Plays. Manual K lines override these paid lines.")\n        paid_quota = load_quota_status()\n\nremaining = paid_quota.get("remaining") if isinstance(paid_quota, dict) else None\nchecked_at = str(paid_quota.get("checked_at_utc", "") or "") if isinstance(paid_quota, dict) else ""\nquota_col, quota_note = st.columns([1, 2])\nquota_col.metric("Odds API credits remaining", "—" if remaining is None else f"{int(remaining):,}")\nquota_note.caption(\n    "Saved from the response headers of the last paid pull"\n    + (f" · checked {checked_at}" if checked_at else " · no paid pull recorded yet")\n    + ". This meter never calls the Odds API by itself."\n)\n\n\nst.markdown('<div class="daily-section-head">📚 Persistent history-only starter tracker</div>','''
+          )
+
+          # ------------------------------------------------------------------
+          # Projection Archive: surface K target/result directly and hide dead
+          # columns in the primary date groups too.
+          # ------------------------------------------------------------------
+          replace_once(
+              "pages/4_Projection_History.py",
+              '''    user_archive = user_archive.sort_values(["_archive_date", "player"], ascending=[False, True], na_position="last")\n\n    archive_dates =''',
+              '''    user_archive = user_archive.sort_values(["_archive_date", "player"], ascending=[False, True], na_position="last")\n    user_archive["archive_k_target"] = user_archive.get("projection", pd.Series(index=user_archive.index, dtype=float)).map(bettable_k_label)\n    user_archive["archive_k_result"] = user_archive.apply(\n        lambda row: bettable_k_result(row.get("projection"), row.get("actual_strikeouts")), axis=1\n    )\n\n    archive_dates ='''
+          )
+          replace_once(
+              "pages/4_Projection_History.py",
+              '''        "player", "team", "opponent",\n        "manual_strikeout_line", "projection", "actual_strikeouts",\n        "manual_outs_line", "outs_projection", "actual_outs",''',
+              '''        "player", "team", "opponent",\n        "projection", "archive_k_target", "actual_strikeouts", "archive_k_result", "manual_strikeout_line",\n        "outs_projection", "actual_outs", "manual_outs_line",'''
+          )
+          replace_once(
+              "pages/4_Projection_History.py",
+              '''                "player": "Pitcher", "team": "Team", "opponent": "Opp",\n                "manual_strikeout_line": "K Line", "projection": "Projected K", "actual_strikeouts": "Actual K",\n                "manual_outs_line": "Outs Line", "outs_projection": "Projected Outs", "actual_outs": "Actual Outs",''',
+              '''                "player": "Pitcher", "team": "Team", "opponent": "Opp",\n                "projection": "Projected K", "archive_k_target": "K Target", "actual_strikeouts": "Actual K", "archive_k_result": "K Result", "manual_strikeout_line": "K Line",\n                "outs_projection": "Projected Outs", "actual_outs": "Actual Outs", "manual_outs_line": "Outs Line",'''
+          )
+          replace_once(
+              "pages/4_Projection_History.py",
+              '''            formatters = {}''',
+              '''            # Normalize placeholder strings and hide columns that are empty for this slate.\n            for col in view.columns:\n                if view[col].dtype == object:\n                    cleaned = view[col].astype(str).str.strip()\n                    empty_token = cleaned.str.lower().isin({"", "nan", "none", "null", "nat", "<na>"})\n                    view.loc[empty_token, col] = pd.NA\n            populated = [col for col in view.columns if bool(view[col].notna().any())]\n            view = view[populated]\n\n            formatters = {}'''
+          )
+          replace_once(
+              "pages/4_Projection_History.py",
+              '''            actual_view_cols = [col for col in ("Actual K", "Actual Outs", "Actual Hits") if col in view.columns]\n            if manual_cols:''',
+              '''            actual_view_cols = [col for col in ("Actual K", "Actual Outs", "Actual Hits") if col in view.columns]\n            target_view_cols = [col for col in ("K Target",) if col in view.columns]\n            if manual_cols:'''
+          )
+          replace_once(
+              "pages/4_Projection_History.py",
+              '''            if actual_view_cols:\n                styled = styled.map(lambda value: "color:#facc15;font-weight:800;" if pd.notna(value) else "", subset=actual_view_cols)\n            st.dataframe(styled, hide_index=True, width="stretch")\n            st.caption("Orange = your manually entered sportsbook line · Green = frozen projection · Gold = resolved MLB result.")''',
+              '''            if actual_view_cols:\n                styled = styled.map(lambda value: "color:#facc15;font-weight:800;" if pd.notna(value) else "", subset=actual_view_cols)\n            if target_view_cols:\n                styled = styled.map(lambda value: "color:#38bdf8;font-weight:800;" if pd.notna(value) else "", subset=target_view_cols)\n            if "K Result" in view.columns:\n                styled = styled.map(\n                    lambda value: "color:#22c55e;font-weight:900;" if "WIN" in str(value) else "color:#ff6379;font-weight:900;" if "MISS" in str(value) else "color:#ffd166;font-weight:800;",\n                    subset=["K Result"],\n                )\n            st.dataframe(styled, hide_index=True, width="stretch")\n            st.caption("Green = frozen projection · Blue = model-supported K target · Gold = resolved MLB result · K Result grades the target. Orange sportsbook lines appear only when you attached one.")'''
+          )
+          replace_once(
+              "pages/4_Projection_History.py",
+              '''    f"Only rows tagged {HISTORY_SEMANTICS} feed these learning diagnostics. "''',
+              '''    f"Only starter-only model rows tagged {HISTORY_SEMANTICS} feed these learning diagnostics. "'''
+          )
+
+          # ------------------------------------------------------------------
+          # CI contracts: update stale tests to the intentional real-line Top
+          # Plays architecture and add coverage for today's fixes.
+          # ------------------------------------------------------------------
+          replace_once(
+              "tests/test_bet_add_buttons_contract.py",
+              '''    assert 'st.markdown("#### Top Play actions")' in source\n    assert "Sportsbook lines/odds are execution info only and never rank the board or feed the forecast" in source\n    assert "market_health=health_map" in source\n    assert 'plays["Live Offer"] = False' in source\n    assert "if api_key:" in source''',
+              '''    assert "require_market_lines=True" in source\n    assert "Line integrity: every ranked leg below uses an active sportsbook line" in source\n    assert "Sportsbook lines/odds are execution info only and never rank the board or feed the forecast" in source\n    assert "market_health=health_map" in source\n    assert 'plays["Live Offer"] = False' in source\n    assert "api_key = None" in source'''
+          )
+          replace_once(
+              "tests/test_bet_add_buttons_contract.py",
+              '''    assert 'disabled=(side=="PASS")' in source''',
+              '''    assert "tradable=side in {\"OVER\",\"UNDER\"} and not no_line" in source\n    assert "disabled=not tradable" in source'''
+          )
+          # Add explicit source contracts for the Main Projection cleanup.
+          text = read("tests/test_bet_add_buttons_contract.py")
+          marker = '\n\ndef test_projection_strikeout_ladder_is_clickable_and_actionable():'
+          addition = '''\n\ndef test_projection_bet_leans_require_real_lines_and_manual_editor_is_gone():\n    source = (Path(__file__).resolve().parents[1] / "streamlit_app.py").read_text(encoding="utf-8")\n    assert "no_active_line_recommendation" in source\n    assert "PROJECTION ONLY" in source\n    assert "NO ACTIVE LINE" in source\n    assert "the app will not manufacture a bet lean" in source\n    assert "MANUAL LINE / ODDS" not in source\n    assert "manual_market_recommendation" not in source\n    assert "get_odds_events" not in source\n    assert "get_event_props" not in source\n\n'''
+          if marker not in text:
+              raise SystemExit("Could not add Projection line-integrity test")
+          write("tests/test_bet_add_buttons_contract.py", text.replace(marker, addition + marker, 1))
+
+          replace_once(
+              "tests/test_signal_ui_contract.py",
+              'build_pos = source.index("plays = build_model_board(slate, history, limit=5, market_health=health_map)")',
+              'build_pos = source.index("plays = build_model_board(slate, history, limit=5, market_health=health_map, require_market_lines=True)")',
+          )
+
+          replace_once(
+              "tests/test_weather_risk.py",
+              "from engine.weather_risk import assess_delay_risk",
+              "from engine.weather_risk import apply_roof_protection, assess_delay_risk",
+          )
+          text = read("tests/test_weather_risk.py")
+          text += '''\n\ndef test_retractable_roof_suppresses_exterior_rain_avoid_signal():\n    exterior=assess_delay_risk(_hourly(prob=80,precip=3.0,code=95),datetime(2026,8,13,0,0,tzinfo=timezone.utc))\n    result=apply_roof_protection(exterior,"Retractable")\n    assert exterior.level == "HIGH"\n    assert result.level == "ROOF"\n    assert result.icon == "🏟️"\n    assert result.precip_probability == exterior.precip_probability\n    assert "verify roof status" in result.summary.lower()\n\n\ndef test_open_air_venue_keeps_weather_risk():\n    exterior=assess_delay_risk(_hourly(prob=80,precip=3.0,code=95),datetime(2026,8,13,0,0,tzinfo=timezone.utc))\n    result=apply_roof_protection(exterior,"Open")\n    assert result == exterior\n'''
+          write("tests/test_weather_risk.py", text)
+
+          replace_once(
+              "tests/test_odds_snapshot.py",
+              '    monkeypatch.setattr(odds, "SNAPSHOT_PATH", tmp_path / "odds.csv")',
+              '    monkeypatch.setattr(odds, "SNAPSHOT_PATH", tmp_path / "odds.csv")\n    monkeypatch.setattr(odds, "QUOTA_PATH", tmp_path / "quota.json")',
+          )
+          replace_once(
+              "tests/test_odds_snapshot.py",
+              '    assert quota["last"] == 1',
+              '    assert quota["last"] == 1\n    saved_quota = odds.load_quota_status()\n    assert saved_quota["remaining"] == 99\n    assert saved_quota["last"] == 1',
+          )
+
+          # The two failing wording contracts are useful, so fix the UI/caption
+          # rather than weakening those tests. Weather helper compatibility was
+          # fixed in production code above.
+
+          # ------------------------------------------------------------------
+          # Repo cleanup: remove one-shot patch workflows and orphaned UI patch
+          # scripts. Keep scheduled/model-validation workflows intact.
+          # ------------------------------------------------------------------
+          obsolete_workflows = [
+              "add-calibration-dashboard.yml",
+              "apply-bet-save-fix.yml",
+              "bet-tracker-command-ui.yml",
+              "bet-tracker-readability.yml",
+              "expand-sidebar-brand.yml",
+              "fix-bet-save.yml",
+              "fix-empty-sidebar-brand.yml",
+              "fix-engine-dataclass.yml",
+              "fix-streamlit-cache.yml",
+          ]
+          workflow_dir = Path(".github/workflows")
+          for name in obsolete_workflows:
+              path = workflow_dir / name
+              if path.exists():
+                  path.unlink()
+
+          script_dir = Path(".github/scripts")
+          if script_dir.exists():
+              workflow_text = "\n".join(p.read_text(encoding="utf-8", errors="ignore") for p in workflow_dir.glob("*.yml"))
+              for script in list(script_dir.glob("*.py")):
+                  if script.name not in workflow_text:
+                      script.unlink()
+              try:
+                  script_dir.rmdir()
+              except OSError:
+                  pass
+
+          # Guardrails: the paid endpoint must be absent from Main Projection,
+          # and the removed local manual editor must stay gone.
+          main_source = read("streamlit_app.py")
+          assert "get_odds_events" not in main_source
+          assert "get_event_props" not in main_source
+          assert "MANUAL LINE / ODDS" not in main_source
+          assert "manual_market_recommendation" not in main_source
+          assert "no_active_line_recommendation" in main_source
+          PY
+      - name: Compile
+        run: python -m compileall -q streamlit_app.py navigation.py engine automation tests
+      - name: Test
+        run: pytest -q
+      - name: Commit verified cleanup
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Restore project guardrails and clean stale patch automation"
+          git push
