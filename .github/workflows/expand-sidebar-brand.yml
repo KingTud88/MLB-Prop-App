@@ -1,13 +1,15 @@
-name: Projection Weather Venue Resolver
+name: Game Status Weather Hero
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  weather-venue-resolver:
+  game-status-weather-hero:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,43 +23,46 @@ jobs:
         run: pip install -r requirements.txt pytest
 
       - name: Validate patch script
-        run: python -m py_compile .github/scripts/weather_venue_resolution_v11.py
+        run: python -m py_compile .github/scripts/game_status_weather_hero_v12.py
 
-      - name: Apply live weather venue resolver
-        run: python .github/scripts/weather_venue_resolution_v11.py
+      - name: Apply Game Status weather hero
+        run: python .github/scripts/game_status_weather_hero_v12.py
 
       - name: Validate app syntax
-        run: python -m py_compile streamlit_app.py
+        run: python -m py_compile streamlit_app.py engine/ui_command_center.py
 
-      - name: Validate live weather coordinate contracts
+      - name: Validate Game Status UI contracts
         run: |
           python - <<'PY'
           from pathlib import Path
-          source = Path("streamlit_app.py").read_text(encoding="utf-8")
-          required = [
-              '"hydrate":"probablePitcher,team,venue(location)"',
-              'MLBClient().get(f"venues/{target_id}",{"hydrate":"location"})',
-              'MLBClient().get("teams",{"sportId":1,"hydrate":"venue(location)"})',
-              'game.venue_latitude,game.venue_longitude',
-              'venue_latitude:float|None=None; venue_longitude:float|None=None',
+          ui = Path("engine/ui_command_center.py").read_text(encoding="utf-8")
+          app = Path("streamlit_app.py").read_text(encoding="utf-8")
+          required_ui = [
+              'grid-template-columns:minmax(0,1fr) 96px',
+              'cc-weather-status-hero',
+              'weather_level: str = "UNKNOWN"',
+              '"NONE": "☀️"',
+              'cc-matchup-status-copy',
           ]
-          missing = [token for token in required if token not in source]
+          missing = [token for token in required_ui if token not in ui]
+          if 'weather_level=_weather_level' not in app:
+              missing.append('weather_level=_weather_level')
           if missing:
-              raise SystemExit(f"Missing live weather coordinate contracts: {missing}")
-          print("Live Projection weather coordinate contracts present")
+              raise SystemExit(f"Missing Game Status weather hero contracts: {missing}")
+          print("Game Status weather hero contracts present")
           PY
-          python -m pytest -q tests/test_weather_risk.py tests/test_projection_weather_batter_contract.py
+          python -m pytest -q tests/test_ui_command_center_contract.py tests/test_projection_weather_batter_contract.py tests/test_weather_risk.py
 
-      - name: Commit weather venue resolver safely
+      - name: Commit Game Status weather hero safely
         run: |
-          if git diff --quiet -- streamlit_app.py; then
-            echo "Live Projection weather venue resolver already applied"
+          if git diff --quiet -- streamlit_app.py engine/ui_command_center.py; then
+            echo "Game Status weather hero already applied"
             exit 0
           fi
           git config user.name "KingTud88"
           git config user.email "jaxson0603@gmail.com"
-          git add streamlit_app.py
-          git commit -m "Fix live Projection weather venue coordinates"
+          git add streamlit_app.py engine/ui_command_center.py
+          git commit -m "Enlarge Game Status weather symbol"
           for attempt in 1 2 3 4; do
             git fetch origin main
             git rebase origin/main || { git rebase --abort || true; sleep 2; continue; }
@@ -66,5 +71,5 @@ jobs:
             fi
             sleep $((attempt * 2))
           done
-          echo "Could not push live weather venue resolver after retries"
+          echo "Could not push Game Status weather hero after retries"
           exit 1
