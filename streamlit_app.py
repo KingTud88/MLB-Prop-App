@@ -280,9 +280,55 @@ h1,h2,h3{letter-spacing:-.02em}
 .game-weather-card.weather-elevated{border-color:rgba(255,190,78,.72)!important}
 .game-weather-card.weather-high{border-color:rgba(255,71,98,.80)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 0 24px rgba(236,22,56,.12),0 14px 32px rgba(0,0,0,.28)!important}
 .game-weather-card.weather-unknown{border-color:rgba(122,143,164,.58)!important}
-.game-weather-head{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:.26rem}
+/* WEATHER_CARD_HERO_V13 · large state-aware weather symbol */
+.game-weather-head{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 100px;
+    gap:1rem;
+    align-items:start;
+    margin-bottom:.26rem;
+}
 .game-weather-title{color:#eef3f7;font-size:.92rem;line-height:1.3;font-weight:900;letter-spacing:.035em}
-.game-weather-icon{font-size:2.55rem;line-height:1;filter:drop-shadow(0 3px 5px rgba(0,0,0,.30))}
+.game-weather-icon{
+    width:92px;
+    height:92px;
+    justify-self:end;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:50%;
+    font-size:3.55rem;
+    line-height:1;
+    border:1px solid rgba(91,119,146,.68);
+    background:radial-gradient(circle at 35% 28%,rgba(30,67,103,.94),rgba(5,22,39,.98) 68%);
+    box-shadow:inset 0 0 0 5px rgba(255,255,255,.025),0 12px 24px rgba(0,0,0,.30),0 0 24px rgba(71,126,174,.16);
+    filter:drop-shadow(0 3px 5px rgba(0,0,0,.28));
+}
+.weather-high .game-weather-icon{
+    border-color:rgba(255,78,101,.82);
+    background:radial-gradient(circle at 35% 28%,rgba(125,24,47,.96),rgba(35,7,18,.98) 70%);
+    box-shadow:inset 0 0 0 5px rgba(255,255,255,.025),0 12px 24px rgba(0,0,0,.30),0 0 28px rgba(236,22,56,.36);
+}
+.weather-elevated .game-weather-icon{
+    border-color:rgba(255,209,102,.78);
+    background:radial-gradient(circle at 35% 28%,rgba(108,77,14,.94),rgba(35,24,5,.98) 70%);
+    box-shadow:inset 0 0 0 5px rgba(255,255,255,.025),0 12px 24px rgba(0,0,0,.30),0 0 28px rgba(255,209,102,.24);
+}
+.weather-low .game-weather-icon{
+    border-color:rgba(91,178,230,.74);
+    background:radial-gradient(circle at 35% 28%,rgba(20,76,112,.94),rgba(5,24,39,.98) 70%);
+    box-shadow:inset 0 0 0 5px rgba(255,255,255,.025),0 12px 24px rgba(0,0,0,.30),0 0 26px rgba(91,178,230,.22);
+}
+.weather-none .game-weather-icon{
+    border-color:rgba(50,229,141,.66);
+    background:radial-gradient(circle at 35% 28%,rgba(16,88,62,.88),rgba(5,30,24,.98) 70%);
+    box-shadow:inset 0 0 0 5px rgba(255,255,255,.025),0 12px 24px rgba(0,0,0,.30),0 0 26px rgba(50,229,141,.20);
+}
+.weather-unknown .game-weather-icon{
+    color:#9cb0c1;
+    border-color:rgba(91,119,146,.55);
+    background:radial-gradient(circle at 35% 28%,rgba(35,54,73,.88),rgba(7,20,34,.98) 70%);
+}
 .game-weather-risk{font-family:Impact,"Arial Narrow",sans-serif;font-size:2.15rem;line-height:1;color:#f5f1e9;letter-spacing:.02em;margin:.08rem 0 .34rem}
 .game-weather-action{display:inline-flex;align-items:center;border:1px solid rgba(93,126,158,.68);border-radius:999px;padding:.25rem .58rem;background:rgba(12,38,65,.82);color:#dce9f5;font-size:.76rem;font-weight:900;letter-spacing:.035em;text-transform:uppercase}
 .weather-high .game-weather-action{border-color:rgba(255,71,98,.58);color:#ff7f91;background:rgba(121,15,37,.30)}
@@ -295,7 +341,7 @@ h1,h2,h3{letter-spacing:-.02em}
 .game-weather-reason{margin-top:.5rem;color:#a9bdce;font-size:.76rem;line-height:1.28}
 .game-weather-note{margin-top:.32rem;color:#7690a6;font-size:.67rem;line-height:1.2}
 @media (max-width:900px){.game-weather-card{min-height:176px!important}}
-@media (max-width:620px){.game-weather-card{min-height:166px!important;padding:14px!important}.game-weather-grid{grid-template-columns:1fr}.game-weather-risk{font-size:1.85rem}}
+@media (max-width:620px){.game-weather-card{min-height:166px!important;padding:14px!important}.game-weather-grid{grid-template-columns:1fr}.game-weather-risk{font-size:1.85rem}.game-weather-head{grid-template-columns:minmax(0,1fr) 76px}.game-weather-icon{width:72px;height:72px;font-size:2.75rem}}
 </style>""", unsafe_allow_html=True)
 
 @dataclass(frozen=True)
@@ -1000,7 +1046,7 @@ elif nav=="Daily Projection Run":
 if not locked: st.info("Lock the pitcher in the left rail to freeze all projection outputs for this pitcher.")
 weather_marker=f" {weather_risk.icon}" if weather_risk.icon else ""
 _weather_level=str(weather_risk.level or "UNKNOWN").upper()
-_weather_icon=weather_risk.icon or ("✓" if weather_risk.available else "—")
+_weather_icon=weather_risk.icon or ("☀️" if str(weather_risk.level or "").upper()=="NONE" else "✓" if weather_risk.available else "—")
 _weather_label={"HIGH":"DELAY RISK","ELEVATED":"RAIN WATCH","LOW":"LOW RAIN RISK","NONE":"CLEAR","UNKNOWN":"UNAVAILABLE"}.get(_weather_level,_weather_level)
 _weather_action={"HIGH":"AVOID · DELAY RISK","ELEVATED":"CAUTION · RECHECK","LOW":"MONITOR NEAR FIRST PITCH","NONE":"NO DELAY SIGNAL","UNKNOWN":"VERIFY WEATHER"}.get(_weather_level,"VERIFY WEATHER")
 _weather_class={"HIGH":"weather-high","ELEVATED":"weather-elevated","LOW":"weather-low","NONE":"weather-none"}.get(_weather_level,"weather-unknown")
