@@ -134,6 +134,31 @@ h1,h2,h3{letter-spacing:-.02em}
 .reco-card .cc-card-icon.cc-emblem{width:64px!important;height:64px!important;flex-basis:64px!important}
 @media (max-width:900px){.cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{width:56px!important;height:56px!important;flex-basis:56px!important;background-size:53px 53px!important}}
 .active-market-line{padding:.72rem .78rem;border:1px solid #20425f;border-radius:12px;background:rgba(9,27,44,.94);text-align:center}.active-market-line .label{color:#9fb3c3;font-size:.72rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase}.active-market-line .value{margin-top:.18rem;color:#f2f6fa;font-size:1.5rem;font-weight:950}.active-market-line .source{margin-top:.14rem;color:#8fa5b7;font-size:.68rem;font-weight:850;letter-spacing:.04em}.active-market-line.manual{border-color:rgba(255,159,28,.66);background:rgba(255,159,28,.07)}.active-market-line.manual .value,.active-market-line.manual .source{color:#ff9f1c}.reco-line.manual-active{color:#ff9f1c;text-shadow:0 0 15px rgba(255,159,28,.18)}
+
+/* PROJECTION_ARTWORK_V1 · actual illustrated mockup badges */
+.cc-card-icon.cc-emblem{
+    width:64px!important;
+    height:64px!important;
+    flex:0 0 64px!important;
+    border:0!important;
+    border-radius:0!important;
+    background-color:transparent!important;
+    background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_summary_emblems.webp?v=1")!important;
+    background-repeat:no-repeat!important;
+    background-size:600% 100%!important;
+    box-shadow:none!important;
+    overflow:visible!important;
+    filter:drop-shadow(0 4px 8px rgba(0,0,0,.32)) drop-shadow(0 0 5px rgba(236,22,56,.18));
+}
+.cc-card-icon.cc-emblem::before,
+.cc-card-icon.cc-emblem::after{display:none!important;content:none!important}
+.metric-card .cc-emblem.whiff{background-position:0% 50%!important}
+.reco-card .cc-emblem.whiff{background-position:20% 50%!important}
+.metric-card .cc-emblem.glove{background-position:40% 50%!important}
+.reco-card .cc-emblem.glove{background-position:60% 50%!important}
+.metric-card .cc-emblem.contact{background-position:80% 50%!important}
+.reco-card .cc-emblem.contact{background-position:100% 50%!important}
+
 </style>""", unsafe_allow_html=True)
 
 @dataclass(frozen=True)
