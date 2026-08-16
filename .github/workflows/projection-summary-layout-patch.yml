@@ -1,0 +1,123 @@
+name: Projection Summary layout patch
+
+on:
+  push:
+    branches:
+      - ui-projection-summary-card-layout
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ui-projection-summary-card-layout
+          fetch-depth: 0
+      - name: Apply presentation-only card layout override
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('streamlit_app.py')
+          text = path.read_text(encoding='utf-8')
+          marker = '/* PROJECTION_SUMMARY_LAYOUT_V8 · title top, value left, large emblem right */'
+          if marker in text:
+              print('Projection Summary V8 layout already present; no change required.')
+              raise SystemExit(0)
+
+          anchor = '/* PROJECTION_BADGE_POLISH_V7 · tighter fill + reduced blur */\n.cc-card-icon.cc-emblem{background-size:72px 72px!important}\n@media (max-width:900px){.cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{background-size:64px 64px!important}}'
+          if anchor not in text:
+              raise SystemExit('Expected Projection badge V7 anchor not found; refusing to patch.')
+
+          override = r'''
+
+/* PROJECTION_SUMMARY_LAYOUT_V8 · title top, value left, large emblem right */
+.metric-card,.reco-card{
+    position:relative!important;
+    min-height:184px!important;
+    padding:16px 108px 16px 16px!important;
+    text-align:left!important;
+    overflow:hidden!important;
+}
+.metric-card .cc-card-top,.reco-card .cc-card-top{
+    display:block!important;
+    margin:0 0 .55rem!important;
+    min-height:1.25rem!important;
+}
+.metric-card .metric-label,.reco-card .reco-label{
+    display:block!important;
+    width:100%!important;
+    margin:0!important;
+    padding:0!important;
+    text-align:left!important;
+    white-space:normal!important;
+    position:relative!important;
+    z-index:2!important;
+}
+.metric-card .cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{
+    position:absolute!important;
+    right:14px!important;
+    top:50px!important;
+    width:88px!important;
+    height:88px!important;
+    min-width:88px!important;
+    flex:0 0 88px!important;
+    margin:0!important;
+    background-size:86px 86px!important;
+    background-position:center!important;
+    z-index:1!important;
+}
+.metric-card .metric-value{
+    margin:.05rem 0 .38rem!important;
+    text-align:left!important;
+    position:relative!important;
+    z-index:2!important;
+}
+.metric-card .badge,.metric-card .alt-k-badge{
+    margin-left:0!important;
+    margin-right:0!important;
+    position:relative!important;
+    z-index:2!important;
+}
+.reco-card .reco-side{
+    margin:.08rem 0 .30rem!important;
+    position:relative!important;
+    z-index:2!important;
+}
+.reco-card .reco-line,.reco-card .reco-meta{
+    text-align:left!important;
+    position:relative!important;
+    z-index:2!important;
+}
+@media (max-width:900px){
+    .metric-card,.reco-card{padding-right:92px!important;min-height:176px!important}
+    .metric-card .cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{
+        right:10px!important;top:52px!important;width:76px!important;height:76px!important;min-width:76px!important;flex-basis:76px!important;background-size:74px 74px!important
+    }
+}
+@media (max-width:620px){
+    .metric-card,.reco-card{padding:14px 82px 14px 14px!important;min-height:166px!important}
+    .metric-card .cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{
+        right:8px!important;top:50px!important;width:68px!important;height:68px!important;min-width:68px!important;flex-basis:68px!important;background-size:66px 66px!important
+    }
+}
+'''
+
+          text = text.replace(anchor, anchor + override, 1)
+          path.write_text(text, encoding='utf-8')
+          print('Applied Projection Summary V8 layout override.')
+          PY
+      - name: Commit patch if changed
+        run: |
+          if git diff --quiet -- streamlit_app.py; then
+            echo "No streamlit_app.py change to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add streamlit_app.py
+          git commit -m "Recompose Projection Summary cards"
+          git push origin HEAD:ui-projection-summary-card-layout
