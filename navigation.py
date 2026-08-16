@@ -3,7 +3,7 @@ from __future__ import annotations
 import streamlit as st
 
 # MASCOT_PATH compatibility marker: mascot is browser-rendered to avoid Pillow codec crashes.
-MASCOT_URL = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000.png"
+MASCOT_URL = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000_clean.png"
 
 
 def render_sidebar(active: str = "projection") -> None:
@@ -22,7 +22,7 @@ def render_sidebar(active: str = "projection") -> None:
         [data-testid="stSidebar"] > div:first-child { width:218px !important; }
         .sk-nav-brand {
             margin: .1rem .15rem .75rem;
-            padding: .8rem .55rem .75rem;
+            padding: .72rem .5rem .75rem;
             border: 1px solid rgba(70,103,139,.44);
             border-radius: 16px;
             background: linear-gradient(145deg, rgba(14,35,64,.78), rgba(7,20,38,.72));
@@ -32,24 +32,24 @@ def render_sidebar(active: str = "projection") -> None:
             display:flex;
             justify-content:center;
             align-items:center;
-            height:104px;
-            margin:-.1rem 0 .2rem;
+            height:126px;
+            margin:-.08rem 0 .2rem;
             position: relative;
         }
         .sk-nav-mascot img {
-            width:100px;
-            height:100px;
+            width:122px;
+            height:122px;
             object-fit:contain;
             display:block;
-            filter: drop-shadow(0 8px 16px rgba(0,0,0,.28));
+            filter: drop-shadow(0 9px 18px rgba(0,0,0,.3));
         }
         .sk-nav-mascot.sk-logo-fallback::after {
             content:"SK 9000";
             display:flex;
             align-items:center;
             justify-content:center;
-            width:84px;
-            height:84px;
+            width:96px;
+            height:96px;
             border-radius:50%;
             border:2px solid #e31937;
             color:#fff;
