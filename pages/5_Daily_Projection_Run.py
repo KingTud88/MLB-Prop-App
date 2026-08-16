@@ -170,7 +170,8 @@ def _parse_market_line(value: object) -> float:
 
 
 def _manual_input_default(row: pd.Series, line_col: str, source_col: str) -> str:
-    if str(row.get(source_col, "") or "").strip().upper() != "MANUAL":
+    source = row.get(source_col, "")
+    if pd.isna(source) or str(source).strip().upper() != "MANUAL":
         return ""
     value = pd.to_numeric(pd.Series([row.get(line_col)]), errors="coerce").iloc[0]
     return "" if pd.isna(value) else f"{float(value):g}"
