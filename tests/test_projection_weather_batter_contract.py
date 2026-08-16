@@ -3,7 +3,11 @@ from pathlib import Path
 
 def test_projection_page_has_weather_badge_and_batter_box():
     text=Path("streamlit_app.py").read_text(encoding="utf-8")
-    assert "get_game_weather(game.venue_id,game.game_time)" in text
+    assert "get_game_weather(game.venue_id,game.game_time,game.venue_latitude,game.venue_longitude)" in text
+    assert '"hydrate":"probablePitcher,team,venue(location)"' in text
+    assert 'MLBClient().get(f"venues/{target_id}",{"hydrate":"location"})' in text
+    assert 'MLBClient().get("teams",{"sportId":1,"hydrate":"venue(location)"})' in text
+    assert "venue_latitude:float|None=None; venue_longitude:float|None=None" in text
     assert "weather_marker" in text
     assert "Weather risk is informational and does not currently modify the projection" in text
     assert "OPPOSING BATTER BOX" in text
