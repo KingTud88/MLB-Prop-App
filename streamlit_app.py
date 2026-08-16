@@ -146,6 +146,24 @@ h1,h2,h3{letter-spacing:-.02em}
 .metric-card .cc-emblem.contact{background-position:80% 50%!important}
 .reco-card .cc-emblem.contact{background-position:100% 50%!important}
 
+
+/* PROJECTION_ARTWORK_INDIVIDUAL_V5 · one real image per Summary emblem, no runtime sprite */
+.cc-card-icon.cc-emblem{
+    width:64px!important;height:64px!important;flex:0 0 64px!important;
+    display:block!important;visibility:visible!important;opacity:1!important;
+    border:0!important;border-radius:0!important;background-color:transparent!important;
+    background-repeat:no-repeat!important;background-position:center!important;background-size:contain!important;
+    box-shadow:none!important;overflow:visible!important;
+    filter:drop-shadow(0 4px 8px rgba(0,0,0,.32)) drop-shadow(0 0 6px rgba(236,22,56,.22))!important;
+}
+.cc-card-icon.cc-emblem::before,.cc-card-icon.cc-emblem::after{display:none!important;content:none!important}
+.metric-card .cc-emblem.whiff{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_k.webp?v=5")!important}
+.reco-card .cc-emblem.whiff{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_k_plus.webp?v=5")!important}
+.metric-card .cc-emblem.glove{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_outs.webp?v=5")!important}
+.reco-card .cc-emblem.glove{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_outs_plus.webp?v=5")!important}
+.metric-card .cc-emblem.contact{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_hits.webp?v=5")!important}
+.reco-card .cc-emblem.contact{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_hits_plus.webp?v=5")!important}
+@media (max-width:900px){.cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{width:56px!important;height:56px!important;flex-basis:56px!important}}
 </style>""", unsafe_allow_html=True)
 
 @dataclass(frozen=True)
