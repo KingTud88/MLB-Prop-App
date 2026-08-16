@@ -43,7 +43,7 @@ def _read_local(local_path: str | Path) -> pd.DataFrame:
 
 
 def load_projection_archive(local_path: str | Path, secrets: Any = None) -> pd.DataFrame:
-    """Load the user-approved projection archive from GitHub when configured."""
+    """Load durable manual/archive data from GitHub when configured."""
     token, repo, path = _config(secrets)
     if token:
         url = f"https://api.github.com/repos/{repo}/contents/{path}"
@@ -62,7 +62,7 @@ def load_projection_archive(local_path: str | Path, secrets: Any = None) -> pd.D
 
 
 def save_projection_archive(local_path: str | Path, frame: pd.DataFrame, secrets: Any = None) -> None:
-    """Persist the complete user-approved archive, using GitHub for restart-safe storage."""
+    """Persist the complete manual/archive overlay using restart-safe GitHub storage."""
     token, repo, path = _config(secrets)
     content = frame.to_csv(index=False)
     if token:
@@ -109,19 +109,24 @@ def save_projection_archive(local_path: str | Path, frame: pd.DataFrame, secrets
 
 def overlay_manual_market_lines(slate: pd.DataFrame, archive: pd.DataFrame) -> pd.DataFrame:
     """Overlay durable manual execution lines onto frozen model rows without mutating projections."""
-    if slate.empty or archive.empty:
-        return slate.copy()
     result = slate.copy()
-    required = {"game_pk", "pitcher_id"}
-    if not required.issubset(result.columns) or not required.issubset(archive.columns):
-        return result
-
     for col in (
+        "manual_strikeout_line", "manual_outs_line", "manual_hits_allowed_line",
         "active_strikeout_line", "active_outs_line", "active_hits_allowed_line",
         "active_strikeout_line_source", "active_outs_line_source", "active_hits_allowed_line_source",
     ):
         if col not in result.columns:
             result[col] = pd.NA
+    if "archive_source" not in result.columns:
+        result["archive_source"] = ""
+    if "archive_committed_at_utc" not in result.columns:
+        result["archive_committed_at_utc"] = ""
+
+    if result.empty or archive.empty:
+        return result
+    required = {"game_pk", "pitcher_id"}
+    if not required.issubset(result.columns) or not required.issubset(archive.columns):
+        return result
 
     archive_rows = archive.copy()
     archive_rows["_game_pk"] = archive_rows["game_pk"].astype(str).str.replace(r"\.0$", "", regex=True)
@@ -146,6 +151,28 @@ def overlay_manual_market_lines(slate: pd.DataFrame, archive: pd.DataFrame) -> p
         for manual_col, line_col, source_col in specs:
             value = pd.to_numeric(pd.Series([saved.get(manual_col)]), errors="coerce").iloc[0]
             if pd.notna(value):
+                result.at[idx, manual_col] = float(value)
                 result.at[idx, line_col] = float(value)
                 result.at[idx, source_col] = "MANUAL"
+        source = str(saved.get("archive_source", "") or "").strip()
+        committed = str(saved.get("archive_committed_at_utc", "") or "").strip()
+        if source:
+            result.at[idx, "archive_source"] = source
+        if committed:
+            result.at[idx, "archive_committed_at_utc"] = committed
+    return result
+
+
+def build_projection_archive_view(evidence: pd.DataFrame, archive: pd.DataFrame) -> pd.DataFrame:
+    """Show every durable frozen evidence row, with manual lines layered on when available."""
+    if evidence.empty:
+        return archive.copy()
+    result = overlay_manual_market_lines(evidence, archive)
+    if "archive_source" not in result.columns:
+        result["archive_source"] = "AUTOMATIC_FROZEN_EVIDENCE"
+    else:
+        blank = result["archive_source"].fillna("").astype(str).str.strip().eq("")
+        result.loc[blank, "archive_source"] = "AUTOMATIC_FROZEN_EVIDENCE"
+    if "archive_committed_at_utc" not in result.columns:
+        result["archive_committed_at_utc"] = ""
     return result
