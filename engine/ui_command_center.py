@@ -252,6 +252,7 @@ def apply_command_center_theme() -> None:
         .cc-matchup-status-label { color:var(--cc-green);font-family:var(--cc-ui-font);font-size:.86rem;font-weight:800;letter-spacing:.025em;text-transform:uppercase; }
         .cc-matchup-status-time { margin-top:.32rem;color:#fff;font-weight:900;font-size:1rem; }
         .cc-matchup-status-meta { margin-top:.28rem;color:#afc0cf;font-family:var(--cc-ui-font);font-size:.84rem; }
+        .cc-weather-status-icon { display:inline-flex;align-items:center;justify-content:center;margin-left:.34rem;min-width:1.25rem;font-size:1rem;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.28)); }
         .cc-lock-pill {
             display:inline-flex;
             align-items:center;
@@ -694,7 +695,7 @@ def render_matchup_strip(
     """Render the matchup strip without changing any projection state."""
     lock_class = "cc-lock-pill locked" if locked else "cc-lock-pill"
     lock_label = "🔒 Locked" if locked else "◇ Unlocked"
-    weather = f" {_safe(weather_icon)}" if weather_icon else ""
+    weather = f'<span class="cc-weather-status-icon" aria-label="Weather delay risk">{_safe(weather_icon)}</span>' if weather_icon else ""
     logo = _team_logo_url(team_id)
     team_mark = (
         f'<div class="cc-team-mark cc-team-logo"><img src="{logo}" alt="{_safe(team)} logo" loading="lazy"></div>'
@@ -705,12 +706,12 @@ def render_matchup_strip(
         <div class="cc-matchup-strip">
           {team_mark}
           <div>
-            <div class="cc-matchup-name">{_safe(pitcher_name)}{weather}</div>
+            <div class="cc-matchup-name">{_safe(pitcher_name)}</div>
             <div class="cc-matchup-vs">{_safe(team)} <strong>vs</strong> {_safe(opponent)}</div>
             <div class="cc-matchup-meta">⚾ {_safe(venue)} · {_safe(side)}</div>
           </div>
           <div class="cc-matchup-status">
-            <div class="cc-matchup-status-label">Game Status</div>
+            <div class="cc-matchup-status-label">Game Status{weather}</div>
             <div class="cc-matchup-status-time">◫ {_safe(_game_time_text(game_time))}</div>
             <div class="cc-matchup-status-meta">{_safe(status)} · {_safe(side)}</div>
             <div class="{lock_class}">{_safe(lock_label)}</div>

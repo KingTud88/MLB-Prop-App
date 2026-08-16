@@ -258,6 +258,44 @@ h1,h2,h3{letter-spacing:-.02em}
 .reco-card .cc-emblem.glove{background-position:60% 50%!important}
 .metric-card .cc-emblem.contact{background-position:80% 50%!important}
 .reco-card .cc-emblem.contact{background-position:100% 50%!important}
+
+
+/* PROJECTION_WEATHER_SUMMARY_V10 · compact Hits pair + game delay-risk command card */
+.game-weather-card{
+    position:relative!important;
+    min-height:184px!important;
+    padding:16px 18px!important;
+    border:1px solid rgba(80,108,136,.72)!important;
+    border-radius:15px!important;
+    background:linear-gradient(145deg,rgba(9,31,55,.98),rgba(4,18,33,.98))!important;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 14px 32px rgba(0,0,0,.28)!important;
+    overflow:hidden!important;
+}
+.game-weather-card::after{
+    content:"";position:absolute;left:0;right:0;bottom:0;height:2px;
+    background:linear-gradient(90deg,transparent,#ec1638,transparent);opacity:.72;
+}
+.game-weather-card.weather-none{border-color:rgba(36,230,155,.58)!important}
+.game-weather-card.weather-low{border-color:rgba(85,170,255,.62)!important}
+.game-weather-card.weather-elevated{border-color:rgba(255,190,78,.72)!important}
+.game-weather-card.weather-high{border-color:rgba(255,71,98,.80)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 0 24px rgba(236,22,56,.12),0 14px 32px rgba(0,0,0,.28)!important}
+.game-weather-card.weather-unknown{border-color:rgba(122,143,164,.58)!important}
+.game-weather-head{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:.26rem}
+.game-weather-title{color:#eef3f7;font-size:.92rem;line-height:1.3;font-weight:900;letter-spacing:.035em}
+.game-weather-icon{font-size:2.55rem;line-height:1;filter:drop-shadow(0 3px 5px rgba(0,0,0,.30))}
+.game-weather-risk{font-family:Impact,"Arial Narrow",sans-serif;font-size:2.15rem;line-height:1;color:#f5f1e9;letter-spacing:.02em;margin:.08rem 0 .34rem}
+.game-weather-action{display:inline-flex;align-items:center;border:1px solid rgba(93,126,158,.68);border-radius:999px;padding:.25rem .58rem;background:rgba(12,38,65,.82);color:#dce9f5;font-size:.76rem;font-weight:900;letter-spacing:.035em;text-transform:uppercase}
+.weather-high .game-weather-action{border-color:rgba(255,71,98,.58);color:#ff7f91;background:rgba(121,15,37,.30)}
+.weather-elevated .game-weather-action{border-color:rgba(255,190,78,.58);color:#ffd36f;background:rgba(101,73,11,.30)}
+.weather-none .game-weather-action{border-color:rgba(36,230,155,.48);color:#5ceeb0;background:rgba(8,80,54,.30)}
+.game-weather-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem;margin-top:.62rem}
+.game-weather-stat{padding:.38rem .52rem;border:1px solid rgba(65,96,128,.58);border-radius:9px;background:rgba(4,18,33,.55)}
+.game-weather-stat span{display:block;color:#8fa5b7;font-size:.68rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.game-weather-stat strong{display:block;margin-top:.08rem;color:#f4f7fa;font-size:1rem;font-weight:900}
+.game-weather-reason{margin-top:.5rem;color:#a9bdce;font-size:.76rem;line-height:1.28}
+.game-weather-note{margin-top:.32rem;color:#7690a6;font-size:.67rem;line-height:1.2}
+@media (max-width:900px){.game-weather-card{min-height:176px!important}}
+@media (max-width:620px){.game-weather-card{min-height:166px!important;padding:14px!important}.game-weather-grid{grid-template-columns:1fr}.game-weather-risk{font-size:1.85rem}}
 </style>""", unsafe_allow_html=True)
 
 @dataclass(frozen=True)
@@ -930,6 +968,14 @@ elif nav=="Daily Projection Run":
 
 if not locked: st.info("Lock the pitcher in the left rail to freeze all projection outputs for this pitcher.")
 weather_marker=f" {weather_risk.icon}" if weather_risk.icon else ""
+_weather_level=str(weather_risk.level or "UNKNOWN").upper()
+_weather_icon=weather_risk.icon or ("✓" if weather_risk.available else "—")
+_weather_label={"HIGH":"DELAY RISK","ELEVATED":"RAIN WATCH","LOW":"LOW RAIN RISK","NONE":"CLEAR","UNKNOWN":"UNAVAILABLE"}.get(_weather_level,_weather_level)
+_weather_action={"HIGH":"AVOID · DELAY RISK","ELEVATED":"CAUTION · RECHECK","LOW":"MONITOR NEAR FIRST PITCH","NONE":"NO DELAY SIGNAL","UNKNOWN":"VERIFY WEATHER"}.get(_weather_level,"VERIFY WEATHER")
+_weather_class={"HIGH":"weather-high","ELEVATED":"weather-elevated","LOW":"weather-low","NONE":"weather-none"}.get(_weather_level,"weather-unknown")
+_weather_prob="—" if weather_risk.precip_probability is None else f"{weather_risk.precip_probability:.0f}%"
+_weather_peak="—" if weather_risk.precipitation_mm is None else f"{weather_risk.precipitation_mm:.1f} mm/h"
+_weather_summary=re.sub(r"[<>]","",str(weather_risk.summary or "Weather forecast unavailable for this game window."))
 render_command_center_hero(
     confidence=proj.confidence,
     quality=proj.quality,
@@ -961,10 +1007,6 @@ for _col,_label,_line,_source in zip(
     with _col:
         st.markdown(f'<div class="{_cls}"><div class="label">{_label}</div><div class="value">{_value}</div><div class="source">{_source_text}</div></div>',unsafe_allow_html=True)
 st.caption("Orange = the durable sportsbook line you entered on Daily Projection Run. These execution lines do not alter the frozen baseball projection; they set the exact line used for the recommendation comparison.")
-if weather_risk.available and weather_risk.level in {"HIGH","ELEVATED"}:
-    st.warning(f"{weather_risk.icon} {weather_risk.summary}. Weather risk is informational and does not currently modify the projection.")
-elif weather_risk.available and weather_risk.level == "LOW":
-    st.caption(f"{weather_risk.icon} {weather_risk.summary}. Informational only.")
 st.markdown('<div class="section-head">PROJECTION SUMMARY</div>',unsafe_allow_html=True)
 alt_k_choice=best_alt_k([(int(str(row["Line"]).rstrip("+")),float(row["Probability"])) for _,row in kdf.iterrows()])
 alt_k_html=(f'<div class="alt-k-badge">BEST ALT K · {alt_k_choice.milestone}+ · {alt_k_choice.probability:.0%} HIT</div>' if alt_k_choice else '<div class="alt-k-badge">BEST ALT K · NO 70%+ ALT</div>')
@@ -973,9 +1015,14 @@ with c1: st.markdown(f'<div class="metric-card"><div class="cc-card-top"><div cl
 render_reco(c2,k_reco,key_prefix=f"manual_k:{game.key}",market_key="pitcher_strikeouts",proj=proj,hits_proj=hits_proj)
 with c3: st.markdown(f'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon cc-emblem glove" aria-hidden="true"></div><div class="metric-label">PROJECTED OUTS</div></div><div class="metric-value">{proj.mean_outs:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(proj.outs_samples,.1))}-{int(np.quantile(proj.outs_samples,.9))}</span></div>',unsafe_allow_html=True)
 render_reco(c4,out_reco,key_prefix=f"manual_outs:{game.key}",market_key="pitcher_outs",proj=proj,hits_proj=hits_proj)
-h1,h2=st.columns(2)
+h1,h2,h3=st.columns([1,1,2])
 with h1: st.markdown(f'<div class="metric-card"><div class="cc-card-top"><div class="cc-card-icon cc-emblem contact" aria-hidden="true"></div><div class="metric-label">PROJECTED HITS ALLOWED</div></div><div class="metric-value">{hits_proj.ensemble_mean:.2f}</div><span class="badge">↑ 80% RANGE {int(np.quantile(hits_proj.simulation_samples,.1))}-{int(np.quantile(hits_proj.simulation_samples,.9))}</span></div>',unsafe_allow_html=True)
 render_reco(h2,hit_reco,key_prefix=f"manual_hits:{game.key}",market_key="pitcher_hits_allowed",proj=proj,hits_proj=hits_proj)
+with h3:
+    st.markdown(
+        f'<div class="game-weather-card {_weather_class}"><div class="game-weather-head"><div><div class="game-weather-title">GAME WEATHER · DELAY RISK</div><div class="game-weather-risk">{_weather_label}</div><div class="game-weather-action">{_weather_action}</div></div><div class="game-weather-icon" aria-hidden="true">{_weather_icon}</div></div><div class="game-weather-grid"><div class="game-weather-stat"><span>Precip chance</span><strong>{_weather_prob}</strong></div><div class="game-weather-stat"><span>Peak precip</span><strong>{_weather_peak}</strong></div></div><div class="game-weather-reason">{_weather_summary}</div><div class="game-weather-note">Game window: 2h before first pitch → 4h after · Weather risk is informational and does not currently modify the projection.</div></div>',
+        unsafe_allow_html=True,
+    )
 
 st.markdown('<div class="section-head">OPPOSING BATTER BOX</div>',unsafe_allow_html=True)
 lineup_label="✅ CONFIRMED BATTING ORDER" if lineup_context.confirmed else "ACTIVE ROSTER FALLBACK · lineup not posted yet"
