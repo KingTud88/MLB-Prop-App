@@ -1,3 +1,3 @@
 Challenger,OOS_Starts,Existing_MAE,Candidate_MAE,Relative_MAE_Improvement,Candidate_Win_Share,Existing_Bias,Candidate_Bias,Status,Reason,Report_Only,Live_Projection_Use,Market_Features_Used,Validation_Version
-ML_SHADOW,84,1.7635252794465497,2.0350407002795703,-0.1539617401561892,0.44047619047619047,-0.02901591471267604,-0.22183723439455563,HURTING,failed,True,False,False,ml-k-shadow-v1-report-only
+ML_SHADOW,86,1.7635325656977856,2.041183127072506,-0.15743999672887304,0.4418604651162791,0.012678376053890779,-0.16320927423710574,HURTING,failed,True,False,False,ml-k-shadow-v1-report-only
 SIM_MATH_ML_EQUAL_THIRDS,0,,,,,,,LEARNING,waiting_for_raw_path_history,True,False,False,ml-k-shadow-v1-report-only
