@@ -1,0 +1,180 @@
+name: Retry app-wide explainability popovers
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/apply-explainability-popovers-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: explainability-popovers-v2
+  cancel-in-progress: false
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt pytest
+
+      - name: Apply rollout with current Daily table anchor
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          workflow = Path('.github/workflows/apply-explainability-popovers.yml').read_text(encoding='utf-8').splitlines()
+          step_name = '      - name: Attach explainability system to every page'
+          step_index = workflow.index(step_name)
+          start = next(i for i in range(step_index, len(workflow)) if "python - <<'PY'" in workflow[i]) + 1
+          end = next(i for i in range(start, len(workflow)) if workflow[i].strip() == 'PY')
+          script_lines = [line[10:] if line.startswith('          ') else line for line in workflow[start:end]]
+
+          target = 'st.dataframe(styled, hide_index=True, use_container_width=True)'
+          replacement = [
+              'daily_path = Path("pages/5_Daily_Projection_Run.py")',
+              'daily_source = daily_path.read_text(encoding="utf-8")',
+              'daily_anchor = "        selected_rows = list(event.selection.rows) if event is not None else []\\n"',
+              'if daily_anchor not in daily_source:',
+              '    raise SystemExit("Current interactive Daily table anchor missing")',
+              'daily_source = daily_source.replace(daily_anchor, "        explain_popover(static_explanation(\\\"daily_table\\\"),label=\\\"ⓘ EXPLAIN DAILY TABLE\\\")\\n" + daily_anchor, 1)',
+              'daily_path.write_text(daily_source, encoding="utf-8")',
+          ]
+          repaired = []
+          replaced = False
+          for line in script_lines:
+              if target in line:
+                  repaired.extend(replacement)
+                  replaced = True
+              else:
+                  repaired.append(line)
+          if not replaced:
+              raise SystemExit('Failed Daily table patch line was not found in original rollout script')
+
+          script = '\n'.join(repaired) + '\n'
+          exec(compile(script, 'explainability-rollout-v2.py', 'exec'), {'__name__': '__main__'})
+          PY
+
+      - name: Write explainability contracts
+        run: |
+          cat > tests/test_explainability_ui.py <<'PY'
+          from pathlib import Path
+
+          from engine.explainability_ui import (
+              EXPLAINABILITY_UI_VERSION,
+              recommendation_explanation,
+              static_explanation,
+              top_play_explanation,
+          )
+
+          ROOT = Path(__file__).resolve().parents[1]
+
+
+          def test_shared_explainability_is_attached_to_every_page():
+              files = [
+                  "streamlit_app.py",
+                  "pages/2_Bet_Tracker.py",
+                  "pages/4_Projection_History.py",
+                  "pages/5_Daily_Projection_Run.py",
+                  "pages/6_Top_Plays.py",
+              ]
+              for filename in files:
+                  source = (ROOT / filename).read_text(encoding="utf-8")
+                  assert "apply_explainability_theme()" in source
+                  assert "explain_popover(" in source
+              assert EXPLAINABILITY_UI_VERSION == "explainability-popovers-v1"
+
+
+          def test_projection_summary_has_metric_decision_and_weather_explainers():
+              source = (ROOT / "streamlit_app.py").read_text(encoding="utf-8")
+              assert source.count("projection_metric_explanation(") >= 3
+              assert source.count("recommendation_explanation(") >= 3
+              assert "weather_explanation(" in source
+              assert "static_explanation(\"opposing_batters\")" in source
+              assert "static_explanation(\"active_lines\")" in source
+
+
+          def test_secondary_pages_cover_dynamic_decision_blocks():
+              tracker = (ROOT / "pages/2_Bet_Tracker.py").read_text(encoding="utf-8")
+              daily = (ROOT / "pages/5_Daily_Projection_Run.py").read_text(encoding="utf-8")
+              history = (ROOT / "pages/4_Projection_History.py").read_text(encoding="utf-8")
+              top = (ROOT / "pages/6_Top_Plays.py").read_text(encoding="utf-8")
+              assert "ticket_explanation(ticket)" in tracker
+              assert "leg_explanation(leg)" in tracker
+              assert "static_explanation(\"manual_lines\")" in daily
+              assert "static_explanation(\"daily_table\")" in daily
+              assert "static_explanation(\"odds_credits\")" in daily
+              assert "static_explanation(\"history_archive\")" in history
+              assert "top_play_explanation(play_row)" in top
+              assert "static_explanation(\"top_parlay\")" in top
+
+
+          def test_no_line_explanation_refuses_synthetic_decision():
+              explanation = recommendation_explanation(
+                  {"side": "NO LINE", "line": None, "projection_mean": 4.8, "reason": "no_active_market_line"},
+                  "Strikeouts",
+              )
+              assert "refuses to manufacture" in explanation.decision
+              assert any("4.80" in item for item in explanation.current)
+
+
+          def test_top_play_explanation_uses_existing_action_gate():
+              explanation = top_play_explanation({
+                  "Rank": 1,
+                  "Pitcher": "Example",
+                  "Market": "Strikeouts",
+                  "Side": "OVER",
+                  "Line": 4.5,
+                  "Projection": 5.2,
+                  "Model Probability": 0.61,
+                  "Data Quality": 79,
+                  "Line Source": "MANUAL",
+                  "Decision Evidence": "SUPPORTED",
+              })
+              assert "at least 55%" in explanation.decision
+              assert "at least 60/100" in explanation.decision
+              assert static_explanation("ml_shadow").note
+          PY
+
+      - name: Syntax validation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for path in [
+              "engine/explainability_ui.py",
+              "streamlit_app.py",
+              "pages/2_Bet_Tracker.py",
+              "pages/4_Projection_History.py",
+              "pages/5_Daily_Projection_Run.py",
+              "pages/6_Top_Plays.py",
+              "tests/test_explainability_ui.py",
+          ]:
+              compile(Path(path).read_text(encoding='utf-8'), path, 'exec')
+          print('syntax_ok')
+          PY
+
+      - name: Full regression suite
+        run: pytest -q
+
+      - name: Commit verified explainability rollout
+        run: |
+          rm -rf .pytest_cache
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add streamlit_app.py pages/2_Bet_Tracker.py pages/4_Projection_History.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py tests/test_explainability_ui.py
+          git diff --cached --check
+          git commit -m "Add app-wide explainability popovers"
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
