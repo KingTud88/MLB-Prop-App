@@ -40,8 +40,8 @@ def render_sidebar(active: str = "projection") -> None:
             display:flex;
             justify-content:center;
             align-items:center;
-            height:226px;
-            margin:-.52rem 0 -.55rem;
+            height:232px;
+            margin:-.72rem 0 -.95rem;
             position: relative;
             overflow:hidden;
         }
@@ -51,7 +51,7 @@ def render_sidebar(active: str = "projection") -> None:
             object-fit:contain;
             display:block;
             filter: drop-shadow(0 9px 18px rgba(0,0,0,.3));
-            transform:scale(1.42);
+            transform:scale(2.15) translateY(1%);
             transform-origin:50% 50%;
         }
         .sk-nav-mascot.sk-logo-fallback::after {
@@ -72,20 +72,32 @@ def render_sidebar(active: str = "projection") -> None:
         .sk-nav-title {
             text-align:center;
             font-family:Impact,"Arial Narrow",sans-serif;
-            font-size:2.05rem;
-            line-height:.86;
+            font-size:2.18rem;
+            line-height:.82;
             color:#fff;
             letter-spacing:.015em;
         }
-        .sk-nav-title span { color:#ff3655; font-size:2.28rem; letter-spacing:.045em; white-space:nowrap; }
+        .sk-nav-title span { color:#ff2848; font-size:2.28rem; letter-spacing:.035em; white-space:nowrap; }
+        .sk-nav-title::after {
+            content:"✦";
+            display:block;
+            width:88%;
+            margin:.58rem auto .05rem;
+            border-top:2px solid rgba(236,22,56,.88);
+            color:#ff2848;
+            font-family:Arial,sans-serif;
+            font-size:.58rem;
+            line-height:0;
+            text-shadow:0 0 8px rgba(236,22,56,.7);
+        }
         .sk-nav-sub {
             text-align:center;
             color:#9eb1c6;
-            font-size:.72rem;
+            font-size:.75rem;
             font-weight:650;
             line-height:1.38;
             letter-spacing:.02em;
-            margin:.42rem .35rem .02rem;
+            margin:.38rem .28rem 0;
         }
         .sk-nav-section {
             color:#d72b43;
@@ -93,7 +105,7 @@ def render_sidebar(active: str = "projection") -> None:
             font-weight:900;
             text-transform:uppercase;
             letter-spacing:.16em;
-            margin:.58rem .95rem .38rem;
+            margin:.42rem .95rem .3rem;
         }
         [data-testid="stSidebar"] .sk-page-link { margin:.11rem .28rem; }
         [data-testid="stSidebar"] .sk-page-link a {
@@ -416,7 +428,7 @@ def render_sidebar(active: str = "projection") -> None:
             unsafe_allow_html=True,
         )
         st.markdown('<div class="sk-nav-title">STRIKEOUT<br><span>KING 9000</span></div>', unsafe_allow_html=True)
-        st.markdown('<div class="sk-nav-sub">CLEVELAND NIGHT MODE · MLB STARTER INTELLIGENCE</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sk-nav-sub">CLEVELAND NIGHT MODE · MLB<br>STARTER INTELLIGENCE</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
         st.markdown('<div class="sk-nav-section">Command Center</div>', unsafe_allow_html=True)
 
