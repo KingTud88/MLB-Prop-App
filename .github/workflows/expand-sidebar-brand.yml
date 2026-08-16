@@ -139,11 +139,11 @@ jobs:
 
           new_markup = '''    with st.sidebar:
         st.markdown(
-            f'''<div class="sk-nav-brand">
+            f"""<div class="sk-nav-brand">
                 <div class="sk-nav-mascot"><img src="{MASCOT_URL}" alt="StrikeOut King 9000 mascot" onerror="this.style.display='none';this.parentElement.classList.add('sk-logo-fallback')"></div>
                 <div class="sk-nav-title">StrikeOut<br><span>King 9000</span></div>
                 <div class="sk-nav-sub">CLEVELAND NIGHT MODE · MLB STARTER INTELLIGENCE</div>
-            </div>''',
+            </div>""",
             unsafe_allow_html=True,
         )
         st.markdown('<div class="sk-nav-section">Command Center</div>', unsafe_allow_html=True)'''
