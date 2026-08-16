@@ -55,21 +55,10 @@ try:
     import streamlit as _st
 
     _original_markdown = _st.markdown
-    _original_set_page_config = _st.set_page_config
     _opponent_slot = None
     _slot_reserved = False
     _profile_rendering = False
     _last_profile_key = None
-
-    def _set_page_config_with_sidebar_cleanup(*args, **kwargs):
-        result = _original_set_page_config(*args, **kwargs)
-        _original_markdown(
-            '<style>[data-testid="stLogoSpacer"]{display:none!important;}</style>',
-            unsafe_allow_html=True,
-        )
-        return result
-
-    _st.set_page_config = _set_page_config_with_sidebar_cleanup
 
     def _pitcher_hand(pitcher_id):
         try:
