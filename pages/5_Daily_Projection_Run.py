@@ -8,6 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from engine.ui_theme import apply_page_theme
+from engine.command_center_consistency import apply_command_center_consistency
 
 from automation.daily_projection_runner import (
     LOG_PATH,
@@ -33,6 +34,7 @@ from training.projection_storage import load_projection_archive, overlay_manual_
 st.set_page_config(page_title="Daily Projection Run", page_icon="📊", layout="wide")
 apply_page_theme()
 render_sidebar("daily")
+apply_command_center_consistency("daily_run")
 st.markdown(
     """
     <style>

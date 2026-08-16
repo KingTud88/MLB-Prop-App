@@ -12,6 +12,7 @@ import requests
 import streamlit as st
 
 from engine.ui_theme import apply_page_theme
+from engine.command_center_consistency import apply_command_center_consistency
 
 from automation.daily_projection_runner import LOG_PATH, game_log
 from engine.calibration import calibrate_blend
@@ -34,17 +35,11 @@ from training.projection_storage import load_projection_archive, overlay_manual_
 st.set_page_config(page_title="Top Plays", page_icon="👑", layout="wide")
 apply_page_theme()
 render_sidebar("top")
+apply_command_center_consistency("top_plays")
 st.markdown(
     """
     <style>
     .block-container{padding-top:1.7rem!important;padding-bottom:3.25rem!important}
-
-    /* Reliable sidebar mascot fallback for this page; clean asset is known-good. */
-    [data-testid="stSidebar"] .sk-nav-mascot img{display:none!important}
-    [data-testid="stSidebar"] .sk-nav-mascot::before{
-        content:"";display:block;width:190px;height:190px;background:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000_clean.png?v=10") center/contain no-repeat;
-        filter:drop-shadow(0 8px 16px rgba(0,0,0,.3));
-    }
 
     .tp-page-hero{
         position:relative;overflow:hidden;margin:.1rem 0 .62rem;padding:.9rem 1.15rem .95rem;border:1px solid rgba(80,108,136,.76);border-radius:18px;

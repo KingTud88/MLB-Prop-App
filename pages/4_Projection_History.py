@@ -7,6 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from engine.ui_theme import apply_page_theme
+from engine.command_center_consistency import apply_command_center_consistency
 from navigation import render_sidebar
 from training.projection_storage import build_projection_archive_view, load_projection_archive
 
@@ -35,6 +36,7 @@ ROLLING_WINDOW = 20
 st.set_page_config(page_title="Projection History", page_icon="📚", layout="wide")
 apply_page_theme()
 render_sidebar("history")
+apply_command_center_consistency("projection_history")
 st.markdown(
     """
     <style>

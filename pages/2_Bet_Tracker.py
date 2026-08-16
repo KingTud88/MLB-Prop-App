@@ -10,6 +10,7 @@ import requests
 import streamlit as st
 
 from engine.ui_theme import apply_page_theme
+from engine.command_center_consistency import apply_command_center_consistency
 
 from automation.daily_projection_runner import LOG_PATH as PROJECTION_LOG, schedule as daily_schedule
 from engine.bet_tracker import (
@@ -36,6 +37,7 @@ EASTERN = ZoneInfo("America/New_York")
 st.set_page_config(page_title="Bet Tracker", page_icon="📊", layout="wide")
 apply_page_theme()
 render_sidebar("bets")
+apply_command_center_consistency("bet_tracker")
 # BET_TRACKER_COMMAND_UI_V1
 st.markdown(
     """
@@ -67,117 +69,6 @@ st.markdown(
     .bt-ticket-state.live .status{color:#8eddf4;border:1px solid rgba(74,191,230,.55);background:rgba(10,65,83,.38)}
     .bt-ticket-state.pending .status{color:#ffe08a;border:1px solid rgba(255,209,102,.5);background:rgba(98,71,8,.28)}
     div[data-testid="stProgress"]>div>div>div{background:#32e58d!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
-    [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
-    div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
-    .bt-ticket-state .status{font-size:.70rem!important}
     [data-testid="stCaptionContainer"]{color:#b8c8d6!important;font-size:.80rem!important;line-height:1.42!important}
     div[data-testid="stMarkdownContainer"] p{color:#d7e1e9;line-height:1.45}
     .bt-ticket-state .status{font-size:.70rem!important}
