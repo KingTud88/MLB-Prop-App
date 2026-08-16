@@ -56,7 +56,7 @@ def test_projection_page_has_unpriced_straight_and_parlay_actions():
 def test_projection_bet_leans_require_real_lines_and_manual_editor_is_gone():
     source = (Path(__file__).resolve().parents[1] / "streamlit_app.py").read_text(encoding="utf-8")
     assert "no_active_line_recommendation" in source
-    assert "PROJECTION ONLY" in source
+    assert 'side_text=f"{projection_text} PROJ"' in source
     assert "NO ACTIVE LINE" in source
     assert "the app will not manufacture a bet lean" in source
     assert "MANUAL LINE / ODDS" not in source

@@ -65,7 +65,6 @@ BANNED_INPUT_TOKENS = (
     "price",
     "book",
     "market",
-    "line",
     "projection",
     "sim_",
     "math_",

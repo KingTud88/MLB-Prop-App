@@ -9,7 +9,7 @@ def test_projection_uses_daily_lines_without_local_manual_market_editor():
     assert "overlay_manual_market_lines" in source
     assert "apply_active_line_to_recommendation" in source
     assert "NO ACTIVE LINE" in source
-    assert "PROJECTION ONLY" in source
+    assert 'side_text=f"{projection_text} PROJ"' in source
 
 
 def test_daily_run_is_single_persistent_manual_line_source_for_all_three_markets():

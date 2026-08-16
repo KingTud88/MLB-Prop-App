@@ -579,6 +579,8 @@ def project(row: dict, matchup_override: dict[str, object] | None = None) -> dic
         "workload_projection_delta_outs": np.nan, "workload_preupgrade_app_version": "",
         "workload_upgraded_at_utc": "",
         "projection": result.ensemble_mean, "k_sd": result.ensemble_sd,
+        "sim_mean_k": result.simulation_mean, "math_mean_k": result.mathematical_mean,
+        "sim_sd_k": result.simulation_sd, "math_sd_k": result.mathematical_sd,
         "k_range_low": int(np.quantile(result.simulation_samples, .10)),
         "k_range_high": int(np.quantile(result.simulation_samples, .90)),
         "hits_projection": hits.ensemble_mean, "hits_sd": hits.ensemble_sd,

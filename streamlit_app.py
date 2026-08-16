@@ -41,6 +41,7 @@ from engine.weather_risk import WeatherDelayRisk, apply_roof_protection, fetch_w
 from engine.workload_context import WorkloadContext, build_workload_context
 from engine.role_workload_gate import build_role_workload_decision
 from engine.team_leash import build_team_leash_context, candidate_workload_fields
+from engine.ml_shadow_ui import render_ml_shadow_dashboard
 from engine.bet_lean import aligned_bet_lean
 from engine.alt_k import best_alt_k
 from engine.odds_snapshot import load_pitcher_strikeout_odds
@@ -257,6 +258,17 @@ h1,h2,h3{letter-spacing:-.02em}
 .metric-card .cc-emblem.contact{background-position:80% 50%!important}
 .reco-card .cc-emblem.contact{background-position:100% 50%!important}
 
+
+/* PROJECTION_SUMMARY_NO_LINE_V14 · compact no-market state; approved emblem geometry untouched */
+.reco-card.reco-neutral .reco-side{
+    font-size:1.82rem!important;
+    line-height:1.04!important;
+    letter-spacing:-.02em!important;
+    white-space:nowrap!important;
+}
+.reco-card.reco-neutral .reco-line{margin-top:.36rem!important}
+.reco-card.reco-neutral .reco-meta{max-width:100%!important;line-height:1.35!important}
+@media (max-width:900px){.reco-card.reco-neutral .reco-side{font-size:1.65rem!important}}
 
 /* PROJECTION_WEATHER_SUMMARY_V10 · compact Hits pair + game delay-risk command card */
 .game-weather-card{
@@ -731,9 +743,9 @@ def render_reco(card,reco):
     active_source=str(reco.get("active_line_source","") or "").strip().upper()
     if no_line:
         cls="reco-neutral"
-        side_text="PROJECTION ONLY"
+        side_text=f"{projection_text} PROJ"
         line_text="NO ACTIVE LINE"
-        meta=f"Projection {projection_text} · add line on Daily Projection Run"
+        meta="Bet lean waits for a Daily Projection Run sportsbook line"
         line_class="reco-line"
     else:
         cls="reco-warn" if side=="PASS" else "reco-under" if side=="UNDER" else "reco-good"
@@ -965,7 +977,7 @@ elif nav=="Form & Workload":
 elif nav=="Model Card":
     st.markdown('<div class="section-head">MODEL CARD</div>',unsafe_allow_html=True); st.write("Two independent paths: (1) plate-appearance Monte Carlo game simulation with workload uncertainty; (2) independent mathematical Negative-Binomial probability model. Milestone probabilities are calibrated from resolved pregame projections when enough observations exist. Sportsbook prices are used only for edge display, never to create the baseball forecast."); st.markdown("### Path comparison"); path_df=pd.DataFrame([{"Path":"Simulation","Mean K":proj.engine.simulation_mean,"SD":proj.engine.simulation_sd},{"Path":"Mathematical","Mean K":proj.engine.mathematical_mean,"SD":proj.engine.mathematical_sd},{"Path":"Ensemble","Mean K":proj.mean_k,"SD":proj.k_sd}]); path_df["Mean K"]=path_df["Mean K"].map(lambda v:f"{v:.2f}"); path_df["SD"]=path_df["SD"].map(lambda v:f"{v:.2f}"); st.dataframe(path_df,use_container_width=True,hide_index=True); model_view=kdf[["Line","Probability","Simulation","Math","Sim Weight"]].copy()
     for c in ("Probability","Simulation","Math","Sim Weight"): model_view[c]=model_view[c].map(lambda v:f"{v:.1%}")
-    st.dataframe(model_view,use_container_width=True,hide_index=True); st.markdown("### Calibration diagnostics"); render_calibration_dashboard(); st.dataframe(calibration_summary(load_projection_history()),use_container_width=True,hide_index=True); st.stop()
+    st.dataframe(model_view,use_container_width=True,hide_index=True); st.markdown("### Calibration diagnostics"); render_calibration_dashboard(); st.dataframe(calibration_summary(load_projection_history()),use_container_width=True,hide_index=True); render_ml_shadow_dashboard(game); st.stop()
 elif nav=="Bet Tracker":
     st.markdown('<div class="section-head">BET TRACKER</div>',unsafe_allow_html=True); st.caption("Current pitcher markets available from the Odds API are shown here when posted.")
     if odds_err: st.info(odds_err)

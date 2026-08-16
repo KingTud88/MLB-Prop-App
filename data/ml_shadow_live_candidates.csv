@@ -1,0 +1,17 @@
+game_date,game_pk,pitcher_id,player,team,opponent,Training_Resolved_Starts,Feature_Count,Existing_Projection,ML_Shadow_Projection,SIM_Mean,MATH_Mean,Three_Path_Candidate,Report_Only,Validation_Version
+2026-08-16,823182,694918,Blade Tidwell,SFG,COL,106,34,4.555084306412306,4.294432340300378,,,,True,ml-k-shadow-v1-report-only
+2026-08-16,824156,693433,Bryan Woo,SEA,HOU,106,34,5.01676483607724,4.12451961441126,,,,True,ml-k-shadow-v1-report-only
+2026-08-16,824397,663554,Casey Mize,SDP,CLE,106,34,4.626856302479892,5.717820384890853,,,,True,ml-k-shadow-v1-report-only
+2026-08-16,824965,674003,Cody Bradford,TEX,ATH,106,34,4.845734792117946,5.0902699135408005,,,,True,ml-k-shadow-v1-report-only
+2026-08-16,824642,665795,Edward Cabrera,CHC,STL,106,34,4.565164903313475,4.557576391364269,,,,True,ml-k-shadow-v1-report-only
+2026-08-16,823182,687312,Gabriel Hughes,COL,SFG,106,34,4.825934159552915,3.292426223949973,,,,True,ml-k-shadow-v1-report-only
+2026-08-16,824156,686613,Hunter Brown,HOU,SEA,106,34,5.072816727384349,5.299255321617465,,,,True,ml-k-shadow-v1-report-only
+2026-08-16,824642,690928,Hunter Dobbins,STL,CHC,106,34,4.539976940292121,5.2510958283301,,,,True,ml-k-shadow-v1-report-only
+2026-08-16,824965,682052,Jacob Lopez,ATH,TEX,106,34,4.715502572247446,5.055864503461412,,,,True,ml-k-shadow-v1-report-only
+2026-08-16,823344,669199,Lake Bachar,PIT,BOS,106,34,3.0540215443291974,3.5257414236342357,,,,True,ml-k-shadow-v1-report-only
+2026-08-16,823912,701656,Logan Henderson,MIL,LAD,106,34,5.166586769096899,6.378899604053306,,,,True,ml-k-shadow-v1-report-only
+2026-08-16,823991,702070,Noah Cameron,KCR,LAA,106,34,5.700107394222463,4.4874281701317535,,,,True,ml-k-shadow-v1-report-only
+2026-08-16,823344,663776,Patrick Sandoval,BOS,PIT,106,34,5.361548644646005,4.16911207468618,,,,True,ml-k-shadow-v1-report-only
+2026-08-16,823991,696270,Ryan Johnson,LAA,KCR,106,34,4.119426045711611,3.0996297573525546,,,,True,ml-k-shadow-v1-report-only
+2026-08-16,824397,676440,Tanner Bibee,CLE,SDP,106,34,4.900820874019503,4.880509719860724,,,,True,ml-k-shadow-v1-report-only
+2026-08-16,823912,669373,Tarik Skubal,LAD,MIL,106,34,5.825653446777954,5.457685095029152,,,,True,ml-k-shadow-v1-report-only
