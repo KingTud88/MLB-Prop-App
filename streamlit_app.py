@@ -171,6 +171,78 @@ h1,h2,h3{letter-spacing:-.02em}
 /* PROJECTION_BADGE_POLISH_V7 · tighter fill + reduced blur */
 .cc-card-icon.cc-emblem{background-size:72px 72px!important}
 @media (max-width:900px){.cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{background-size:64px 64px!important}}
+
+/* PROJECTION_SUMMARY_LAYOUT_V8 · title top, value left, large emblem right */
+.metric-card,.reco-card{
+    position:relative!important;
+    min-height:184px!important;
+    padding:16px 108px 16px 16px!important;
+    text-align:left!important;
+    overflow:hidden!important;
+}
+.metric-card .cc-card-top,.reco-card .cc-card-top{
+    display:block!important;
+    margin:0 0 .55rem!important;
+    min-height:1.3rem!important;
+}
+.metric-card .metric-label,.reco-card .reco-label{
+    display:block!important;
+    width:100%!important;
+    margin:0!important;
+    padding:0!important;
+    text-align:left!important;
+    white-space:normal!important;
+    position:relative!important;
+    z-index:2!important;
+}
+.metric-card .cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{
+    position:absolute!important;
+    right:14px!important;
+    top:50px!important;
+    width:88px!important;
+    height:88px!important;
+    min-width:88px!important;
+    flex:0 0 88px!important;
+    margin:0!important;
+    background-size:86px 86px!important;
+    background-position:center!important;
+    z-index:1!important;
+}
+.metric-card .metric-value{
+    margin:.05rem 0 .38rem!important;
+    text-align:left!important;
+    position:relative!important;
+    z-index:2!important;
+}
+.metric-card .badge,.metric-card .alt-k-badge{
+    margin-left:0!important;
+    margin-right:0!important;
+    position:relative!important;
+    z-index:2!important;
+}
+.reco-card .reco-side{
+    margin:.08rem 0 .30rem!important;
+    position:relative!important;
+    z-index:2!important;
+}
+.reco-card .reco-line,.reco-card .reco-meta{
+    text-align:left!important;
+    position:relative!important;
+    z-index:2!important;
+}
+@media (max-width:900px){
+    .metric-card,.reco-card{padding-right:92px!important;min-height:176px!important}
+    .metric-card .cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{
+        right:10px!important;top:52px!important;width:76px!important;height:76px!important;min-width:76px!important;flex-basis:76px!important;background-size:74px 74px!important
+    }
+}
+@media (max-width:620px){
+    .metric-card,.reco-card{padding:14px 82px 14px 14px!important;min-height:166px!important}
+    .metric-card .cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{
+        right:8px!important;top:50px!important;width:68px!important;height:68px!important;min-width:68px!important;flex-basis:68px!important;background-size:66px 66px!important
+    }
+}
+
 </style>""", unsafe_allow_html=True)
 
 @dataclass(frozen=True)
