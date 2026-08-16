@@ -1,5 +1,5 @@
 Lineage_Version,Total_Rows,Eligible_Rows,Excluded_Rows,Eligibility_Rate,Exclusion_Reason,Rows
-calibration-lineage-v1,211,103,108,0.4881516587677725,history_semantics,75
-calibration-lineage-v1,211,103,108,0.4881516587677725,late_capture,7
-calibration-lineage-v1,211,103,108,0.4881516587677725,probability_semantics,47
-calibration-lineage-v1,211,103,108,0.4881516587677725,unresolved,26
+calibration-lineage-v1,211,105,106,0.4976303317535545,history_semantics,75
+calibration-lineage-v1,211,105,106,0.4976303317535545,late_capture,7
+calibration-lineage-v1,211,105,106,0.4976303317535545,probability_semantics,47
+calibration-lineage-v1,211,105,106,0.4976303317535545,unresolved,24
