@@ -53,7 +53,7 @@ def render_sidebar(active: str = "projection") -> None:
             min-width:236px !important;
             display:block;
             filter: drop-shadow(0 9px 18px rgba(0,0,0,.3));
-            transform:scale(3.60) !important;
+            transform:scale(1.00) !important;
             transform-origin:50% 50%;
         }
         .sk-nav-mascot.sk-logo-fallback::after {
@@ -426,7 +426,7 @@ def render_sidebar(active: str = "projection") -> None:
     with st.sidebar:
         st.markdown('<div class="sk-nav-brand">', unsafe_allow_html=True)
         st.markdown(
-            f'<div class="sk-nav-mascot"><img src="{MASCOT_URL}" alt="StrikeOut King 9000 mascot" style="width:236px !important;height:236px !important;min-width:236px !important;max-width:236px !important;object-fit:contain !important;display:block !important;transform:scale(3.60) !important;transform-origin:50% 50% !important;" onerror="this.style.display=\'none\';this.parentElement.classList.add(\'sk-logo-fallback\')"></div>',
+            f'<div class="sk-nav-mascot"><img src="{MASCOT_URL}" alt="StrikeOut King 9000 mascot" style="width:236px !important;height:236px !important;min-width:236px !important;max-width:236px !important;object-fit:contain !important;display:block !important;transform:scale(1.00) !important;transform-origin:50% 50% !important;" onerror="this.style.display=\'none\';this.parentElement.classList.add(\'sk-logo-fallback\')"></div>',
             unsafe_allow_html=True,
         )
         st.markdown('<div class="sk-nav-title">STRIKEOUT<br><span>KING 9000</span></div>', unsafe_allow_html=True)

@@ -41,7 +41,7 @@ st.markdown(
     /* Reliable sidebar mascot fallback for this page; clean asset is known-good. */
     [data-testid="stSidebar"] .sk-nav-mascot img{display:none!important}
     [data-testid="stSidebar"] .sk-nav-mascot::before{
-        content:"";display:block;width:104px;height:104px;background:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000_clean.png") center/contain no-repeat;
+        content:"";display:block;width:190px;height:190px;background:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000_clean.png?v=10") center/contain no-repeat;
         filter:drop-shadow(0 8px 16px rgba(0,0,0,.3));
     }
 
