@@ -1,4 +1,4 @@
-name: Manual Projection Archive UX
+name: Market Line Integrity Fix
 
 on:
   push:
@@ -15,114 +15,341 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Patch Daily Run and Projection History
+
+      - name: Patch active market line flow
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          daily = Path('pages/5_Daily_Projection_Run.py')
-          s = daily.read_text()
+          # 1) Model Top Plays: allow current UI to require a real/active market line,
+          # while historical walk-forward diagnostics keep their old synthetic grid.
+          p = Path('engine/model_top_plays.py')
+          s = p.read_text()
 
-          if 'ARCHIVE_PATH = LOG_PATH.parent / "projection_archive.csv"' not in s:
-              anchor = 'today = datetime.now(EASTERN).date()\nslate_date = st.date_input("Slate date", value=today)'
-              repl = 'today = datetime.now(EASTERN).date()\nARCHIVE_PATH = LOG_PATH.parent / "projection_archive.csv"\nslate_date = st.date_input("Slate date", value=today)'
+          if 'MARKET_LINE_COLUMNS = {' not in s:
+              anchor = '''PROJECTION_COLUMNS = {
+    MARKET_STRIKEOUTS: "projection",
+    MARKET_OUTS: "outs_projection",
+    MARKET_HITS: "hits_projection",
+}
+'''
+              repl = anchor + '''
+MARKET_LINE_COLUMNS = {
+    MARKET_STRIKEOUTS: "active_strikeout_line",
+    MARKET_OUTS: "active_outs_line",
+    MARKET_HITS: "active_hits_allowed_line",
+}
+
+MARKET_LINE_SOURCE_COLUMNS = {
+    MARKET_STRIKEOUTS: "active_strikeout_line_source",
+    MARKET_OUTS: "active_outs_line_source",
+    MARKET_HITS: "active_hits_allowed_line_source",
+}
+'''
               if anchor not in s:
-                  raise SystemExit('Daily archive path anchor not found')
+                  raise SystemExit('model_top_plays projection anchor missing')
               s = s.replace(anchor, repl, 1)
 
-          if 'def commit_projection_archive(' not in s:
-              anchor = '    frame.to_csv(LOG_PATH, index=False)\n\n\ndef run_full_slate'
-              helper = '''    frame.to_csv(LOG_PATH, index=False)\n\n\ndef _archive_row_key(row: pd.Series) -> str:\n    game_pk = str(row.get("game_pk", "")).split(".")[0]\n    pitcher_id = str(row.get("pitcher_id", "")).split(".")[0]\n    return f"{game_pk}:{pitcher_id}"\n\n\ndef _parse_market_line(value: object) -> float:\n    text = str(value or "").strip()\n    if not text:\n        return np.nan\n    try:\n        return float(text)\n    except ValueError as exc:\n        raise ValueError(f"Invalid market line: {text}") from exc\n\n\ndef commit_projection_archive(slate: pd.DataFrame, manual_lines: dict[str, dict[str, float]], slate_day: str) -> int:\n    if slate.empty:\n        return 0\n    snapshot = slate.copy().reset_index(drop=True)\n    snapshot["manual_strikeout_line"] = [manual_lines.get(_archive_row_key(row), {}).get("k", np.nan) for _, row in snapshot.iterrows()]\n    snapshot["manual_outs_line"] = [manual_lines.get(_archive_row_key(row), {}).get("outs", np.nan) for _, row in snapshot.iterrows()]\n    snapshot["manual_hits_allowed_line"] = [manual_lines.get(_archive_row_key(row), {}).get("hits", np.nan) for _, row in snapshot.iterrows()]\n    snapshot["archive_source"] = "DAILY_RUN_MANUAL"\n    snapshot["archive_committed_at_utc"] = datetime.now(ZoneInfo("UTC")).isoformat()\n\n    if ARCHIVE_PATH.exists():\n        try:\n            existing = pd.read_csv(ARCHIVE_PATH)\n        except Exception:\n            existing = pd.DataFrame()\n    else:\n        existing = load_log()\n        if not existing.empty and "game_date" in existing.columns:\n            cutoff = pd.Timestamp(slate_day).date()\n            legacy_dates = pd.to_datetime(existing["game_date"], errors="coerce").dt.date\n            existing = existing.loc[legacy_dates < cutoff].copy()\n            if not existing.empty:\n                existing["manual_strikeout_line"] = np.nan\n                existing["manual_outs_line"] = np.nan\n                existing["manual_hits_allowed_line"] = np.nan\n                existing["archive_source"] = "LEGACY_PRE_MANUAL_ARCHIVE"\n                existing["archive_committed_at_utc"] = existing.get("captured_at_utc", "")\n        else:\n            existing = pd.DataFrame()\n\n    if not existing.empty and {"game_pk", "pitcher_id"}.issubset(existing.columns) and {"game_pk", "pitcher_id"}.issubset(snapshot.columns):\n        new_keys = set(zip(snapshot["game_pk"].astype(str), snapshot["pitcher_id"].astype(str)))\n        keep_mask = [key not in new_keys for key in zip(existing["game_pk"].astype(str), existing["pitcher_id"].astype(str))]\n        existing = existing.loc[keep_mask].copy()\n\n    archive = pd.concat([existing, snapshot], ignore_index=True, sort=False)\n    ARCHIVE_PATH.parent.mkdir(parents=True, exist_ok=True)\n    archive.to_csv(ARCHIVE_PATH, index=False)\n    return len(snapshot)\n\n\ndef run_full_slate'''
+          old_sig = '''def build_model_candidate(
+    row: Mapping[str, object],
+    market: str,
+    history: pd.DataFrame,
+    market_health: Mapping[str, str] | None = None,
+) -> dict[str, object] | None:'''
+          new_sig = '''def build_model_candidate(
+    row: Mapping[str, object],
+    market: str,
+    history: pd.DataFrame,
+    market_health: Mapping[str, str] | None = None,
+    *,
+    require_market_line: bool = False,
+) -> dict[str, object] | None:'''
+          if old_sig in s:
+              s = s.replace(old_sig, new_sig, 1)
+
+          old_line = '''    line = target_line(market, projection)
+    if abs(float(projection) - float(line)) > MAX_TARGET_DISTANCE[market]:
+        return None
+    over_p = over_probability(row, market, line, history)'''
+          new_line = '''    if require_market_line:
+        line = _num(row.get(MARKET_LINE_COLUMNS[market]))
+        if line is None:
+            return None
+        line_source = str(row.get(MARKET_LINE_SOURCE_COLUMNS[market], "") or "").strip() or "ACTIVE MARKET LINE"
+    else:
+        line = target_line(market, projection)
+        if abs(float(projection) - float(line)) > MAX_TARGET_DISTANCE[market]:
+            return None
+        line_source = "MODEL GRID · DIAGNOSTIC ONLY"
+    over_p = over_probability(row, market, line, history)'''
+          if old_line in s:
+              s = s.replace(old_line, new_line, 1)
+
+          if '"Line Source": line_source,' not in s:
+              anchor = '''        "Line": line,
+        "Projection": projection,'''
+              repl = '''        "Line": line,
+        "Line Source": line_source,
+        "Projection": projection,'''
               if anchor not in s:
-                  raise SystemExit('Daily helper anchor not found')
-              s = s.replace(anchor, helper, 1)
+                  raise SystemExit('model_top_plays candidate line anchor missing')
+              s = s.replace(anchor, repl, 1)
 
-          paid_start_marker = 'st.markdown(\'<div class="daily-section-head">Manual Paid Data</div>\', unsafe_allow_html=True)'
-          projection_marker = 'st.markdown(\'<div class="daily-section-head">Projection Capture</div>\', unsafe_allow_html=True)'
-          history_marker = 'st.markdown(\'<div class="daily-section-head">Persistent History-Only Tracker</div>\', unsafe_allow_html=True)'
-          if paid_start_marker in s and projection_marker in s and history_marker in s:
-              paid_start = s.index(paid_start_marker)
-              projection_start = s.index(projection_marker)
-              if paid_start < projection_start:
-                  paid_block = s[paid_start:projection_start]
-                  s = s[:paid_start] + s[projection_start:]
-                  history_pos = s.index(history_marker)
-                  s = s[:history_pos] + paid_block + '\n' + s[history_pos:]
+          old_board_sig = '''def build_model_board(
+    slate: pd.DataFrame,
+    history: pd.DataFrame,
+    limit: int = 5,
+    market_health: Mapping[str, str] | None = None,
+) -> pd.DataFrame:'''
+          new_board_sig = '''def build_model_board(
+    slate: pd.DataFrame,
+    history: pd.DataFrame,
+    limit: int = 5,
+    market_health: Mapping[str, str] | None = None,
+    *,
+    require_market_lines: bool = False,
+) -> pd.DataFrame:'''
+          if old_board_sig in s:
+              s = s.replace(old_board_sig, new_board_sig, 1)
 
-          if 'APPLY LINES + ADD TO PROJECTION ARCHIVE' not in s:
-              anchor = '    c6.metric("Confirmed lineups", confirmed_lineups)\n\n    if not slate.empty:'
-              manual_ui = '''    c6.metric("Confirmed lineups", confirmed_lineups)\n\n    if not slate.empty:\n        st.markdown('<div class="daily-action-label">🎚️ Manual sportsbook lines</div>', unsafe_allow_html=True)\n        st.caption("Open each pitcher bar and enter the sportsbook lines you want attached to this frozen projection. Half-lines such as 4.5, 15.5, and 5.5 are supported. Blank markets are allowed.")\n        manual_line_values: dict[str, dict[str, str]] = {}\n        for _, manual_row in slate.reset_index(drop=True).iterrows():\n            row_key = _archive_row_key(manual_row)\n            player = str(manual_row.get("player", "Unknown"))\n            team = str(manual_row.get("team", "—"))\n            opponent = str(manual_row.get("opponent", "—"))\n            with st.expander(f"⚾ {player} · {team} vs {opponent}", expanded=False):\n                l1, l2, l3 = st.columns(3)\n                k_raw = l1.text_input("Strikeout line", placeholder="e.g. 4.5", key=f"daily_manual_k_{row_key}")\n                outs_raw = l2.text_input("Total outs line", placeholder="e.g. 15.5", key=f"daily_manual_outs_{row_key}")\n                hits_raw = l3.text_input("Hits allowed line", placeholder="e.g. 5.5", key=f"daily_manual_hits_{row_key}")\n                st.caption(f"Model: {float(manual_row.get('projection', float('nan'))):.2f} K · {float(manual_row.get('outs_projection', float('nan'))):.2f} outs · {float(manual_row.get('hits_projection', float('nan'))):.2f} hits allowed")\n            manual_line_values[row_key] = {"k": k_raw, "outs": outs_raw, "hits": hits_raw}\n\n        if st.button("✅ APPLY LINES + ADD TO PROJECTION ARCHIVE", type="primary", use_container_width=True, key="daily_apply_archive"):\n            try:\n                parsed_lines = {\n                    key: {\n                        "k": _parse_market_line(values.get("k")),\n                        "outs": _parse_market_line(values.get("outs")),\n                        "hits": _parse_market_line(values.get("hits")),\n                    }\n                    for key, values in manual_line_values.items()\n                }\n                filled_lines = sum(pd.notna(value) for values in parsed_lines.values() for value in values.values())\n                if filled_lines == 0:\n                    raise ValueError("Enter at least one sportsbook line before adding the slate to the Projection Archive.")\n                archived = commit_projection_archive(slate, parsed_lines, slate_date.isoformat())\n                st.session_state["daily_archive_saved_at"] = datetime.now(EASTERN).strftime("%b %d, %Y · %I:%M:%S %p ET")\n                st.success(f"Applied {filled_lines} manual market line(s) and added {archived} pitcher projection(s) to the Projection Archive.")\n            except ValueError as exc:\n                st.error(str(exc))\n\n    if not slate.empty:'''
+          old_call = 'candidate = build_model_candidate(row, market, history, market_health=market_health)'
+          new_call = 'candidate = build_model_candidate(row, market, history, market_health=market_health, require_market_line=require_market_lines)'
+          if old_call in s:
+              s = s.replace(old_call, new_call, 1)
+          p.write_text(s)
+
+          # 2) Daily Run: manual line application writes onto the frozen evidence row.
+          p = Path('pages/5_Daily_Projection_Run.py')
+          s = p.read_text()
+
+          if 'def apply_active_market_lines(' not in s:
+              anchor = '\n\ndef run_full_slate(day: str)'
+              helper = r'''
+
+def apply_active_market_lines(slate_day: str, manual_lines: dict[str, dict[str, float]]) -> int:
+    """Apply user-entered sportsbook lines to frozen rows used by current Top Plays."""
+    frame = load_log()
+    if frame.empty or "game_date" not in frame.columns:
+        return 0
+    for col in (
+        "active_strikeout_line", "active_outs_line", "active_hits_allowed_line",
+        "active_strikeout_line_source", "active_outs_line_source", "active_hits_allowed_line_source",
+    ):
+        if col not in frame.columns:
+            frame[col] = np.nan if col.endswith("_line") else ""
+
+    applied = 0
+    day_mask = frame["game_date"].astype(str).eq(str(slate_day))
+    for idx in frame.index[day_mask]:
+        row = frame.loc[idx]
+        values = manual_lines.get(_archive_row_key(row), {})
+        for key, line_col, source_col in (
+            ("k", "active_strikeout_line", "active_strikeout_line_source"),
+            ("outs", "active_outs_line", "active_outs_line_source"),
+            ("hits", "active_hits_allowed_line", "active_hits_allowed_line_source"),
+        ):
+            value = values.get(key, np.nan)
+            if pd.notna(value):
+                frame.at[idx, line_col] = float(value)
+                frame.at[idx, source_col] = "MANUAL"
+                applied += 1
+    save_log(frame)
+    return applied
+
+
+def apply_paid_strikeout_lines(odds_snapshot: pd.DataFrame, slate_day: str) -> int:
+    """Apply saved paid K lines without overwriting a deliberate manual line."""
+    if odds_snapshot.empty:
+        return 0
+    frame = load_log()
+    if frame.empty or "game_date" not in frame.columns:
+        return 0
+    for col, default in (("active_strikeout_line", np.nan), ("active_strikeout_line_source", "")):
+        if col not in frame.columns:
+            frame[col] = default
+
+    snap = odds_snapshot.copy()
+    snap["point"] = pd.to_numeric(snap.get("point"), errors="coerce")
+    snap = snap.dropna(subset=["point"])
+    snap["_name"] = snap.get("pitcher", pd.Series(index=snap.index, dtype=str)).fillna("").astype(str).map(lambda x: " ".join(x.lower().split()))
+    snap["_book"] = snap.get("book", pd.Series(index=snap.index, dtype=str)).fillna("").astype(str).str.lower()
+
+    applied = 0
+    day_mask = frame["game_date"].astype(str).eq(str(slate_day))
+    for idx in frame.index[day_mask]:
+        if str(frame.at[idx, "active_strikeout_line_source"] or "").upper() == "MANUAL":
+            continue
+        name = " ".join(str(frame.at[idx, "player"]).lower().split())
+        offers = snap.loc[snap["_name"].eq(name)]
+        if offers.empty:
+            continue
+        fanduel = offers.loc[offers["_book"].str.contains("fanduel", na=False)]
+        chosen = fanduel if not fanduel.empty else offers
+        mode = chosen["point"].mode()
+        if mode.empty:
+            continue
+        frame.at[idx, "active_strikeout_line"] = float(mode.iloc[0])
+        frame.at[idx, "active_strikeout_line_source"] = "PAID API · FANDUEL" if not fanduel.empty else "PAID API · CONSENSUS"
+        applied += 1
+    save_log(frame)
+    return applied
+'''
               if anchor not in s:
-                  raise SystemExit('Daily manual line UI anchor not found')
-              s = s.replace(anchor, manual_ui, 1)
+                  raise SystemExit('Daily run function anchor missing')
+              s = s.replace(anchor, helper + anchor, 1)
 
-          daily.write_text(s)
+          old_apply = '''                archived = commit_projection_archive(slate, parsed_lines, slate_date.isoformat())
+                st.session_state["daily_archive_saved_at"] = datetime.now(EASTERN).strftime("%b %d, %Y · %I:%M:%S %p ET")
+                st.success(f"Applied {filled_lines} manual market line(s) and added {archived} pitcher projection(s) to the Projection Archive.")'''
+          new_apply = '''                applied = apply_active_market_lines(slate_date.isoformat(), parsed_lines)
+                archived = commit_projection_archive(slate, parsed_lines, slate_date.isoformat())
+                refreshed_log = load_log()
+                st.session_state["daily_slate"] = refreshed_log.loc[refreshed_log.get("game_date", pd.Series(dtype=str)).astype(str).eq(slate_date.isoformat())].copy()
+                st.session_state["daily_archive_saved_at"] = datetime.now(EASTERN).strftime("%b %d, %Y · %I:%M:%S %p ET")
+                st.success(f"Applied {applied} active sportsbook line(s) to Top Plays and added {archived} pitcher projection(s) to the Projection Archive.")'''
+          if old_apply in s:
+              s = s.replace(old_apply, new_apply, 1)
 
-          history = Path('pages/4_Projection_History.py')
-          h = history.read_text()
+          old_paid = '''        pitchers=int(odds_snapshot.get("pitcher",pd.Series(dtype=str)).nunique()) if not odds_snapshot.empty else 0
+        st.success(f"Saved {len(odds_snapshot)} strikeout offers for {pitchers} pitchers. Main Projections will reuse this snapshot for free.")'''
+          new_paid = '''        pitchers=int(odds_snapshot.get("pitcher",pd.Series(dtype=str)).nunique()) if not odds_snapshot.empty else 0
+        active_lines = apply_paid_strikeout_lines(odds_snapshot, slate_date.isoformat())
+        st.success(f"Saved {len(odds_snapshot)} strikeout offers for {pitchers} pitchers and applied {active_lines} active K line(s) for Top Plays. Manual K lines override these paid lines.")'''
+          if old_paid in s:
+              s = s.replace(old_paid, new_paid, 1)
 
-          if 'ARCHIVE_PATH = ROOT / "data" / "projection_archive.csv"' not in h:
-              anchor = 'LOG_PATH = ROOT / "data" / "projection_log.csv"\nOBS_LOG_PATH = ROOT / "data" / "starter_observation_log.csv"'
-              repl = 'LOG_PATH = ROOT / "data" / "projection_log.csv"\nARCHIVE_PATH = ROOT / "data" / "projection_archive.csv"\nOBS_LOG_PATH = ROOT / "data" / "starter_observation_log.csv"'
-              if anchor not in h:
-                  raise SystemExit('History archive path anchor not found')
-              h = h.replace(anchor, repl, 1)
+          s = s.replace(
+              'Open each pitcher bar and enter the sportsbook lines you want attached to this frozen projection. Half-lines such as 4.5, 15.5, and 5.5 are supported. Blank markets are allowed.',
+              'Open each pitcher bar and enter the real sportsbook lines you want Top Plays to evaluate. Manual values override paid API lines. Half-lines such as 4.5, 15.5, and 5.5 are supported; a blank market is excluded from Top Plays unless a paid active line already exists.',
+              1,
+          )
+          p.write_text(s)
 
-          h = h.replace('Scoreboard first, K wins and crushers next, deeper learning diagnostics below.', 'Projection Archive first, then performance and deeper learning diagnostics below.', 1)
+          # 3) Top Plays: current board MUST use active sportsbook/manual lines.
+          p = Path('pages/6_Top_Plays.py')
+          s = p.read_text()
+          old = 'plays = build_model_board(slate, history, limit=5, market_health=health_map)'
+          new = 'plays = build_model_board(slate, history, limit=5, market_health=health_map, require_market_lines=True)'
+          if old in s:
+              s = s.replace(old, new, 1)
 
-          if 'def load_user_archive(' not in h:
-              anchor = 'def load_observation_history() -> pd.DataFrame:'
-              helper = '''def load_user_archive(evidence: pd.DataFrame) -> pd.DataFrame:\n    if ARCHIVE_PATH.exists():\n        try:\n            return pd.read_csv(ARCHIVE_PATH)\n        except Exception:\n            return pd.DataFrame()\n    if evidence.empty or "game_date" not in evidence.columns:\n        return pd.DataFrame()\n    today_eastern = pd.Timestamp.now(tz="America/New_York").date()\n    dates = pd.to_datetime(evidence["game_date"], errors="coerce").dt.date\n    legacy = evidence.loc[dates < today_eastern].copy()\n    if not legacy.empty:\n        legacy["manual_strikeout_line"] = np.nan\n        legacy["manual_outs_line"] = np.nan\n        legacy["manual_hits_allowed_line"] = np.nan\n        legacy["archive_source"] = "LEGACY_PRE_MANUAL_ARCHIVE"\n        legacy["archive_committed_at_utc"] = legacy.get("captured_at_utc", "")\n    return legacy\n\n\n'''
-              if anchor not in h:
-                  raise SystemExit('History user archive helper anchor not found')
-              h = h.replace(anchor, helper + anchor, 1)
+          s = s.replace(
+              'No current market passed the starter-history, probability-path, and model-health eligibility guards. The app will not manufacture a Top Play when the validated board is empty.',
+              'No current market has both a valid model path and an active sportsbook line. Enter manual K / outs / hits lines on Daily Projection Run (or load the saved paid K snapshot) before Top Plays can rank a real bet.',
+              1,
+          )
 
-          resolve_start_marker = 'if st.button("Resolve completed games", type="primary"):'
-          df_marker = 'df = load_projection_history()'
-          resolve_block = ''
-          if resolve_start_marker in h and df_marker in h:
-              rstart = h.index(resolve_start_marker)
-              dstart = h.index(df_marker)
-              if rstart < dstart:
-                  resolve_block = h[rstart:dstart]
-                  h = h[:rstart] + h[dstart:]
+          marker = '# The board exists before any paid sportsbook request. Credit Saver keeps paid'
+          if 'TOP_PLAYS_REAL_LINE_GUARD_V1' not in s and marker in s:
+              note = '''# TOP_PLAYS_REAL_LINE_GUARD_V1
+st.caption("Line integrity: every ranked leg below uses an active sportsbook line from Daily Run. MANUAL overrides the saved paid K snapshot; markets with no active line are excluded. Model-grid/default lines are diagnostics only and cannot become current Top Plays.")
 
-          if 'MANUAL_PROJECTION_ARCHIVE_V1' not in h:
-              anchor = 'k_resolved = df["actual_strikeouts"].notna()'
-              top_archive = '''# MANUAL_PROJECTION_ARCHIVE_V1\nst.markdown('<div class="history-kicker">Primary workflow</div>', unsafe_allow_html=True)\nst.subheader("📋 Projection Archive")\nst.caption("This is the archive you manually approve from Daily Projection Run. Automatic background captures stay in the evidence log lower on this page and do not appear here until you add the slate.")\nuser_archive = load_user_archive(df)\nif user_archive.empty:\n    st.info("No manually committed projection slates yet. Run Daily Projection Run, enter the sportsbook lines, then use Apply Lines + Add to Projection Archive.")\nelse:\n    archive_dates = pd.to_datetime(user_archive.get("game_date"), errors="coerce")\n    user_archive = user_archive.copy()\n    user_archive["_archive_date"] = archive_dates\n    user_archive = user_archive.sort_values(["_archive_date", "player"], ascending=[False, True], na_position="last")\n    archive_columns = [\n        "player", "team", "opponent",\n        "manual_strikeout_line", "projection", "actual_strikeouts",\n        "manual_outs_line", "outs_projection", "actual_outs",\n        "manual_hits_allowed_line", "hits_projection", "actual_hits_allowed",\n        "confidence", "data_quality", "archive_source", "archive_committed_at_utc",\n    ]\n    archive_columns = [col for col in archive_columns if col in user_archive.columns]\n    unique_dates = user_archive["_archive_date"].dt.date.dropna().drop_duplicates().tolist()\n    for idx, archive_date in enumerate(unique_dates):\n        group = user_archive.loc[user_archive["_archive_date"].dt.date.eq(archive_date), archive_columns].copy()\n        date_label = pd.Timestamp(archive_date).strftime("%B %-d, %Y")\n        with st.expander(f"📅 {date_label} · {len(group)} pitcher{'s' if len(group) != 1 else ''}", expanded=(idx == 0)):\n            st.dataframe(\n                group,\n                hide_index=True,\n                width="stretch",\n                column_config={\n                    "player": st.column_config.TextColumn("Pitcher"),\n                    "team": st.column_config.TextColumn("Team"),\n                    "opponent": st.column_config.TextColumn("Opp"),\n                    "manual_strikeout_line": st.column_config.NumberColumn("K Line", format="%.1f"),\n                    "projection": st.column_config.NumberColumn("Projected K", format="%.2f"),\n                    "actual_strikeouts": st.column_config.NumberColumn("Actual K", format="%.0f"),\n                    "manual_outs_line": st.column_config.NumberColumn("Outs Line", format="%.1f"),\n                    "outs_projection": st.column_config.NumberColumn("Projected Outs", format="%.2f"),\n                    "actual_outs": st.column_config.NumberColumn("Actual Outs", format="%.0f"),\n                    "manual_hits_allowed_line": st.column_config.NumberColumn("Hits Line", format="%.1f"),\n                    "hits_projection": st.column_config.NumberColumn("Projected Hits", format="%.2f"),\n                    "actual_hits_allowed": st.column_config.NumberColumn("Actual Hits", format="%.0f"),\n                    "archive_source": st.column_config.TextColumn("Archive Source"),\n                },\n            )\n\nst.divider()\n'''
-              if anchor not in h:
-                  raise SystemExit('History top archive anchor not found')
-              h = h.replace(anchor, top_archive + (resolve_block if resolve_block else '') + anchor, 1)
+'''
+              s = s.replace(marker, note + marker, 1)
 
-          h = h.replace('col1.metric("Archived projections", len(df))', 'col1.metric("Evidence snapshots", len(df))', 1)
-          h = h.replace('<div class="history-kicker">Resolved & pending slates</div>', '<div class="history-kicker">Automatic model evidence</div>', 1)
-          h = h.replace('st.subheader("📋 Projection archive")', 'st.subheader("🧪 Automatic Evidence Log")\nst.caption("This lower log is populated by scheduled background capture for calibration and diagnostics, so today can appear here even if you never manually ran or archived the slate.")', 1)
+          if 'line_source = str(play_row.get("Line Source"' not in s:
+              anchor = '    matchup_text = " · ".join(v for v in [team, f"vs {opponent}" if opponent else "", weather_icon] if v)\n'
+              repl = anchor + '    line_source = str(play_row.get("Line Source", "ACTIVE MARKET LINE") or "ACTIVE MARKET LINE")\n'
+              if anchor not in s:
+                  raise SystemExit('Top Plays matchup anchor missing')
+              s = s.replace(anchor, repl, 1)
 
-          history.write_text(h)
+          market_html = '''                <div class="tp-market-row">
+                  <div class="tp-market">{play_row['Market']}</div>
+                  <div class="tp-side {side_class}">{side} {float(play_row['Line']):g}</div>
+                </div>'''
+          market_html_new = market_html + '''
+                <div class="tp-card-note"><strong>Line source:</strong> {line_source}</div>'''
+          if market_html in s and '<strong>Line source:</strong>' not in s:
+              s = s.replace(market_html, market_html_new, 1)
+
+          if '"line_source": str(leg.get("Line Source", "")),' not in s:
+              anchor = '''                "line": float(leg["Line"]),
+                "side": str(leg["Side"]),'''
+              repl = '''                "line": float(leg["Line"]),
+                "line_source": str(leg.get("Line Source", "")),
+                "side": str(leg["Side"]),'''
+              if anchor not in s:
+                  raise SystemExit('Top Plays parlay leg anchor missing')
+              s = s.replace(anchor, repl, 1)
+          p.write_text(s)
+
+          # 4) Canonical parlay record keeps the verified line source.
+          p = Path('engine/bet_tracker.py')
+          s = p.read_text()
+          if '"line_source": str(leg.get("line_source", "")),' not in s:
+              anchor = '''            "line": float(leg.get("line")),
+            "side": side,'''
+              repl = '''            "line": float(leg.get("line")),
+            "line_source": str(leg.get("line_source", "")),
+            "side": side,'''
+              if anchor not in s:
+                  raise SystemExit('bet_tracker cleaned leg anchor missing')
+              s = s.replace(anchor, repl, 1)
+          p.write_text(s)
+
+          # 5) UI tracker quarantines legacy model parlays that never saved a verified line source.
+          p = Path('pages/2_Bet_Tracker.py')
+          s = p.read_text()
+          old = '''            grade = grade_parlay(leg_grades)
+            profit = profit_for(stake, odds, grade)
+            resolved_rows.append({'''
+          new = '''            grade = grade_parlay(leg_grades)
+            source_text = str(row.get("source", "") or "").strip()
+            legacy_model_line_ticket = (
+                source_text in {"Top Plays Model Parlay", "Projection Page Model Parlay"}
+                and bool(legs)
+                and all(not str(leg.get("line_source", "") or "").strip() for leg in legs)
+            )
+            result_text = "INVALID LINE" if legacy_model_line_ticket else grade.result
+            profit = None if legacy_model_line_ticket else profit_for(stake, odds, grade)
+            resolved_rows.append({'''
+          if old in s:
+              s = s.replace(old, new, 1)
+              s = s.replace('                "Result": grade.result,\n                "Profit/Loss": profit,', '                "Result": result_text,\n                "Profit/Loss": profit,', 1)
+
+          if '"INVALID LINE": 3,' not in s:
+              s = s.replace('    "PUSH LEG": 2,\n}', '    "PUSH LEG": 2,\n    "INVALID LINE": 3,\n}', 1)
+          s = s.replace(
+              'pending = int((~results["Result"].isin(["WIN", "LOSS", "PUSH", "PUSH LEG"])).sum())',
+              'invalid = int((results["Result"] == "INVALID LINE").sum())\npending = int((~results["Result"].isin(["WIN", "LOSS", "PUSH", "PUSH LEG", "INVALID LINE"])).sum())',
+              1,
+          )
+          if 'Legacy model-line tickets marked INVALID LINE' not in s:
+              anchor = 'if stake_series.isna().any():\n'
+              note = 'if invalid:\n    st.warning(f"{invalid} legacy model-only ticket(s) are marked INVALID LINE and excluded from the real win/loss record because their saved legs used synthetic/default lines rather than verified sportsbook lines.")\n'
+              if anchor not in s:
+                  raise SystemExit('Bet Tracker caption anchor missing')
+              s = s.replace(anchor, note + anchor, 1)
+          if 'if state == "INVALID LINE":' not in s:
+              anchor = '    if state in {"PUSH", "PUSH LEG"}:\n        return "🟡"\n'
+              repl = anchor + '    if state == "INVALID LINE":\n        return "⚠️"\n'
+              if anchor not in s:
+                  raise SystemExit('Bet Tracker ticket icon anchor missing')
+              s = s.replace(anchor, repl, 1)
+          p.write_text(s)
           PY
+
       - name: Validate Python syntax
-        run: python -m py_compile pages/5_Daily_Projection_Run.py pages/4_Projection_History.py
-      - name: Commit workflow changes safely
+        run: python -m py_compile engine/model_top_plays.py engine/bet_tracker.py pages/2_Bet_Tracker.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py
+
+      - name: Commit safely
         run: |
-          if git diff --quiet -- pages/5_Daily_Projection_Run.py pages/4_Projection_History.py; then
-            echo "No manual archive changes to commit"
+          if git diff --quiet -- engine/model_top_plays.py engine/bet_tracker.py pages/2_Bet_Tracker.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py; then
+            echo "No market-line integrity changes to commit"
             exit 0
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pages/5_Daily_Projection_Run.py pages/4_Projection_History.py
-          git commit -m "Add manual projection archive workflow"
+          git config user.name "KingTud88"
+          git config user.email "jaxson0603@gmail.com"
+          git add engine/model_top_plays.py engine/bet_tracker.py pages/2_Bet_Tracker.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py
+          git commit -m "Use verified market lines for Top Plays"
           for attempt in 1 2 3 4; do
             git fetch origin main
-            if git rebase origin/main; then
-              if git push origin HEAD:main; then
-                exit 0
-              fi
-            else
-              git rebase --abort || true
+            git rebase origin/main || { git rebase --abort || true; sleep 2; continue; }
+            if git push origin HEAD:main; then
+              exit 0
             fi
-            echo "Push race on attempt ${attempt}; retrying"
             sleep $((attempt * 2))
           done
-          echo "Manual archive patch push failed after retries"
+          echo "Could not push market-line integrity patch after retries"
           exit 1
