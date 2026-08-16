@@ -13,28 +13,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Widen sidebar and scale brand
+      - name: Apply final mascot and wordmark lockup
         run: |
           python - <<'PY'
           from pathlib import Path
+
           p = Path('navigation.py')
           s = p.read_text()
           changes = [
-              ('width: 218px !important;', 'width: 276px !important;'),
-              ('min-width: 218px !important;', 'min-width: 276px !important;'),
-              ('[data-testid="stSidebar"] > div:first-child { width:218px !important; }', '[data-testid="stSidebar"] > div:first-child { width:276px !important; }'),
-              ('height:174px;', 'height:216px;'),
-              ('margin:-.2rem 0 -.12rem;', 'margin:-.28rem 0 -.18rem;'),
-              ('width:172px;', 'width:214px;'),
-              ('height:172px;', 'height:214px;'),
-              ('font-size:1.52rem;', 'font-size:1.82rem;'),
-              ('line-height:.92;', 'line-height:.9;'),
-              ('.sk-nav-title span { color:#ff3655; font-size:1.68rem; letter-spacing:.035em; }', '.sk-nav-title span { color:#ff3655; font-size:2rem; letter-spacing:.04em; }'),
-              ('font-size:.61rem;', 'font-size:.68rem;'),
-              ('margin:.52rem .2rem .05rem;', 'margin:.58rem .45rem .08rem;'),
-              ('margin:.8rem .7rem .35rem;', 'margin:.9rem .95rem .38rem;'),
-              ('[data-testid="stSidebar"] .sk-page-link { margin:.1rem .16rem; }', '[data-testid="stSidebar"] .sk-page-link { margin:.11rem .28rem; }'),
-              ('padding:.48rem .6rem!important;', 'padding:.52rem .72rem!important;'),
+              ('height:216px;', 'height:248px;'),
+              ('margin:-.28rem 0 -.18rem;', 'margin:-.45rem 0 -.42rem;'),
+              ('width:214px;', 'width:246px;'),
+              ('height:214px;', 'height:246px;'),
+              ('font-size:1.82rem;', 'font-size:2.05rem;'),
+              ('line-height:.9;', 'line-height:.86;'),
+              ('.sk-nav-title span { color:#ff3655; font-size:2rem; letter-spacing:.04em; }', '.sk-nav-title span { color:#ff3655; font-size:2.28rem; letter-spacing:.045em; white-space:nowrap; }'),
+              ('font-size:.68rem;', 'font-size:.72rem;'),
+              ('margin:.58rem .45rem .08rem;', 'margin:.42rem .35rem .02rem;'),
+              ('margin:.9rem .95rem .38rem;', 'margin:.58rem .95rem .38rem;'),
+              ('color:#7790aa;', 'color:#d72b43;'),
+              ('font-size:.61rem;', 'font-size:.67rem;'),
+              ('st.markdown(\'<div class="sk-nav-title">StrikeOut <span>King 9000</span></div>\', unsafe_allow_html=True)', 'st.markdown(\'<div class="sk-nav-title">STRIKEOUT<br><span>KING 9000</span></div>\', unsafe_allow_html=True)'),
           ]
           changed = False
           for old, new in changes:
@@ -42,7 +41,7 @@ jobs:
                   s = s.replace(old, new, 1)
                   changed = True
           if not changed:
-              raise SystemExit('Expected sidebar values were not found')
+              raise SystemExit('Expected sidebar brand values were not found')
           p.write_text(s)
           PY
       - name: Commit patch
@@ -54,5 +53,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add navigation.py
-          git commit -m "Widen sidebar and scale brand block"
+          git commit -m "Finalize sidebar mascot and wordmark lockup"
           git push
