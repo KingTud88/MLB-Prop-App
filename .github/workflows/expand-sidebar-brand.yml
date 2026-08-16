@@ -17,7 +17,9 @@ jobs:
           fetch-depth: 0
 
       - name: Apply market-line integrity patch
-        run: python tools/patch_market_line_integrity.py
+        run: |
+          python tools/fix_market_line_patch_anchor.py
+          python tools/patch_market_line_integrity.py
 
       - name: Validate Python syntax
         run: python -m py_compile engine/model_top_plays.py engine/bet_tracker.py pages/2_Bet_Tracker.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py
