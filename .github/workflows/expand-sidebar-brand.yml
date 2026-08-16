@@ -16,12 +16,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Keep manual line highlight applied
-        run: python tools/highlight_manual_lines.py
-
-      - name: Keep Projection History command UI applied
-        run: python tools/patch_projection_history_command.py
-
       - name: Add restart-safe projection persistence
         run: python tools/patch_projection_persistence.py
 
