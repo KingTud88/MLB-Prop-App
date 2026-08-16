@@ -13,33 +13,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Increase mascot visual zoom
+      - name: Fix Top Plays mascot override
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re
 
-          p = Path('navigation.py')
-          s = p.read_text()
+          # Top Plays has a page-local mascot fallback that hides the shared image.
+          # Enlarge the fallback that is actually visible on this page.
+          top = Path('pages/6_Top_Plays.py')
+          s = top.read_text()
+          old = 'content:"";display:block;width:104px;height:104px;background:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000_clean.png") center/contain no-repeat;'
+          new = 'content:"";display:block;width:190px;height:190px;background:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000_clean.png?v=10") center/contain no-repeat;'
+          if old not in s:
+              raise SystemExit('Top Plays 104px mascot override not found')
+          top.write_text(s.replace(old, new, 1))
 
-          # Only change the mascot visual zoom. Sidebar, wordmark, subtitle and nav stay untouched.
-          s = s.replace('transform:scale(1.90) !important;', 'transform:scale(3.60) !important;')
-          s = s.replace('transform:scale(1.90) !important;transform-origin:50% 50% !important;', 'transform:scale(3.60) !important;transform-origin:50% 50% !important;')
-          s = re.sub(r'(strikeout_king_9000_sidebar\.png\?v=)\d+', r'\g<1>9', s, count=1)
-
-          if 'transform:scale(3.60) !important;' not in s:
-              raise SystemExit('Mascot scale patch did not land')
-
-          p.write_text(s)
+          # Undo the temporary debug zoom in shared navigation so other pages stay normal.
+          nav = Path('navigation.py')
+          n = nav.read_text()
+          n = n.replace('transform:scale(3.60) !important;', 'transform:scale(1.00) !important;')
+          n = n.replace('transform:scale(3.60) !important;transform-origin:50% 50% !important;', 'transform:scale(1.00) !important;transform-origin:50% 50% !important;')
+          nav.write_text(n)
           PY
       - name: Commit patch
         run: |
-          if git diff --quiet -- navigation.py; then
-            echo "No mascot scale changes to commit"
+          if git diff --quiet -- navigation.py pages/6_Top_Plays.py; then
+            echo "No mascot override changes to commit"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add navigation.py
-          git commit -m "Increase mascot visual zoom"
+          git add navigation.py pages/6_Top_Plays.py
+          git commit -m "Fix Top Plays mascot size override"
           git push
