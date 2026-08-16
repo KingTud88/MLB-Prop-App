@@ -16,15 +16,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Enlarge and tighten Projection Summary badges
+      - name: Sharpen Projection Summary badges
         run: |
           python - <<'PY'
           from pathlib import Path
           p = Path('streamlit_app.py')
           text = p.read_text(encoding='utf-8')
-          marker = 'PROJECTION_BADGE_POLISH_V6'
+          marker = 'PROJECTION_BADGE_POLISH_V7'
           if marker in text:
-              print('Projection badge polish already active')
+              print('Projection badge sharpening already active')
               raise SystemExit(0)
           start = text.find('PROJECTION_ARTWORK_INDIVIDUAL_V5')
           if start < 0:
@@ -33,25 +33,33 @@ jobs:
           if end < 0:
               raise SystemExit('Projection style close not found')
           before, block, after = text[:start], text[start:end], text[end:]
-          block = block.replace('width:64px!important;height:64px!important;flex:0 0 64px!important;', 'width:74px!important;height:74px!important;flex:0 0 74px!important;')
-          block = block.replace('width:56px!important;height:56px!important;flex-basis:56px!important', 'width:66px!important;height:66px!important;flex-basis:66px!important')
-          block = block.replace('?v=5', '?v=6')
-          block += '\n/* PROJECTION_BADGE_POLISH_V6 · larger, tighter cleaned artwork only */\n.cc-card-top{gap:.72rem!important}\n'
+          old_filter = 'filter:drop-shadow(0 4px 8px rgba(0,0,0,.32)) drop-shadow(0 0 6px rgba(236,22,56,.22))!important;'
+          new_filter = 'filter:drop-shadow(0 3px 5px rgba(0,0,0,.28)) drop-shadow(0 0 3px rgba(236,22,56,.16))!important;'
+          block = block.replace(old_filter, new_filter)
+          block += '\n/* PROJECTION_BADGE_POLISH_V7 · tighter fill + reduced blur */\n.cc-card-icon.cc-emblem{background-size:72px 72px!important}\n@media (max-width:900px){.cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{background-size:64px 64px!important}}\n'
           p.write_text(before + block + after, encoding='utf-8')
           PY
 
       - name: Validate Python syntax
         run: python -m py_compile streamlit_app.py
 
-      - name: Commit badge sizing safely
+      - name: Commit badge cleanup safely
         run: |
           if git diff --quiet -- streamlit_app.py; then
-            echo "Badge sizing already applied"
+            echo "Badge cleanup already applied"
             exit 0
           fi
           git config user.name "KingTud88"
           git config user.email "jaxson0603@gmail.com"
           git add streamlit_app.py
-          git commit -m "Polish Projection Summary badge sizing"
-          git pull --rebase origin main
-          git push origin HEAD:main
+          git commit -m "Sharpen Projection Summary badges"
+          for attempt in 1 2 3 4; do
+            git fetch origin main
+            git rebase origin/main || { git rebase --abort || true; sleep 2; continue; }
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            sleep $((attempt * 2))
+          done
+          echo "Could not push badge cleanup after retries"
+          exit 1
