@@ -4,9 +4,6 @@ on:
   push:
     branches: [main]
   schedule:
-    # Multiple pregame refreshes keep the durable archive in sync with late
-    # probable-starter announcements. Existing (game_pk, pitcher_id) snapshots
-    # are deduped by the runner, so these extra passes do not create duplicates.
     - cron: "15 13 * * *"
     - cron: "15 16 * * *"
     - cron: "15 18 * * *"
@@ -48,8 +45,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pytest
 
-      - name: Safety, lineage, calibration, ML-shadow, Top Plays, catcher-context, lineup, umpire, matchup, and matchup-boost contracts
-        run: PYTHONPATH=. pytest -q tests/test_live_role_shadow_evidence.py tests/test_live_role_shadow_gate.py tests/test_daily_role_shadow.py tests/test_role_workload_gate.py tests/test_calibration_lineage.py tests/test_calibration_health.py tests/test_calibration_shadow_replay.py tests/test_calibration_shadow_gate.py tests/test_umpire_context.py tests/test_umpire_k_live_validation.py tests/test_ml_shadow_report.py tests/test_top_plays_postmortem.py tests/test_top_plays_postmortem_nulls.py tests/test_top_plays_accountability.py tests/test_catcher_context_capture.py tests/test_catcher_context_validation.py tests/test_lineup_k_walkforward.py tests/test_opponent_matchup_validation.py tests/test_opponent_matchup_boost_stress.py
+      - name: Safety, lineage, calibration, ML-shadow, Top Plays, catcher-context, lineup, umpire, matchup, matchup-boost, and boost-cap contracts
+        run: PYTHONPATH=. pytest -q tests/test_live_role_shadow_evidence.py tests/test_live_role_shadow_gate.py tests/test_daily_role_shadow.py tests/test_role_workload_gate.py tests/test_calibration_lineage.py tests/test_calibration_health.py tests/test_calibration_shadow_replay.py tests/test_calibration_shadow_gate.py tests/test_umpire_context.py tests/test_umpire_k_live_validation.py tests/test_ml_shadow_report.py tests/test_top_plays_postmortem.py tests/test_top_plays_postmortem_nulls.py tests/test_top_plays_accountability.py tests/test_catcher_context_capture.py tests/test_catcher_context_validation.py tests/test_lineup_k_walkforward.py tests/test_opponent_matchup_validation.py tests/test_opponent_matchup_boost_stress.py tests/test_opponent_matchup_boost_cap_shadow.py
 
       - name: Resolve completed projection rows
         run: PYTHONPATH=. python automation/resolve_projection_log.py
@@ -105,13 +102,16 @@ jobs:
       - name: Refresh report-only positive opponent matchup boost stress test
         run: PYTHONPATH=. python -m training.opponent_matchup_boost_stress
 
-      - name: Commit updated projection, shadow, calibration, ML, Top Plays, catcher, lineup, umpire, matchup, and matchup-boost reports
+      - name: Refresh report-only frozen positive opponent boost-cap shadow
+        run: PYTHONPATH=. python -m training.opponent_matchup_boost_cap_shadow
+
+      - name: Commit updated projection, shadow, calibration, ML, Top Plays, catcher, lineup, umpire, matchup, matchup-boost, and boost-cap reports
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/projection_log.csv data/starter_observation_log.csv data/umpire_observation_log.csv data/live_role_shadow_detail.csv data/live_role_shadow_summary.csv data/live_role_shadow_gate.csv data/calibration_lineage_audit.csv data/calibration_health.csv data/calibration_shadow_detail.csv data/calibration_shadow_summary.csv data/calibration_shadow_gate.csv data/ml_shadow_detail.csv data/ml_shadow_summary.csv data/ml_shadow_live_candidates.csv data/ml_shadow_feature_manifest.csv data/top_plays_postmortem_detail.csv data/top_plays_postmortem_summary.csv data/top_plays_postmortem_daily.csv data/top_plays_postmortem_coverage.csv data/top_plays_accountability_summary.csv data/top_plays_accountability_findings.csv data/catcher_context_log.csv data/catcher_context_validation_detail.csv data/catcher_context_validation_summary.csv data/catcher_context_validation_gate.csv data/lineup_k_walkforward_detail.csv data/lineup_k_walkforward_summary.csv data/lineup_k_walkforward_segments.csv data/lineup_k_walkforward_gate.csv data/umpire_k_live_validation_detail.csv data/umpire_k_live_validation_summary.csv data/umpire_k_live_validation_segments.csv data/umpire_k_live_validation_gate.csv data/opponent_matchup_validation_detail.csv data/opponent_matchup_validation_summary.csv data/opponent_matchup_validation_segments.csv data/opponent_matchup_validation_gate.csv data/opponent_matchup_boost_stress_detail.csv data/opponent_matchup_boost_stress_summary.csv data/opponent_matchup_boost_stress_segments.csv data/opponent_matchup_boost_stress_gate.csv
+          git add data/projection_log.csv data/starter_observation_log.csv data/umpire_observation_log.csv data/live_role_shadow_detail.csv data/live_role_shadow_summary.csv data/live_role_shadow_gate.csv data/calibration_lineage_audit.csv data/calibration_health.csv data/calibration_shadow_detail.csv data/calibration_shadow_summary.csv data/calibration_shadow_gate.csv data/ml_shadow_detail.csv data/ml_shadow_summary.csv data/ml_shadow_live_candidates.csv data/ml_shadow_feature_manifest.csv data/top_plays_postmortem_detail.csv data/top_plays_postmortem_summary.csv data/top_plays_postmortem_daily.csv data/top_plays_postmortem_coverage.csv data/top_plays_accountability_summary.csv data/top_plays_accountability_findings.csv data/catcher_context_log.csv data/catcher_context_validation_detail.csv data/catcher_context_validation_summary.csv data/catcher_context_validation_gate.csv data/lineup_k_walkforward_detail.csv data/lineup_k_walkforward_summary.csv data/lineup_k_walkforward_segments.csv data/lineup_k_walkforward_gate.csv data/umpire_k_live_validation_detail.csv data/umpire_k_live_validation_summary.csv data/umpire_k_live_validation_segments.csv data/umpire_k_live_validation_gate.csv data/opponent_matchup_validation_detail.csv data/opponent_matchup_validation_summary.csv data/opponent_matchup_validation_segments.csv data/opponent_matchup_validation_gate.csv data/opponent_matchup_boost_stress_detail.csv data/opponent_matchup_boost_stress_summary.csv data/opponent_matchup_boost_stress_segments.csv data/opponent_matchup_boost_stress_gate.csv data/opponent_matchup_boost_cap_shadow_detail.csv data/opponent_matchup_boost_cap_shadow_summary.csv
           if git diff --cached --quiet; then
-            echo "No projection/history/shadow/calibration/ML/Top-Plays/catcher/lineup/umpire/matchup/matchup-boost report changes to commit."
+            echo "No projection/history/shadow/calibration/ML/Top-Plays/catcher/lineup/umpire/matchup/matchup-boost/boost-cap report changes to commit."
             exit 0
           fi
 
