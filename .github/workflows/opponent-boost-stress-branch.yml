@@ -1,0 +1,24 @@
+name: Opponent Boost Stress Branch
+
+on:
+  push:
+    branches: [opponent-matchup-boost-stress]
+
+jobs:
+  stress-report:
+    if: github.event.head_commit.message == 'Run opponent boost stress report on branch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Generate boost stress report
+        run: PYTHONPATH=. python -m training.opponent_matchup_boost_stress
+      - name: Print boost stress gate and segments
+        run: |
+          echo '=== GATE ==='
+          cat data/opponent_matchup_boost_stress_gate.csv
+          echo '=== SEGMENTS ==='
+          cat data/opponent_matchup_boost_stress_segments.csv
