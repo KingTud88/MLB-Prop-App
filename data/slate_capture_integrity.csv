@@ -1,31 +1,23 @@
 game_date,game_pk,pitcher_id,player,team,opponent,game_time,schedule_status,capture_status,audit_version
-2026-08-16,822940,669432,Trevor Rogers,BAL,TBR,2026-08-16T16:15:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,822940,642547,Freddy Peralta,TBR,BAL,2026-08-16T16:15:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,823344,663776,Patrick Sandoval,BOS,PIT,2026-08-16T17:35:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,823344,669199,Lake Bachar,PIT,BOS,2026-08-16T17:35:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,824880,647336,Michael Soroka,ARI,ATL,2026-08-16T17:35:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,824880,693821,Bryce Elder,ATL,ARI,2026-08-16T17:35:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,822774,677960,Ryan Weathers,NYY,TOR,2026-08-16T17:37:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,822774,656302,Dylan Cease,TOR,NYY,2026-08-16T17:37:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,823590,663623,Jake Irvin,WSH,NYM,2026-08-16T17:40:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,823590,681035,Christian Scott,NYM,WSH,2026-08-16T17:40:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,824397,663554,Casey Mize,SDP,CLE,2026-08-16T17:40:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,824397,676440,Tanner Bibee,CLE,SDP,2026-08-16T17:40:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,824236,680732,Sean Burke,CHW,DET,2026-08-16T17:40:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,824236,623454,Drew Anderson,DET,CHW,2026-08-16T17:40:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,824477,691587,Eury Pérez,MIA,CIN,2026-08-16T17:40:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,824477,666157,Nick Lodolo,CIN,MIA,2026-08-16T17:40:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,823670,691725,Andrew Painter,PHI,MIN,2026-08-16T18:10:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,823670,665152,Dean Kremer,MIN,PHI,2026-08-16T18:10:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,824642,690928,Hunter Dobbins,STL,CHC,2026-08-16T19:15:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,824642,665795,Edward Cabrera,CHC,STL,2026-08-16T19:15:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,823182,687312,Gabriel Hughes,COL,SFG,2026-08-16T20:05:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,823182,694918,Blade Tidwell,SFG,COL,2026-08-16T20:05:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,824965,674003,Cody Bradford,TEX,ATH,2026-08-16T20:05:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,824965,682052,Jacob Lopez,ATH,TEX,2026-08-16T20:05:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,823991,702070,Noah Cameron,KCR,LAA,2026-08-16T20:07:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,823991,696270,Ryan Johnson,LAA,KCR,2026-08-16T20:07:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,823912,701656,Logan Henderson,MIL,LAD,2026-08-16T20:10:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,823912,669373,Tarik Skubal,LAD,MIL,2026-08-16T20:10:00Z,Final,PROJECTED,slate-capture-integrity-v1
-2026-08-16,824156,693433,Bryan Woo,SEA,HOU,2026-08-16T23:20:00Z,In Progress,PROJECTED,slate-capture-integrity-v1
-2026-08-16,824156,686613,Hunter Brown,HOU,SEA,2026-08-16T23:20:00Z,In Progress,PROJECTED,slate-capture-integrity-v1
+2026-08-17,824514,687273,Quinn Mathews,STL,CIN,2026-08-17T17:40:00Z,In Progress,PROJECTED,slate-capture-integrity-v1
+2026-08-17,824514,592288,Kent Emanuel,CIN,STL,2026-08-17T17:40:00Z,In Progress,HISTORY_ONLY,slate-capture-integrity-v1
+2026-08-17,824478,669467,Andre Pallante,STL,CIN,2026-08-17T22:40:00Z,Scheduled,PROJECTED,slate-capture-integrity-v1
+2026-08-17,824478,695076,Rhett Lowder,CIN,STL,2026-08-17T22:40:00Z,Scheduled,PROJECTED,slate-capture-integrity-v1
+2026-08-17,822939,687064,Brandon Young,BAL,TBR,2026-08-17T22:05:00Z,Pre-Game,PROJECTED,slate-capture-integrity-v1
+2026-08-17,822939,663556,Shane McClanahan,TBR,BAL,2026-08-17T22:05:00Z,Pre-Game,PROJECTED,slate-capture-integrity-v1
+2026-08-17,823427,676083,Janson Junk,MIA,PHI,2026-08-17T22:40:00Z,Pre-Game,PROJECTED,slate-capture-integrity-v1
+2026-08-17,823427,650911,Cristopher Sánchez,PHI,MIA,2026-08-17T22:40:00Z,Pre-Game,PROJECTED,slate-capture-integrity-v1
+2026-08-17,823343,664285,Framber Valdez,DET,PIT,2026-08-17T23:05:00Z,Scheduled,PROJECTED,slate-capture-integrity-v1
+2026-08-17,823343,669387,Carmen Mlodzinski,PIT,DET,2026-08-17T23:05:00Z,Scheduled,PROJECTED,slate-capture-integrity-v1
+2026-08-17,824725,683352,Mitch Bratt,ARI,BOS,2026-08-17T23:10:00Z,Scheduled,PROJECTED,slate-capture-integrity-v1
+2026-08-17,824725,687941,Alec Gamboa,BOS,ARI,2026-08-17T23:10:00Z,Scheduled,HISTORY_ONLY,slate-capture-integrity-v1
+2026-08-17,823589,621111,Walker Buehler,SDP,NYM,2026-08-17T23:10:00Z,Pre-Game,PROJECTED,slate-capture-integrity-v1
+2026-08-17,823589,690997,Nolan McLean,NYM,SDP,2026-08-17T23:10:00Z,Pre-Game,PROJECTED,slate-capture-integrity-v1
+2026-08-17,824077,686930,Mason Barnett,ATH,KCR,2026-08-17T23:40:00Z,Scheduled,PROJECTED,slate-capture-integrity-v1
+2026-08-17,824077,608379,Michael Wacha,KCR,ATH,2026-08-17T23:40:00Z,Scheduled,PROJECTED,slate-capture-integrity-v1
+2026-08-17,823668,527048,Martín Pérez,ATL,MIN,2026-08-17T23:40:00Z,Scheduled,PROJECTED,slate-capture-integrity-v1
+2026-08-17,823668,641927,Bailey Ober,MIN,ATL,2026-08-17T23:40:00Z,Scheduled,PROJECTED,slate-capture-integrity-v1
+2026-08-17,824641,622491,Luis Castillo,CHW,CHC,2026-08-18T00:05:00Z,Scheduled,PROJECTED,slate-capture-integrity-v1
+2026-08-17,824641,684007,Shota Imanaga,CHC,CHW,2026-08-18T00:05:00Z,Scheduled,PROJECTED,slate-capture-integrity-v1
+2026-08-17,824320,605483,Blake Snell,LAD,COL,2026-08-18T00:40:00Z,Scheduled,PROJECTED,slate-capture-integrity-v1
+2026-08-17,824320,608372,Tomoyuki Sugano,COL,LAD,2026-08-18T00:40:00Z,Scheduled,PROJECTED,slate-capture-integrity-v1
