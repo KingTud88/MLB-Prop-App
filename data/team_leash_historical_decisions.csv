@@ -1,0 +1,4 @@
+Metric,Decision,Passing_Seasons,Required_Seasons,Pooled_Evaluated_Starts,Pooled_Baseline_MAE,Pooled_Candidate_MAE,Pooled_Relative_MAE_Improvement,Pooled_Candidate_Win_Share,Reasons,Production_Authority,Report_Only,Validation_Version
+PITCHES,HOLD,0,3,5835,8.855337405634968,8.982247595156531,-0.01433149113446608,0.45809768637532133,2024:mae|win_share;2025:mae|win_share;2026:mae|win_share,NONE,True,team-leash-historical-v1
+BF,HOLD,0,3,5835,2.6116290394504973,2.64105816989711,-0.01126849564086813,0.4570694087403599,2024:mae|win_share;2025:mae|win_share;2026:mae|win_share,NONE,True,team-leash-historical-v1
+OUTS,HOLD,0,3,5835,2.811314612581318,2.8417663971321736,-0.010831866492130218,0.45552699228791776,2024:mae|win_share;2025:mae|win_share;2026:mae|win_share,NONE,True,team-leash-historical-v1
