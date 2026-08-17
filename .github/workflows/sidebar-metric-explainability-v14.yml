@@ -1,0 +1,43 @@
+name: Sidebar + Metric Explainability V14
+
+on:
+  push:
+    paths:
+      - '.github/workflows/sidebar-metric-explainability-v14.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt pytest
+      - name: Apply presentation-only patch
+        run: python .github/scripts/sidebar_explainability_v14.py
+      - name: Compile changed Python
+        run: python -m compileall -q navigation.py engine/explainability_ui.py pages tests/test_sidebar_metric_explainability_v2.py
+      - name: Run targeted UI contracts
+        run: |
+          python -m pytest -q \
+            tests/test_sidebar_metric_explainability_v2.py \
+            tests/test_explainability_ui.py \
+            tests/test_projection_history_learning_dashboard.py \
+            tests/test_command_center_consistency.py \
+            tests/test_command_center_readability.py \
+            tests/test_bet_tracker_page_contract.py \
+            tests/test_daily_projection_page_contract.py \
+            tests/test_top_play_details_contract.py
+      - name: Commit presentation-only changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add navigation.py engine/explainability_ui.py pages/2_Bet_Tracker.py pages/4_Projection_History.py pages/5_Daily_Projection_Run.py pages/6_Top_Plays.py tests/test_sidebar_metric_explainability_v2.py
+          git diff --cached --check
+          git commit -m "Unify secondary sidebar and explain scorecard metrics"
+          git push
