@@ -41,7 +41,6 @@ SUMMARY_COLUMNS = [
     "Mean_Opponent_K_Delta_PP", "Mean_Matchup_PA", "Reason", "Recommended_Action",
     "Manual_Review_Ready", "Report_Only", "Production_Authority", "Validation_Version",
 ]
-
 SEGMENT_COLUMNS = [
     "Dimension", "Segment", "Boost_Starts", "Observed_Days", "Distinct_Opponents",
     "Applied_MAE", "Neutral_MAE", "Relative_MAE_Improvement", "Applied_Win_Share",
@@ -51,7 +50,6 @@ SEGMENT_COLUMNS = [
     "Mean_Opponent_K_Delta_PP", "Mean_Matchup_PA", "Stress_Read",
     "Report_Only", "Production_Authority", "Validation_Version",
 ]
-
 GATE_COLUMNS = SUMMARY_COLUMNS
 
 
@@ -117,8 +115,8 @@ def _matchup_pa_band(value: float) -> str:
 def build_boost_detail(matchup_detail: pd.DataFrame) -> pd.DataFrame:
     """Keep only authentic, informative positive opponent-K adjustments.
 
-    The source is the v2 analytic-ablation detail. Segmentation uses only values
-    available before first pitch. Final strikeouts are used solely for scoring.
+    Source columns come from the v2 analytic-ablation detail. Segment labels use
+    only pregame information; final strikeouts are used solely for scoring.
     """
     if matchup_detail is None or matchup_detail.empty:
         return pd.DataFrame(columns=DETAIL_COLUMNS)
@@ -153,36 +151,45 @@ def build_boost_detail(matchup_detail: pd.DataFrame) -> pd.DataFrame:
     return boost[DETAIL_COLUMNS].reset_index(drop=True)
 
 
+def _empty_metrics() -> dict[str, object]:
+    return {
+        "Boost_Starts": 0,
+        "Observed_Days": 0,
+        "Distinct_Opponents": 0,
+        "Applied_MAE": np.nan,
+        "Neutral_MAE": np.nan,
+        "Relative_MAE_Improvement": np.nan,
+        "Applied_Win_Share": np.nan,
+        "Neutral_Win_Share": np.nan,
+        "Tie_Share": np.nan,
+        "Applied_Bias": np.nan,
+        "Neutral_Bias": np.nan,
+        "Bias_Abs_Change": np.nan,
+        "Applied_Overprediction_Rate": np.nan,
+        "Neutral_Overprediction_Rate": np.nan,
+        "Overprediction_Rate_Change": np.nan,
+        "Mean_Boost_K": np.nan,
+        "Median_Boost_K": np.nan,
+        "Mean_Opponent_K_Delta_PP": np.nan,
+        "Mean_Matchup_PA": np.nan,
+    }
+
+
 def _metrics(group: pd.DataFrame) -> dict[str, object]:
     if group is None or group.empty:
-        return {
-            "Boost_Starts": 0,
-            "Observed_Days": 0,
-            "Distinct_Opponents": 0,
-            "Applied_MAE": np.nan,
-            "Neutral_MAE": np.nan,
-            "Relative_MAE_Improvement": np.nan,
-            "Applied_Win_Share": np.nan,
-            "Neutral_Win_Share": np.nan,
-            "Tie_Share": np.nan,
-            "Applied_Bias": np.nan,
-            "Neutral_Bias": np.nan,
-            "Bias_Abs_Change": np.nan,
-            "Applied_Overprediction_Rate": np.nan,
-            "Neutral_Overprediction_Rate": np.nan,
-            "Overprediction_Rate_Change": np.nan,
-            "Mean_Boost_K": np.nan,
-            "Median_Boost_K": np.nan,
-            "Mean_Opponent_K_Delta_PP": np.nan,
-            "Mean_Matchup_PA": np.nan,
-        }
+        return _empty_metrics()
 
     n = int(len(group))
     days = int(group["game_date"].replace("", np.nan).dropna().astype(str).nunique())
     opponents = int(group["opponent"].replace("", np.nan).dropna().astype(str).nunique())
     applied_mae = float(_num(group, "Applied_Absolute_Error").mean())
     neutral_mae = float(_num(group, "Neutral_Absolute_Error").mean())
-    relative = float((neutral_mae - applied_mae) / neutral_mae) if neutral_mae > 0 else np.nan
+    if neutral_mae > 0:
+        relative = float((neutral_mae - applied_mae) / neutral_mae)
+    elif neutral_mae == 0 and applied_mae == 0:
+        relative = 0.0
+    else:
+        relative = np.nan
     applied_win = float(_boolish(group, "Applied_Win").mean())
     neutral_win = float(_boolish(group, "Neutral_Win").mean())
     tie = float(_boolish(group, "Tie").mean())
@@ -214,10 +221,23 @@ def _metrics(group: pd.DataFrame) -> dict[str, object]:
     }
 
 
+def _perfect_neutral_failure(metrics: dict[str, object]) -> bool:
+    neutral_mae = metrics["Neutral_MAE"]
+    applied_mae = metrics["Applied_MAE"]
+    return bool(
+        pd.notna(neutral_mae)
+        and pd.notna(applied_mae)
+        and float(neutral_mae) == 0.0
+        and float(applied_mae) > 0.0
+    )
+
+
 def _early_read(metrics: dict[str, object]) -> str:
-    n = int(metrics["Boost_Starts"])
-    if n < 10:
+    if int(metrics["Boost_Starts"]) < 10:
         return "SMALL_SAMPLE"
+    if _perfect_neutral_failure(metrics):
+        return "LEAN_TOO_HOT"
+
     rel = metrics["Relative_MAE_Improvement"]
     win = metrics["Applied_Win_Share"]
     bias_change = metrics["Bias_Abs_Change"]
@@ -246,18 +266,30 @@ def _formal_finding(metrics: dict[str, object]) -> tuple[str, str, str, bool]:
             False,
         )
 
+    if _perfect_neutral_failure(metrics):
+        return (
+            "TOO HOT",
+            "The neutral-opponent counterfactual is perfect in this evaluation sample while the positive boost adds error. This is a manual-review signal only.",
+            "MANUAL_REVIEW_DO_NOT_RETUNE_AUTOMATICALLY",
+            True,
+        )
+
     rel = metrics["Relative_MAE_Improvement"]
     win = metrics["Applied_Win_Share"]
     bias_change = metrics["Bias_Abs_Change"]
     if pd.isna(rel) or pd.isna(win) or pd.isna(bias_change):
-        return "INCONCLUSIVE", "Boost sample is large enough, but required scoring metrics are incomplete.", "KEEP_CURRENT_BOOST_AND_LEARN", False
+        return (
+            "INCONCLUSIVE",
+            "Boost sample is large enough, but required scoring metrics are incomplete.",
+            "KEEP_CURRENT_BOOST_AND_LEARN",
+            False,
+        )
 
-    supported = bool(
+    if (
         float(rel) >= MIN_SUPPORT_RELATIVE_MAE
         and float(win) >= MIN_SUPPORT_WIN_SHARE
         and float(bias_change) <= BIAS_WORSEN_TOLERANCE
-    )
-    if supported:
+    ):
         return (
             "SUPPORTED",
             "Positive matchup boosts clear MAE, head-to-head win-share, and absolute-bias guardrails versus the neutral-opponent counterfactual.",
@@ -289,6 +321,8 @@ def _formal_finding(metrics: dict[str, object]) -> tuple[str, str, str, bool]:
 def _segment_read(metrics: dict[str, object]) -> str:
     if int(metrics["Boost_Starts"]) < MIN_SEGMENT_READ_STARTS:
         return "SMALL_SAMPLE"
+    if _perfect_neutral_failure(metrics):
+        return "HURTING"
     rel = metrics["Relative_MAE_Improvement"]
     win = metrics["Applied_Win_Share"]
     bias_change = metrics["Bias_Abs_Change"]
