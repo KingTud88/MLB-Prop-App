@@ -10,142 +10,6 @@ MASCOT_URL = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/asse
 
 def render_sidebar(active: str = "projection") -> None:
     """Render the shared Cleveland-night app navigation."""
-    st.markdown(
-        """
-        <style>
-        [data-testid="stSidebar"] {
-            width: 252px !important;
-            min-width: 252px !important;
-            background:
-                radial-gradient(circle at 50% 2%, rgba(227,25,55,.13), transparent 12rem),
-                linear-gradient(180deg, #07162a 0%, #050d19 100%) !important;
-            border-right: 1px solid rgba(61,94,129,.45) !important;
-        }
-        [data-testid="stSidebar"] > div:first-child { width:252px !important; }
-        .sk-nav-brand {
-            margin: .1rem .15rem .75rem;
-            padding: .72rem .5rem .75rem;
-            border: 1px solid rgba(70,103,139,.44);
-            border-radius: 16px;
-            background: linear-gradient(145deg, rgba(14,35,64,.78), rgba(7,20,38,.72));
-            box-shadow: 0 13px 32px rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.025);
-        }
-        .sk-nav-brand:empty {
-            display:none !important;
-            margin:0 !important;
-            padding:0 !important;
-            border:0 !important;
-            background:none !important;
-            box-shadow:none !important;
-        }
-        .sk-nav-mascot {
-            display:flex;
-            justify-content:center;
-            align-items:center;
-            height:238px;
-            margin:-.48rem 0 -.60rem;
-            position: relative;
-            overflow:hidden;
-        }
-        .sk-nav-mascot img {
-            width:236px !important;
-            height:236px !important;
-            object-fit:contain;
-            max-width:none !important;
-            min-width:236px !important;
-            display:block;
-            filter: drop-shadow(0 9px 18px rgba(0,0,0,.3));
-            transform:scale(1.00) !important;
-            transform-origin:50% 50%;
-        }
-        .sk-nav-mascot.sk-logo-fallback::after {
-            content:"SK 9000";
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            width:96px;
-            height:96px;
-            border-radius:50%;
-            border:2px solid #e31937;
-            color:#fff;
-            font-family:Impact,"Arial Narrow",sans-serif;
-            letter-spacing:.06em;
-            background:radial-gradient(circle,#17345d,#08162a 68%);
-            box-shadow:0 0 28px rgba(227,25,55,.2);
-        }
-        .sk-nav-title {
-            text-align:center;
-            font-family:Impact,"Arial Narrow",sans-serif;
-            font-size:2.18rem;
-            line-height:.82;
-            color:#fff;
-            letter-spacing:.015em;
-        }
-        .sk-nav-title span { color:#ff2848; font-size:2.28rem; letter-spacing:.035em; white-space:nowrap; }
-        .sk-nav-title::after {
-            content:"✦";
-            display:block;
-            width:88%;
-            margin:.58rem auto .05rem;
-            border-top:2px solid rgba(236,22,56,.88);
-            color:#ff2848;
-            font-family:Arial,sans-serif;
-            font-size:.58rem;
-            line-height:0;
-            text-shadow:0 0 8px rgba(236,22,56,.7);
-        }
-        .sk-nav-sub {
-            text-align:center;
-            color:#9eb1c6;
-            font-size:.75rem;
-            font-weight:650;
-            line-height:1.38;
-            letter-spacing:.02em;
-            margin:.38rem .28rem 0;
-        }
-        .sk-nav-section {
-            color:#d72b43;
-            font-size:.67rem;
-            font-weight:900;
-            text-transform:uppercase;
-            letter-spacing:.16em;
-            margin:.42rem .95rem .3rem;
-        }
-        [data-testid="stSidebar"] .sk-page-link { margin:.11rem .28rem; }
-        [data-testid="stSidebar"] .sk-page-link a {
-            font-family:Arial,sans-serif!important;
-            font-weight:800!important;
-            border-radius:10px!important;
-            padding:.52rem .72rem!important;
-            border:1px solid transparent!important;
-            transition:background .14s ease,border-color .14s ease,transform .14s ease!important;
-        }
-        [data-testid="stSidebar"] .sk-page-link a:hover {
-            background:rgba(30,61,96,.55)!important;
-            border-color:rgba(76,110,145,.42)!important;
-            transform:translateX(2px);
-        }
-        [data-testid="stSidebar"] .sk-page-link.active a {
-            background:linear-gradient(90deg,rgba(227,25,55,.95),rgba(151,13,38,.88))!important;
-            border-color:rgba(255,78,102,.55)!important;
-            color:#fff!important;
-            box-shadow:0 8px 20px rgba(227,25,55,.16), inset 0 1px 0 rgba(255,255,255,.08);
-        }
-        .sk-nav-footer {
-            margin:.85rem .7rem 0;
-            padding-top:.7rem;
-            border-top:1px solid rgba(52,82,114,.52);
-            color:#6f879f;
-            font-size:.59rem;
-            line-height:1.45;
-            text-align:center;
-            letter-spacing:.035em;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
     if active == "top":
         st.markdown(
             """
@@ -439,7 +303,19 @@ def render_sidebar(active: str = "projection") -> None:
             width:auto!important;
             min-width:0!important;
         }
-        [data-testid="stSidebar"] .cc-sidebar-brand{margin:.10rem 0 .80rem!important}
+        [data-testid="stSidebar"] .cc-sidebar-brand{
+            padding:.85rem .7rem .8rem!important;
+            margin:.10rem 0 .80rem!important;
+            border:1px solid rgba(78,108,137,.66)!important;
+            border-radius:14px!important;
+            background:linear-gradient(145deg,rgba(8,29,51,.98),rgba(3,16,30,.98))!important;
+            text-align:center!important;
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 12px 26px rgba(0,0,0,.20)!important;
+        }
+        [data-testid="stSidebar"] .cc-sidebar-crown{color:#ec1638!important;font-size:1.2rem!important;line-height:1!important}
+        [data-testid="stSidebar"] .cc-sidebar-script{color:#f5f1e9!important;font-family:Georgia,"Times New Roman",serif!important;font-size:1.55rem!important;font-weight:800!important;font-style:italic!important;line-height:.95!important}
+        [data-testid="stSidebar"] .cc-sidebar-king{color:#ec1638!important;font-family:Impact,"Arial Narrow",sans-serif!important;font-size:1.42rem!important;letter-spacing:.035em!important;line-height:1!important;text-transform:uppercase!important}
+        [data-testid="stSidebar"] .cc-sidebar-tag{margin-top:.38rem!important;color:#9fb3c5!important;font:700 .78rem/1.35 system-ui,-apple-system,"Segoe UI",Arial,sans-serif!important}
         [data-testid="stSidebar"] [data-testid="stRadio"] > div{gap:.28rem!important}
         [data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label{
             display:flex!important;

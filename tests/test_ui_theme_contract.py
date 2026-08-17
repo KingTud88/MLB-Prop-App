@@ -35,6 +35,10 @@ def test_sidebar_matches_main_projection_navigation_language():
     assert "st.page_link" not in rendered
     assert "sk-nav-compact-crown" not in rendered
     assert "👑" not in rendered
+    assert "width: 252px !important" not in source
+    assert "sk-page-link" not in source
+    assert "cc-sidebar-script" in source
+    assert "cc-sidebar-king" in source
 
 
 def test_streamlit_base_theme_matches_shared_skin():
