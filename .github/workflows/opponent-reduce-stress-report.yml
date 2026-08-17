@@ -1,0 +1,31 @@
+name: Opponent Reduce Robustness Stress Report
+
+on:
+  push:
+    branches: [agent/opponent-reduce-robustness-stress]
+
+permissions:
+  contents: write
+
+jobs:
+  report:
+    if: github.event.head_commit.message != 'Run opponent reduction robustness stress report'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - name: Generate report-only reduction robustness evidence
+        run: PYTHONPATH=. python -m training.opponent_matchup_reduce_stress
+      - name: Commit report outputs to isolated branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/opponent_matchup_reduce_stress_detail.csv data/opponent_matchup_reduce_stress_summary.csv data/opponent_matchup_reduce_stress_segments.csv data/opponent_matchup_reduce_stress_gate.csv
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Run opponent reduction robustness stress report"
+          git push origin HEAD:agent/opponent-reduce-robustness-stress
