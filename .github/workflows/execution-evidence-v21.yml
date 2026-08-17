@@ -48,4 +48,4 @@ jobs:
           git rebase origin/main
           git push origin HEAD:main
 
-# final rerun after automatic-evidence contract refresh
+# rerun after final test-import repair
