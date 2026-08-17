@@ -44,7 +44,9 @@ def test_projection_history_bettable_wins_and_clean_archive():
     assert 'TextColumn("80% K Range")' in text
     assert 'TextColumn("80% Hits Range")' in text
     assert 'TextColumn("80% Outs Range")' in text
-    assert "K Target / K Result is the only WIN/MISS lane" in text
+    assert "Model diagnostics and execution evidence are intentionally separate" in text
+    assert "Hits/Outs Line + Side + Bet Result = true execution history" in text
+    assert "Execution evidence never feeds calibration or projection training" in text
     assert "empty_token" in text
     assert '"none", "null", "nat", "<na>"' in text
     assert "#22c55e" in text
