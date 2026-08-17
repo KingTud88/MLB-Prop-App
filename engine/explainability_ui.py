@@ -186,7 +186,7 @@ def metric_help(key: str, *, current: str = "") -> str:
         ),
         "history_k_hit_rate": (
             "What it is: the share of eligible resolved K intervals that contained the final strikeout total.\n\n"
-            "Formula: K range hits ÷ resolved rows with actual Ks + both frozen K range bounds.\n\n"
+            "Formula: K intervals covered ÷ resolved rows with actual Ks + both frozen K range bounds.\n\n"
             "How to read it: the saved interval is the model's central 80% range, so long-run coverage near 80% is the calibration target—not 100%."
         ),
         "history_hits_range_hits": (
@@ -196,7 +196,7 @@ def metric_help(key: str, *, current: str = "") -> str:
         ),
         "history_hits_hit_rate": (
             "What it is: the share of eligible Hits Allowed intervals that contained the final result.\n\n"
-            "Formula: Hits range hits ÷ resolved rows with actual Hits Allowed + both frozen Hits range bounds.\n\n"
+            "Formula: Hits intervals covered ÷ resolved rows with actual Hits Allowed + both frozen Hits range bounds.\n\n"
             "How to read it: the central 80% interval should trend toward roughly 80% coverage over a large, stable sample."
         ),
         "history_outs_range_hits": (
@@ -206,7 +206,7 @@ def metric_help(key: str, *, current: str = "") -> str:
         ),
         "history_outs_hit_rate": (
             "What it is: the share of eligible Outs intervals that contained the final starter-outs total.\n\n"
-            "Formula: Outs range hits ÷ resolved rows with actual Outs + both frozen Outs range bounds.\n\n"
+            "Formula: Outs intervals covered ÷ resolved rows with actual Outs + both frozen Outs range bounds.\n\n"
             "How to read it: compare it with the nominal 80% interval target; materially low coverage means the interval may be too narrow."
         ),
         "history_k_mae": (

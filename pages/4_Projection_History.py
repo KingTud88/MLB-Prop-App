@@ -129,7 +129,7 @@ def range_result(row: pd.Series, actual_col: str, low_col: str, high_col: str) -
     if pd.isna(row.get(low_col)) or pd.isna(row.get(high_col)):
         return "RESOLVED"
     actual = float(row[actual_col])
-    return "✅ HIT" if float(row[low_col]) <= actual <= float(row[high_col]) else "❌ MISS"
+    return "✅ IN RANGE" if float(row[low_col]) <= actual <= float(row[high_col]) else "❌ OUTSIDE"
 
 
 def rolling_learning_frame(frame: pd.DataFrame) -> pd.DataFrame:
@@ -334,14 +334,14 @@ o_hit_rate = float(o_hit_count / o_ready_count) if o_ready_count else None
 col1, col2, col3, col4, col5, col6 = st.columns(6)
 col1.metric("Automatic evidence rows", len(df), help=metric_help("history_evidence_rows", current=f"{len(df)} frozen evidence row(s) loaded"))
 col2.metric("Resolved games", resolved_any_count, help=metric_help("history_resolved_games", current=f"{resolved_any_count}/{len(df)} evidence row(s) have at least one final MLB stat"))
-col3.metric("K range hits", k_hit_count, help=metric_help("history_k_range_hits", current=f"{k_hit_count}/{k_ready_count} eligible K intervals contained the final Ks"))
-col4.metric("K hit rate", f"{k_hit_rate:.1%}" if k_hit_rate is not None else "—", help=metric_help("history_k_hit_rate", current=(f"{k_hit_count}/{k_ready_count} = {k_hit_rate:.1%}" if k_hit_rate is not None else "No eligible resolved K intervals yet")))
-col5.metric("Hits range hits", h_hit_count, help=metric_help("history_hits_range_hits", current=f"{h_hit_count}/{h_ready_count} eligible Hits intervals contained the final result"))
-col6.metric("Hits hit rate", f"{h_hit_rate:.1%}" if h_hit_rate is not None else "—", help=metric_help("history_hits_hit_rate", current=(f"{h_hit_count}/{h_ready_count} = {h_hit_rate:.1%}" if h_hit_rate is not None else "No eligible resolved Hits intervals yet")))
+col3.metric("K intervals covered", k_hit_count, help=metric_help("history_k_range_hits", current=f"{k_hit_count}/{k_ready_count} eligible K intervals contained the final Ks"))
+col4.metric("K coverage rate", f"{k_hit_rate:.1%}" if k_hit_rate is not None else "—", help=metric_help("history_k_hit_rate", current=(f"{k_hit_count}/{k_ready_count} = {k_hit_rate:.1%}" if k_hit_rate is not None else "No eligible resolved K intervals yet")))
+col5.metric("Hits intervals covered", h_hit_count, help=metric_help("history_hits_range_hits", current=f"{h_hit_count}/{h_ready_count} eligible Hits intervals contained the final result"))
+col6.metric("Hits coverage rate", f"{h_hit_rate:.1%}" if h_hit_rate is not None else "—", help=metric_help("history_hits_hit_rate", current=(f"{h_hit_count}/{h_ready_count} = {h_hit_rate:.1%}" if h_hit_rate is not None else "No eligible resolved Hits intervals yet")))
 
 outs_metrics1, outs_metrics2 = st.columns(2)
-outs_metrics1.metric("Outs range hits", o_hit_count, help=metric_help("history_outs_range_hits", current=f"{o_hit_count}/{o_ready_count} eligible Outs intervals contained the final result"))
-outs_metrics2.metric("Outs hit rate", f"{o_hit_rate:.1%}" if o_hit_rate is not None else "—", help=metric_help("history_outs_hit_rate", current=(f"{o_hit_count}/{o_ready_count} = {o_hit_rate:.1%}" if o_hit_rate is not None else "No eligible resolved Outs intervals yet")))
+outs_metrics1.metric("Outs intervals covered", o_hit_count, help=metric_help("history_outs_range_hits", current=f"{o_hit_count}/{o_ready_count} eligible Outs intervals contained the final result"))
+outs_metrics2.metric("Outs coverage rate", f"{o_hit_rate:.1%}" if o_hit_rate is not None else "—", help=metric_help("history_outs_hit_rate", current=(f"{o_hit_count}/{o_ready_count} = {o_hit_rate:.1%}" if o_hit_rate is not None else "No eligible resolved Outs intervals yet")))
 
 mae1, mae2, mae3 = st.columns(3)
 k_mae_value = h_mae_value = o_mae_value = None
@@ -369,7 +369,7 @@ if o_resolved.any() and df.loc[o_resolved, "outs_projection"].notna().any():
     o_mae_value = float(o_valid_error.abs().mean()) if o_mae_n else None
 mae3.metric("Total Outs MAE", f"{o_mae_value:.2f} outs" if o_mae_value is not None else "—", help=metric_help("history_outs_mae", current=(f"{o_mae_value:.2f} outs average absolute miss across {o_mae_n} valid pair(s)" if o_mae_value is not None else "No valid resolved Outs pairs yet")))
 
-st.caption("ⓘ Every scorecard now has its own info icon. 80% range HIT means the final result landed inside that market's frozen pregame interval; MAE measures average miss size.")
+st.caption("ⓘ Every scorecard now has its own info icon. 80% range coverage means the final result landed inside that market's frozen pregame interval; it is not a sportsbook win/loss grade. MAE measures average miss size.")
 explain_popover(
     Explanation(
         "Evidence performance scoreboard",
@@ -870,19 +870,19 @@ archive_column_config = {
     "k_bettable_target": st.column_config.TextColumn("K Target"),
     "k_bettable_result": st.column_config.TextColumn("K Result"),
     "k_target_margin": st.column_config.NumberColumn("Vs Target", format="%+.0f"),
-    "k_range_result": st.column_config.TextColumn("80% Range Result"),
+    "k_range_result": st.column_config.TextColumn("80% K Range"),
     "k_error": st.column_config.NumberColumn("Vs Projection", format="%+.2f"),
     "hits_projection": st.column_config.NumberColumn("Projected Hits", format="%.2f"),
     "hits_range_low": st.column_config.NumberColumn("80% H Low", format="%.0f"),
     "hits_range_high": st.column_config.NumberColumn("80% H High", format="%.0f"),
     "actual_hits_allowed": st.column_config.NumberColumn("Actual Hits", format="%.0f"),
-    "hits_result": st.column_config.TextColumn("Hits Result"),
+    "hits_result": st.column_config.TextColumn("80% Hits Range"),
     "hits_error": st.column_config.NumberColumn("Hits Error", format="%+.2f"),
     "outs_projection": st.column_config.NumberColumn("Projected Outs", format="%.2f"),
     "outs_range_low": st.column_config.NumberColumn("80% Outs Low", format="%.0f"),
     "outs_range_high": st.column_config.NumberColumn("80% Outs High", format="%.0f"),
     "actual_outs": st.column_config.NumberColumn("Actual Outs", format="%.0f"),
-    "outs_result": st.column_config.TextColumn("Outs Result"),
+    "outs_result": st.column_config.TextColumn("80% Outs Range"),
     "outs_error": st.column_config.NumberColumn("Outs Error", format="%+.2f"),
     "history_semantics": st.column_config.TextColumn("History Model"),
 }
@@ -902,7 +902,7 @@ def style_archive_group(group: pd.DataFrame):
     return styled
 
 
-st.caption("Click a date to open that slate. Inside each date: pitcher/matchup → projected K → bettable K target → actual Ks → WIN/MISS → exact-model and 80% range diagnostics. Empty None/null/NaN columns are hidden automatically.")
+st.caption("Click a date to open that slate. K Target / K Result is the only WIN/MISS lane in this automatic evidence table. The 80% K, Hits, and Outs Range columns only show whether the final MLB result landed inside the frozen model interval; they are not sportsbook bet grades. Hits/Outs are never graded as bets here without a saved sportsbook line + side. Empty None/null/NaN columns are hidden automatically.")
 archive_view["_archive_date"] = pd.to_datetime(archive_view.get("game_date"), errors="coerce")
 archive_view = archive_view.sort_values(["_archive_date", "player"], ascending=[False, True], na_position="last")
 archive_dates = archive_view["_archive_date"].dt.date.drop_duplicates().tolist()

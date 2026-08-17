@@ -41,7 +41,10 @@ def test_projection_history_bettable_wins_and_clean_archive():
     assert 'TextColumn("K Result"' in text
     assert 'NumberColumn("Vs Target"' in text
     assert 'NumberColumn("Vs Projection"' in text
-    assert "80% Range Result" in text
+    assert 'TextColumn("80% K Range")' in text
+    assert 'TextColumn("80% Hits Range")' in text
+    assert 'TextColumn("80% Outs Range")' in text
+    assert "K Target / K Result is the only WIN/MISS lane" in text
     assert "empty_token" in text
     assert '"none", "null", "nat", "<na>"' in text
     assert "#22c55e" in text

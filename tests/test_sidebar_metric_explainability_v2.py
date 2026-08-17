@@ -79,3 +79,26 @@ def test_metric_help_v3_includes_current_value_and_limitation():
     assert "This box right now:" in text
     assert "180/209 = 86.1%" in text
     assert "What not to conclude:" in text
+
+
+def test_automatic_evidence_uses_range_coverage_not_bet_grades():
+    source = (ROOT / "pages/4_Projection_History.py").read_text(encoding="utf-8")
+    assert 'return "✅ IN RANGE"' in source
+    assert 'else "❌ OUTSIDE"' in source
+    assert 'TextColumn("80% K Range")' in source
+    assert 'TextColumn("80% Hits Range")' in source
+    assert 'TextColumn("80% Outs Range")' in source
+    assert 'TextColumn("Hits Result")' not in source
+    assert 'TextColumn("Outs Result")' not in source
+    assert 'K Target / K Result is the only WIN/MISS lane' in source
+    assert 'without a saved sportsbook line + side' in source
+    assert 'K coverage rate' in source
+    assert 'Hits coverage rate' in source
+    assert 'Outs coverage rate' in source
+
+
+def test_evidence_metric_help_uses_coverage_language():
+    for key in ("history_k_hit_rate", "history_hits_hit_rate", "history_outs_hit_rate"):
+        text = metric_help(key)
+        assert "intervals covered" in text
+        assert "coverage" in text.lower()

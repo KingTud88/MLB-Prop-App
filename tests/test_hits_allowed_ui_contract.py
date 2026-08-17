@@ -11,7 +11,7 @@ def test_main_projection_wires_hits_allowed_market_and_card():
     assert 'st.switch_page("pages/6_Top_Plays.py")' in source
 
 
-def test_projection_history_grades_hits_allowed():
+def test_projection_history_tracks_hits_allowed_range_coverage():
     source = Path("pages/4_Projection_History.py").read_text(encoding="utf-8")
     for token in (
         "hits_projection",
@@ -19,6 +19,10 @@ def test_projection_history_grades_hits_allowed():
         "hits_range_high",
         "actual_hits_allowed",
         "hits_result",
-        "Hits hit rate",
+        "Hits coverage rate",
+        'TextColumn("80% Hits Range")',
+        "✅ IN RANGE",
+        "❌ OUTSIDE",
     ):
         assert token in source
+    assert 'TextColumn("Hits Result")' not in source
