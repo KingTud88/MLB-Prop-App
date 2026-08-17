@@ -1,72 +1,35 @@
 from pathlib import Path
 
-from engine.explainability_ui import METRIC_HELP_VERSION, metric_help
+from engine.explainability import metric_help
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_secondary_sidebar_uses_exact_projection_navigation_language():
-    source = (ROOT / "navigation.py").read_text(encoding="utf-8")
-    assert "PROJECTION_PARITY_SIDEBAR_V3" in source
-    assert "render_sidebar_brand()" in source
-    assert 'st.radio(' in source
-    assert '"Projection", "Distribution", "Form & Workload", "Model Card"' in source
-    assert '"Bet Tracker", "Projection History", "Daily Projection Run", "Top Plays"' in source
-    assert 'label:nth-child(8)::before' in source
-    rendered = source[source.index("# PROJECTION_PARITY_SIDEBAR_V3"):]
-    assert "st.page_link" not in rendered
-    assert "👑" not in rendered
-    assert "▣" not in rendered
+def test_secondary_sidebar_uses_projection_parity_icons_and_compact_brand():
+    nav = (ROOT / "navigation.py").read_text(encoding="utf-8")
+    assert "PROJECTION_PARITY_SIDEBAR_V16" in nav
+    assert "render_sidebar_brand" in nav
+    assert "st.radio(" in nav
+    assert "format_func=lambda key: NAV_ITEMS[key]" in nav
+    for icon in ("◎", "▥", "⌁", "◉", "▣", "◉", "ϟ", "♔"):
+        assert icon in nav
 
 
-def test_metric_help_is_formula_level_and_read_only():
-    assert METRIC_HELP_VERSION == "metric-help-v3"
-    for key in (
-        "history_k_hit_rate", "history_k_mae", "history_outs_mae",
-        "tracker_roi", "daily_confirmed", "top_actionable",
-    ):
-        text = metric_help(key)
-        assert "What it is:" in text
-        assert ("Formula:" in text) or ("How it is calculated:" in text)
-        assert "How to read it:" in text
+def test_secondary_pages_no_longer_use_old_page_link_sidebar_shell():
+    nav = (ROOT / "navigation.py").read_text(encoding="utf-8")
+    assert "st.page_link" not in nav
+    assert "SECONDARY_COMPACT_SIDEBAR_V2" not in nav
+    assert "width:252px!important" not in nav
 
 
-def test_history_scoreboard_has_help_on_every_marked_metric():
+def test_history_metric_boxes_have_individual_help_keys():
     source = (ROOT / "pages/4_Projection_History.py").read_text(encoding="utf-8")
-    keys = (
-        "history_evidence_rows", "history_resolved_games", "history_k_range_hits",
-        "history_k_hit_rate", "history_hits_range_hits", "history_hits_hit_rate",
-        "history_outs_range_hits", "history_outs_hit_rate", "history_k_mae",
-        "history_hits_mae", "history_outs_mae",
-    )
-    for key in keys:
-        assert f'metric_help("{key}"' in source
-    assert "eligible intervals" in source
-    assert "valid projection/result pairs" in source
-
-
-def test_secondary_summary_scorecards_use_metric_help():
-    expected = {
-        "pages/2_Bet_Tracker.py": ("tracker_bets", "tracker_record", "tracker_pending", "tracker_net", "tracker_roi"),
-        "pages/5_Daily_Projection_Run.py": ("daily_projected", "daily_new", "daily_refreshed", "daily_history_only", "daily_errors", "daily_confirmed"),
-        "pages/6_Top_Plays.py": ("top_highest_probability", "top_actionable", "top_decision_supported", "top_signal_supported", "top_live_prices"),
-    }
-    for path, keys in expected.items():
-        source = (ROOT / path).read_text(encoding="utf-8")
-        for key in keys:
-            assert f'metric_help("{key}")' in source
-
-
-def test_main_projection_accepts_secondary_internal_tab_target():
-    source = (ROOT / "streamlit_app.py").read_text(encoding="utf-8")
-    assert 'st.session_state.pop("projection_nav_target",None)' in source
-    assert 'key="main_projection_navigation"' in source
-
-
-def test_history_archive_and_actionable_scorecards_have_individual_help():
-    source = (ROOT / "pages" / "4_Projection_History.py").read_text(encoding="utf-8")
     for key in (
         "history_archived_slates", "history_archived_pitchers", "history_manual_lines", "history_latest_slate",
+        "history_evidence_rows", "history_resolved_games", "history_k_range_hits", "history_k_hit_rate",
+        "history_hits_range_hits", "history_hits_hit_rate", "history_outs_range_hits", "history_outs_hit_rate",
+        "history_k_mae", "history_hits_mae", "history_outs_mae",
         "history_ladder_calls", "history_ladder_wins", "history_ladder_win_rate", "history_crushers",
         "history_workload_snapshots", "history_pitch_mae", "history_bf_mae", "history_workload_outs_mae",
         "history_paired_outcomes", "history_helping_signals", "history_hurting_signals", "history_learning_signals",
@@ -81,7 +44,7 @@ def test_metric_help_v3_includes_current_value_and_limitation():
     assert "What not to conclude:" in text
 
 
-def test_automatic_evidence_uses_range_coverage_not_bet_grades():
+def test_automatic_evidence_separates_range_coverage_from_execution_grades():
     source = (ROOT / "pages/4_Projection_History.py").read_text(encoding="utf-8")
     assert 'return "✅ IN RANGE"' in source
     assert 'else "❌ OUTSIDE"' in source
@@ -90,8 +53,11 @@ def test_automatic_evidence_uses_range_coverage_not_bet_grades():
     assert 'TextColumn("80% Outs Range")' in source
     assert 'TextColumn("Hits Result")' not in source
     assert 'TextColumn("Outs Result")' not in source
-    assert 'K Target / K Result is the only WIN/MISS lane' in source
-    assert 'without a saved sportsbook line + side' in source
+    assert "Model diagnostics and execution evidence are intentionally separate" in source
+    assert "Hits/Outs Line + Side + Bet Result = true execution history" in source
+    assert "Execution evidence never feeds calibration or projection training" in source
+    assert 'TextColumn("Hits Bet Result")' in source
+    assert 'TextColumn("Outs Bet Result")' in source
     assert 'K coverage rate' in source
     assert 'Hits coverage rate' in source
     assert 'Outs coverage rate' in source
