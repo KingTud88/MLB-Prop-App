@@ -12,7 +12,7 @@ import streamlit as st
 from engine.ui_theme import apply_page_theme
 from engine.explainability_ui import (
     Explanation, apply_explainability_theme, explain_popover, leg_explanation,
-    projection_metric_explanation, recommendation_explanation, static_explanation,
+    metric_help, projection_metric_explanation, recommendation_explanation, static_explanation,
     ticket_explanation, top_play_explanation, weather_explanation,
 )
 from engine.command_center_consistency import apply_command_center_consistency
@@ -655,11 +655,11 @@ risked = float(stake_series.loc[graded_mask].sum()) if graded_mask.any() else 0.
 roi = net / risked if risked > 0 else None
 
 m1, m2, m3, m4, m5 = st.columns(5)
-m1.metric("Tracked bets", len(results))
-m2.metric("Record", f"{wins}-{losses}-{pushes}")
-m3.metric("Pending / Live", pending)
-m4.metric("Net P/L", f"{net:+.2f}" if profit_series.notna().any() else "—")
-m5.metric("ROI", f"{roi:+.1%}" if roi is not None else "—")
+m1.metric("Tracked bets", len(results), help=metric_help("tracker_bets"))
+m2.metric("Record", f"{wins}-{losses}-{pushes}", help=metric_help("tracker_record"))
+m3.metric("Pending / Live", pending, help=metric_help("tracker_pending"))
+m4.metric("Net P/L", f"{net:+.2f}" if profit_series.notna().any() else "—", help=metric_help("tracker_net"))
+m5.metric("ROI", f"{roi:+.1%}" if roi is not None else "—", help=metric_help("tracker_roi"))
 explain_popover(static_explanation("tracker_summary"),label="ⓘ EXPLAIN TRACKER SUMMARY")
 
 if invalid:

@@ -10,7 +10,7 @@ import streamlit as st
 from engine.ui_theme import apply_page_theme
 from engine.explainability_ui import (
     Explanation, apply_explainability_theme, explain_popover, leg_explanation,
-    projection_metric_explanation, recommendation_explanation, static_explanation,
+    metric_help, projection_metric_explanation, recommendation_explanation, static_explanation,
     ticket_explanation, top_play_explanation, weather_explanation,
 )
 from engine.command_center_consistency import apply_command_center_consistency
@@ -528,13 +528,13 @@ if isinstance(slate, pd.DataFrame):
         unsafe_allow_html=True,
     )
     c1, c2, c3, c4, c5, c6 = st.columns(6)
-    c1.metric("Projected starters", len(slate))
-    c2.metric("New snapshots", added)
-    c3.metric("Already captured/refreshed", skipped)
-    c4.metric("History-only tracked", len(history_only))
-    c5.metric("Errors", len(errors))
+    c1.metric("Projected starters", len(slate), help=metric_help("daily_projected"))
+    c2.metric("New snapshots", added, help=metric_help("daily_new"))
+    c3.metric("Already captured/refreshed", skipped, help=metric_help("daily_refreshed"))
+    c4.metric("History-only tracked", len(history_only), help=metric_help("daily_history_only"))
+    c5.metric("Errors", len(errors), help=metric_help("daily_errors"))
     confirmed_lineups = int(slate.get("lineup_source", pd.Series(index=slate.index, dtype=str)).astype(str).eq("CONFIRMED_LINEUP").sum()) if not slate.empty else 0
-    c6.metric("Confirmed lineups", confirmed_lineups)
+    c6.metric("Confirmed lineups", confirmed_lineups, help=metric_help("daily_confirmed"))
     explain_popover(static_explanation("daily_status"),label="ⓘ EXPLAIN SLATE STATUS")
 
     if not slate.empty:

@@ -8,6 +8,7 @@ import streamlit as st
 
 
 EXPLAINABILITY_UI_VERSION = "explainability-popovers-v1"
+METRIC_HELP_VERSION = "metric-help-v2"
 
 
 @dataclass(frozen=True)
@@ -160,6 +161,98 @@ def explain_popover(
             st.markdown(f'<div class="explain-note">{explanation.note}</div>', unsafe_allow_html=True)
 
 
+def metric_help(key: str) -> str:
+    """Return formula-level help for compact scorecard metrics.
+
+    This text is presentation-only. It explains values already computed by the
+    page and never recalculates projections, grades, rankings, or market logic.
+    """
+    specs = {
+        # Projection History evidence scoreboard.
+        "history_evidence_rows": (
+            "What it is: every frozen evidence row currently loaded into Projection History.\n\n"
+            "How it is calculated: count of rows in the durable projection evidence table (len(df)). Resolved and unresolved rows are both included.\n\n"
+            "How to read it: this is the size of the evidence archive, not the number of completed games."
+        ),
+        "history_resolved_games": (
+            "What it is: evidence rows where MLB has attached at least one final pitcher result.\n\n"
+            "How it is calculated: count(actual Ks available OR actual Hits Allowed available OR actual Outs available). A row is counted once even when all three results exist.\n\n"
+            "How to read it: this is the pool that can contribute to resolved diagnostics."
+        ),
+        "history_k_range_hits": (
+            "What it is: resolved strikeout results that landed inside the frozen pregame K interval.\n\n"
+            "How it is calculated: actual Ks must exist, both saved K range bounds must exist, and K range low ≤ actual Ks ≤ K range high.\n\n"
+            "How to read it: this measures interval coverage, not whether an OVER/UNDER bet won."
+        ),
+        "history_k_hit_rate": (
+            "What it is: the share of eligible resolved K intervals that contained the final strikeout total.\n\n"
+            "Formula: K range hits ÷ resolved rows with actual Ks + both frozen K range bounds.\n\n"
+            "How to read it: the saved interval is the model's central 80% range, so long-run coverage near 80% is the calibration target—not 100%."
+        ),
+        "history_hits_range_hits": (
+            "What it is: resolved Hits Allowed results inside the frozen pregame Hits interval.\n\n"
+            "How it is calculated: actual hits allowed and both saved Hits range bounds must exist, then low ≤ actual ≤ high.\n\n"
+            "How to read it: it evaluates interval coverage only; it is not sportsbook grading."
+        ),
+        "history_hits_hit_rate": (
+            "What it is: the share of eligible Hits Allowed intervals that contained the final result.\n\n"
+            "Formula: Hits range hits ÷ resolved rows with actual Hits Allowed + both frozen Hits range bounds.\n\n"
+            "How to read it: the central 80% interval should trend toward roughly 80% coverage over a large, stable sample."
+        ),
+        "history_outs_range_hits": (
+            "What it is: resolved starter-outs results inside the frozen pregame Outs interval.\n\n"
+            "How it is calculated: actual outs and both saved Outs range bounds must exist, then low ≤ actual ≤ high.\n\n"
+            "How to read it: it measures whether uncertainty was sized correctly, not a betting win/loss."
+        ),
+        "history_outs_hit_rate": (
+            "What it is: the share of eligible Outs intervals that contained the final starter-outs total.\n\n"
+            "Formula: Outs range hits ÷ resolved rows with actual Outs + both frozen Outs range bounds.\n\n"
+            "How to read it: compare it with the nominal 80% interval target; materially low coverage means the interval may be too narrow."
+        ),
+        "history_k_mae": (
+            "What it is: average absolute strikeout projection error.\n\n"
+            "Formula: mean(|final Ks − frozen projected Ks|) across resolved projection/result pairs. Positive and negative misses do not cancel.\n\n"
+            "How to read it: lower is better; 0.00 would be perfect. A value of 1.81 K means the model missed by about 1.81 strikeouts on average, regardless of direction."
+        ),
+        "history_hits_mae": (
+            "What it is: average absolute Hits Allowed projection error.\n\n"
+            "Formula: mean(|final Hits Allowed − frozen projected Hits Allowed|) across rows where both values exist.\n\n"
+            "How to read it: lower is better; this measures typical error size, not over/under bias."
+        ),
+        "history_outs_mae": (
+            "What it is: average absolute Total Outs projection error.\n\n"
+            "Formula: mean(|final starter outs − frozen projected outs|) across rows where both values exist.\n\n"
+            "How to read it: lower is better; divide by 3 if you want to think of the typical error in innings."
+        ),
+
+        # Bet Tracker summary.
+        "tracker_bets": "What it is: all saved tickets currently loaded into Bet Tracker.\n\nHow it is calculated: count of resolved tracker display rows, including straight bets and parlays.\n\nHow to read it: this is tracking volume, not a performance score.",
+        "tracker_record": "What it is: finalized WIN-LOSS-PUSH record.\n\nHow it is calculated: counts the tracker grading states WIN, LOSS, and PUSH/PUSH LEG after MLB results are checked. Pending/live and INVALID LINE tickets are excluded.\n\nHow to read it: this is result grading only and never trains the projection model.",
+        "tracker_pending": "What it is: saved tickets still waiting for a final grade, including live games.\n\nHow it is calculated: count of result states that are not final WIN/LOSS/PUSH/PUSH LEG/INVALID LINE.\n\nHow to read it: these tickets can still change and are not part of the finalized record.",
+        "tracker_net": "What it is: total tracked profit/loss in units from tickets with calculable P/L.\n\nHow it is calculated: sum of each saved ticket's Profit/Loss value produced from its final grade, saved stake, and saved American odds. Missing P/L values do not create assumed profit.\n\nHow to read it: positive is profit; negative is loss. This is tracker accounting only.",
+        "tracker_roi": "What it is: return on the stake counted by the tracker for finalized tickets.\n\nFormula: Net P/L ÷ total saved stake on final WIN/LOSS/PUSH rows with stake data.\n\nHow to read it: positive means profit relative to units risked; it is not a model probability or projection input.",
+
+        # Daily Projection Run summary.
+        "daily_projected": "What it is: starters returned in the current Daily Projection Run slate.\n\nHow it is calculated: number of projection rows in the selected-date slate after the batch capture/recovery path.\n\nHow to read it: these are the starters with a usable frozen model row on this run.",
+        "daily_new": "What it is: first-time frozen snapshots created by this run.\n\nHow it is calculated: count returned by the batch runner for eligible starters that did not already have the durable pregame snapshot.\n\nHow to read it: these are new archive writes, not duplicate projections.",
+        "daily_refreshed": "What it is: starters whose durable row already existed or was legally refreshed while still pregame.\n\nHow it is calculated: the batch runner's skipped/refreshed count. Frozen post-first-pitch model outputs are preserved.\n\nHow to read it: a high number is normal when rerunning the same slate.",
+        "daily_history_only": "What it is: starters tracked for history/context but without an eligible model snapshot in this batch.\n\nHow it is calculated: length of the runner's history-only list.\n\nHow to read it: these rows are not silently promoted into a projection.",
+        "daily_errors": "What it is: capture failures returned by the current batch run.\n\nHow it is calculated: number of error messages produced while loading/projecting the selected starter slate.\n\nHow to read it: 0 means the batch completed without recorded capture failures.",
+        "daily_confirmed": "What it is: frozen slate rows using MLB's posted batting order instead of the active-roster fallback.\n\nHow it is calculated: count(lineup_source == CONFIRMED_LINEUP) in the current slate.\n\nHow to read it: more confirmed lineups means more specific matchup context; it does not mean a bet is automatically better.",
+
+        # Top Plays summary.
+        "top_highest_probability": "What it is: the largest model hit probability among today's already-ranked Top 5 legs.\n\nHow it is calculated: max(Model Probability) across the five model-ranked real-line legs.\n\nHow to read it: it is a model probability at that exact market/line, not a guarantee and not sportsbook implied probability.",
+        "top_actionable": "What it is: Top 5 legs that clear the current straight-action gate.\n\nFormula: Model Probability ≥ 55% AND Data Quality ≥ 60/100.\n\nHow to read it: legs below either threshold stay WATCH even if they remain highly ranked.",
+        "top_decision_supported": "What it is: Top 5 legs whose settled decision-learning segment has enough favorable evidence to be labeled SUPPORTED or STRONG EVIDENCE.\n\nHow it is calculated: count of Decision Evidence labels in {SUPPORTED, STRONG EVIDENCE}.\n\nHow to read it: this is supporting accountability evidence; it does not create or reorder the projection.",
+        "top_signal_supported": "What it is: Top 5 legs with a pregame signal profile currently labeled SUPPORTED.\n\nHow it is calculated: count(Signal Evidence == SUPPORTED) after the board is ranked.\n\nHow to read it: signal evidence is descriptive safety context and cannot move today's rank by itself.",
+        "top_live_prices": "What it is: how many Top 5 legs were matched to an exact current sportsbook offer.\n\nHow it is calculated: count(Live Offer == True) ÷ number of ranked plays.\n\nHow to read it: live price availability affects execution/add-to-tracker controls, not the model-first ranking.",
+    }
+    return specs.get(
+        key,
+        "What it is: a StrikeOut King scorecard metric.\n\nHow it is calculated: the value comes from the page's existing read-only data path.\n\nHow to read it: this help layer explains the displayed value and does not change model state.",
+    )
+
+
 def static_explanation(key: str) -> Explanation:
     specs: dict[str, Explanation] = {
         "active_lines": Explanation(
@@ -243,9 +336,11 @@ def static_explanation(key: str) -> Explanation:
         ),
         "tracker_summary": Explanation(
             "Bet Tracker summary",
-            "These metrics summarize the tickets you chose to save: record, open/live count, net units and ROI.",
-            "WIN/LOSS/PUSH comes from MLB pitching results. Net P/L uses saved stake and American odds. ROI is net profit divided by total graded stake for tickets that have the required price/stake data.",
-            note="Unpriced model tickets can still grade WIN/LOSS but are excluded from P/L and ROI.",
+            "These five counters separate tracking volume, finalized record, open/live tickets, unit profit/loss and return on risked stake.",
+            "Each saved ticket is resolved against MLB pitching results. Record counts final WIN/LOSS/PUSH states; Pending/Live counts non-final tickets; Net P/L sums calculable ticket profit/loss; ROI divides that net result by the tracker's graded stake denominator.",
+            inputs=("Saved side + exact line", "Final/live MLB pitcher stat", "Saved American odds when available", "Saved stake when available"),
+            decision="These are accounting and grading conclusions about tickets you saved. They never feed back into pitcher projections or Top Plays ranking.",
+            note="Use the individual metric ⓘ icons for the exact formula behind each counter.",
         ),
         "daily_capture": Explanation(
             "Projection Capture",
@@ -255,8 +350,10 @@ def static_explanation(key: str) -> Explanation:
         ),
         "daily_status": Explanation(
             "Daily slate output status",
-            "These counters tell you what the batch run actually did for the selected date.",
-            "Projected starters counts returned model rows; New snapshots are first-time frozen captures; Already captured/refreshed are durable rows reused or legally refreshed pregame; History-only tracks starters without an eligible model snapshot; Errors are capture failures; Confirmed lineups counts rows upgraded to MLB's posted batting order.",
+            "These counters audit exactly what the selected-date batch capture returned and what kind of durable evidence was produced.",
+            "Projected starters = rows in the current slate; New snapshots = first-time durable captures; Already captured/refreshed = existing rows reused or legally refreshed while still pregame; History-only = tracked starters without an eligible projection snapshot; Errors = runner failures; Confirmed lineups = rows whose lineup_source is CONFIRMED_LINEUP.",
+            decision="The counters describe capture integrity, not projection quality. Re-running a slate can legitimately increase the already-captured/refreshed count without creating duplicate model evidence.",
+            note="Use each metric's ⓘ icon for its exact counting rule.",
         ),
         "manual_lines": Explanation(
             "Manual sportsbook lines",
@@ -289,8 +386,10 @@ def static_explanation(key: str) -> Explanation:
         ),
         "top_summary": Explanation(
             "Top Plays summary",
-            "These counters describe today's already-ranked Top 5 board: strongest model probability, action-threshold count and supporting evidence coverage.",
-            "The board is ranked model-first using frozen projection probability and data quality. Active sportsbook lines are required for a ranked executable leg, but price/odds do not create the forecast or rank the board.",
+            "These counters separate the strongest probability on today's Top 5, how many legs clear the straight-action gate, how much independent decision/signal evidence supports them, and whether an exact live price was found.",
+            "The Top 5 is already ranked model-first from frozen pregame projections. Actionable Model Plays require Model Probability ≥55% and Data Quality ≥60/100. Decision/signal support is attached accountability evidence. Exact live prices affect execution only.",
+            decision="A leg can be highly ranked but still remain WATCH if it misses the action gate. A missing live price can prevent one-click tracking without lowering the model rank.",
+            note="Sportsbook odds never create the baseball forecast or rank the board. Use each metric's ⓘ icon for its exact rule.",
         ),
         "top_parlay": Explanation(
             "Top Plays parlay builder",

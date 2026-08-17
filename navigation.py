@@ -423,15 +423,62 @@ def render_sidebar(active: str = "projection") -> None:
             unsafe_allow_html=True,
         )
 
+    # SECONDARY_COMPACT_SIDEBAR_V2 · mirrors the Projection command-center rail.
+    st.markdown(
+        """
+        <style>
+        [data-testid="stSidebar"]{
+            width:252px!important;min-width:252px!important;
+            background:linear-gradient(180deg,#071727 0%,#04101d 100%)!important;
+            border-right:1px solid #18334b!important;
+        }
+        [data-testid="stSidebar"] > div:first-child{width:252px!important}
+        [data-testid="stSidebar"] .sk-nav-brand{
+            margin:.12rem .34rem .86rem!important;padding:.86rem .72rem .82rem!important;
+            border:1px solid rgba(78,108,137,.66)!important;border-radius:14px!important;
+            background:linear-gradient(145deg,rgba(8,29,51,.98),rgba(3,16,30,.98))!important;
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 12px 26px rgba(0,0,0,.20)!important;
+            text-align:center!important;
+        }
+        .sk-nav-compact-crown{color:#ec1638;font-size:1.2rem;line-height:1}
+        .sk-nav-compact-script{color:#f5f1e9;font-family:Georgia,"Times New Roman",serif;font-size:1.55rem;font-weight:800;font-style:italic;line-height:.95}
+        .sk-nav-compact-king{color:#ec1638;font-family:Impact,"Arial Narrow",sans-serif;font-size:1.42rem;letter-spacing:.035em;line-height:1;text-transform:uppercase}
+        .sk-nav-compact-tag{margin-top:.38rem;color:#9fb3c5;font:700 .72rem/1.35 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+        [data-testid="stSidebar"] .sk-nav-section{margin:.36rem .78rem .38rem!important;color:#ff536b!important;font-size:.65rem!important;letter-spacing:.14em!important}
+        [data-testid="stSidebar"] .sk-page-link{margin:.14rem .28rem!important}
+        [data-testid="stSidebar"] .sk-page-link a{
+            min-height:2.62rem!important;display:flex!important;align-items:center!important;
+            padding:.48rem .64rem!important;border:1px solid rgba(61,92,125,.34)!important;border-radius:10px!important;
+            background:linear-gradient(90deg,rgba(8,27,48,.62),rgba(5,19,35,.46))!important;
+            color:#d9e5ee!important;font:800 .78rem/1.2 system-ui,-apple-system,"Segoe UI",Arial,sans-serif!important;
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.018)!important;
+        }
+        [data-testid="stSidebar"] .sk-page-link a:hover{
+            transform:translateX(2px)!important;border-color:rgba(236,22,56,.56)!important;
+            background:linear-gradient(90deg,rgba(31,55,82,.84),rgba(8,27,48,.76))!important;
+        }
+        [data-testid="stSidebar"] .sk-page-link.active a{
+            color:#fff!important;border-color:rgba(255,69,96,.72)!important;
+            background:linear-gradient(90deg,rgba(83,18,39,.96),rgba(9,31,55,.98))!important;
+            box-shadow:inset 3px 0 0 #ec1638,0 8px 20px rgba(0,0,0,.22),0 0 14px rgba(236,22,56,.10)!important;
+        }
+        [data-testid="stSidebar"] .sk-nav-footer{margin-top:1rem!important;color:#6f879f!important}
+        @media (max-width:640px){
+            [data-testid="stSidebar"],[data-testid="stSidebar"] > div:first-child{width:238px!important;min-width:238px!important}
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     with st.sidebar:
-        st.markdown('<div class="sk-nav-brand">', unsafe_allow_html=True)
         st.markdown(
-            f'<div class="sk-nav-mascot"><img src="{MASCOT_URL}" alt="StrikeOut King 9000 mascot" style="width:236px !important;height:236px !important;min-width:236px !important;max-width:236px !important;object-fit:contain !important;display:block !important;transform:scale(1.00) !important;transform-origin:50% 50% !important;" onerror="this.style.display=\'none\';this.parentElement.classList.add(\'sk-logo-fallback\')"></div>',
+            '<div class="sk-nav-brand"><div class="sk-nav-compact-crown">♛</div>'
+            '<div class="sk-nav-compact-script">StrikeOut</div>'
+            '<div class="sk-nav-compact-king">King 9000</div>'
+            '<div class="sk-nav-compact-tag">CLE-themed MLB starter projection engine</div></div>',
             unsafe_allow_html=True,
         )
-        st.markdown('<div class="sk-nav-title">STRIKEOUT<br><span>KING 9000</span></div>', unsafe_allow_html=True)
-        st.markdown('<div class="sk-nav-sub">CLEVELAND NIGHT MODE · MLB<br>STARTER INTELLIGENCE</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
         st.markdown('<div class="sk-nav-section">Command Center</div>', unsafe_allow_html=True)
 
         links = [

@@ -14,7 +14,7 @@ import streamlit as st
 from engine.ui_theme import apply_page_theme
 from engine.explainability_ui import (
     Explanation, apply_explainability_theme, explain_popover, leg_explanation,
-    projection_metric_explanation, recommendation_explanation, static_explanation,
+    metric_help, projection_metric_explanation, recommendation_explanation, static_explanation,
     ticket_explanation, top_play_explanation, weather_explanation,
 )
 from engine.command_center_consistency import apply_command_center_consistency
@@ -604,11 +604,11 @@ live_offers = int(plays["Live Offer"].fillna(False).sum())
 decision_supported = int(plays["Decision Evidence"].isin(["SUPPORTED", "STRONG EVIDENCE"]).sum())
 signal_supported = int(plays["Signal Evidence"].eq("SUPPORTED").sum())
 c1, c2, c3, c4, c5 = st.columns(5)
-c1.metric("Highest model hit probability", f"{plays['Model Probability'].max():.1%}")
-c2.metric("Actionable model plays", model_plays)
-c3.metric("Decision-supported legs", decision_supported)
-c4.metric("Signal-supported legs", signal_supported)
-c5.metric("Exact live prices found", f"{live_offers}/{len(plays)}")
+c1.metric("Highest model hit probability", f"{plays['Model Probability'].max():.1%}", help=metric_help("top_highest_probability"))
+c2.metric("Actionable model plays", model_plays, help=metric_help("top_actionable"))
+c3.metric("Decision-supported legs", decision_supported, help=metric_help("top_decision_supported"))
+c4.metric("Signal-supported legs", signal_supported, help=metric_help("top_signal_supported"))
+c5.metric("Exact live prices found", f"{live_offers}/{len(plays)}", help=metric_help("top_live_prices"))
 explain_popover(static_explanation("top_summary"),label="ⓘ EXPLAIN TOP 5 SUMMARY")
 
 st.markdown('<div class="tp-section-ribbon">Top Play Actions</div>', unsafe_allow_html=True)

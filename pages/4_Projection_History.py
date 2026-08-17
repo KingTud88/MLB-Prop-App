@@ -9,7 +9,7 @@ import streamlit as st
 from engine.ui_theme import apply_page_theme
 from engine.explainability_ui import (
     Explanation, apply_explainability_theme, explain_popover, leg_explanation,
-    projection_metric_explanation, recommendation_explanation, static_explanation,
+    metric_help, projection_metric_explanation, recommendation_explanation, static_explanation,
     ticket_explanation, top_play_explanation, weather_explanation,
 )
 from engine.command_center_consistency import apply_command_center_consistency
@@ -324,39 +324,76 @@ o_hit = o_ready & (df["actual_outs"] >= df["outs_range_low"]) & (df["actual_outs
 
 st.markdown('<div class="history-secondary-zone">Automatic Evidence + Model Diagnostics</div>', unsafe_allow_html=True)
 st.markdown('<div class="history-kicker">Evidence performance scoreboard</div>', unsafe_allow_html=True)
+resolved_any_count = int((k_resolved | h_resolved | o_resolved).sum())
+k_ready_count, h_ready_count, o_ready_count = int(k_ready.sum()), int(h_ready.sum()), int(o_ready.sum())
+k_hit_count, h_hit_count, o_hit_count = int(k_hit.sum()), int(h_hit.sum()), int(o_hit.sum())
+k_hit_rate = float(k_hit_count / k_ready_count) if k_ready_count else None
+h_hit_rate = float(h_hit_count / h_ready_count) if h_ready_count else None
+o_hit_rate = float(o_hit_count / o_ready_count) if o_ready_count else None
+
 col1, col2, col3, col4, col5, col6 = st.columns(6)
-col1.metric("Automatic evidence rows", len(df))
-col2.metric("Resolved games", int((k_resolved | h_resolved | o_resolved).sum()))
-col3.metric("K range hits", int(k_hit.sum()))
-col4.metric("K hit rate", f"{float(k_hit.sum() / k_ready.sum()):.1%}" if k_ready.any() else "—")
-col5.metric("Hits range hits", int(h_hit.sum()))
-col6.metric("Hits hit rate", f"{float(h_hit.sum() / h_ready.sum()):.1%}" if h_ready.any() else "—")
+col1.metric("Automatic evidence rows", len(df), help=metric_help("history_evidence_rows"))
+col2.metric("Resolved games", resolved_any_count, help=metric_help("history_resolved_games"))
+col3.metric("K range hits", k_hit_count, help=metric_help("history_k_range_hits"))
+col4.metric("K hit rate", f"{k_hit_rate:.1%}" if k_hit_rate is not None else "—", help=metric_help("history_k_hit_rate"))
+col5.metric("Hits range hits", h_hit_count, help=metric_help("history_hits_range_hits"))
+col6.metric("Hits hit rate", f"{h_hit_rate:.1%}" if h_hit_rate is not None else "—", help=metric_help("history_hits_hit_rate"))
 
 outs_metrics1, outs_metrics2 = st.columns(2)
-outs_metrics1.metric("Outs range hits", int(o_hit.sum()))
-outs_metrics2.metric("Outs hit rate", f"{float(o_hit.sum() / o_ready.sum()):.1%}" if o_ready.any() else "—")
+outs_metrics1.metric("Outs range hits", o_hit_count, help=metric_help("history_outs_range_hits"))
+outs_metrics2.metric("Outs hit rate", f"{o_hit_rate:.1%}" if o_hit_rate is not None else "—", help=metric_help("history_outs_hit_rate"))
 
 mae1, mae2, mae3 = st.columns(3)
+k_mae_value = h_mae_value = o_mae_value = None
+k_mae_n = h_mae_n = o_mae_n = 0
 if k_resolved.any():
     k_error = df.loc[k_resolved, "actual_strikeouts"] - df.loc[k_resolved, "projection"]
-    mae1.metric("Strikeout MAE", f"{float(k_error.abs().mean()):.2f} K")
-else:
-    mae1.metric("Strikeout MAE", "—")
+    k_valid_error = k_error.dropna()
+    k_mae_n = int(len(k_valid_error))
+    k_mae_value = float(k_valid_error.abs().mean()) if k_mae_n else None
+mae1.metric("Strikeout MAE", f"{k_mae_value:.2f} K" if k_mae_value is not None else "—", help=metric_help("history_k_mae"))
+
 if h_resolved.any() and df.loc[h_resolved, "hits_projection"].notna().any():
     h_mask = h_resolved & df["hits_projection"].notna()
     h_error = df.loc[h_mask, "actual_hits_allowed"] - df.loc[h_mask, "hits_projection"]
-    mae2.metric("Hits Allowed MAE", f"{float(h_error.abs().mean()):.2f} H")
-else:
-    mae2.metric("Hits Allowed MAE", "—")
+    h_valid_error = h_error.dropna()
+    h_mae_n = int(len(h_valid_error))
+    h_mae_value = float(h_valid_error.abs().mean()) if h_mae_n else None
+mae2.metric("Hits Allowed MAE", f"{h_mae_value:.2f} H" if h_mae_value is not None else "—", help=metric_help("history_hits_mae"))
+
 if o_resolved.any() and df.loc[o_resolved, "outs_projection"].notna().any():
     o_mask = o_resolved & df["outs_projection"].notna()
     o_error = df.loc[o_mask, "actual_outs"] - df.loc[o_mask, "outs_projection"]
-    mae3.metric("Total Outs MAE", f"{float(o_error.abs().mean()):.2f} outs")
-else:
-    mae3.metric("Total Outs MAE", "—")
+    o_valid_error = o_error.dropna()
+    o_mae_n = int(len(o_valid_error))
+    o_mae_value = float(o_valid_error.abs().mean()) if o_mae_n else None
+mae3.metric("Total Outs MAE", f"{o_mae_value:.2f} outs" if o_mae_value is not None else "—", help=metric_help("history_outs_mae"))
 
-st.caption("80% range HIT means the final result landed inside that market's frozen pregame interval. Range coverage is calibration evidence, not directional win/loss grading.")
-explain_popover(Explanation("Evidence performance scoreboard","This block measures projection error and whether final results landed inside the frozen central 80% ranges.","Range hit rate counts resolved outcomes inside the saved 10th–90th percentile interval. MAE is the average absolute difference between frozen projection and final MLB result.",note="Range coverage is calibration evidence, not sportsbook win/loss grading."),label="ⓘ EXPLAIN EVIDENCE SCOREBOARD")
+st.caption("ⓘ Every scorecard now has its own info icon. 80% range HIT means the final result landed inside that market's frozen pregame interval; MAE measures average miss size.")
+explain_popover(
+    Explanation(
+        "Evidence performance scoreboard",
+        "This block measures two different model-health questions: did the final result land inside the frozen uncertainty interval, and how far was the point projection from the final MLB result?",
+        "Range hit rate = eligible final results inside the saved 10th–90th percentile interval ÷ all eligible resolved intervals for that market. MAE = mean absolute error = average of |final result − frozen point projection|, so over- and under-predictions cannot cancel each other out.",
+        decision="Central 80% interval coverage should trend toward roughly 80% as the sample grows; 100% is not the goal. For MAE, lower is better. These are model-diagnostic conclusions, not sportsbook win/loss calls.",
+        inputs=(
+            "Frozen pregame point projections",
+            "Frozen 10th–90th percentile range bounds",
+            "Final MLB pitcher results attached by the resolver",
+        ),
+        current=(
+            f"Evidence archive: {len(df)} rows · {resolved_any_count} have at least one resolved final stat",
+            f"K coverage: {k_hit_count}/{k_ready_count} eligible intervals" + (f" = {k_hit_rate:.1%}" if k_hit_rate is not None else ""),
+            f"Hits coverage: {h_hit_count}/{h_ready_count} eligible intervals" + (f" = {h_hit_rate:.1%}" if h_hit_rate is not None else ""),
+            f"Outs coverage: {o_hit_count}/{o_ready_count} eligible intervals" + (f" = {o_hit_rate:.1%}" if o_hit_rate is not None else ""),
+            f"Strikeout MAE: {'—' if k_mae_value is None else f'{k_mae_value:.2f} K'} across {k_mae_n} valid projection/result pairs",
+            f"Hits Allowed MAE: {'—' if h_mae_value is None else f'{h_mae_value:.2f} H'} across {h_mae_n} valid projection/result pairs",
+            f"Total Outs MAE: {'—' if o_mae_value is None else f'{o_mae_value:.2f} outs'} across {o_mae_n} valid projection/result pairs",
+        ),
+        note="Range coverage and MAE never retroactively change old projections or grade sportsbook bets.",
+    ),
+    label="ⓘ EXPLAIN EVIDENCE SCOREBOARD",
+)
 
 st.divider()
 st.markdown('<div class="history-kicker">Actionable K results</div>', unsafe_allow_html=True)
