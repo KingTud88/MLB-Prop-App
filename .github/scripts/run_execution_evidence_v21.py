@@ -1,11 +1,14 @@
 from pathlib import Path
 import runpy
+import sys
 
 import pandas as pd
 
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
 from engine.execution_history import backfill_legacy_execution_sides
 
-ROOT = Path(__file__).resolve().parents[2]
 runpy.run_path(str(ROOT / ".github" / "scripts" / "execution_evidence_v21.py"), run_name="__main__")
 
 archive_path = ROOT / "data" / "projection_archive.csv"
