@@ -62,7 +62,11 @@ def grade_frozen_execution(side: object, line: object, actual: object) -> str:
     threshold = _num(line)
     if threshold is None:
         return "—"
-    normalized = str(side or "").strip().upper()
+    # Legacy archive rows predate frozen execution sides and therefore carry
+    # pandas.NA. Never use boolean coercion (``side or ''``) on pandas.NA:
+    # its truth value is intentionally ambiguous. Missing sides remain honest
+    # historical UNGRADABLE rows instead of being reconstructed after the fact.
+    normalized = "" if side is None or pd.isna(side) else str(side).strip().upper()
     if normalized in {"PASS", "NO BET"}:
         return "NO BET"
     if normalized not in ACTIONABLE_SIDES:
