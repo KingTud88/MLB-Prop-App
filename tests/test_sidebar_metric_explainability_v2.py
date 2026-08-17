@@ -8,12 +8,17 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_secondary_sidebar_uses_projection_parity_icons_and_compact_brand():
     nav = (ROOT / "navigation.py").read_text(encoding="utf-8")
-    assert "PROJECTION_PARITY_SIDEBAR_V16" in nav
+    assert "PROJECTION_PARITY_SIDEBAR_V3" in nav
     assert "render_sidebar_brand" in nav
     assert "st.radio(" in nav
-    assert "format_func=lambda key: NAV_ITEMS[key]" in nav
-    for icon in ("◎", "▥", "⌁", "◉", "▣", "◉", "ϟ", "♔"):
-        assert icon in nav
+    assert 'nav_options = [' in nav
+    for label in (
+        "Projection", "Distribution", "Form & Workload", "Model Card",
+        "Bet Tracker", "Projection History", "Daily Projection Run", "Top Plays",
+    ):
+        assert f'"{label}"' in nav
+    for index in range(1, 9):
+        assert f"label:nth-child({index})::before" in nav
 
 
 def test_secondary_pages_no_longer_use_old_page_link_sidebar_shell():
