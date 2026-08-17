@@ -40,13 +40,26 @@ def _num(value: object) -> float | None:
     return None if pd.isna(parsed) else float(parsed)
 
 
+def _missing_scalar(value: object) -> bool:
+    if value is None:
+        return True
+    try:
+        return bool(pd.isna(value))
+    except (TypeError, ValueError):
+        return False
+
+
 def _key(value: object) -> str:
-    text = str(value or "").strip()
+    if _missing_scalar(value):
+        return ""
+    text = str(value).strip()
     return text[:-2] if text.endswith(".0") else text
 
 
 def _safe_line_source(value: object) -> str:
-    source = str(value or "").strip()
+    if _missing_scalar(value):
+        return ""
+    source = str(value).strip()
     upper = source.upper()
     if not source or any(marker in upper for marker in FORBIDDEN_LINE_SOURCE_MARKERS):
         return ""
@@ -134,18 +147,23 @@ def _lineup_state(snapshot: pd.Series) -> str:
     confirmed = snapshot.get("lineup_confirmed")
     if isinstance(confirmed, (bool, np.bool_)):
         return "CONFIRMED" if bool(confirmed) else "PROJECTED"
-    text = str(confirmed or "").strip().lower()
-    if text in {"true", "1", "yes"}:
-        return "CONFIRMED"
-    if text in {"false", "0", "no"}:
-        return "PROJECTED"
-    source = str(snapshot.get("lineup_source", "") or "").strip().upper()
+    if not _missing_scalar(confirmed):
+        text = str(confirmed).strip().lower()
+        if text in {"true", "1", "yes"}:
+            return "CONFIRMED"
+        if text in {"false", "0", "no"}:
+            return "PROJECTED"
+    source_value = snapshot.get("lineup_source", "")
+    source = "" if _missing_scalar(source_value) else str(source_value).strip().upper()
     return source or "UNKNOWN"
 
 
 def _weather_state(snapshot: pd.Series) -> str:
-    value = str(snapshot.get("weather_delay_risk", "") or "").strip().upper()
-    return value or "UNKNOWN"
+    value = snapshot.get("weather_delay_risk", "")
+    if _missing_scalar(value):
+        return "UNKNOWN"
+    text = str(value).strip().upper()
+    return text or "UNKNOWN"
 
 
 def _outcome_margin(side: str, actual: float | None, line: float | None) -> float | None:
