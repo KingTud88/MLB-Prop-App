@@ -248,8 +248,8 @@ else:
     archive_columns = [
         "player", "team", "opponent",
         "projection", "archive_k_target", "actual_strikeouts", "archive_k_result", "manual_strikeout_line",
-        "outs_projection", "actual_outs", "manual_outs_line",
-        "manual_hits_allowed_line", "hits_projection", "actual_hits_allowed",
+        "outs_projection", "manual_outs_line", "manual_outs_side", "actual_outs", "archive_outs_bet_result",
+        "hits_projection", "manual_hits_allowed_line", "manual_hits_allowed_side", "actual_hits_allowed", "archive_hits_bet_result",
         "confidence", "data_quality", "archive_source", "archive_committed_at_utc",
     ]
     archive_columns = [col for col in archive_columns if col in user_archive.columns]

@@ -55,5 +55,8 @@ def test_execution_history_integration_contracts():
     assert "grade_frozen_execution" in history
     assert '"Outs Side"' in history and '"Outs Bet Result"' in history
     assert '"Hits Side"' in history and '"Hits Bet Result"' in history
+    archive_block = history[history.index("archive_columns = ["):history.index("unique_dates =", history.index("archive_columns = ["))]
+    assert '"manual_outs_side"' in archive_block and '"archive_outs_bet_result"' in archive_block
+    assert '"manual_hits_allowed_side"' in archive_block and '"archive_hits_bet_result"' in archive_block
     assert "manual_outs_side_frozen_at_utc" in storage
     assert "manual_hits_allowed_side_frozen_at_utc" in storage
