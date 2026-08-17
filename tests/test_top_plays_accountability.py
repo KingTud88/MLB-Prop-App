@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 from training.top_plays_accountability import (
     PRODUCTION_AUTHORITY,
@@ -38,7 +39,7 @@ def _leg(**overrides):
 
 
 def test_margin_percentage_is_market_relative_and_banded() -> None:
-    assert margin_percent(6.6, 5.5) == 0.2
+    assert margin_percent(6.6, 5.5) == pytest.approx(0.2)
     assert margin_percent_band(0.099) == "<10%"
     assert margin_percent_band(0.10) == "10–14%"
     assert margin_percent_band(0.15) == "15–19%"
