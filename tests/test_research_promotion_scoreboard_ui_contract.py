@@ -17,3 +17,14 @@ def test_research_scoreboard_is_report_only_and_source_owned() -> None:
     assert "Production Authority" in text
     assert "The scoreboard does not recalculate them" in text
     assert "cannot change the live baseball projection" in text
+
+
+def test_research_scoreboard_density_polish_keeps_gate_progress_primary_and_authority_compact() -> None:
+    text = Path("engine/research_promotion_scoreboard.py").read_text(encoding="utf-8")
+    assert ".research-card{min-height:198px" in text
+    assert "research-label-gate" in text
+    assert "research-value-gate" in text
+    assert "research-authority-strip" in text
+    assert '<span class="research-authority-label">Production authority</span>' in text
+    assert "research-value-sample" in text
+    assert "research-value-action" in text
