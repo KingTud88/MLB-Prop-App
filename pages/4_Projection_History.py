@@ -31,7 +31,7 @@ from engine.decision_learning import decision_tier_report
 from engine.signal_validation import context_performance_report, paired_signal_report
 from engine.team_leash import team_leash_walk_forward_report
 from engine.projection_crushers import bettable_k_label, bettable_k_result, bettable_k_target, crusher_report
-from engine.execution_history import grade_frozen_execution
+from engine.execution_history import backfill_legacy_execution_sides, grade_frozen_execution
 
 ROOT = Path(__file__).resolve().parents[1]
 LOG_PATH = ROOT / "data" / "projection_log.csv"
@@ -112,6 +112,7 @@ def load_projection_history() -> pd.DataFrame:
 def load_user_archive(evidence: pd.DataFrame) -> pd.DataFrame:
     # PROJECTION_HISTORY_DURABLE_ARCHIVE_V1
     durable_manual = load_projection_archive(ARCHIVE_PATH, st.secrets)
+    durable_manual, _ = backfill_legacy_execution_sides(durable_manual, evidence)
     return build_projection_archive_view(evidence, durable_manual)
 
 
@@ -827,7 +828,23 @@ st.divider()
 st.markdown('<div class="history-kicker">Automatic model evidence</div>', unsafe_allow_html=True)
 st.subheader("🧪 Automatic Evidence Log")
 st.caption("This lower log is populated by scheduled background capture for calibration and diagnostics, so today can appear here even if you never manually ran or archived the slate.")
-display = df.sort_values(["game_date", "captured_at_utc"], ascending=[False, False]).copy()
+# Automatic model evidence remains the frozen projection log, with the durable
+# manual execution overlay joined only for reporting. Execution lines/sides do
+# not feed calibration, model training, or the frozen baseball projection.
+_execution_source = user_archive.drop(columns=["_archive_date"], errors="ignore").copy() if not user_archive.empty else df.copy()
+display = _execution_source.sort_values(["game_date", "captured_at_utc"], ascending=[False, False]).copy()
+for _col in ("manual_outs_line", "manual_hits_allowed_line"):
+    if _col in display.columns:
+        display[_col] = pd.to_numeric(display[_col], errors="coerce")
+for _col in ("manual_outs_side", "manual_hits_allowed_side"):
+    if _col not in display.columns:
+        display[_col] = ""
+display["outs_bet_result"] = display.apply(
+    lambda r: grade_frozen_execution(r.get("manual_outs_side"), r.get("manual_outs_line"), r.get("actual_outs")), axis=1
+)
+display["hits_bet_result"] = display.apply(
+    lambda r: grade_frozen_execution(r.get("manual_hits_allowed_side"), r.get("manual_hits_allowed_line"), r.get("actual_hits_allowed")), axis=1
+)
 display["status"] = display.apply(
     lambda r: "Resolved" if pd.notna(r.get("actual_strikeouts")) or pd.notna(r.get("actual_hits_allowed")) or pd.notna(r.get("actual_outs")) else "Pending",
     axis=1,
@@ -858,8 +875,8 @@ display["outs_result"] = display.apply(lambda r: range_result(r, "actual_outs", 
 display_columns = [
     "game_date", "player", "team", "opponent",
     "projection", "k_bettable_target", "actual_strikeouts", "k_bettable_result", "k_target_margin", "k_error", "k_range_low", "k_range_high", "k_range_result",
-    "hits_projection", "actual_hits_allowed", "hits_error", "hits_range_low", "hits_range_high", "hits_result",
-    "outs_projection", "actual_outs", "outs_error", "outs_range_low", "outs_range_high", "outs_result",
+    "hits_projection", "manual_hits_allowed_line", "manual_hits_allowed_side", "actual_hits_allowed", "hits_bet_result", "hits_error", "hits_range_low", "hits_range_high", "hits_result",
+    "outs_projection", "manual_outs_line", "manual_outs_side", "actual_outs", "outs_bet_result", "outs_error", "outs_range_low", "outs_range_high", "outs_result",
     "confidence", "data_quality", "starter_history_games", "starter_history_source", "starter_history_mlb_games", "starter_history_observation_games",
     "status", "history_semantics",
 ]
@@ -881,6 +898,9 @@ for col in ["projection", "hits_projection", "outs_projection", "k_target_margin
 for col in ["actual_strikeouts", "actual_hits_allowed", "actual_outs", "k_range_low", "k_range_high", "hits_range_low", "hits_range_high", "outs_range_low", "outs_range_high", "starter_history_games", "starter_history_mlb_games", "starter_history_observation_games"]:
     if col in archive_view.columns:
         archive_formats[col] = "{:.0f}"
+for col in ["manual_hits_allowed_line", "manual_outs_line"]:
+    if col in archive_view.columns:
+        archive_formats[col] = "{:.1f}"
 
 archive_column_config = {
     "player": st.column_config.TextColumn("Pitcher"),
@@ -900,12 +920,18 @@ archive_column_config = {
     "k_range_result": st.column_config.TextColumn("80% K Range"),
     "k_error": st.column_config.NumberColumn("Vs Projection", format="%+.2f"),
     "hits_projection": st.column_config.NumberColumn("Projected Hits", format="%.2f"),
+    "manual_hits_allowed_line": st.column_config.NumberColumn("Hits Line", format="%.1f"),
+    "manual_hits_allowed_side": st.column_config.TextColumn("Hits Side"),
+    "hits_bet_result": st.column_config.TextColumn("Hits Bet Result"),
     "hits_range_low": st.column_config.NumberColumn("80% H Low", format="%.0f"),
     "hits_range_high": st.column_config.NumberColumn("80% H High", format="%.0f"),
     "actual_hits_allowed": st.column_config.NumberColumn("Actual Hits", format="%.0f"),
     "hits_result": st.column_config.TextColumn("80% Hits Range"),
     "hits_error": st.column_config.NumberColumn("Hits Error", format="%+.2f"),
     "outs_projection": st.column_config.NumberColumn("Projected Outs", format="%.2f"),
+    "manual_outs_line": st.column_config.NumberColumn("Outs Line", format="%.1f"),
+    "manual_outs_side": st.column_config.TextColumn("Outs Side"),
+    "outs_bet_result": st.column_config.TextColumn("Outs Bet Result"),
     "outs_range_low": st.column_config.NumberColumn("80% Outs Low", format="%.0f"),
     "outs_range_high": st.column_config.NumberColumn("80% Outs High", format="%.0f"),
     "actual_outs": st.column_config.NumberColumn("Actual Outs", format="%.0f"),
@@ -926,10 +952,19 @@ def style_archive_group(group: pd.DataFrame):
         styled = styled.map(lambda _: "color:#facc15;font-weight:800;", subset=actual_cols)
     if target_cols:
         styled = styled.map(lambda _: "color:#38bdf8;font-weight:800;", subset=target_cols)
+    manual_line_cols = [c for c in ["manual_hits_allowed_line", "manual_outs_line"] if c in group.columns]
+    if manual_line_cols:
+        styled = styled.map(lambda value: "color:#ff9f1c;font-weight:850;background-color:rgba(255,159,28,.10);" if pd.notna(value) else "", subset=manual_line_cols)
+    for result_col in ["hits_bet_result", "outs_bet_result"]:
+        if result_col in group.columns:
+            styled = styled.map(
+                lambda value: "color:#22c55e;font-weight:900;" if "WIN" in str(value) else "color:#ff6379;font-weight:900;" if "LOSS" in str(value) else "color:#ffd166;font-weight:850;" if ("PUSH" in str(value) or "NO BET" in str(value)) else "color:#9fb3c6;font-weight:800;",
+                subset=[result_col],
+            )
     return styled
 
 
-st.caption("Click a date to open that slate. K Target / K Result is the only WIN/MISS lane in this automatic evidence table. The 80% K, Hits, and Outs Range columns only show whether the final MLB result landed inside the frozen model interval; they are not sportsbook bet grades. Hits/Outs are never graded as bets here without a saved sportsbook line + side. Empty None/null/NaN columns are hidden automatically.")
+st.caption("Click a date to open that slate. Model diagnostics and execution evidence are intentionally separate: 80% K/Hits/Outs Range = frozen interval coverage; K Target/K Result = model-supported K ladder grading; Hits/Outs Line + Side + Bet Result = true execution history only when a real line and a certified pregame side exist. Eligible legacy manual lines can be leakage-safely recovered from their archived pregame timestamp/model snapshot; post-start or ambiguous rows remain UNGRADABLE. Execution evidence never feeds calibration or projection training. Empty None/null/NaN columns are hidden automatically.")
 archive_view["_archive_date"] = pd.to_datetime(archive_view.get("game_date"), errors="coerce")
 archive_view = archive_view.sort_values(["_archive_date", "player"], ascending=[False, True], na_position="last")
 archive_dates = archive_view["_archive_date"].dt.date.drop_duplicates().tolist()
