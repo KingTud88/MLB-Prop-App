@@ -1,0 +1,4 @@
+Metric,Recommended_Version,Decision,Pooled_Live_MAE,Pooled_Candidate_MAE,Pooled_Relative_MAE,Passing_Seasons,Required_Seasons,MAE_Better_Seasons,Reasons,Production_Authority,Report_Only,Report_Version
+PITCHES,tight-v2.4,HOLD,8.91838954382622,8.62391105562275,0.03301924487110163,0,3,3,2024:win_share|bias;2025:bias;2026:bias,NONE,True,workload-promotion-report-v1
+BF,tight-v2.2,HOLD,2.631739648995007,2.600536410456651,0.011856506607814331,0,3,3,2024:win_share|bias;2025:win_share|bias;2026:win_share,NONE,True,workload-promotion-report-v1
+OUTS,tight-v2.2,HOLD,2.80385320306856,2.781335496545102,0.008030986250925876,0,3,2,2024:mae|win_share|bias;2025:win_share|bias;2026:win_share,NONE,True,workload-promotion-report-v1
