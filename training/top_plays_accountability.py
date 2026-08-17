@@ -48,7 +48,8 @@ def margin_percent(projection: object, line: object) -> float | None:
     market_line = _num(line)
     if proj is None or market_line is None or abs(market_line) < 1e-12:
         return None
-    return float(abs(proj - market_line) / abs(market_line))
+    # Stabilize exact threshold values such as 20% before categorical banding.
+    return round(float(abs(proj - market_line) / abs(market_line)), 12)
 
 
 def margin_percent_band(value: object) -> str:
@@ -56,7 +57,7 @@ def margin_percent_band(value: object) -> str:
     if number is None or number < 0:
         return "UNKNOWN"
     band = pd.cut(
-        pd.Series([number]),
+        pd.Series([round(number, 12)]),
         bins=MARGIN_PERCENT_EDGES,
         labels=MARGIN_PERCENT_LABELS,
         right=False,
