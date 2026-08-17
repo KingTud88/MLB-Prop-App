@@ -32,6 +32,8 @@ from automation.daily_projection_runner import (
 from engine.calibration import calibrate_blend
 from engine.hits_calibration import calibrate_hits_blend
 from engine.outs_calibration import calibrate_outs_blend
+from engine.execution_history import freeze_execution_decision, is_pregame_execution_window
+from engine.model_top_plays import MARKET_HITS, MARKET_OUTS
 from engine.odds_snapshot import load_quota_status, refresh_strikeout_snapshot, resolve_api_key
 from navigation import render_sidebar
 from training.projection_storage import load_projection_archive, overlay_manual_market_lines, save_projection_archive
@@ -186,15 +188,21 @@ def _manual_input_default(row: pd.Series, line_col: str, source_col: str) -> str
     return "" if pd.isna(value) else f"{float(value):g}"
 
 
+def _clean_saved_text(value: object) -> str:
+    if pd.isna(value):
+        return ""
+    return str(value).strip()
+
+
+def _same_market_line(left: object, right: object) -> bool:
+    a = pd.to_numeric(pd.Series([left]), errors="coerce").iloc[0]
+    b = pd.to_numeric(pd.Series([right]), errors="coerce").iloc[0]
+    return pd.notna(a) and pd.notna(b) and abs(float(a) - float(b)) <= 1e-9
+
+
 def commit_projection_archive(slate: pd.DataFrame, manual_lines: dict[str, dict[str, float]], slate_day: str) -> int:
     if slate.empty:
         return 0
-    snapshot = slate.copy().reset_index(drop=True)
-    snapshot["manual_strikeout_line"] = [manual_lines.get(_archive_row_key(row), {}).get("k", np.nan) for _, row in snapshot.iterrows()]
-    snapshot["manual_outs_line"] = [manual_lines.get(_archive_row_key(row), {}).get("outs", np.nan) for _, row in snapshot.iterrows()]
-    snapshot["manual_hits_allowed_line"] = [manual_lines.get(_archive_row_key(row), {}).get("hits", np.nan) for _, row in snapshot.iterrows()]
-    snapshot["archive_source"] = "DAILY_RUN_MANUAL"
-    snapshot["archive_committed_at_utc"] = datetime.now(ZoneInfo("UTC")).isoformat()
 
     existing = load_projection_archive(ARCHIVE_PATH, st.secrets)
     if existing.empty:
@@ -204,13 +212,80 @@ def commit_projection_archive(slate: pd.DataFrame, manual_lines: dict[str, dict[
             legacy_dates = pd.to_datetime(existing["game_date"], errors="coerce").dt.date
             existing = existing.loc[legacy_dates < cutoff].copy()
             if not existing.empty:
-                existing["manual_strikeout_line"] = np.nan
-                existing["manual_outs_line"] = np.nan
-                existing["manual_hits_allowed_line"] = np.nan
+                for col in (
+                    "manual_strikeout_line", "manual_outs_line", "manual_hits_allowed_line",
+                    "manual_outs_side", "manual_outs_decision_probability", "manual_outs_decision_reason", "manual_outs_side_frozen_at_utc",
+                    "manual_hits_allowed_side", "manual_hits_allowed_decision_probability", "manual_hits_allowed_decision_reason", "manual_hits_allowed_side_frozen_at_utc",
+                ):
+                    existing[col] = np.nan
                 existing["archive_source"] = "LEGACY_PRE_MANUAL_ARCHIVE"
                 existing["archive_committed_at_utc"] = existing.get("captured_at_utc", "")
         else:
             existing = pd.DataFrame()
+
+    source = slate.copy().reset_index(drop=True)
+    snapshot = source.copy()
+    history = load_log()
+    now_utc = datetime.now(ZoneInfo("UTC"))
+    frozen_at = now_utc.isoformat()
+
+    snapshot["manual_strikeout_line"] = [manual_lines.get(_archive_row_key(row), {}).get("k", np.nan) for _, row in source.iterrows()]
+    snapshot["manual_outs_line"] = [manual_lines.get(_archive_row_key(row), {}).get("outs", np.nan) for _, row in source.iterrows()]
+    snapshot["manual_hits_allowed_line"] = [manual_lines.get(_archive_row_key(row), {}).get("hits", np.nan) for _, row in source.iterrows()]
+    for col in (
+        "manual_outs_side", "manual_outs_decision_probability", "manual_outs_decision_reason", "manual_outs_side_frozen_at_utc",
+        "manual_hits_allowed_side", "manual_hits_allowed_decision_probability", "manual_hits_allowed_decision_reason", "manual_hits_allowed_side_frozen_at_utc",
+    ):
+        if col not in snapshot.columns:
+            snapshot[col] = np.nan
+
+    specs = (
+        ("outs", MARKET_OUTS, "manual_outs_line", "manual_outs_side", "manual_outs_decision_probability", "manual_outs_decision_reason", "manual_outs_side_frozen_at_utc"),
+        ("hits", MARKET_HITS, "manual_hits_allowed_line", "manual_hits_allowed_side", "manual_hits_allowed_decision_probability", "manual_hits_allowed_decision_reason", "manual_hits_allowed_side_frozen_at_utc"),
+    )
+    for idx, row in source.iterrows():
+        values = manual_lines.get(_archive_row_key(row), {})
+        pregame = is_pregame_execution_window(row, now_utc=now_utc)
+        for key, market, line_col, side_col, prob_col, reason_col, frozen_col in specs:
+            entered_line = values.get(key, np.nan)
+            if pd.isna(entered_line):
+                snapshot.at[idx, side_col] = np.nan
+                snapshot.at[idx, prob_col] = np.nan
+                snapshot.at[idx, reason_col] = ""
+                snapshot.at[idx, frozen_col] = ""
+                continue
+
+            old_line = row.get(line_col)
+            old_side = _clean_saved_text(row.get(side_col)).upper()
+            old_frozen = _clean_saved_text(row.get(frozen_col))
+            old_reason = _clean_saved_text(row.get(reason_col))
+            old_prob = pd.to_numeric(pd.Series([row.get(prob_col)]), errors="coerce").iloc[0]
+            has_frozen_decision = old_side in {"OVER", "UNDER", "PASS"} and bool(old_frozen)
+
+            if has_frozen_decision and (_same_market_line(old_line, entered_line) or not pregame):
+                # Once first pitch passes, preserve the certified decision and its original line.
+                snapshot.at[idx, line_col] = old_line
+                snapshot.at[idx, side_col] = old_side
+                snapshot.at[idx, prob_col] = old_prob
+                snapshot.at[idx, reason_col] = old_reason
+                snapshot.at[idx, frozen_col] = old_frozen
+                continue
+
+            if pregame:
+                decision = freeze_execution_decision(row, market, entered_line, history)
+                snapshot.at[idx, side_col] = decision.side
+                snapshot.at[idx, prob_col] = np.nan if decision.model_probability is None else float(decision.model_probability)
+                snapshot.at[idx, reason_col] = decision.reason
+                snapshot.at[idx, frozen_col] = frozen_at
+            else:
+                # Keep the historical line, but never reverse-engineer a side after first pitch.
+                snapshot.at[idx, side_col] = "UNGRADABLE"
+                snapshot.at[idx, prob_col] = np.nan
+                snapshot.at[idx, reason_col] = "side_not_frozen_pregame"
+                snapshot.at[idx, frozen_col] = ""
+
+    snapshot["archive_source"] = "DAILY_RUN_MANUAL"
+    snapshot["archive_committed_at_utc"] = frozen_at
 
     if not existing.empty and {"game_pk", "pitcher_id"}.issubset(existing.columns) and {"game_pk", "pitcher_id"}.issubset(snapshot.columns):
         new_keys = set(zip(snapshot["game_pk"].astype(str), snapshot["pitcher_id"].astype(str)))
@@ -539,7 +614,7 @@ if isinstance(slate, pd.DataFrame):
 
     if not slate.empty:
         st.markdown('<div class="daily-action-label">🎚️ Manual sportsbook lines</div>', unsafe_allow_html=True)
-        st.caption("Open each pitcher bar and enter the real sportsbook lines you want Top Plays to evaluate. Manual values override paid API lines. Half-lines such as 4.5, 15.5, and 5.5 are supported; a blank market is excluded from Top Plays unless a paid active line already exists. Saved manual lines reload automatically after an app restart.")
+        st.caption("Open each pitcher bar and enter the real sportsbook lines you want Top Plays to evaluate. Manual values override paid API lines. For Hits Allowed and Total Outs, saving a real line also freezes the app's current OVER / UNDER / PASS decision before first pitch so Projection History can grade it honestly later. A side is never reconstructed after first pitch. Saved manual lines reload automatically after an app restart.")
         explain_popover(static_explanation("manual_lines"),label="ⓘ EXPLAIN MANUAL LINES")
         durable_archive = load_projection_archive(ARCHIVE_PATH, st.secrets)
         slate = overlay_manual_market_lines(slate, durable_archive)

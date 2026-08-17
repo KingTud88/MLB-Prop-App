@@ -31,6 +31,7 @@ from engine.decision_learning import decision_tier_report
 from engine.signal_validation import context_performance_report, paired_signal_report
 from engine.team_leash import team_leash_walk_forward_report
 from engine.projection_crushers import bettable_k_label, bettable_k_result, bettable_k_target, crusher_report
+from engine.execution_history import grade_frozen_execution
 
 ROOT = Path(__file__).resolve().parents[1]
 LOG_PATH = ROOT / "data" / "projection_log.csv"
@@ -213,6 +214,16 @@ else:
         if col in user_archive.columns:
             user_archive[col] = pd.to_numeric(user_archive[col], errors="coerce")
     user_archive = user_archive.sort_values(["_archive_date", "player"], ascending=[False, True], na_position="last")
+    for col in ("manual_outs_side", "manual_hits_allowed_side"):
+        if col not in user_archive.columns:
+            user_archive[col] = ""
+    user_archive["archive_outs_bet_result"] = user_archive.apply(
+        lambda row: grade_frozen_execution(row.get("manual_outs_side"), row.get("manual_outs_line"), row.get("actual_outs")), axis=1
+    )
+    user_archive["archive_hits_bet_result"] = user_archive.apply(
+        lambda row: grade_frozen_execution(row.get("manual_hits_allowed_side"), row.get("manual_hits_allowed_line"), row.get("actual_hits_allowed")), axis=1
+    )
+
     user_archive["archive_k_target"] = user_archive.get("projection", pd.Series(index=user_archive.index, dtype=float)).map(bettable_k_label)
     user_archive["archive_k_result"] = user_archive.apply(
         lambda row: bettable_k_result(row.get("projection"), row.get("actual_strikeouts")), axis=1
@@ -255,8 +266,8 @@ else:
             view = group.rename(columns={
                 "player": "Pitcher", "team": "Team", "opponent": "Opp",
                 "projection": "Projected K", "archive_k_target": "K Target", "actual_strikeouts": "Actual K", "archive_k_result": "K Result", "manual_strikeout_line": "K Line",
-                "outs_projection": "Projected Outs", "actual_outs": "Actual Outs", "manual_outs_line": "Outs Line",
-                "manual_hits_allowed_line": "Hits Line", "hits_projection": "Projected Hits", "actual_hits_allowed": "Actual Hits",
+                "outs_projection": "Projected Outs", "actual_outs": "Actual Outs", "manual_outs_line": "Outs Line", "manual_outs_side": "Outs Side", "archive_outs_bet_result": "Outs Bet Result",
+                "manual_hits_allowed_line": "Hits Line", "manual_hits_allowed_side": "Hits Side", "hits_projection": "Projected Hits", "actual_hits_allowed": "Actual Hits", "archive_hits_bet_result": "Hits Bet Result",
                 "confidence": "Confidence", "data_quality": "Quality",
                 "archive_source": "Archive Source", "archive_committed_at_utc": "Committed UTC",
             })
@@ -268,6 +279,16 @@ else:
                     view.loc[empty_token, col] = pd.NA
             populated = [col for col in view.columns if bool(view[col].notna().any())]
             view = view[populated]
+            preferred = [
+                "Pitcher", "Team", "Opp",
+                "Projected K", "K Target", "Actual K", "K Result", "K Line",
+                "Projected Outs", "Outs Line", "Outs Side", "Actual Outs", "Outs Bet Result",
+                "Projected Hits", "Hits Line", "Hits Side", "Actual Hits", "Hits Bet Result",
+                "Confidence", "Quality", "Archive Source", "Committed UTC",
+            ]
+            ordered = [col for col in preferred if col in view.columns]
+            ordered += [col for col in view.columns if col not in ordered]
+            view = view[ordered]
 
             formatters = {}
             for col in ("K Line", "Outs Line", "Hits Line"):
@@ -297,8 +318,14 @@ else:
                     lambda value: "color:#22c55e;font-weight:900;" if "WIN" in str(value) else "color:#ff6379;font-weight:900;" if "MISS" in str(value) else "color:#ffd166;font-weight:800;",
                     subset=["K Result"],
                 )
+            for result_col in ("Outs Bet Result", "Hits Bet Result"):
+                if result_col in view.columns:
+                    styled = styled.map(
+                        lambda value: "color:#22c55e;font-weight:900;" if "WIN" in str(value) else "color:#ff6379;font-weight:900;" if "LOSS" in str(value) else "color:#ffd166;font-weight:850;" if ("PUSH" in str(value) or "NO BET" in str(value)) else "color:#9fb3c6;font-weight:800;",
+                        subset=[result_col],
+                    )
             st.dataframe(styled, hide_index=True, width="stretch")
-            st.caption("Green = frozen projection · Blue = model-supported K target · Gold = resolved MLB result · K Result grades the target. Orange sportsbook lines appear only when you attached one.")
+            st.caption("Green = frozen projection · Blue = model-supported K target · Gold = resolved MLB result. K Result grades the model-supported K ladder target. Outs/Hits Bet Result grades only a real line plus a side that was frozen before first pitch; legacy/post-start lines remain UNGRADABLE, and PASS remains NO BET.")
 
 st.divider()
 if st.button("Resolve completed games", type="primary"):

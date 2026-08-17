@@ -112,6 +112,8 @@ def overlay_manual_market_lines(slate: pd.DataFrame, archive: pd.DataFrame) -> p
     result = slate.copy()
     for col in (
         "manual_strikeout_line", "manual_outs_line", "manual_hits_allowed_line",
+        "manual_outs_side", "manual_outs_decision_probability", "manual_outs_decision_reason", "manual_outs_side_frozen_at_utc",
+        "manual_hits_allowed_side", "manual_hits_allowed_decision_probability", "manual_hits_allowed_decision_reason", "manual_hits_allowed_side_frozen_at_utc",
         "active_strikeout_line", "active_outs_line", "active_hits_allowed_line",
         "active_strikeout_line_source", "active_outs_line_source", "active_hits_allowed_line_source",
     ):
@@ -154,6 +156,13 @@ def overlay_manual_market_lines(slate: pd.DataFrame, archive: pd.DataFrame) -> p
                 result.at[idx, manual_col] = float(value)
                 result.at[idx, line_col] = float(value)
                 result.at[idx, source_col] = "MANUAL"
+        for meta_col in (
+            "manual_outs_side", "manual_outs_decision_probability", "manual_outs_decision_reason", "manual_outs_side_frozen_at_utc",
+            "manual_hits_allowed_side", "manual_hits_allowed_decision_probability", "manual_hits_allowed_decision_reason", "manual_hits_allowed_side_frozen_at_utc",
+        ):
+            value = saved.get(meta_col)
+            if pd.notna(value) and str(value).strip():
+                result.at[idx, meta_col] = value
         source = str(saved.get("archive_source", "") or "").strip()
         committed = str(saved.get("archive_committed_at_utc", "") or "").strip()
         if source:
