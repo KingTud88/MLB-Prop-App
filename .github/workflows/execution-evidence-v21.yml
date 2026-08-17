@@ -1,0 +1,49 @@
+name: Execution Evidence V21
+
+on:
+  push:
+    paths:
+      - '.github/workflows/execution-evidence-v21.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  migrate-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt pytest
+      - name: Apply UI patch and leakage-safe legacy migration
+        run: python .github/scripts/run_execution_evidence_v21.py
+      - name: Compile changed Python
+        run: python -m compileall -q engine pages tests
+      - name: Targeted execution-history tests
+        run: pytest -q tests/test_frozen_execution_history.py tests/test_projection_history_learning_dashboard.py
+      - name: Full regression suite
+        run: pytest -q
+      - name: Commit verified execution evidence changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pages/4_Projection_History.py data/projection_archive.csv
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "No product/data changes to commit."
+            exit 0
+          fi
+          git commit -m "Backfill pregame execution sides and expose evidence"
+          git restore .
+          git clean -fd
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
