@@ -418,9 +418,14 @@ def summarize_oos(detail: pd.DataFrame) -> pd.DataFrame:
         float(metrics["Preconfirm_Bias"]),
         float(metrics["Confirmed_Bias"]),
     )
+    paired_mask = (
+        _num(detail, "Preconfirm_Projection").notna()
+        & _num(detail, "Confirmed_Projection").notna()
+        & _num(detail, "Actual_Strikeouts").notna()
+    ) if detail is not None and not detail.empty else pd.Series(dtype=bool)
     row = {
         "Metric": "STRIKEOUTS",
-        "Paired_Starts": int(metrics["Rows"]),
+        "Paired_Starts": int(paired_mask.sum()),
         **{key: value for key, value in metrics.items() if key != "Rows"},
         "Status": status,
         "Reason": reason,
