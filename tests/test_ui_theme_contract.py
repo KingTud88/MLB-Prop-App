@@ -19,11 +19,16 @@ def test_shared_theme_keeps_cleveland_night_design_tokens():
     assert "stExpanderDetails" in source
 
 
-def test_sidebar_has_custom_navigation_and_logo_fallback():
+def test_sidebar_has_compact_custom_navigation():
     source = Path("navigation.py").read_text(encoding="utf-8")
-    assert "CLEVELAND NIGHT MODE" in source
-    assert "sk-logo-fallback" in source
+    assert "SECONDARY_COMPACT_SIDEBAR_V2" in source
+    assert "sk-nav-compact-crown" in source
+    assert "sk-nav-compact-script" in source
+    assert "sk-nav-compact-king" in source
+    assert "CLE-themed MLB starter projection engine" in source
     assert 'render_sidebar(active: str = "projection")' in source
+    rendered = source[source.index("with st.sidebar:"):]
+    assert "sk-nav-mascot" not in rendered
     for label in ("Projection", "Top Plays", "Bet Tracker", "Projection History", "Daily Projection Run"):
         assert label in source
 

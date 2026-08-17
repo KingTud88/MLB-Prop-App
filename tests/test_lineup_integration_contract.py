@@ -35,4 +35,4 @@ def test_daily_confirmed_lineup_metric_has_sixth_column():
     source = Path("pages/5_Daily_Projection_Run.py").read_text(encoding="utf-8")
     summary = source[source.index('slate = st.session_state.get("daily_slate")'):]
     assert 'c1, c2, c3, c4, c5, c6 = st.columns(6)' in summary
-    assert 'c6.metric("Confirmed lineups", confirmed_lineups)' in summary
+    assert 'c6.metric("Confirmed lineups", confirmed_lineups, help=metric_help("daily_confirmed"))' in summary
