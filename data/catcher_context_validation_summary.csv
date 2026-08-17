@@ -1,17 +1,17 @@
 Dimension,Segment,Rows,Resolved_Rows,Authentic_Pregame_Rows,Auditable_Starts,Distinct_Catchers,Observed_Days,Avg_Prior_Starts,Base_MAE,Candidate_MAE,Relative_MAE_Improvement,Candidate_Win_Share,Candidate_Loss_Share,Base_Bias,Candidate_Bias,Signal_Alignment,Mean_Absolute_Factor_Delta,Evidence,Reason,Report_Only,Production_Authority,Validation_Version
-OVERALL,ALL CATCHER CONTEXT,155,134,17,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
-LINEAGE,POST_START_BACKFILL,118,117,0,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
-LINEAGE,PRE_GAME_CAPTURE,23,17,17,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
-LINEAGE,UNCONFIRMED,14,0,0,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
-PRIOR SAMPLE BAND,0–2,148,130,17,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
-PRIOR SAMPLE BAND,3–4,7,4,0,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
-SIGNAL DIRECTION,NEUTRAL,155,134,17,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
-QUALITY BAND,60–69,36,31,4,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
-QUALITY BAND,70–79,94,83,8,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
-QUALITY BAND,<60,18,14,1,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
-QUALITY BAND,UNKNOWN,7,6,4,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
-STARTER HISTORY BAND,0–2,2,1,0,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
-STARTER HISTORY BAND,10+,131,114,12,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
+OVERALL,ALL CATCHER CONTEXT,155,136,18,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
+LINEAGE,POST_START_BACKFILL,118,118,0,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
+LINEAGE,PRE_GAME_CAPTURE,32,18,18,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
+LINEAGE,UNCONFIRMED,5,0,0,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
+PRIOR SAMPLE BAND,0–2,147,131,18,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
+PRIOR SAMPLE BAND,3–4,8,5,0,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
+SIGNAL DIRECTION,NEUTRAL,155,136,18,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
+QUALITY BAND,60–69,34,31,4,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
+QUALITY BAND,70–79,93,83,8,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
+QUALITY BAND,<60,17,15,2,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
+QUALITY BAND,UNKNOWN,11,7,4,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
+STARTER HISTORY BAND,0–2,2,2,1,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
+STARTER HISTORY BAND,10+,127,114,12,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
 STARTER HISTORY BAND,3–5,7,7,0,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
 STARTER HISTORY BAND,6–9,8,6,1,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
-STARTER HISTORY BAND,UNKNOWN,7,6,4,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
+STARTER HISTORY BAND,UNKNOWN,11,7,4,0,0,0,,,,,,,,,,,LEARNING,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",True,NONE,catcher-context-walkforward-v1
