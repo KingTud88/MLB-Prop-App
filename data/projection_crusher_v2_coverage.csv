@@ -1,0 +1,2 @@
+Resolved_Calls,Crusher_Events,Crusher_Rate,Probability_Coverage,Data_Quality_Coverage,Confirmed_Lineup_Coverage,Weather_Context_Coverage,Starter_Role_Coverage,Production_Authority,Report_Only,Crusher_Version
+133,48,0.3609022556390977,1.0,1.0,0.9774436090225563,0.21052631578947367,0.7518796992481203,NONE,True,projection-crusher-v2-report-only
