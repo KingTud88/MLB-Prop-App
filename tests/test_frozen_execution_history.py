@@ -19,6 +19,8 @@ def test_true_execution_grading_requires_frozen_side_and_line():
     assert grade_frozen_execution("OVER", 17.0, 17) == "➖ PUSH"
     assert grade_frozen_execution("PASS", 5.5, 2) == "NO BET"
     assert grade_frozen_execution("", 5.5, 2) == "⚪ UNGRADABLE"
+    assert grade_frozen_execution(pd.NA, 5.5, 2) == "⚪ UNGRADABLE"
+    assert grade_frozen_execution(None, 5.5, 2) == "⚪ UNGRADABLE"
     assert grade_frozen_execution("UNDER", 5.5, None) == "PENDING"
     assert grade_frozen_execution("UNDER", None, 4) == "—"
 
