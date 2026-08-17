@@ -1,0 +1,11 @@
+Finding,Status,Evidence,Conclusion,Report Only,Production Authority,Accountability Version
+OVERALL ACCOUNTABILITY STATE,LEARNING,5 settled real-line Top Plays across 1 observed real-line slate(s),Observed hit rate 60.0% versus average model probability 78.4% (calibration gap 18.4%). Current sample is too small to change ranking or trust labels.,True,NONE,top-plays-accountability-v1
+REAL-LINE COVERAGE,LEARNING,1 of 6 frozen slate date(s) currently contain persisted real lines,Older slates without observed real lines are intentionally excluded rather than reconstructed from model defaults.,True,NONE,top-plays-accountability-v1
+STRIKEOUTS SAMPLE,LEARNING,3 settled Top Play leg(s),No market-specific conclusion is allowed yet.,True,NONE,top-plays-accountability-v1
+TOTAL OUTS SAMPLE,LEARNING,2 settled Top Play leg(s),No market-specific conclusion is allowed yet.,True,NONE,top-plays-accountability-v1
+HITS ALLOWED SAMPLE,LEARNING,0 settled Top Play leg(s),No persisted real-line Top Play evidence exists for this market yet.,True,NONE,top-plays-accountability-v1
+RANK ORDER,LEARNING,5 observed state(s); largest segment 1 settled leg(s),"Multiple states are present, but the largest segment has only 1 settled leg(s); keep learning.",True,NONE,top-plays-accountability-v1
+LINEUP CONTEXT,LEARNING,1 observed state(s); largest segment 5 settled leg(s),"Only one observed state exists, so this context cannot be compared yet.",True,NONE,top-plays-accountability-v1
+WEATHER CONTEXT,LEARNING,1 observed state(s); largest segment 5 settled leg(s),"Only one observed state exists, so this context cannot be compared yet.",True,NONE,top-plays-accountability-v1
+LINE-SOURCE CONTEXT,LEARNING,1 observed state(s); largest segment 5 settled leg(s),"Only one observed state exists, so this context cannot be compared yet.",True,NONE,top-plays-accountability-v1
+MODEL-vs-LINE MARGIN,LEARNING,Largest relative-margin band has 3 settled leg(s),"Projection/line separation is now tracked relative to the market line, but no margin band is large enough to trust yet.",True,NONE,top-plays-accountability-v1
