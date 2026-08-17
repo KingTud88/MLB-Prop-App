@@ -8,7 +8,7 @@ import streamlit as st
 
 
 EXPLAINABILITY_UI_VERSION = "explainability-popovers-v1"
-METRIC_HELP_VERSION = "metric-help-v2"
+METRIC_HELP_VERSION = "metric-help-v3"
 
 
 @dataclass(frozen=True)
@@ -161,7 +161,7 @@ def explain_popover(
             st.markdown(f'<div class="explain-note">{explanation.note}</div>', unsafe_allow_html=True)
 
 
-def metric_help(key: str) -> str:
+def metric_help(key: str, *, current: str = "") -> str:
     """Return formula-level help for compact scorecard metrics.
 
     This text is presentation-only. It explains values already computed by the
@@ -225,6 +225,24 @@ def metric_help(key: str) -> str:
             "How to read it: lower is better; divide by 3 if you want to think of the typical error in innings."
         ),
 
+        # Projection History archive + actionable K scorecards.
+        "history_archived_slates": "What it is: the number of different slate dates preserved in the durable Projection Archive.\n\nHow it is calculated: count of unique non-null game_date values in the user-facing frozen archive.\n\nHow to read it: this tells you how many daily slates are represented, not how many pitchers or bets were recorded.",
+        "history_archived_pitchers": "What it is: the number of archived pitcher-game rows currently shown in the Projection Archive.\n\nHow it is calculated: count of rows in the durable user archive after archive-source filtering. The same pitcher can appear on multiple dates.\n\nHow to read it: this is evidence volume, not the number of unique MLB pitchers.",
+        "history_manual_lines": "What it is: sportsbook execution lines you manually attached to archived pitcher rows.\n\nHow it is calculated: count of non-null manual K lines + manual Outs lines + manual Hits Allowed lines. One pitcher row can contribute up to three attached lines.\n\nHow to read it: these lines are execution overlays only and never rewrite the frozen projection.",
+        "history_latest_slate": "What it is: the most recent game date represented in the Projection Archive.\n\nHow it is calculated: maximum non-null archived game_date.\n\nHow to read it: use this as a freshness check for the archive, not as proof that every game on that date is resolved.",
+        "history_ladder_calls": "What it is: resolved strikeout projections that produced a supported whole-K ladder target inside the 3+–12+ ladder.\n\nHow it is calculated: rows with both frozen projected Ks and final actual Ks, where floor(Projected K) maps to a supported milestone.\n\nHow to read it: this is the denominator for ladder win rate; it is not sportsbook bet count.",
+        "history_ladder_wins": "What it is: resolved ladder calls where final Ks reached or exceeded the model-supported whole-K target.\n\nHow it is calculated: count(actual Ks ≥ floor(Projected K)) for valid 3+–12+ targets.\n\nHow to read it: this grades model-supported milestones, not an OVER/UNDER sportsbook ticket unless that exact milestone was actually bet.",
+        "history_ladder_win_rate": "What it is: the share of resolved model-supported K targets that were reached.\n\nFormula: ladder wins ÷ resolved ladder calls.\n\nHow to read it: higher is better for this descriptive ladder test, but it is different from MAE, calibration, and sportsbook ROI.",
+        "history_crushers": "What it is: pitchers meeting the existing repeat-Crusher tracking rule in the descriptive history board.\n\nHow it is calculated: the current crusher_report rule requires enough resolved calls plus the existing win-rate and average-margin thresholds.\n\nHow to read it: Crushers identify repeated historical target clearing; they do not automatically become a live Top Play rule.",
+        "history_workload_snapshots": "What it is: frozen rows tagged with the workload-v1 workload model.\n\nHow it is calculated: count(workload_version == workload-v1) in the current evidence archive.\n\nHow to read it: this is the sample available for workload-v1 auditing.",
+        "history_pitch_mae": "What it is: average absolute error of expected pitch count.\n\nFormula: mean(|actual pitches − expected pitches|) where both values exist.\n\nHow to read it: lower is better; it measures typical pitch-count miss size, not directional bias.",
+        "history_bf_mae": "What it is: average absolute error of expected batters faced.\n\nFormula: mean(|actual BF − expected BF|) where both values exist.\n\nHow to read it: lower is better; it measures workload exposure accuracy rather than strikeout accuracy.",
+        "history_workload_outs_mae": "What it is: average absolute error of the workload layer's expected starter outs.\n\nFormula: mean(|actual outs − expected workload outs|) where both values exist.\n\nHow to read it: lower is better; this audits workload opportunity separately from the full outs projection model.",
+        "history_paired_outcomes": "What it is: total resolved before/after feature-upgrade pairs available for signal accountability.\n\nHow it is calculated: sum of Resolved Pairs across the paired-signal report.\n\nHow to read it: this is the evidence sample used to judge candidate signals; it is not a count of live bets.",
+        "history_helping_signals": "What it is: paired candidate signals currently meeting the report's HELPING gate.\n\nHow it is calculated: count(Status == HELPING) after the existing minimum-sample, MAE-improvement and improved-share requirements.\n\nHow to read it: HELPING is evidence for further research, not automatic production authority.",
+        "history_hurting_signals": "What it is: paired candidate signals currently meeting the symmetric HURTING guardrail.\n\nHow it is calculated: count(Status == HURTING) in the paired-signal report.\n\nHow to read it: these are signals the evidence says are making paired forecasts worse and should not be promoted.",
+        "history_learning_signals": "What it is: paired candidate signals that do not yet have enough evidence for a HELPING/HURTING conclusion.\n\nHow it is calculated: count(Status == LEARNING).\n\nHow to read it: LEARNING means wait for more leakage-safe resolved pairs; it is not a neutral vote for promotion.",
+
         # Bet Tracker summary.
         "tracker_bets": "What it is: all saved tickets currently loaded into Bet Tracker.\n\nHow it is calculated: count of resolved tracker display rows, including straight bets and parlays.\n\nHow to read it: this is tracking volume, not a performance score.",
         "tracker_record": "What it is: finalized WIN-LOSS-PUSH record.\n\nHow it is calculated: counts the tracker grading states WIN, LOSS, and PUSH/PUSH LEG after MLB results are checked. Pending/live and INVALID LINE tickets are excluded.\n\nHow to read it: this is result grading only and never trains the projection model.",
@@ -247,10 +265,17 @@ def metric_help(key: str) -> str:
         "top_signal_supported": "What it is: Top 5 legs with a pregame signal profile currently labeled SUPPORTED.\n\nHow it is calculated: count(Signal Evidence == SUPPORTED) after the board is ranked.\n\nHow to read it: signal evidence is descriptive safety context and cannot move today's rank by itself.",
         "top_live_prices": "What it is: how many Top 5 legs were matched to an exact current sportsbook offer.\n\nHow it is calculated: count(Live Offer == True) ÷ number of ranked plays.\n\nHow to read it: live price availability affects execution/add-to-tracker controls, not the model-first ranking.",
     }
-    return specs.get(
+    text = specs.get(
         key,
         "What it is: a StrikeOut King scorecard metric.\n\nHow it is calculated: the value comes from the page's existing read-only data path.\n\nHow to read it: this help layer explains the displayed value and does not change model state.",
     )
+    if current:
+        text += f"\n\nThis box right now: {current}"
+    text += (
+        "\n\nWhat not to conclude: this metric is one diagnostic/accountability signal. "
+        "By itself it does not rewrite a frozen projection, create a sportsbook bet, or guarantee future performance."
+    )
+    return text
 
 
 def static_explanation(key: str) -> Explanation:

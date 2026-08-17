@@ -818,7 +818,13 @@ def build_market_table(proj,odds_rows,hits_proj=None):
 
 with st.sidebar:
     render_sidebar_brand()
-    nav=st.radio("Navigation",["Projection","Distribution","Form & Workload","Model Card","Bet Tracker","Projection History","Daily Projection Run","Top Plays"],label_visibility="collapsed")
+    _nav_options=["Projection","Distribution","Form & Workload","Model Card","Bet Tracker","Projection History","Daily Projection Run","Top Plays"]
+    _nav_target=st.session_state.pop("projection_nav_target",None)
+    if _nav_target in _nav_options:
+        st.session_state["main_projection_navigation"]=_nav_target
+    if st.session_state.get("main_projection_navigation") not in _nav_options:
+        st.session_state["main_projection_navigation"]="Projection"
+    nav=st.radio("Navigation",_nav_options,label_visibility="collapsed",key="main_projection_navigation")
     if nav == "Bet Tracker":
         st.switch_page("pages/2_Bet_Tracker.py")
     if nav == "Daily Projection Run":

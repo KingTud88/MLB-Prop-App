@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import streamlit as st
 
+from engine.ui_command_center import render_sidebar_brand
+
 # MASCOT_PATH compatibility marker: mascot is browser-rendered to avoid Pillow codec crashes.
 MASCOT_URL = "https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/strikeout_king_9000_sidebar.png?v=9"
 
@@ -423,75 +425,124 @@ def render_sidebar(active: str = "projection") -> None:
             unsafe_allow_html=True,
         )
 
-    # SECONDARY_COMPACT_SIDEBAR_V2 · mirrors the Projection command-center rail.
+    # PROJECTION_PARITY_SIDEBAR_V3 · exact Main Projection navigation language.
     st.markdown(
         """
         <style>
+        /* Secondary pages deliberately inherit Streamlit's same sidebar width as Main Projection. */
         [data-testid="stSidebar"]{
-            width:252px!important;min-width:252px!important;
-            background:linear-gradient(180deg,#071727 0%,#04101d 100%)!important;
-            border-right:1px solid #18334b!important;
+            background:linear-gradient(180deg,rgba(7,20,38,.99),rgba(4,12,24,.99))!important;
+            border-right:1px solid rgba(62,95,130,.48)!important;
+            box-shadow:12px 0 42px rgba(0,0,0,.14)!important;
         }
-        [data-testid="stSidebar"] > div:first-child{width:252px!important}
-        [data-testid="stSidebar"] .sk-nav-brand{
-            margin:.12rem .34rem .86rem!important;padding:.86rem .72rem .82rem!important;
-            border:1px solid rgba(78,108,137,.66)!important;border-radius:14px!important;
-            background:linear-gradient(145deg,rgba(8,29,51,.98),rgba(3,16,30,.98))!important;
-            box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 12px 26px rgba(0,0,0,.20)!important;
+        [data-testid="stSidebar"] > div:first-child{
+            width:auto!important;
+            min-width:0!important;
+        }
+        [data-testid="stSidebar"] .cc-sidebar-brand{margin:.10rem 0 .80rem!important}
+        [data-testid="stSidebar"] [data-testid="stRadio"] > div{gap:.28rem!important}
+        [data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label{
+            display:flex!important;
+            align-items:center!important;
+            flex-direction:row!important;
+            flex-wrap:nowrap!important;
+            position:relative!important;
+            gap:.52rem!important;
+            min-height:2.42rem!important;
+            padding:.26rem .38rem!important;
+            border:1px solid transparent!important;
+            border-radius:9px!important;
+            transition:background .14s ease,border-color .14s ease,box-shadow .14s ease!important;
+            font:800 .82rem/1.2 system-ui,-apple-system,"Segoe UI",Arial,sans-serif!important;
+        }
+        [data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:hover{
+            background:rgba(227,25,55,.07)!important;
+            border-color:rgba(227,25,55,.22)!important;
+        }
+        [data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:has(input:checked){
+            background:linear-gradient(90deg,rgba(227,25,55,.22),rgba(19,43,71,.72))!important;
+            border-color:rgba(255,54,85,.44)!important;
+            box-shadow:inset 3px 0 0 #ff3655!important;
+        }
+        [data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label input[type="radio"]{display:none!important}
+        [data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label>div:has(input[type="radio"]){display:none!important;width:0!important;height:0!important;margin:0!important;padding:0!important}
+        [data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label [role="radio"]{display:none!important}
+        [data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label::before{
+            content:""!important;
+            display:inline-block!important;
+            width:1.72rem!important;
+            height:1.72rem!important;
+            flex:0 0 1.72rem!important;
+            border:1px solid rgba(236,22,56,.68)!important;
+            border-radius:7px!important;
+            background-color:#0b2038!important;
+            background-repeat:no-repeat!important;
+            background-position:center!important;
+            background-size:1.20rem 1.20rem!important;
+            box-shadow:inset 0 0 0 2px rgba(255,255,255,.025),0 4px 10px rgba(0,0,0,.25)!important;
+        }
+        [data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:has(input:checked)::before{
+            border-color:#ff3553!important;
+            background-color:#411225!important;
+            box-shadow:inset 0 0 0 2px rgba(255,255,255,.04),0 0 13px rgba(236,22,56,.48)!important;
+        }
+        [data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(1)::before{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGcgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZjdmN2ZiIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCI+PGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMTQiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSI0IiBmaWxsPSIjZWMxNjM4IiBzdHJva2U9IiNlYzE2MzgiLz48cGF0aCBkPSJNMzIgNnYxMk0zMiA0NnYxMk02IDMyaDEyTTQ2IDMyaDEyIi8+PC9nPjwvc3ZnPg==")!important}
+        [data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(2)::before{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGcgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZjdmN2ZiIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTEwIDU0aDQ0Ii8+PHJlY3QgeD0iMTMiIHk9IjM0IiB3aWR0aD0iOCIgaGVpZ2h0PSIxOCIgcng9IjIiLz48cmVjdCB4PSIyOCIgeT0iMjIiIHdpZHRoPSI4IiBoZWlnaHQ9IjMwIiByeD0iMiIgZmlsbD0iI2VjMTYzOCIgc3Ryb2tlPSIjZWMxNjM4Ii8+PHJlY3QgeD0iNDMiIHk9IjEyIiB3aWR0aD0iOCIgaGVpZ2h0PSI0MCIgcng9IjIiLz48L2c+PC9zdmc+")!important}
+        [data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(3)::before{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTYgMzRoMTJsNi0xNCA5IDI4IDgtMjAgNSA2aDEyIiBmaWxsPSJub25lIiBzdHJva2U9IiNmN2Y3ZmIiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PGNpcmNsZSBjeD0iMzMiIGN5PSIzNCIgcj0iMyIgZmlsbD0iI2VjMTYzOCIvPjwvc3ZnPg==")!important}
+        [data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(4)::before{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGcgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZjdmN2ZiIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCI+PHJlY3QgeD0iMTciIHk9IjE3IiB3aWR0aD0iMzAiIGhlaWdodD0iMzAiIHJ4PSI2Ii8+PHJlY3QgeD0iMjYiIHk9IjI2IiB3aWR0aD0iMTIiIGhlaWdodD0iMTIiIHJ4PSIyIiBmaWxsPSIjZWMxNjM4IiBzdHJva2U9IiNlYzE2MzgiLz48cGF0aCBkPSJNMjQgOHY5TTQwIDh2OU0yNCA0N3Y5TTQwIDQ3djlNOCAyNGg5TTggNDBoOU00NyAyNGg5TTQ3IDQwaDkiLz48L2c+PC9zdmc+")!important}
+        [data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(5)::before{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTE0IDE0aDM2djEyYTcgNyAwIDAgMCAwIDEydjEySDE0VjM4YTcgNyAwIDAgMCAwLTEyVjE0WiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZjdmN2ZiIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48cGF0aCBkPSJNMjcgMjJ2MjAiIHN0cm9rZT0iI2VjMTYzOCIgc3Ryb2tlLXdpZHRoPSI0IiBzdHJva2UtZGFzaGFycmF5PSI0IDUiLz48L3N2Zz4=")!important}
+        [data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(6)::before{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGcgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZjdmN2ZiIiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTE4IDIwSDh2LTEwIi8+PHBhdGggZD0iTTEwIDIwYTI0IDI0IDAgMSAxLTIgMjIiLz48Y2lyY2xlIGN4PSIzNCIgY3k9IjM0IiByPSIxNiIvPjxwYXRoIGQ9Ik0zNCAyNHYxMWw4IDUiIHN0cm9rZT0iI2VjMTYzOCIvPjwvZz48L3N2Zz4=")!important}
+        [data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(7)::before{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0iTTM2IDYgMTYgMzZoMTVsLTMgMjIgMjAtMzFIMzRsMi0yMVoiIGZpbGw9IiNmN2Y3ZmIiIHN0cm9rZT0iI2VjMTYzOCIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+")!important}
+        [data-testid="stSidebar"] [data-testid="stRadio"] [role="radiogroup"]>label:nth-child(8)::before{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHBhdGggZD0ibTEwIDIyIDEyIDkgMTAtMTcgMTAgMTctOSAyOEgxNUwxMCAyMloiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2Y3ZjdmYiIgc3Ryb2tlLXdpZHRoPSI0IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PGNpcmNsZSBjeD0iMzIiIGN5PSIzOSIgcj0iNCIgZmlsbD0iI2VjMTYzOCIvPjwvc3ZnPg==")!important}
+        .sk-nav-footer{
+            margin:.85rem .7rem 0!important;
+            padding-top:.7rem!important;
+            border-top:1px solid rgba(52,82,114,.52)!important;
+            color:#6f879f!important;
+            font-size:.59rem!important;
+            line-height:1.45!important;
             text-align:center!important;
-        }
-        .sk-nav-compact-crown{color:#ec1638;font-size:1.2rem;line-height:1}
-        .sk-nav-compact-script{color:#f5f1e9;font-family:Georgia,"Times New Roman",serif;font-size:1.55rem;font-weight:800;font-style:italic;line-height:.95}
-        .sk-nav-compact-king{color:#ec1638;font-family:Impact,"Arial Narrow",sans-serif;font-size:1.42rem;letter-spacing:.035em;line-height:1;text-transform:uppercase}
-        .sk-nav-compact-tag{margin-top:.38rem;color:#9fb3c5;font:700 .72rem/1.35 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
-        [data-testid="stSidebar"] .sk-nav-section{margin:.36rem .78rem .38rem!important;color:#ff536b!important;font-size:.65rem!important;letter-spacing:.14em!important}
-        [data-testid="stSidebar"] .sk-page-link{margin:.14rem .28rem!important}
-        [data-testid="stSidebar"] .sk-page-link a{
-            min-height:2.62rem!important;display:flex!important;align-items:center!important;
-            padding:.48rem .64rem!important;border:1px solid rgba(61,92,125,.34)!important;border-radius:10px!important;
-            background:linear-gradient(90deg,rgba(8,27,48,.62),rgba(5,19,35,.46))!important;
-            color:#d9e5ee!important;font:800 .78rem/1.2 system-ui,-apple-system,"Segoe UI",Arial,sans-serif!important;
-            box-shadow:inset 0 1px 0 rgba(255,255,255,.018)!important;
-        }
-        [data-testid="stSidebar"] .sk-page-link a:hover{
-            transform:translateX(2px)!important;border-color:rgba(236,22,56,.56)!important;
-            background:linear-gradient(90deg,rgba(31,55,82,.84),rgba(8,27,48,.76))!important;
-        }
-        [data-testid="stSidebar"] .sk-page-link.active a{
-            color:#fff!important;border-color:rgba(255,69,96,.72)!important;
-            background:linear-gradient(90deg,rgba(83,18,39,.96),rgba(9,31,55,.98))!important;
-            box-shadow:inset 3px 0 0 #ec1638,0 8px 20px rgba(0,0,0,.22),0 0 14px rgba(236,22,56,.10)!important;
-        }
-        [data-testid="stSidebar"] .sk-nav-footer{margin-top:1rem!important;color:#6f879f!important}
-        @media (max-width:640px){
-            [data-testid="stSidebar"],[data-testid="stSidebar"] > div:first-child{width:238px!important;min-width:238px!important}
+            letter-spacing:.035em!important;
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
+    nav_options = [
+        "Projection", "Distribution", "Form & Workload", "Model Card",
+        "Bet Tracker", "Projection History", "Daily Projection Run", "Top Plays",
+    ]
+    active_label = {
+        "projection": "Projection",
+        "bets": "Bet Tracker",
+        "history": "Projection History",
+        "daily": "Daily Projection Run",
+        "top": "Top Plays",
+    }.get(active, "Projection")
+    page_targets = {
+        "Bet Tracker": "pages/2_Bet_Tracker.py",
+        "Projection History": "pages/4_Projection_History.py",
+        "Daily Projection Run": "pages/5_Daily_Projection_Run.py",
+        "Top Plays": "pages/6_Top_Plays.py",
+    }
+
     with st.sidebar:
+        render_sidebar_brand()
+        selected = st.radio(
+            "Navigation",
+            nav_options,
+            index=nav_options.index(active_label),
+            label_visibility="collapsed",
+            key=f"secondary_command_nav_{active}",
+        )
+        if selected != active_label:
+            if selected in {"Projection", "Distribution", "Form & Workload", "Model Card"}:
+                st.session_state["projection_nav_target"] = selected
+                st.switch_page("streamlit_app.py")
+            else:
+                st.switch_page(page_targets[selected])
         st.markdown(
-            '<div class="sk-nav-brand"><div class="sk-nav-compact-crown">♛</div>'
-            '<div class="sk-nav-compact-script">StrikeOut</div>'
-            '<div class="sk-nav-compact-king">King 9000</div>'
-            '<div class="sk-nav-compact-tag">CLE-themed MLB starter projection engine</div></div>',
+            '<div class="sk-nav-footer">MODEL FIRST · MARKET SECOND<br>REPORT-ONLY SHADOW LANES STAY ISOLATED</div>',
             unsafe_allow_html=True,
         )
-        st.markdown('<div class="sk-nav-section">Command Center</div>', unsafe_allow_html=True)
-
-        links = [
-            ("projection", "streamlit_app.py", "⌂", "Projection"),
-            ("top", "pages/6_Top_Plays.py", "👑", "Top Plays"),
-            ("bets", "pages/2_Bet_Tracker.py", "◇", "Bet Tracker"),
-            ("history", "pages/4_Projection_History.py", "▣", "Projection History"),
-            ("daily", "pages/5_Daily_Projection_Run.py", "▤", "Daily Projection Run"),
-        ]
-        for key, page, icon, label in links:
-            cls = "sk-page-link active" if key == active else "sk-page-link"
-            st.markdown(f'<div class="{cls}">', unsafe_allow_html=True)
-            st.page_link(page, label=f"{icon}  {label}", use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        st.markdown('<div class="sk-nav-footer">MODEL FIRST · MARKET SECOND<br>REPORT-ONLY SHADOW LANES STAY ISOLATED</div>', unsafe_allow_html=True)

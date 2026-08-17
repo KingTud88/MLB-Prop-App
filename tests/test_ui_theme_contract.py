@@ -19,18 +19,22 @@ def test_shared_theme_keeps_cleveland_night_design_tokens():
     assert "stExpanderDetails" in source
 
 
-def test_sidebar_has_compact_custom_navigation():
+def test_sidebar_matches_main_projection_navigation_language():
     source = Path("navigation.py").read_text(encoding="utf-8")
-    assert "SECONDARY_COMPACT_SIDEBAR_V2" in source
-    assert "sk-nav-compact-crown" in source
-    assert "sk-nav-compact-script" in source
-    assert "sk-nav-compact-king" in source
-    assert "CLE-themed MLB starter projection engine" in source
+    assert "PROJECTION_PARITY_SIDEBAR_V3" in source
+    assert "render_sidebar_brand()" in source
     assert 'render_sidebar(active: str = "projection")' in source
-    rendered = source[source.index("with st.sidebar:"):]
-    assert "sk-nav-mascot" not in rendered
-    for label in ("Projection", "Top Plays", "Bet Tracker", "Projection History", "Daily Projection Run"):
+    assert "st.radio(" in source
+    assert 'label:nth-child(8)::before' in source
+    for label in (
+        "Projection", "Distribution", "Form & Workload", "Model Card",
+        "Bet Tracker", "Projection History", "Daily Projection Run", "Top Plays",
+    ):
         assert label in source
+    rendered = source[source.index("# PROJECTION_PARITY_SIDEBAR_V3"):]
+    assert "st.page_link" not in rendered
+    assert "sk-nav-compact-crown" not in rendered
+    assert "👑" not in rendered
 
 
 def test_streamlit_base_theme_matches_shared_skin():

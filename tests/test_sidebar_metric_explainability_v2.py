@@ -5,19 +5,22 @@ from engine.explainability_ui import METRIC_HELP_VERSION, metric_help
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_secondary_sidebar_uses_compact_projection_language():
+def test_secondary_sidebar_uses_exact_projection_navigation_language():
     source = (ROOT / "navigation.py").read_text(encoding="utf-8")
-    assert "SECONDARY_COMPACT_SIDEBAR_V2" in source
-    assert "sk-nav-compact-crown" in source
-    assert "sk-nav-compact-script" in source
-    assert "sk-nav-compact-king" in source
-    rendered = source[source.index("with st.sidebar:"):]
-    assert "sk-nav-mascot" not in rendered
-    assert "CLE-themed MLB starter projection engine" in rendered
+    assert "PROJECTION_PARITY_SIDEBAR_V3" in source
+    assert "render_sidebar_brand()" in source
+    assert 'st.radio(' in source
+    assert '"Projection", "Distribution", "Form & Workload", "Model Card"' in source
+    assert '"Bet Tracker", "Projection History", "Daily Projection Run", "Top Plays"' in source
+    assert 'label:nth-child(8)::before' in source
+    rendered = source[source.index("# PROJECTION_PARITY_SIDEBAR_V3"):]
+    assert "st.page_link" not in rendered
+    assert "👑" not in rendered
+    assert "▣" not in rendered
 
 
 def test_metric_help_is_formula_level_and_read_only():
-    assert METRIC_HELP_VERSION == "metric-help-v2"
+    assert METRIC_HELP_VERSION == "metric-help-v3"
     for key in (
         "history_k_hit_rate", "history_k_mae", "history_outs_mae",
         "tracker_roi", "daily_confirmed", "top_actionable",
@@ -37,7 +40,7 @@ def test_history_scoreboard_has_help_on_every_marked_metric():
         "history_hits_mae", "history_outs_mae",
     )
     for key in keys:
-        assert f'metric_help("{key}")' in source
+        assert f'metric_help("{key}"' in source
     assert "eligible intervals" in source
     assert "valid projection/result pairs" in source
 
@@ -52,3 +55,27 @@ def test_secondary_summary_scorecards_use_metric_help():
         source = (ROOT / path).read_text(encoding="utf-8")
         for key in keys:
             assert f'metric_help("{key}")' in source
+
+
+def test_main_projection_accepts_secondary_internal_tab_target():
+    source = (ROOT / "streamlit_app.py").read_text(encoding="utf-8")
+    assert 'st.session_state.pop("projection_nav_target",None)' in source
+    assert 'key="main_projection_navigation"' in source
+
+
+def test_history_archive_and_actionable_scorecards_have_individual_help():
+    source = (ROOT / "pages" / "4_Projection_History.py").read_text(encoding="utf-8")
+    for key in (
+        "history_archived_slates", "history_archived_pitchers", "history_manual_lines", "history_latest_slate",
+        "history_ladder_calls", "history_ladder_wins", "history_ladder_win_rate", "history_crushers",
+        "history_workload_snapshots", "history_pitch_mae", "history_bf_mae", "history_workload_outs_mae",
+        "history_paired_outcomes", "history_helping_signals", "history_hurting_signals", "history_learning_signals",
+    ):
+        assert f'metric_help("{key}"' in source
+
+
+def test_metric_help_v3_includes_current_value_and_limitation():
+    text = metric_help("history_k_hit_rate", current="180/209 = 86.1%")
+    assert "This box right now:" in text
+    assert "180/209 = 86.1%" in text
+    assert "What not to conclude:" in text

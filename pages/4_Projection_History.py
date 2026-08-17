@@ -227,10 +227,10 @@ else:
     latest_archive_date = max(archive_dates).strftime("%b %d") if len(archive_dates) else "—"
 
     a1, a2, a3, a4 = st.columns(4)
-    a1.metric("Archived slates", archived_slates)
-    a2.metric("Archived pitchers", len(user_archive))
-    a3.metric("Manual lines attached", manual_lines)
-    a4.metric("Latest slate", latest_archive_date)
+    a1.metric("Archived slates", archived_slates, help=metric_help("history_archived_slates", current=f"{archived_slates} unique slate date(s)"))
+    a2.metric("Archived pitchers", len(user_archive), help=metric_help("history_archived_pitchers", current=f"{len(user_archive)} archived pitcher-game row(s)"))
+    a3.metric("Manual lines attached", manual_lines, help=metric_help("history_manual_lines", current=f"{manual_lines} saved manual market line(s)"))
+    a4.metric("Latest slate", latest_archive_date, help=metric_help("history_latest_slate", current=f"Most recent archive date: {latest_archive_date}"))
     explain_popover(static_explanation("history_archive"),label="ⓘ EXPLAIN ARCHIVE COUNTERS")
     st.caption(f"{resolved_pitchers} archived pitcher row(s) currently have at least one resolved MLB outcome attached.")
 
@@ -332,16 +332,16 @@ h_hit_rate = float(h_hit_count / h_ready_count) if h_ready_count else None
 o_hit_rate = float(o_hit_count / o_ready_count) if o_ready_count else None
 
 col1, col2, col3, col4, col5, col6 = st.columns(6)
-col1.metric("Automatic evidence rows", len(df), help=metric_help("history_evidence_rows"))
-col2.metric("Resolved games", resolved_any_count, help=metric_help("history_resolved_games"))
-col3.metric("K range hits", k_hit_count, help=metric_help("history_k_range_hits"))
-col4.metric("K hit rate", f"{k_hit_rate:.1%}" if k_hit_rate is not None else "—", help=metric_help("history_k_hit_rate"))
-col5.metric("Hits range hits", h_hit_count, help=metric_help("history_hits_range_hits"))
-col6.metric("Hits hit rate", f"{h_hit_rate:.1%}" if h_hit_rate is not None else "—", help=metric_help("history_hits_hit_rate"))
+col1.metric("Automatic evidence rows", len(df), help=metric_help("history_evidence_rows", current=f"{len(df)} frozen evidence row(s) loaded"))
+col2.metric("Resolved games", resolved_any_count, help=metric_help("history_resolved_games", current=f"{resolved_any_count}/{len(df)} evidence row(s) have at least one final MLB stat"))
+col3.metric("K range hits", k_hit_count, help=metric_help("history_k_range_hits", current=f"{k_hit_count}/{k_ready_count} eligible K intervals contained the final Ks"))
+col4.metric("K hit rate", f"{k_hit_rate:.1%}" if k_hit_rate is not None else "—", help=metric_help("history_k_hit_rate", current=(f"{k_hit_count}/{k_ready_count} = {k_hit_rate:.1%}" if k_hit_rate is not None else "No eligible resolved K intervals yet")))
+col5.metric("Hits range hits", h_hit_count, help=metric_help("history_hits_range_hits", current=f"{h_hit_count}/{h_ready_count} eligible Hits intervals contained the final result"))
+col6.metric("Hits hit rate", f"{h_hit_rate:.1%}" if h_hit_rate is not None else "—", help=metric_help("history_hits_hit_rate", current=(f"{h_hit_count}/{h_ready_count} = {h_hit_rate:.1%}" if h_hit_rate is not None else "No eligible resolved Hits intervals yet")))
 
 outs_metrics1, outs_metrics2 = st.columns(2)
-outs_metrics1.metric("Outs range hits", o_hit_count, help=metric_help("history_outs_range_hits"))
-outs_metrics2.metric("Outs hit rate", f"{o_hit_rate:.1%}" if o_hit_rate is not None else "—", help=metric_help("history_outs_hit_rate"))
+outs_metrics1.metric("Outs range hits", o_hit_count, help=metric_help("history_outs_range_hits", current=f"{o_hit_count}/{o_ready_count} eligible Outs intervals contained the final result"))
+outs_metrics2.metric("Outs hit rate", f"{o_hit_rate:.1%}" if o_hit_rate is not None else "—", help=metric_help("history_outs_hit_rate", current=(f"{o_hit_count}/{o_ready_count} = {o_hit_rate:.1%}" if o_hit_rate is not None else "No eligible resolved Outs intervals yet")))
 
 mae1, mae2, mae3 = st.columns(3)
 k_mae_value = h_mae_value = o_mae_value = None
@@ -351,7 +351,7 @@ if k_resolved.any():
     k_valid_error = k_error.dropna()
     k_mae_n = int(len(k_valid_error))
     k_mae_value = float(k_valid_error.abs().mean()) if k_mae_n else None
-mae1.metric("Strikeout MAE", f"{k_mae_value:.2f} K" if k_mae_value is not None else "—", help=metric_help("history_k_mae"))
+mae1.metric("Strikeout MAE", f"{k_mae_value:.2f} K" if k_mae_value is not None else "—", help=metric_help("history_k_mae", current=(f"{k_mae_value:.2f} K average absolute miss across {k_mae_n} valid pair(s)" if k_mae_value is not None else "No valid resolved K pairs yet")))
 
 if h_resolved.any() and df.loc[h_resolved, "hits_projection"].notna().any():
     h_mask = h_resolved & df["hits_projection"].notna()
@@ -359,7 +359,7 @@ if h_resolved.any() and df.loc[h_resolved, "hits_projection"].notna().any():
     h_valid_error = h_error.dropna()
     h_mae_n = int(len(h_valid_error))
     h_mae_value = float(h_valid_error.abs().mean()) if h_mae_n else None
-mae2.metric("Hits Allowed MAE", f"{h_mae_value:.2f} H" if h_mae_value is not None else "—", help=metric_help("history_hits_mae"))
+mae2.metric("Hits Allowed MAE", f"{h_mae_value:.2f} H" if h_mae_value is not None else "—", help=metric_help("history_hits_mae", current=(f"{h_mae_value:.2f} H average absolute miss across {h_mae_n} valid pair(s)" if h_mae_value is not None else "No valid resolved Hits pairs yet")))
 
 if o_resolved.any() and df.loc[o_resolved, "outs_projection"].notna().any():
     o_mask = o_resolved & df["outs_projection"].notna()
@@ -367,7 +367,7 @@ if o_resolved.any() and df.loc[o_resolved, "outs_projection"].notna().any():
     o_valid_error = o_error.dropna()
     o_mae_n = int(len(o_valid_error))
     o_mae_value = float(o_valid_error.abs().mean()) if o_mae_n else None
-mae3.metric("Total Outs MAE", f"{o_mae_value:.2f} outs" if o_mae_value is not None else "—", help=metric_help("history_outs_mae"))
+mae3.metric("Total Outs MAE", f"{o_mae_value:.2f} outs" if o_mae_value is not None else "—", help=metric_help("history_outs_mae", current=(f"{o_mae_value:.2f} outs average absolute miss across {o_mae_n} valid pair(s)" if o_mae_value is not None else "No valid resolved Outs pairs yet")))
 
 st.caption("ⓘ Every scorecard now has its own info icon. 80% range HIT means the final result landed inside that market's frozen pregame interval; MAE measures average miss size.")
 explain_popover(
@@ -417,10 +417,10 @@ else:
     _crushers = crusher_report(df)
     _crusher_count = int(_crushers["Crusher Status"].eq("🔥 CRUSHER").sum()) if not _crushers.empty else 0
     kw1, kw2, kw3, kw4 = st.columns(4)
-    kw1.metric("Resolved ladder calls", len(_bettable))
-    kw2.metric("Ladder wins", _wins)
-    kw3.metric("Ladder win rate", f"{_win_rate:.1%}")
-    kw4.metric("Consistent crushers", _crusher_count)
+    kw1.metric("Resolved ladder calls", len(_bettable), help=metric_help("history_ladder_calls", current=f"{len(_bettable)} valid resolved whole-K target call(s)"))
+    kw2.metric("Ladder wins", _wins, help=metric_help("history_ladder_wins", current=f"{_wins}/{len(_bettable)} resolved ladder call(s) reached target"))
+    kw3.metric("Ladder win rate", f"{_win_rate:.1%}", help=metric_help("history_ladder_win_rate", current=f"{_wins}/{len(_bettable)} = {_win_rate:.1%}"))
+    kw4.metric("Consistent crushers", _crusher_count, help=metric_help("history_crushers", current=f"{_crusher_count} pitcher(s) currently meet the existing Crusher tracking rule"))
     explain_popover(Explanation("Bettable K Wins & Crushers","This block grades the model-supported whole-K milestone derived from each frozen strikeout projection and identifies pitchers who have repeatedly cleared those targets.","K Target is floor(Projected K) inside the supported 3+–12+ ladder. Crushers require the existing minimum resolved-call count, win-rate threshold and average margin above target.",note="This is descriptive model tracking. It does not retroactively change old projections or create a new live ranking rule."),label="ⓘ EXPLAIN K RESULTS")
 
     high_calls = _bettable.loc[_bettable.get("confidence", pd.Series(index=_bettable.index, dtype=str)).astype(str).str.upper().eq("HIGH")].copy()
@@ -534,10 +534,10 @@ else:
         bf_ready = expected_bf.notna() & actual_bf.notna()
         outs_ready_w = expected_outs.notna() & actual_outs_w.notna()
         wa1,wa2,wa3,wa4 = st.columns(4)
-        wa1.metric("workload-v1 snapshots", len(workload_rows))
-        wa2.metric("Pitch-count MAE", "—" if not pitch_ready.any() else f"{float((actual_pitches[pitch_ready]-expected_pitches[pitch_ready]).abs().mean()):.1f} pitches")
-        wa3.metric("BF MAE", "—" if not bf_ready.any() else f"{float((actual_bf[bf_ready]-expected_bf[bf_ready]).abs().mean()):.2f} BF")
-        wa4.metric("Workload-outs MAE", "—" if not outs_ready_w.any() else f"{float((actual_outs_w[outs_ready_w]-expected_outs[outs_ready_w]).abs().mean()):.2f} outs")
+        wa1.metric("workload-v1 snapshots", len(workload_rows), help=metric_help("history_workload_snapshots", current=f"{len(workload_rows)} workload-v1 snapshot row(s)"))
+        wa2.metric("Pitch-count MAE", "—" if not pitch_ready.any() else f"{float((actual_pitches[pitch_ready]-expected_pitches[pitch_ready]).abs().mean()):.1f} pitches", help=metric_help("history_pitch_mae", current=f"{int(pitch_ready.sum())} valid expected/actual pitch pair(s)"))
+        wa3.metric("BF MAE", "—" if not bf_ready.any() else f"{float((actual_bf[bf_ready]-expected_bf[bf_ready]).abs().mean()):.2f} BF", help=metric_help("history_bf_mae", current=f"{int(bf_ready.sum())} valid expected/actual BF pair(s)"))
+        wa4.metric("Workload-outs MAE", "—" if not outs_ready_w.any() else f"{float((actual_outs_w[outs_ready_w]-expected_outs[outs_ready_w]).abs().mean()):.2f} outs", help=metric_help("history_workload_outs_mae", current=f"{int(outs_ready_w.sum())} valid expected/actual workload-outs pair(s)"))
         upgrades = pd.to_numeric(workload_rows.get("workload_projection_delta_k"), errors="coerce") if "workload_projection_delta_k" in workload_rows.columns else pd.Series(dtype=float)
         if upgrades.notna().any():
             st.caption(f"Pregame workload upgrades recorded: {int(upgrades.notna().sum())} · average K projection change {float(upgrades.dropna().mean()):+.2f} K. Started/finished snapshots are never rewritten.")
@@ -678,10 +678,10 @@ else:
     learning = int(paired_signals["Status"].eq("LEARNING").sum())
     paired_outcomes = int(pd.to_numeric(paired_signals["Resolved Pairs"], errors="coerce").fillna(0).sum())
     s1,s2,s3,s4 = st.columns(4)
-    s1.metric("Paired market outcomes", paired_outcomes)
-    s2.metric("Helping signals", helping)
-    s3.metric("Hurting signals", hurting)
-    s4.metric("Still learning", learning)
+    s1.metric("Paired market outcomes", paired_outcomes, help=metric_help("history_paired_outcomes", current=f"{paired_outcomes} resolved before/after pair(s) across candidate signals"))
+    s2.metric("Helping signals", helping, help=metric_help("history_helping_signals", current=f"{helping} paired signal(s) currently meet HELPING"))
+    s3.metric("Hurting signals", hurting, help=metric_help("history_hurting_signals", current=f"{hurting} paired signal(s) currently meet HURTING"))
+    s4.metric("Still learning", learning, help=metric_help("history_learning_signals", current=f"{learning} paired signal(s) still need more evidence"))
     signal_view = paired_signals.copy()
     for col in ["Relative MAE Improvement", "Improved Share"]:
         signal_view[col] = signal_view[col].map(lambda x: "—" if pd.isna(x) else f"{float(x):+.1%}" if col == "Relative MAE Improvement" else f"{float(x):.1%}")
