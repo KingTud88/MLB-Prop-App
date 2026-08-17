@@ -32,6 +32,7 @@ from engine.signal_validation import context_performance_report, paired_signal_r
 from engine.team_leash import team_leash_walk_forward_report
 from engine.projection_crushers import bettable_k_label, bettable_k_result, bettable_k_target, crusher_report
 from engine.execution_history import backfill_legacy_execution_sides, grade_frozen_execution
+from engine.research_promotion_scoreboard import render_research_promotion_scoreboard
 
 ROOT = Path(__file__).resolve().parents[1]
 LOG_PATH = ROOT / "data" / "projection_log.csv"
@@ -422,6 +423,9 @@ explain_popover(
     ),
     label="ⓘ EXPLAIN EVIDENCE SCOREBOARD",
 )
+
+# RESEARCH_PROMOTION_SCOREBOARD_V1 · presentation/reporting only.
+render_research_promotion_scoreboard(ROOT)
 
 st.divider()
 st.markdown('<div class="history-kicker">Actionable K results</div>', unsafe_allow_html=True)
