@@ -1,3 +1,4 @@
 game_pk,game_date,pitcher_id,player,team,opponent,venue,game_time,captured_at_utc,reason,history_semantics,history_games_available_at_capture,actual_strikeouts,actual_hits_allowed,actual_outs,actual_batters_faced,actual_pitches,resolved_at_utc
 822698,2026-08-12,800600,Jackson Kent,WSH,CHC,Nationals Park,2026-08-12T22:45:00Z,2026-08-12T04:24:35.263172+00:00,no usable starter history,starter-only-v1,0,6.0,3.0,12.0,19.0,78.0,2026-08-13T02:58:29.789698+00:00
 823187,2026-08-12,687911,Bryan King,HOU,SFG,Oracle Park,2026-08-12T19:45:00Z,2026-08-12T04:59:32.575911+00:00,no usable starter history,starter-only-v1,0,1.0,0.0,2.0,4.0,19.0,2026-08-12T22:25:08.420646+00:00
+824514,2026-08-17,592288,Kent Emanuel,CIN,STL,Great American Ball Park,2026-08-17T17:40:00Z,2026-08-17T14:30:04.322171+00:00,no usable starter history,starter-only-v1,0,,,,,,
