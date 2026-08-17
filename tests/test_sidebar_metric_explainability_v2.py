@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from engine.explainability import metric_help
+from engine.explainability_ui import metric_help
 
 
 ROOT = Path(__file__).resolve().parents[1]
