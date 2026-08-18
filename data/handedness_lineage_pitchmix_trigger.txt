@@ -1,1 +1,0 @@
-trigger=handedness-lineage-pitchmix-readiness
