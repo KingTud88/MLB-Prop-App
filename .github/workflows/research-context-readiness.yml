@@ -15,6 +15,7 @@ concurrency:
 
 jobs:
   refresh:
+    # Suppress only bot-authored push recursion; user, schedule, and manual resolver runs must refresh research.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (
