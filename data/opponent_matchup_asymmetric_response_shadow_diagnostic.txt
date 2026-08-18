@@ -1,0 +1,15 @@
+pytest_rc=0
+report_rc=0
+--- pytest ---
+......                                                                   [100%]
+=============================== warnings summary ===============================
+../../../../../opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/_pytest/config/__init__.py:1345
+  /opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/_pytest/config/__init__.py:1345: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; anyio
+    self._mark_plugins_for_rewrite(hook, disable_autoload)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+6 passed, 1 warning in 1.78s
+--- report ---
+     Finding     Early_Read  Forward_Starts  Forward_Days  Forward_Opponents  Forward_Changed_Starts  Forward_Boost_Capped_Starts  Forward_Weak_Reduce_Neutralized_Starts  Changed_Relative_MAE_vs_Applied  Changed_Win_Share_vs_Applied  Candidate_Bias_Abs_Change_vs_Applied Boost_Component_Read Weak_Reduce_Component_Read                                                                                                                                                       Reason              Recommended_Action  Manual_Review_Ready  Report_Only Production_Authority                             Validation_Version
+INCONCLUSIVE LEAN_SUPPORTED               0             0                  0                       0                            0                                       0                              NaN                           NaN                                   NaN             LEARNING                   LEARNING Need 60 forward informative starts, 10 days, 15 opponents, and 15 starts in each changed component; have 0, 0, 0, BOOST_CAPPED=0, WEAK_REDUCE_NEUTRALIZED=0. KEEP_COMPOSITE_FROZEN_AND_LEARN                False         True                 NONE opponent-matchup-asymmetric-response-shadow-v1
+report_only=True production_authority=NONE boost_cap_k=0.1 weak_reduce_delta=(-1.0, -0.25]
