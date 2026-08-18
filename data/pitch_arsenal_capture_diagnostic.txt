@@ -1,6 +1,0 @@
-diagnostic=success
-arsenal_rows=28
-eligible_rows=28
-readiness_status=PITCHER_CONTEXT_READY_BATTER_CONTEXT_MISSING
-satisfied_requirements=4
-missing_requirements=BATTER_PITCH_K_RATES
