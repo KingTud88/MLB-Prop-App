@@ -1,0 +1,27 @@
+name: Research Evidence Command Center Diagnostic
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt pytest
+      - name: Build and print command center
+        run: |
+          PYTHONPATH=. pytest -q tests/test_research_evidence_command_center.py
+          PYTHONPATH=. python -m training.research_evidence_command_center >/tmp/command-center.txt
+          echo '--- COMMAND CENTER CSV ---'
+          cat data/research_evidence_command_center.csv
+          echo '--- SUMMARY CSV ---'
+          cat data/research_evidence_command_center_summary.csv
