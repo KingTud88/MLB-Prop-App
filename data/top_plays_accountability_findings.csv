@@ -6,6 +6,6 @@ TOTAL OUTS SAMPLE,LEARNING,2 settled Top Play leg(s),No market-specific conclusi
 HITS ALLOWED SAMPLE,LEARNING,0 settled Top Play leg(s),No market-specific conclusion is allowed yet.,True,NONE,top-plays-accountability-v1
 RANK ORDER,LEARNING,5 observed state(s); largest segment 1 settled leg(s),"Multiple states are present, but the largest segment has only 1 settled leg(s); keep learning.",True,NONE,top-plays-accountability-v1
 LINEUP CONTEXT,LEARNING,2 observed state(s); largest segment 5 settled leg(s),"Multiple states are present, but the largest segment has only 5 settled leg(s); keep learning.",True,NONE,top-plays-accountability-v1
-WEATHER CONTEXT,LEARNING,1 observed state(s); largest segment 5 settled leg(s),"Only one observed state exists, so this context cannot be compared yet.",True,NONE,top-plays-accountability-v1
+WEATHER CONTEXT,LEARNING,2 observed state(s); largest segment 5 settled leg(s),"Multiple states are present, but the largest segment has only 5 settled leg(s); keep learning.",True,NONE,top-plays-accountability-v1
 LINE-SOURCE CONTEXT,LEARNING,1 observed state(s); largest segment 5 settled leg(s),"Only one observed state exists, so this context cannot be compared yet.",True,NONE,top-plays-accountability-v1
 MODEL-vs-LINE MARGIN,LEARNING,Largest relative-margin band has 3 settled leg(s),"Projection/line separation is now tracked relative to the market line, but no margin band is large enough to trust yet.",True,NONE,top-plays-accountability-v1
