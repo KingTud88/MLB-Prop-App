@@ -1,0 +1,50 @@
+name: Handedness Lineage and Pitch Mix Readiness Diagnostic
+
+on:
+  push:
+    branches: [agent/handedness-lineage-pitchmix-readiness]
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    if: github.event.head_commit.message != 'Record handedness lineage and pitch mix readiness diagnostic'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt pytest
+      - name: Run targeted contracts
+        shell: bash
+        run: |
+          set +e
+          PYTHONPATH=. pytest -q tests/test_handedness_matchup_lineage_guard.py tests/test_handedness_matchup_audit.py tests/test_pitch_mix_readiness_audit.py > /tmp/tests.log 2>&1
+          TEST_RC=$?
+          PYTHONPATH=. python -m training.handedness_matchup_lineage_guard > /tmp/lineage.log 2>&1
+          LINEAGE_RC=$?
+          PYTHONPATH=. python -m training.handedness_matchup_audit --context-log data/handedness_matchup_effective_context.csv > /tmp/audit.log 2>&1
+          AUDIT_RC=$?
+          PYTHONPATH=. python -m training.pitch_mix_readiness_audit > /tmp/pitchmix.log 2>&1
+          PITCHMIX_RC=$?
+          {
+            echo "tests_rc=${TEST_RC}"
+            echo "lineage_rc=${LINEAGE_RC}"
+            echo "audit_rc=${AUDIT_RC}"
+            echo "pitchmix_rc=${PITCHMIX_RC}"
+            echo "--- tests ---"
+            tail -80 /tmp/tests.log
+            echo "--- lineage ---"
+            tail -30 /tmp/lineage.log
+            echo "--- audit ---"
+            tail -30 /tmp/audit.log
+            echo "--- pitchmix ---"
+            tail -30 /tmp/pitchmix.log
+          } > data/handedness_lineage_pitchmix_diagnostic.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/handedness_matchup_effective_context.csv data/handedness_matchup_lineage_gate.csv data/handedness_matchup_audit_detail.csv data/handedness_matchup_audit_segments.csv data/handedness_matchup_audit_gate.csv data/pitch_mix_readiness_fields.csv data/pitch_mix_readiness_summary.csv data/handedness_lineage_pitchmix_diagnostic.txt
+          git commit -m "Record handedness lineage and pitch mix readiness diagnostic"
+          git push origin HEAD:agent/handedness-lineage-pitchmix-readiness
