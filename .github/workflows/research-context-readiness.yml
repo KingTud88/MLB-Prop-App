@@ -44,6 +44,11 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt pytest
 
+      - name: Stamp research evidence refresh
+        run: >-
+          echo "RESEARCH_REFRESH_AT_UTC=$(python -c 'from datetime import datetime, timezone; print(datetime.now(timezone.utc).isoformat())')"
+          >> "$GITHUB_ENV"
+
       - name: Validate report-only context contracts
         run: >-
           PYTHONPATH=. pytest -q
@@ -56,6 +61,7 @@ jobs:
           tests/test_pitch_mix_whiff_forward_evaluation.py
           tests/test_research_evidence_command_center.py
           tests/test_research_evidence_history.py
+          tests/test_research_evidence_transition_digest.py
 
       - name: Build effective handedness context
         run: PYTHONPATH=. python -m training.handedness_matchup_lineage_guard
@@ -84,7 +90,14 @@ jobs:
         run: PYTHONPATH=. python -m training.research_evidence_command_center
 
       - name: Append change-only research evidence history
-        run: PYTHONPATH=. python -m training.research_evidence_history
+        run: >-
+          PYTHONPATH=. python -m training.research_evidence_history
+          --observed-at-utc "$RESEARCH_REFRESH_AT_UTC"
+
+      - name: Build exact-refresh research evidence transition digest
+        run: >-
+          PYTHONPATH=. python -m training.research_evidence_transition_digest
+          --refresh-at-utc "$RESEARCH_REFRESH_AT_UTC"
 
       - name: Commit report-only readiness evidence
         run: |
@@ -107,7 +120,9 @@ jobs:
             data/research_evidence_command_center.csv \
             data/research_evidence_command_center_summary.csv \
             data/research_evidence_history.csv \
-            data/research_evidence_history_summary.csv
+            data/research_evidence_history_summary.csv \
+            data/research_evidence_transition_digest.csv \
+            data/research_evidence_transition_digest_summary.csv
           if git diff --cached --quiet; then
             echo "No research context readiness changes to commit."
             exit 0
