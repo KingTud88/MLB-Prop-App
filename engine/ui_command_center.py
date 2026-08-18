@@ -7,6 +7,8 @@ from zoneinfo import ZoneInfo
 
 import streamlit as st
 
+from engine.ui_weather import clean_ui_text, weather_icon_for_display
+
 
 COMMAND_CENTER_UI_VERSION = "cle-command-center-v8"
 ASSET_DIR = Path(__file__).resolve().parents[1] / "assets"
@@ -745,19 +747,15 @@ def render_matchup_strip(
     """Render the matchup strip without changing any projection state."""
     lock_class = "cc-lock-pill locked" if locked else "cc-lock-pill"
     lock_label = "🔒 Locked" if locked else "◇ Unlocked"
-    level = str(weather_level or "UNKNOWN").upper()
+    level = clean_ui_text(weather_level, "UNKNOWN").upper()
     weather_class = {
         "HIGH": "weather-high",
         "ELEVATED": "weather-elevated",
         "LOW": "weather-low",
         "NONE": "weather-none",
+        "ROOF": "weather-none",
     }.get(level, "weather-unknown")
-    weather_symbol = str(weather_icon or "").strip() or {
-        "HIGH": "⛈️",
-        "ELEVATED": "🌩️",
-        "LOW": "🌧️",
-        "NONE": "☀️",
-    }.get(level, "—")
+    weather_symbol = weather_icon_for_display(level, weather_icon)
     weather = f'<div class="cc-weather-status-hero {weather_class}" aria-label="Weather delay risk">{_safe(weather_symbol)}</div>'
     logo = _team_logo_url(team_id)
     team_mark = (

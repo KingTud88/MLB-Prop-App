@@ -9,6 +9,7 @@ from engine.calibration import calibrate_blend
 from engine.hits_calibration import calibrate_hits_blend
 from engine.outs_calibration import calibrate_outs_blend
 from engine.starter_history import HISTORY_SEMANTICS, MIN_STARTS_FOR_TOP_PLAY
+from engine.ui_weather import clean_ui_text, weather_icon_for_display
 
 MARKET_STRIKEOUTS = "Strikeouts"
 MARKET_OUTS = "Total Outs"
@@ -162,9 +163,9 @@ def build_model_candidate(
         "Probability Semantics": row.get("probability_semantics", ""),
         "History Semantics": row.get("history_semantics", ""),
         "Captured At UTC": row.get("captured_at_utc", ""),
-        "Weather Icon": row.get("weather_icon", ""),
-        "Weather Risk": row.get("weather_delay_risk", ""),
-        "Weather Summary": row.get("weather_summary", ""),
+        "Weather Icon": weather_icon_for_display(row.get("weather_delay_risk", ""), row.get("weather_icon", ""), unknown=""),
+        "Weather Risk": clean_ui_text(row.get("weather_delay_risk", "")),
+        "Weather Summary": clean_ui_text(row.get("weather_summary", "")),
         "Rain Probability": row.get("weather_precip_probability", None),
     }
 

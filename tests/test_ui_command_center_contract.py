@@ -27,7 +27,7 @@ def test_main_projection_uses_v7_components_without_removing_model_flow():
     assert "render_matchup_strip(" in source
     assert "confidence=proj.confidence" in source
     assert "quality=proj.quality" in source
-    assert "weather_icon=weather_risk.icon or \"\"" in source
+    assert "weather_icon=_weather_icon" in source
     # Core projection and market-separation contracts remain in the page.
     assert "calculate_projection(" in source
     assert "load_pitcher_strikeout_odds" in source

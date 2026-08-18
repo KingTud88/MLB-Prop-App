@@ -678,7 +678,7 @@ if isinstance(slate, pd.DataFrame):
         display_cols = [c for c in display_cols if c in slate.columns]
         display = slate[display_cols].copy()
         if "weather_icon" in display.columns:
-            display["player"] = display.apply(lambda r: f"{r.get('player', 'Unknown')} {str(r.get('weather_icon', '') or '')}".strip(), axis=1)
+            display["player"] = display.apply(lambda r: f"{_clean_saved_text(r.get('player', 'Unknown'))} {_clean_saved_text(r.get('weather_icon', ''))}".strip(), axis=1)
             display = display.drop(columns=["weather_icon"])
 
         # Low/high columns are endpoints of ONE central 80% interval. Collapse

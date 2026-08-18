@@ -43,6 +43,7 @@ from engine.starter_history import TARGET_STARTER_HISTORY, combine_starter_histo
 from engine.opposing_batters import get_opposing_batters, matchup_summary
 from engine.lineup_context import LINEUP_CONFIRMED, get_confirmed_lineup
 from engine.weather_risk import WeatherDelayRisk, apply_roof_protection, fetch_weather_delay_risk
+from engine.ui_weather import saved_weather_risk, weather_icon_for_display
 from engine.workload_context import WorkloadContext, build_workload_context
 from engine.role_workload_gate import build_role_workload_decision
 from engine.team_leash import build_team_leash_context, candidate_workload_fields
@@ -871,6 +872,10 @@ opposing_batters=get_opposing_batters(
 )
 opponent_matchup=matchup_summary(opposing_batters,confirmed_lineup=lineup_context.confirmed)
 weather_risk=get_game_weather(game.venue_id,game.game_time,game.venue_latitude,game.venue_longitude)
+if not weather_risk.available:
+    frozen_weather=saved_weather_risk(load_projection_history(),game.game_pk,game.pitcher_id)
+    if frozen_weather is not None and frozen_weather.available:
+        weather_risk=frozen_weather
 confirmed_count=lineup_context.batter_count if lineup_context.confirmed else 0
 workload_ctx=build_workload_context(log,game.game_time)
 role_workload_decision=build_role_workload_decision(
@@ -1015,7 +1020,7 @@ elif nav=="Daily Projection Run":
 if not locked: st.info("Lock the pitcher in the left rail to freeze all projection outputs for this pitcher.")
 weather_marker=f" {weather_risk.icon}" if weather_risk.icon else ""
 _weather_level=str(weather_risk.level or "UNKNOWN").upper()
-_weather_icon=weather_risk.icon or ("☀️" if str(weather_risk.level or "").upper()=="NONE" else "✓" if weather_risk.available else "—")
+_weather_icon=weather_icon_for_display(_weather_level,weather_risk.icon)
 _weather_label={"HIGH":"DELAY RISK","ELEVATED":"RAIN WATCH","LOW":"LOW RAIN RISK","NONE":"CLEAR","ROOF":"ROOF PROTECTED","UNKNOWN":"UNAVAILABLE"}.get(_weather_level,_weather_level)
 _weather_action={"HIGH":"AVOID · DELAY RISK","ELEVATED":"CAUTION · RECHECK","LOW":"MONITOR NEAR FIRST PITCH","NONE":"NO DELAY SIGNAL","ROOF":"RAIN DELAY MITIGATED · VERIFY ROOF","UNKNOWN":"VERIFY WEATHER"}.get(_weather_level,"VERIFY WEATHER")
 _weather_class={"HIGH":"weather-high","ELEVATED":"weather-elevated","LOW":"weather-low","NONE":"weather-none","ROOF":"weather-none"}.get(_weather_level,"weather-unknown")
@@ -1037,7 +1042,7 @@ render_matchup_strip(
     status=game.status,
     game_time=game.game_time,
     locked=locked,
-    weather_icon=weather_risk.icon or "",
+    weather_icon=_weather_icon,
     weather_level=_weather_level,
     team_id=TEAM_ID_BY_ABBR.get(game.team,0),
 )

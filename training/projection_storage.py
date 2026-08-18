@@ -9,6 +9,8 @@ from typing import Any
 import pandas as pd
 import requests
 
+from engine.ui_weather import clean_ui_text, weather_icon_for_display
+
 DEFAULT_REPO = "KingTud88/MLB-Prop-App"
 DEFAULT_PATH = "data/projection_archive.csv"
 
@@ -110,6 +112,12 @@ def save_projection_archive(local_path: str | Path, frame: pd.DataFrame, secrets
 def overlay_manual_market_lines(slate: pd.DataFrame, archive: pd.DataFrame) -> pd.DataFrame:
     """Overlay durable manual execution lines onto frozen model rows without mutating projections."""
     result = slate.copy()
+    if "weather_icon" in result.columns:
+        levels = result["weather_delay_risk"] if "weather_delay_risk" in result.columns else pd.Series("UNKNOWN", index=result.index)
+        result["weather_icon"] = [
+            weather_icon_for_display(level, icon, unknown="")
+            for level, icon in zip(levels.tolist(), result["weather_icon"].tolist())
+        ]
     for col in (
         "manual_strikeout_line", "manual_outs_line", "manual_hits_allowed_line",
         "manual_outs_side", "manual_outs_decision_probability", "manual_outs_decision_reason", "manual_outs_side_frozen_at_utc",
@@ -163,8 +171,8 @@ def overlay_manual_market_lines(slate: pd.DataFrame, archive: pd.DataFrame) -> p
             value = saved.get(meta_col)
             if pd.notna(value) and str(value).strip():
                 result.at[idx, meta_col] = value
-        source = str(saved.get("archive_source", "") or "").strip()
-        committed = str(saved.get("archive_committed_at_utc", "") or "").strip()
+        source = clean_ui_text(saved.get("archive_source"))
+        committed = clean_ui_text(saved.get("archive_committed_at_utc"))
         if source:
             result.at[idx, "archive_source"] = source
         if committed:

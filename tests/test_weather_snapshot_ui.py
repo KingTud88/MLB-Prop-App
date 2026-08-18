@@ -21,8 +21,11 @@ def test_daily_and_top_plays_surface_weather_icons():
 
 def test_model_board_only_carries_weather_metadata():
     text=Path("engine/model_top_plays.py").read_text(encoding="utf-8")
-    assert '"Weather Icon": row.get("weather_icon", "")' in text
+    assert '"Weather Icon": weather_icon_for_display' in text
+    assert '"Weather Risk": clean_ui_text' in text
+    assert '"Weather Summary": clean_ui_text' in text
     assert 'sort_values(["Model Probability", "Data Quality"]' in text
+    assert 'sort_values(["Weather' not in text
 
 
 def test_changed_pages_compile():
