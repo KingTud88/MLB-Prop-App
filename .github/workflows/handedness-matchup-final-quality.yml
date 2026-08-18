@@ -1,0 +1,50 @@
+name: Handedness Matchup Audit Final Quality
+
+on:
+  push:
+    branches: [agent/handedness-matchup-audit]
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    if: github.event.head_commit.message != 'Record handedness matchup full quality'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt pytest
+      - name: Capture full quality result
+        shell: bash
+        run: |
+          set +e
+          python -m compileall -q streamlit_app.py navigation.py engine automation tests training > /tmp/compile.log 2>&1
+          COMPILE_RC=$?
+          pytest -q > /tmp/pytest.log 2>&1
+          TEST_RC=$?
+          PYTHONPATH=. python -m training.handedness_matchup_capture > /tmp/capture.log 2>&1
+          CAPTURE_RC=$?
+          PYTHONPATH=. python -m training.handedness_matchup_audit > /tmp/audit.log 2>&1
+          AUDIT_RC=$?
+          {
+            echo "compile_rc=${COMPILE_RC}"
+            echo "pytest_rc=${TEST_RC}"
+            echo "capture_rc=${CAPTURE_RC}"
+            echo "audit_rc=${AUDIT_RC}"
+            echo "--- compile ---"
+            tail -30 /tmp/compile.log
+            echo "--- pytest ---"
+            tail -120 /tmp/pytest.log
+            echo "--- capture ---"
+            tail -30 /tmp/capture.log
+            echo "--- audit ---"
+            tail -40 /tmp/audit.log
+          } > data/handedness_matchup_full_quality.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/handedness_matchup_full_quality.txt
+          git commit -m "Record handedness matchup full quality"
+          git push origin HEAD:agent/handedness-matchup-audit
