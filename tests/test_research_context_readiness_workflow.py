@@ -3,6 +3,14 @@ from pathlib import Path
 
 WORKFLOW = Path(".github/workflows/research-context-readiness.yml")
 BOT_PREFIX = "Automate projection capture and game resolution"
+FALLBACK_CRONS = (
+    "15 14 * * *",
+    "15 17 * * *",
+    "15 19 * * *",
+    "15 21 * * *",
+    "15 23 * * *",
+    "15 3 * * *",
+)
 
 
 def _text() -> str:
@@ -25,6 +33,14 @@ def test_research_readiness_keeps_bot_push_recursion_guard() -> None:
     text = _text()
     assert f"!startsWith(github.event.workflow_run.head_commit.message, '{BOT_PREFIX}')" in text
     assert "github.event.workflow_run.event != 'push' ||\n          github.event.workflow_run.actor.login != 'github-actions[bot]' ||\n          !startsWith" in text
+
+
+def test_research_readiness_has_one_hour_later_fallback_for_every_resolver_window() -> None:
+    text = _text()
+    assert "github.event_name == 'schedule' ||" in text
+    for cron in FALLBACK_CRONS:
+        assert f'- cron: "{cron}"' in text
+    assert text.count("- cron:") == len(FALLBACK_CRONS)
 
 
 def test_research_readiness_persists_freshness_outputs() -> None:
