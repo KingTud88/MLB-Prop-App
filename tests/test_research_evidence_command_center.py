@@ -156,6 +156,17 @@ def test_summary_is_operational_only_not_a_composite_research_score(tmp_path: Pa
     assert "Score" not in summary.index
 
 
+def test_current_repository_evidence_sources_are_readable_and_non_authoritative() -> None:
+    center = build_command_center(Path("data"))
+    summary = build_summary(center).iloc[0]
+    assert len(center) == 12
+    assert summary["Source_Missing_Lanes"] == 0
+    assert summary["All_Report_Only"] in (True, 1)
+    assert summary["All_Production_Authority_None"] in (True, 1)
+    assert center["No_Auto_Promotion"].all()
+    assert set(center["Production_Authority"]) == {"NONE"}
+
+
 def test_command_center_contract_is_report_only_and_preserves_locked_scoreboard() -> None:
     assert REPORT_ONLY is True
     assert PRODUCTION_AUTHORITY == "NONE"
