@@ -1,0 +1,40 @@
+name: Lineup Materiality Shadow Diagnostic
+
+on:
+  push:
+    branches: [agent/lineup-materiality-shadow]
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    if: github.event.head_commit.message != 'Record lineup materiality diagnostics'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt pytest
+      - name: Capture targeted diagnostics
+        shell: bash
+        run: |
+          set +e
+          PYTHONPATH=. pytest -q tests/test_lineup_materiality_shadow.py > /tmp/pytest.log 2>&1
+          TEST_RC=$?
+          PYTHONPATH=. python -m training.lineup_materiality_shadow > /tmp/report.log 2>&1
+          REPORT_RC=$?
+          {
+            echo "pytest_rc=${TEST_RC}"
+            echo "report_rc=${REPORT_RC}"
+            echo "--- pytest ---"
+            tail -80 /tmp/pytest.log
+            echo "--- report ---"
+            tail -80 /tmp/report.log
+          } > data/lineup_materiality_shadow_diagnostic.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/lineup_materiality_shadow_diagnostic.txt
+          git commit -m "Record lineup materiality diagnostics"
+          git push origin HEAD:agent/lineup-materiality-shadow
