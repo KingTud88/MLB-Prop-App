@@ -410,6 +410,20 @@ def _catcher(data_dir: Path) -> dict[str, object]:
     report_only, authority = _source_contract(row)
     metric = _number(row.get("Relative_MAE_Improvement"))
     direction = "NO_AUDITABLE_METRIC_YET" if metric is None else f"relative_mae={_pct(metric)}"
+
+    secondary_parts = [f"authentic_pregame_resolved={_integer(row.get('Authentic_Pregame_Resolved')) or 0}"]
+    maturity = _first(_read(data_dir, "catcher_prior_maturity_summary.csv"))
+    if not maturity.empty:
+        maturity_report_only, maturity_authority = _source_contract(maturity)
+        if maturity_report_only and maturity_authority.upper() == PRODUCTION_AUTHORITY:
+            secondary_parts.extend([
+                f"resolved_pool={_integer(maturity.get('Known_Resolved_Catchers')) or 0} catchers/{_integer(maturity.get('Resolved_Context_Starts')) or 0} starts",
+                f"next_appearance_ready={_integer(maturity.get('Next_Appearance_Ready_No_Auditable_Yet')) or 0}",
+                f"near_ready_3_4={_integer(maturity.get('Near_Ready_3_4')) or 0}",
+            ])
+        else:
+            secondary_parts.append("maturity_context=CONTROL_BLOCKED")
+
     return _base(
         lane="Catcher Context",
         category="CONTEXT",
@@ -423,7 +437,7 @@ def _catcher(data_dir: Path) -> dict[str, object]:
         breadth_label="CATCHERS",
         current_breadth=_integer(row.get("Distinct_Catchers")),
         required_breadth=8,
-        secondary=f"authentic_pregame_resolved={_integer(row.get('Authentic_Pregame_Resolved')) or 0}",
+        secondary="; ".join(secondary_parts),
         action="KEEP_LEARNING" if not _truthy(row.get("Recommended_Activation")) else "MANUAL_REVIEW_SOURCE_GATE",
         reason=_clean(row.get("Reason")),
         report_only=report_only,
