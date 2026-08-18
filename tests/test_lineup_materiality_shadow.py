@@ -68,10 +68,12 @@ def test_august_17_and_earlier_are_derivation_only() -> None:
 
 def test_supported_gate_requires_forward_size_and_changed_pair_value() -> None:
     rows = []
-    # 30 immaterial changes hurt full confirmed candidate; threshold reversion wins.
+    # 30 immaterial changes hurt the full confirmed candidate; threshold
+    # reversion wins while retaining a non-perfect pre-confirm baseline so
+    # relative performance versus that baseline is defined.
     for i in range(30):
         day = 18 + (i % 10)
-        rows.append(_row(f"2026-08-{day:02d}", 5.0, 5.10, 5.0, opponent=f"OPP{i % 12:02d}"))
+        rows.append(_row(f"2026-08-{day:02d}", 5.0, 5.10, 5.02, opponent=f"OPP{i % 12:02d}"))
     detail = build_detail(pd.DataFrame(rows))
     gate = build_gate(summarize(detail)).iloc[0]
     assert gate["Finding"] == "SUPPORTED"
