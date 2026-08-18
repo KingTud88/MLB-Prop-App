@@ -54,6 +54,7 @@ jobs:
           PYTHONPATH=. pytest -q
           tests/test_handedness_matchup_lineage_guard.py
           tests/test_handedness_matchup_audit.py
+          tests/test_catcher_prior_maturity.py
           tests/test_pitch_arsenal_capture.py
           tests/test_batter_pitch_whiff_capture.py
           tests/test_pitch_mix_readiness_audit.py
@@ -88,6 +89,9 @@ jobs:
       - name: Refresh preregistered pitch-mix Whiff forward evaluation
         run: PYTHONPATH=. python -m training.pitch_mix_whiff_forward_evaluation
 
+      - name: Refresh report-only catcher prior maturity
+        run: PYTHONPATH=. python -m training.catcher_prior_maturity
+
       - name: Refresh report-only research evidence command center
         run: PYTHONPATH=. python -m training.research_evidence_command_center
 
@@ -121,6 +125,8 @@ jobs:
             data/handedness_matchup_audit_detail.csv \
             data/handedness_matchup_audit_segments.csv \
             data/handedness_matchup_audit_gate.csv \
+            data/catcher_prior_maturity.csv \
+            data/catcher_prior_maturity_summary.csv \
             data/pitch_arsenal_context_log.csv \
             data/batter_pitch_whiff_context_log.csv \
             data/pitch_mix_readiness_fields.csv \
