@@ -1,0 +1,54 @@
+name: Pitch Mix Whiff Score Diagnostic
+
+on:
+  push:
+    branches: [agent/pitch-mix-whiff-score-preregister]
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    if: github.event.head_commit.message != 'Record preregistered pitch mix whiff score diagnostic'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt pytest
+      - name: Validate and capture preregistered score
+        run: |
+          PYTHONPATH=. pytest -q tests/test_pitch_mix_whiff_score_capture.py
+          PYTHONPATH=. python -m training.pitch_mix_whiff_score_capture
+          python - <<'PY'
+          from pathlib import Path
+          import pandas as pd
+
+          score = pd.read_csv('data/pitch_mix_whiff_score_log.csv') if Path('data/pitch_mix_whiff_score_log.csv').exists() else pd.DataFrame()
+          eligible = pd.DataFrame()
+          if not score.empty and 'audit_eligible' in score.columns:
+              mask = score['audit_eligible'].astype(str).str.lower().isin({'true','1','yes','y'})
+              eligible = score.loc[mask].copy()
+          lines = [
+              'diagnostic=success',
+              f'score_rows={len(score)}',
+              f'eligible_rows={len(eligible)}',
+          ]
+          for column in ['weighted_arsenal_usage_coverage','pitch_mix_whiff_score','baseline_whiff_rate','pitch_mix_whiff_delta','score_batters']:
+              if not eligible.empty and column in eligible.columns:
+                  values = pd.to_numeric(eligible[column], errors='coerce').dropna()
+                  if not values.empty:
+                      lines.append(f'{column}_min={values.min()}')
+                      lines.append(f'{column}_median={values.median()}')
+                      lines.append(f'{column}_max={values.max()}')
+          Path('data/pitch_mix_whiff_score_diagnostic.txt').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          PY
+      - name: Commit diagnostic evidence
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/pitch_mix_whiff_score_log.csv data/pitch_mix_whiff_score_diagnostic.txt
+          git commit -m "Record preregistered pitch mix whiff score diagnostic"
+          git push origin HEAD:agent/pitch-mix-whiff-score-preregister
