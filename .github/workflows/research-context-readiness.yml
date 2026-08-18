@@ -65,6 +65,7 @@ jobs:
           tests/test_research_evidence_transition_digest.py
           tests/test_research_manual_review_packet.py
           tests/test_research_manual_review_queue.py
+          tests/test_research_pipeline_freshness_audit.py
 
       - name: Build effective handedness context
         run: PYTHONPATH=. python -m training.handedness_matchup_lineage_guard
@@ -115,6 +116,9 @@ jobs:
           PYTHONPATH=. python -m training.research_manual_review_queue
           --queued-at-utc "$RESEARCH_REFRESH_AT_UTC"
 
+      - name: Audit research dependency freshness
+        run: PYTHONPATH=. python -m training.research_pipeline_freshness_audit
+
       - name: Commit report-only readiness evidence
         run: |
           git config user.name "github-actions[bot]"
@@ -144,7 +148,9 @@ jobs:
             data/research_manual_review_packet.csv \
             data/research_manual_review_packet_summary.csv \
             data/research_manual_review_queue.csv \
-            data/research_manual_review_queue_summary.csv
+            data/research_manual_review_queue_summary.csv \
+            data/research_pipeline_freshness_audit.csv \
+            data/research_pipeline_freshness_summary.csv
           if git diff --cached --quiet; then
             echo "No research context readiness changes to commit."
             exit 0
