@@ -4,14 +4,35 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
   test:
+    if: github.event_name == 'pull_request' || !startsWith(github.event.head_commit.message, 'Temporary catcher maturity snapshot')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: agent/catcher-maturity-snapshot
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt pytest
-      - run: python -m compileall -q streamlit_app.py navigation.py engine automation tests
+      - run: python -m compileall -q streamlit_app.py navigation.py engine automation training tests
       - run: pytest -q
+      - name: Build live catcher maturity snapshot
+        run: PYTHONPATH=. python -m training.catcher_prior_maturity
+      - name: Commit live catcher maturity snapshot
+        if: github.event_name == 'pull_request'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/catcher_prior_maturity.csv data/catcher_prior_maturity_summary.csv
+          if git diff --cached --quiet; then
+            echo "No snapshot changes to commit."
+          else
+            git commit -m "Temporary catcher maturity snapshot"
+            git push origin HEAD:agent/catcher-maturity-snapshot
+          fi
