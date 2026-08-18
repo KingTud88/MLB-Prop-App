@@ -1,0 +1,89 @@
+name: Catcher Prior Maturity Diagnostic
+
+on:
+  workflow_run:
+    workflows: ["Daily Projection Capture and Resolver"]
+    types: [completed]
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - training/catcher_prior_maturity.py
+      - tests/test_catcher_prior_maturity.py
+      - .github/workflows/catcher-prior-maturity.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: catcher-prior-maturity
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
+      (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main'
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Sync to current main
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest
+
+      - name: Validate catcher maturity contracts
+        run: >-
+          PYTHONPATH=. pytest -q
+          tests/test_catcher_context_validation.py
+          tests/test_catcher_prior_maturity.py
+
+      - name: Refresh report-only catcher prior maturity
+        run: PYTHONPATH=. python -m training.catcher_prior_maturity
+
+      - name: Commit catcher maturity evidence
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/catcher_prior_maturity.csv data/catcher_prior_maturity_summary.csv
+          if git diff --cached --quiet; then
+            echo "No catcher prior maturity changes to commit."
+            exit 0
+          fi
+          git commit -m "Automate projection capture and game resolution: refresh catcher prior maturity"
+
+          for attempt in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main; then
+              if git push origin HEAD:main; then
+                exit 0
+              fi
+            else
+              git rebase --abort || true
+              echo "Rebase conflict while refreshing catcher prior maturity; refusing to overwrite main."
+              exit 1
+            fi
+            echo "Push race on attempt ${attempt}; retrying against latest main."
+            sleep $((attempt * 2))
+          done
+
+          echo "Catcher prior maturity push failed after 3 attempts."
+          exit 1
