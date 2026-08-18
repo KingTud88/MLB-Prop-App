@@ -1,0 +1,15 @@
+diagnostic=success
+whiff_rows=28
+eligible_rows=28
+typed_pitch_coverage_min=0.9992902767920512
+typed_pitch_coverage_median=1.0
+classified_pitch_coverage_min=1.0
+classified_pitch_coverage_median=1.0
+sample_batter_coverage_min=0.8461538461538461
+sample_batter_coverage_median=0.9230769230769232
+swing_events_min=603
+swing_events_median=679.5
+readiness_status=READY_FOR_REPORT_ONLY_VALIDATION_DESIGN
+satisfied_requirements=5
+missing_requirements=nan
+current_lineage_rows=28
