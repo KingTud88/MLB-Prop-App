@@ -4,8 +4,12 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
   test:
+    if: github.event_name != 'push' || github.event.head_commit.message != 'Record lineage readiness trusted quality'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -13,5 +17,19 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt pytest
-      - run: python -m compileall -q streamlit_app.py navigation.py engine automation tests
+      - run: python -m compileall -q streamlit_app.py navigation.py engine automation tests training
       - run: pytest -q
+      - name: Generate lineage and readiness reports
+        run: |
+          PYTHONPATH=. python -m training.handedness_matchup_lineage_guard
+          PYTHONPATH=. python -m training.handedness_matchup_audit --context-log data/handedness_matchup_effective_context.csv
+          PYTHONPATH=. python -m training.pitch_mix_readiness_audit
+      - name: Record trusted quality success
+        if: github.event_name == 'push' && github.ref == 'refs/heads/agent/handedness-lineage-pitchmix-readiness'
+        run: |
+          printf 'full_quality=success\nverified_head=%s\n' "${GITHUB_SHA}" > data/lineage_readiness_quality_ok.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/handedness_matchup_effective_context.csv data/handedness_matchup_lineage_gate.csv data/handedness_matchup_audit_detail.csv data/handedness_matchup_audit_segments.csv data/handedness_matchup_audit_gate.csv data/pitch_mix_readiness_fields.csv data/pitch_mix_readiness_summary.csv data/lineage_readiness_quality_ok.txt
+          git commit -m "Record lineage readiness trusted quality"
+          git push origin HEAD:agent/handedness-lineage-pitchmix-readiness
