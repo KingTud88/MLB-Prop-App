@@ -1,2 +1,2 @@
 Evidence_Status,Authentic_Pregame_Resolved,Auditable_Starts,Distinct_Catchers,Observed_Days,Base_MAE,Candidate_MAE,Relative_MAE_Improvement,Candidate_Win_Share,Candidate_Loss_Share,Base_Bias,Candidate_Bias,Signal_Alignment,Mean_Absolute_Factor_Delta,Reason,Recommended_Activation,Report_Only,Production_Authority,Validation_Version
-LEARNING,32,0,0,0,,,,,,,,,,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",False,True,NONE,catcher-context-walkforward-v1
+LEARNING,36,0,0,0,,,,,,,,,,"Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",False,True,NONE,catcher-context-walkforward-v1
