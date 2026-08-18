@@ -1,0 +1,45 @@
+name: Handedness Matchup Audit Diagnostic
+
+on:
+  push:
+    branches: [agent/handedness-matchup-audit]
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    if: github.event.head_commit.message != 'Record handedness matchup audit diagnostics'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt pytest
+      - name: Capture targeted diagnostics
+        shell: bash
+        run: |
+          set +e
+          PYTHONPATH=. pytest -q tests/test_handedness_matchup_capture.py tests/test_handedness_matchup_audit.py > /tmp/pytest.log 2>&1
+          TEST_RC=$?
+          PYTHONPATH=. python -m training.handedness_matchup_capture > /tmp/capture.log 2>&1
+          CAPTURE_RC=$?
+          PYTHONPATH=. python -m training.handedness_matchup_audit > /tmp/audit.log 2>&1
+          AUDIT_RC=$?
+          {
+            echo "pytest_rc=${TEST_RC}"
+            echo "capture_rc=${CAPTURE_RC}"
+            echo "audit_rc=${AUDIT_RC}"
+            echo "--- pytest ---"
+            tail -100 /tmp/pytest.log
+            echo "--- capture ---"
+            tail -40 /tmp/capture.log
+            echo "--- audit ---"
+            tail -60 /tmp/audit.log
+          } > data/handedness_matchup_audit_diagnostic.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/handedness_matchup_context_log.csv data/handedness_matchup_audit_detail.csv data/handedness_matchup_audit_segments.csv data/handedness_matchup_audit_gate.csv data/handedness_matchup_audit_diagnostic.txt
+          git commit -m "Record handedness matchup audit diagnostics"
+          git push origin HEAD:agent/handedness-matchup-audit
