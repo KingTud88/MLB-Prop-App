@@ -15,3 +15,10 @@ jobs:
       - run: pip install -r requirements.txt pytest
       - run: python -m compileall -q streamlit_app.py navigation.py engine automation tests
       - run: pytest -q
+      - name: Print research evidence command center proof
+        run: |
+          PYTHONPATH=. python -m training.research_evidence_command_center >/tmp/command-center.txt
+          echo '--- COMMAND CENTER CSV ---'
+          cat data/research_evidence_command_center.csv
+          echo '--- SUMMARY CSV ---'
+          cat data/research_evidence_command_center_summary.csv
