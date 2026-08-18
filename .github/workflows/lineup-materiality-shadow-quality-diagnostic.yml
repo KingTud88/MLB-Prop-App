@@ -1,0 +1,45 @@
+name: Lineup Materiality Shadow Quality Diagnostic
+
+on:
+  push:
+    branches: [agent/lineup-materiality-shadow-current]
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    if: github.event.head_commit.message != 'Record lineup materiality full quality diagnostics'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt pytest
+      - name: Capture full quality diagnostics
+        shell: bash
+        run: |
+          set +e
+          python -m compileall -q streamlit_app.py navigation.py engine automation tests training > /tmp/compile.log 2>&1
+          COMPILE_RC=$?
+          pytest -q > /tmp/pytest.log 2>&1
+          TEST_RC=$?
+          PYTHONPATH=. python -m training.lineup_materiality_shadow > /tmp/report.log 2>&1
+          REPORT_RC=$?
+          {
+            echo "compile_rc=${COMPILE_RC}"
+            echo "pytest_rc=${TEST_RC}"
+            echo "report_rc=${REPORT_RC}"
+            echo "--- compile ---"
+            tail -40 /tmp/compile.log
+            echo "--- pytest ---"
+            tail -120 /tmp/pytest.log
+            echo "--- report ---"
+            tail -60 /tmp/report.log
+          } > data/lineup_materiality_shadow_quality_diagnostic.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/lineup_materiality_shadow_quality_diagnostic.txt
+          git commit -m "Record lineup materiality full quality diagnostics"
+          git push origin HEAD:agent/lineup-materiality-shadow-current
