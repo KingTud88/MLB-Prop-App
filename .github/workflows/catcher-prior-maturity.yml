@@ -1,4 +1,5 @@
 name: Catcher Prior Maturity Diagnostic
+# Report-only observability. This workflow never changes catcher thresholds or production authority.
 
 on:
   workflow_run:
