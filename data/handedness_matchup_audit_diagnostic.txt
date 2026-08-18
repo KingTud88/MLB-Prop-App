@@ -1,0 +1,24 @@
+pytest_rc=0
+capture_rc=0
+audit_rc=0
+--- pytest ---
+.......                                                                  [100%]
+=============================== warnings summary ===============================
+../../../../../opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/_pytest/config/__init__.py:1345
+  /opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/_pytest/config/__init__.py:1345: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; anyio
+    self._mark_plugins_for_rewrite(hook, disable_autoload)
+
+tests/test_handedness_matchup_capture.py::test_confirmed_hash_match_captures_lineage_and_hand_mix
+tests/test_handedness_matchup_capture.py::test_confirmed_hash_mismatch_is_not_auditable
+tests/test_handedness_matchup_capture.py::test_active_roster_context_dedupes_and_postgame_is_ignored
+  /home/runner/work/MLB-Prop-App/MLB-Prop-App/training/handedness_matchup_capture.py:198: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+    existing = pd.concat([existing, pd.DataFrame(additions)], ignore_index=True)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+7 passed, 4 warnings in 1.82s
+--- capture ---
+handedness_context_rows=0 report_only=True production_authority=NONE
+--- audit ---
+ Finding   Early_Read  Auditable_Starts  Observed_Days  Distinct_Opponents  RHP_Starts  LHP_Starts  RHP_Relative_MAE_Improvement  LHP_Relative_MAE_Improvement  RHP_Applied_Win_Share  LHP_Applied_Win_Share                                                                                           Reason                        Recommended_Action  Report_Only Production_Authority                      Validation_Version
+LEARNING INCONCLUSIVE                 0              0                   0           0           0                           NaN                           NaN                    NaN                    NaN Need 60 starts, 10 days, 15 opponents, 35 RHP starts, and 15 LHP starts; have 0, 0, 0, 0, and 0. KEEP_MATCHUP_HANDLING_UNCHANGED_AND_LEARN         True                 NONE handedness-matchup-audit-v1-report-only
+report_only=True production_authority=NONE
