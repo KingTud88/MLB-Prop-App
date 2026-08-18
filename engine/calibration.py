@@ -43,7 +43,7 @@ def _eligible_probability_rows(frame: pd.DataFrame) -> pd.DataFrame:
         & frame["history_semantics"].astype(str).eq(HISTORY_SEMANTICS)
         & game_date.notna()
         & captured.notna()
-        & captured.lt(game_date + pd.Timedelta(days=1))
+        & captured.lt(game_date + pd.Timedelta(1, unit="D"))
     )
     return frame.loc[mask].copy()
 
