@@ -1,0 +1,116 @@
+compile_rc=0
+pytest_rc=0
+report_rc=0
+--- compile ---
+--- pytest ---
+........................................................................ [ 18%]
+........................................................................ [ 37%]
+........................................................................ [ 55%]
+........................................................................ [ 74%]
+........................................................................ [ 92%]
+.............................                                            [100%]
+=============================== warnings summary ===============================
+tests/test_app_contract.py: 19 warnings
+tests/test_calibration_shadow_replay.py: 121 warnings
+tests/test_matchup_weather_integrity.py: 16 warnings
+tests/test_model_health.py: 3 warnings
+tests/test_strikeout_calibration_lineage.py: 1 warning
+  /home/runner/work/MLB-Prop-App/MLB-Prop-App/engine/calibration.py:46: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+    & captured.lt(game_date + pd.Timedelta(days=1))
+
+tests/test_calibration_health.py: 65 warnings
+tests/test_calibration_lineage.py: 11 warnings
+tests/test_calibration_shadow_replay.py: 125 warnings
+  /home/runner/work/MLB-Prop-App/MLB-Prop-App/training/calibration_lineage.py:50: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+    elif pd.notna(game_date.loc[idx]) and captured.loc[idx] >= game_date.loc[idx] + pd.Timedelta(days=1):
+
+tests/test_lineup_k_walkforward.py: 175 warnings
+  /home/runner/work/MLB-Prop-App/MLB-Prop-App/tests/test_lineup_k_walkforward.py:29: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+    game_time = pd.Timestamp("2026-06-01T23:00:00Z") + pd.Timedelta(days=day)
+
+tests/test_lineup_k_walkforward.py: 175 warnings
+  /home/runner/work/MLB-Prop-App/MLB-Prop-App/tests/test_lineup_k_walkforward.py:42: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+    "lineup_captured_at_utc": (game_time + pd.Timedelta(hours=capture_offset_hours)).isoformat(),
+
+tests/test_lineup_k_walkforward.py: 175 warnings
+  /home/runner/work/MLB-Prop-App/MLB-Prop-App/tests/test_lineup_k_walkforward.py:48: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+    "resolved_at_utc": (game_time + pd.Timedelta(hours=resolved_offset_hours)).isoformat(),
+
+tests/test_ml_shadow_report.py: 340 warnings
+  /home/runner/work/MLB-Prop-App/MLB-Prop-App/tests/test_ml_shadow_report.py:14: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+    date = start + pd.Timedelta(days=i)
+
+tests/test_opponent_matchup_boost_stress.py: 248 warnings
+  /home/runner/work/MLB-Prop-App/MLB-Prop-App/tests/test_opponent_matchup_boost_stress.py:31: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+    game_time = pd.Timestamp("2026-06-01T23:00:00Z") + pd.Timedelta(days=day)
+
+tests/test_opponent_matchup_boost_stress.py: 248 warnings
+  /home/runner/work/MLB-Prop-App/MLB-Prop-App/tests/test_opponent_matchup_boost_stress.py:40: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+    "captured_at_utc": (game_time - pd.Timedelta(hours=5)).isoformat(),
+
+tests/test_opponent_matchup_boost_stress.py: 248 warnings
+  /home/runner/work/MLB-Prop-App/MLB-Prop-App/tests/test_opponent_matchup_boost_stress.py:41: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+    "resolved_at_utc": (game_time + pd.Timedelta(hours=4)).isoformat(),
+
+tests/test_opponent_matchup_validation.py: 260 warnings
+  /home/runner/work/MLB-Prop-App/MLB-Prop-App/tests/test_opponent_matchup_validation.py:28: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+    game_time = pd.Timestamp("2026-06-01T23:00:00Z") + pd.Timedelta(days=day)
+
+tests/test_opponent_matchup_validation.py: 260 warnings
+  /home/runner/work/MLB-Prop-App/MLB-Prop-App/tests/test_opponent_matchup_validation.py:37: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+    "captured_at_utc": (game_time + pd.Timedelta(hours=capture_offset_hours)).isoformat(),
+
+tests/test_opponent_matchup_validation.py: 260 warnings
+  /home/runner/work/MLB-Prop-App/MLB-Prop-App/tests/test_opponent_matchup_validation.py:38: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+    "resolved_at_utc": (game_time + pd.Timedelta(hours=resolved_offset_hours)).isoformat(),
+
+tests/test_starter_observations.py::test_resolved_observation_becomes_fallback_starter_history
+  /home/runner/work/MLB-Prop-App/MLB-Prop-App/tests/test_starter_observations.py:75: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '2026-08-13T03:00:00+00:00' has dtype incompatible with float64, please explicitly cast to a compatible dtype first.
+    frame.loc[0, "resolved_at_utc"] = "2026-08-13T03:00:00+00:00"
+
+tests/test_starter_role.py::test_same_day_and_future_starts_cannot_change_context
+  /home/runner/work/MLB-Prop-App/MLB-Prop-App/tests/test_starter_role.py:53: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+    "date": [target, target + pd.Timedelta(days=5)],
+
+tests/test_team_leash.py: 211 warnings
+  /home/runner/work/MLB-Prop-App/MLB-Prop-App/tests/test_team_leash.py:16: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+    day = pd.Timestamp("2026-04-01") + pd.Timedelta(days=i)
+
+tests/test_team_leash.py::test_small_team_sample_is_neutral_and_context_only
+  /home/runner/work/MLB-Prop-App/MLB-Prop-App/tests/test_team_leash.py:38: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+    target = (pd.Timestamp("2026-04-01") + pd.Timedelta(days=MIN_TEAM_STARTS)).date().isoformat()
+
+tests/test_team_leash.py: 336 warnings
+  /home/runner/work/MLB-Prop-App/MLB-Prop-App/engine/team_leash.py:102: FutureWarning: The behavior of DataFrame concatenation with empty or all-NA entries is deprecated. In a future version, this will no longer exclude empty or all-NA columns when determining the result dtypes. To retain the old behavior, exclude the relevant entries before the concat operation.
+    combined = pd.concat([projected, observed], ignore_index=True)
+
+tests/test_team_leash_historical_validation.py: 55 warnings
+  /home/runner/work/MLB-Prop-App/MLB-Prop-App/tests/test_team_leash_historical_validation.py:18: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+    day = pd.Timestamp("2026-04-01") + pd.Timedelta(days=i)
+
+tests/test_umpire_k_live_validation.py: 98 warnings
+  /home/runner/work/MLB-Prop-App/MLB-Prop-App/tests/test_umpire_k_live_validation.py:27: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+    game_time = pd.Timestamp("2026-06-01T23:00:00Z") + pd.Timedelta(days=day)
+
+tests/test_umpire_k_live_validation.py: 98 warnings
+  /home/runner/work/MLB-Prop-App/MLB-Prop-App/tests/test_umpire_k_live_validation.py:39: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+    "umpire_captured_at_utc": (game_time + pd.Timedelta(hours=capture_offset_hours)).isoformat(),
+
+tests/test_umpire_k_live_validation.py: 98 warnings
+  /home/runner/work/MLB-Prop-App/MLB-Prop-App/tests/test_umpire_k_live_validation.py:47: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+    "resolved_at_utc": (game_time + pd.Timedelta(hours=resolved_offset_hours)).isoformat(),
+
+tests/test_workload_context.py::test_short_rest_conservatively_reduces_expected_exposure
+  /home/runner/work/MLB-Prop-App/MLB-Prop-App/tests/test_workload_context.py:38: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+    short = build_workload_context(history, last + pd.Timedelta(days=4))
+
+tests/test_workload_context.py::test_short_rest_conservatively_reduces_expected_exposure
+  /home/runner/work/MLB-Prop-App/MLB-Prop-App/tests/test_workload_context.py:39: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`).Please use a specific unit instead.
+    normal = build_workload_context(history, last + pd.Timedelta(days=6))
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+389 passed, 3651 warnings in 52.61s
+--- report ---
+     Finding     Early_Read  Forward_Pairs  Forward_Days  Forward_Opponents  Forward_Changed_Pairs  Changed_Relative_MAE_vs_Confirmed  Changed_Win_Share_vs_Confirmed  Materiality_Relative_MAE_vs_Preconfirm  Materiality_Bias_Abs_Change_vs_Confirmed                                                                                              Reason                          Recommended_Action  Manual_Review_Ready  Report_Only Production_Authority           Validation_Version
+INCONCLUSIVE LEAN_SUPPORTED              0             0                  0                      0                                NaN                             NaN                                     NaN                                       NaN Need 30 forward pairs, 10 days, 12 opponents, and 20 immaterial changed pairs; have 0, 0, 0, and 0. KEEP_MATERIALITY_THRESHOLD_FROZEN_AND_LEARN                False         True                 NONE lineup-materiality-shadow-v1
+report_only=True production_authority=NONE materiality_k=0.15
