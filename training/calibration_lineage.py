@@ -47,7 +47,7 @@ def classify_rows(frame: pd.DataFrame) -> pd.DataFrame:
             row_reasons.append("game_date")
         if pd.isna(captured.loc[idx]):
             row_reasons.append("capture_time")
-        elif pd.notna(game_date.loc[idx]) and captured.loc[idx] >= game_date.loc[idx] + pd.Timedelta(days=1):
+        elif pd.notna(game_date.loc[idx]) and captured.loc[idx] >= game_date.loc[idx] + pd.Timedelta(1, unit="D"):
             # We cannot reconstruct first pitch from every legacy row, but a
             # capture on/after the next UTC day is certainly not a trustworthy
             # frozen pregame snapshot for calibration purposes.
