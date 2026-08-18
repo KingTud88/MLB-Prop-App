@@ -1,15 +1,14 @@
 name: Pitch Mix Whiff Forward Diagnostic
 
 on:
-  push:
-    branches: [agent/pitch-mix-whiff-forward-eval]
+  pull_request:
+    branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   diagnose:
-    if: github.event.head_commit.message != 'Record pitch mix Whiff forward diagnostic'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -22,13 +21,9 @@ jobs:
         run: |
           PYTHONPATH=. pytest -q tests/test_pitch_mix_whiff_forward_evaluation.py
           PYTHONPATH=. python -m training.pitch_mix_whiff_forward_evaluation
-      - name: Commit diagnostic evidence
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            data/pitch_mix_whiff_forward_detail.csv \
-            data/pitch_mix_whiff_forward_summary.csv \
-            data/pitch_mix_whiff_forward_gate.csv
-          git commit -m "Record pitch mix Whiff forward diagnostic"
-          git push origin HEAD:agent/pitch-mix-whiff-forward-eval
+          echo '--- gate ---'
+          cat data/pitch_mix_whiff_forward_gate.csv
+          echo '--- summary ---'
+          cat data/pitch_mix_whiff_forward_summary.csv
+          echo '--- detail rows ---'
+          wc -l data/pitch_mix_whiff_forward_detail.csv
