@@ -13,5 +13,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt pytest
-      - run: python -m compileall -q streamlit_app.py navigation.py engine automation tests
+      - run: python -m compileall -q streamlit_app.py navigation.py engine automation training tests
       - run: pytest -q
+      - name: Run semantic freshness audit against current branch data
+        run: PYTHONPATH=. python -m training.research_pipeline_freshness_audit
