@@ -17,21 +17,26 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r requirements.txt pytest
-      - name: Capture targeted diagnostics
+      - name: Capture full quality diagnostics
         shell: bash
         run: |
           set +e
-          PYTHONPATH=. pytest -q tests/test_opponent_matchup_asymmetric_response_shadow.py > /tmp/pytest.log 2>&1
+          python -m compileall -q streamlit_app.py navigation.py engine automation tests training > /tmp/compile.log 2>&1
+          COMPILE_RC=$?
+          pytest -q > /tmp/pytest.log 2>&1
           TEST_RC=$?
           PYTHONPATH=. python -m training.opponent_matchup_asymmetric_response_shadow > /tmp/report.log 2>&1
           REPORT_RC=$?
           {
+            echo "compile_rc=${COMPILE_RC}"
             echo "pytest_rc=${TEST_RC}"
             echo "report_rc=${REPORT_RC}"
+            echo "--- compile ---"
+            tail -40 /tmp/compile.log
             echo "--- pytest ---"
-            tail -80 /tmp/pytest.log
+            tail -100 /tmp/pytest.log
             echo "--- report ---"
-            tail -80 /tmp/report.log
+            tail -40 /tmp/report.log
           } > data/opponent_matchup_asymmetric_response_shadow_diagnostic.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
