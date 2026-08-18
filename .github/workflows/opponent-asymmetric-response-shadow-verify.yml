@@ -1,0 +1,31 @@
+name: Opponent Asymmetric Response Shadow Verify
+
+on:
+  push:
+    branches: [agent/opponent-asymmetric-response-challenger]
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    if: github.event.head_commit.message != 'Record asymmetric response shadow quality success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt pytest
+      - name: Compile
+        run: python -m compileall -q streamlit_app.py navigation.py engine automation tests training
+      - name: Full pytest
+        run: pytest -q
+      - name: Record success sentinel
+        run: |
+          printf 'full_quality=success\nhead_before_sentinel=%s\n' "${GITHUB_SHA}" > data/opponent_matchup_asymmetric_response_shadow_quality_ok.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/opponent_matchup_asymmetric_response_shadow_quality_ok.txt
+          git commit -m "Record asymmetric response shadow quality success"
+          git push origin HEAD:agent/opponent-asymmetric-response-challenger
