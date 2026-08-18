@@ -1,0 +1,6 @@
+Requirement,Satisfied,Matched_Column,Non_Null_Rows,Reason,Report_Only,Production_Authority,Validation_Version
+PITCHER_PITCH_TYPES,False,,0,No persisted column in the current projection archive satisfies this input family.,True,NONE,pitch-mix-readiness-v1-report-only
+PITCHER_USAGE,False,,0,No persisted column in the current projection archive satisfies this input family.,True,NONE,pitch-mix-readiness-v1-report-only
+BATTER_PITCH_K_RATES,False,,0,No persisted column in the current projection archive satisfies this input family.,True,NONE,pitch-mix-readiness-v1-report-only
+PREGAME_CAPTURE_TIME,False,,0,No persisted column in the current projection archive satisfies this input family.,True,NONE,pitch-mix-readiness-v1-report-only
+LINEUP_FINGERPRINT,True,lineup_hash,154,Persisted pregame field family is available through lineup_hash.,True,NONE,pitch-mix-readiness-v1-report-only

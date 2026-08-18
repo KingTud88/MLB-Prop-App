@@ -1,0 +1,2 @@
+Status,Projection_Rows,Handedness_Context_Rows,Satisfied_Requirements,Required_Requirements,Missing_Requirements,Historical_Backfill_Allowed,Reason,Recommended_Action,Report_Only,Production_Authority,Validation_Version
+PARTIAL_CAPTURE_SCHEMA,261,28,1,5,PITCHER_PITCH_TYPES|PITCHER_USAGE|BATTER_PITCH_K_RATES|PREGAME_CAPTURE_TIME,False,"Some pitch-mix lineage inputs are persisted, but the full auditable input contract is incomplete.",COMPLETE_PREGAME_PITCH_MIX_CAPTURE_SCHEMA,True,NONE,pitch-mix-readiness-v1-report-only
