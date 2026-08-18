@@ -1,0 +1,38 @@
+pytest_rc=1
+report_rc=0
+--- pytest ---
+...F.                                                                    [100%]
+=================================== FAILURES ===================================
+_______ test_supported_gate_requires_forward_size_and_changed_pair_value _______
+
+    def test_supported_gate_requires_forward_size_and_changed_pair_value() -> None:
+        rows = []
+        # 30 immaterial changes hurt full confirmed candidate; threshold reversion wins.
+        for i in range(30):
+            day = 18 + (i % 10)
+            rows.append(_row(f"2026-08-{day:02d}", 5.0, 5.10, 5.0, opponent=f"OPP{i % 12:02d}"))
+        detail = build_detail(pd.DataFrame(rows))
+        gate = build_gate(summarize(detail)).iloc[0]
+>       assert gate["Finding"] == "SUPPORTED"
+E       AssertionError: assert 'MIXED' == 'SUPPORTED'
+E         
+E         - SUPPORTED
+E         + MIXED
+
+tests/test_lineup_materiality_shadow.py:77: AssertionError
+=============================== warnings summary ===============================
+../../../../../opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/_pytest/config/__init__.py:1345
+  /opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/_pytest/config/__init__.py:1345: PytestAssertRewriteWarning: Module already imported so cannot be rewritten; anyio
+    self._mark_plugins_for_rewrite(hook, disable_autoload)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_lineup_materiality_shadow.py::test_supported_gate_requires_forward_size_and_changed_pair_value - AssertionError: assert 'MIXED' == 'SUPPORTED'
+  
+  - SUPPORTED
+  + MIXED
+1 failed, 4 passed, 1 warning in 0.98s
+--- report ---
+     Finding     Early_Read  Forward_Pairs  Forward_Days  Forward_Opponents  Forward_Changed_Pairs  Changed_Relative_MAE_vs_Confirmed  Changed_Win_Share_vs_Confirmed  Materiality_Relative_MAE_vs_Preconfirm  Materiality_Bias_Abs_Change_vs_Confirmed                                                                                              Reason                          Recommended_Action  Manual_Review_Ready  Report_Only Production_Authority           Validation_Version
+INCONCLUSIVE LEAN_SUPPORTED              0             0                  0                      0                                NaN                             NaN                                     NaN                                       NaN Need 30 forward pairs, 10 days, 12 opponents, and 20 immaterial changed pairs; have 0, 0, 0, and 0. KEEP_MATERIALITY_THRESHOLD_FROZEN_AND_LEARN                False         True                 NONE lineup-materiality-shadow-v1
+report_only=True production_authority=NONE materiality_k=0.15
