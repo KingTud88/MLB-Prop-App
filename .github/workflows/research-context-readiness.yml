@@ -55,6 +55,7 @@ jobs:
           tests/test_pitch_mix_whiff_score_capture.py
           tests/test_pitch_mix_whiff_forward_evaluation.py
           tests/test_research_evidence_command_center.py
+          tests/test_research_evidence_history.py
 
       - name: Build effective handedness context
         run: PYTHONPATH=. python -m training.handedness_matchup_lineage_guard
@@ -82,6 +83,9 @@ jobs:
       - name: Refresh report-only research evidence command center
         run: PYTHONPATH=. python -m training.research_evidence_command_center
 
+      - name: Append change-only research evidence history
+        run: PYTHONPATH=. python -m training.research_evidence_history
+
       - name: Commit report-only readiness evidence
         run: |
           git config user.name "github-actions[bot]"
@@ -101,7 +105,9 @@ jobs:
             data/pitch_mix_whiff_forward_summary.csv \
             data/pitch_mix_whiff_forward_gate.csv \
             data/research_evidence_command_center.csv \
-            data/research_evidence_command_center_summary.csv
+            data/research_evidence_command_center_summary.csv \
+            data/research_evidence_history.csv \
+            data/research_evidence_history_summary.csv
           if git diff --cached --quiet; then
             echo "No research context readiness changes to commit."
             exit 0
