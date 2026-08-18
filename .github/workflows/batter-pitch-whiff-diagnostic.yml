@@ -1,0 +1,67 @@
+name: Batter Pitch Whiff Diagnostic
+
+on:
+  push:
+    branches: [agent/batter-pitch-whiff-capture]
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    if: github.event.head_commit.message != 'Record batter pitch whiff diagnostic'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt pytest
+      - name: Validate and capture live batter pitch whiff context
+        run: |
+          PYTHONPATH=. pytest -q tests/test_batter_pitch_whiff_capture.py tests/test_pitch_mix_readiness_audit.py
+          PYTHONPATH=. python -m training.batter_pitch_whiff_capture
+          PYTHONPATH=. python -m training.pitch_mix_readiness_audit
+          python - <<'PY'
+          from pathlib import Path
+          import pandas as pd
+
+          whiff = pd.read_csv('data/batter_pitch_whiff_context_log.csv') if Path('data/batter_pitch_whiff_context_log.csv').exists() else pd.DataFrame()
+          readiness = pd.read_csv('data/pitch_mix_readiness_summary.csv') if Path('data/pitch_mix_readiness_summary.csv').exists() else pd.DataFrame()
+          eligible = pd.DataFrame()
+          if not whiff.empty and 'audit_eligible' in whiff.columns:
+              mask = whiff['audit_eligible'].astype(str).str.lower().isin({'true','1','yes','y'})
+              eligible = whiff.loc[mask].copy()
+          lines = [
+              'diagnostic=success',
+              f'whiff_rows={len(whiff)}',
+              f'eligible_rows={len(eligible)}',
+          ]
+          for column in ['typed_pitch_coverage','classified_pitch_coverage','sample_batter_coverage','swing_events']:
+              if not eligible.empty and column in eligible.columns:
+                  values = pd.to_numeric(eligible[column], errors='coerce').dropna()
+                  if not values.empty:
+                      lines.append(f'{column}_min={values.min()}')
+                      lines.append(f'{column}_median={values.median()}')
+          if not readiness.empty:
+              row = readiness.iloc[0]
+              lines.extend([
+                  f"readiness_status={row.get('Status','')}",
+                  f"satisfied_requirements={row.get('Satisfied_Requirements','')}",
+                  f"missing_requirements={row.get('Missing_Requirements','')}",
+                  f"current_lineage_rows={row.get('Batter_Whiff_Current_Lineage_Rows','')}",
+              ])
+          Path('data/batter_pitch_whiff_diagnostic.txt').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          PY
+      - name: Commit diagnostic evidence
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            data/batter_pitch_whiff_context_log.csv \
+            data/pitch_mix_readiness_fields.csv \
+            data/pitch_mix_readiness_summary.csv \
+            data/batter_pitch_whiff_diagnostic.txt
+          git commit -m "Record batter pitch whiff diagnostic"
+          git push origin HEAD:agent/batter-pitch-whiff-capture
