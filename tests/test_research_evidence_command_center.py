@@ -89,6 +89,59 @@ def test_confirmed_lineup_preserves_source_status_metrics_and_reason(tmp_path: P
     assert row["Source_Reason"].startswith("Need at least 30 OOS pairs")
 
 
+def test_catcher_context_surfaces_maturity_without_changing_source_gate(tmp_path: Path) -> None:
+    _write(tmp_path, "catcher_context_validation_gate.csv", [{
+        "Evidence_Status": "LEARNING",
+        "Authentic_Pregame_Resolved": 36,
+        "Auditable_Starts": 0,
+        "Observed_Days": 0,
+        "Distinct_Catchers": 0,
+        "Reason": "Need at least 30 auditable starts, 8 catchers, and 10 days; have 0, 0, and 0.",
+        "Recommended_Activation": False,
+        "Report_Only": True,
+        "Production_Authority": "NONE",
+        "Validation_Version": "catcher-v1",
+    }])
+    _write(tmp_path, "catcher_prior_maturity_summary.csv", [{
+        "Known_Resolved_Catchers": 64,
+        "Resolved_Context_Starts": 156,
+        "Next_Appearance_Ready_No_Auditable_Yet": 1,
+        "Near_Ready_3_4": 28,
+        "Report_Only": True,
+        "Production_Authority": "NONE",
+        "Maturity_Version": "maturity-v1",
+    }])
+
+    center = build_command_center(tmp_path)
+    row = center.loc[center["Lane"].eq("Catcher Context")].iloc[0]
+    assert row["Status"] == "LEARNING"
+    assert row["Current_Starts"] == 0
+    assert row["Current_Breadth"] == 0
+    assert row["Ready_For_Manual_Review"] in (False, 0)
+    assert row["Recommended_Action"] == "KEEP_LEARNING"
+    assert row["Production_Authority"] == "NONE"
+    assert "authentic_pregame_resolved=36" in row["Secondary_Progress"]
+    assert "resolved_pool=64 catchers/156 starts" in row["Secondary_Progress"]
+    assert "next_appearance_ready=1" in row["Secondary_Progress"]
+    assert "near_ready_3_4=28" in row["Secondary_Progress"]
+
+    _write(tmp_path, "catcher_prior_maturity_summary.csv", [{
+        "Known_Resolved_Catchers": 999,
+        "Resolved_Context_Starts": 999,
+        "Next_Appearance_Ready_No_Auditable_Yet": 999,
+        "Near_Ready_3_4": 999,
+        "Report_Only": False,
+        "Production_Authority": "LIVE",
+    }])
+    blocked = build_command_center(tmp_path)
+    blocked_row = blocked.loc[blocked["Lane"].eq("Catcher Context")].iloc[0]
+    assert "maturity_context=CONTROL_BLOCKED" in blocked_row["Secondary_Progress"]
+    assert "999" not in blocked_row["Secondary_Progress"]
+    assert blocked_row["Current_Starts"] == 0
+    assert blocked_row["Ready_For_Manual_Review"] in (False, 0)
+    assert blocked_row["Production_Authority"] == "NONE"
+
+
 def test_top_plays_uses_only_overall_real_line_row(tmp_path: Path) -> None:
     _write(tmp_path, "top_plays_accountability_summary.csv", [
         {
