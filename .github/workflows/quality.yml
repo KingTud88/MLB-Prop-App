@@ -4,8 +4,12 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
   test:
+    if: github.event_name != 'push' || github.event.head_commit.message != 'Record handedness trusted quality success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -13,5 +17,14 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt pytest
-      - run: python -m compileall -q streamlit_app.py navigation.py engine automation tests
+      - run: python -m compileall -q streamlit_app.py navigation.py engine automation tests training
       - run: pytest -q
+      - name: Record trusted quality success
+        if: github.event_name == 'push' && github.ref == 'refs/heads/agent/handedness-matchup-audit'
+        run: |
+          printf 'full_quality=success\nverified_head=%s\n' "${GITHUB_SHA}" > data/handedness_matchup_trusted_quality_ok.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/handedness_matchup_trusted_quality_ok.txt
+          git commit -m "Record handedness trusted quality success"
+          git push origin HEAD:agent/handedness-matchup-audit
