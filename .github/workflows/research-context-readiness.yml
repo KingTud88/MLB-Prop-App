@@ -49,6 +49,7 @@ jobs:
           PYTHONPATH=. pytest -q
           tests/test_handedness_matchup_lineage_guard.py
           tests/test_handedness_matchup_audit.py
+          tests/test_pitch_arsenal_capture.py
           tests/test_pitch_mix_readiness_audit.py
 
       - name: Build effective handedness context
@@ -58,6 +59,9 @@ jobs:
         run: >-
           PYTHONPATH=. python -m training.handedness_matchup_audit
           --context-log data/handedness_matchup_effective_context.csv
+
+      - name: Capture frozen pregame pitcher arsenal context
+        run: PYTHONPATH=. python -m training.pitch_arsenal_capture
 
       - name: Refresh pitch-mix capture readiness audit
         run: PYTHONPATH=. python -m training.pitch_mix_readiness_audit
@@ -72,6 +76,7 @@ jobs:
             data/handedness_matchup_audit_detail.csv \
             data/handedness_matchup_audit_segments.csv \
             data/handedness_matchup_audit_gate.csv \
+            data/pitch_arsenal_context_log.csv \
             data/pitch_mix_readiness_fields.csv \
             data/pitch_mix_readiness_summary.csv
           if git diff --cached --quiet; then
