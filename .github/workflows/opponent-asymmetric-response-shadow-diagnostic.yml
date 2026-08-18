@@ -1,0 +1,40 @@
+name: Opponent Asymmetric Response Shadow Diagnostic
+
+on:
+  push:
+    branches: [agent/opponent-asymmetric-response-challenger]
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    if: github.event.head_commit.message != 'Record asymmetric response diagnostics'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt pytest
+      - name: Capture targeted diagnostics
+        shell: bash
+        run: |
+          set +e
+          PYTHONPATH=. pytest -q tests/test_opponent_matchup_asymmetric_response_shadow.py > /tmp/pytest.log 2>&1
+          TEST_RC=$?
+          PYTHONPATH=. python -m training.opponent_matchup_asymmetric_response_shadow > /tmp/report.log 2>&1
+          REPORT_RC=$?
+          {
+            echo "pytest_rc=${TEST_RC}"
+            echo "report_rc=${REPORT_RC}"
+            echo "--- pytest ---"
+            tail -80 /tmp/pytest.log
+            echo "--- report ---"
+            tail -80 /tmp/report.log
+          } > data/opponent_matchup_asymmetric_response_shadow_diagnostic.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/opponent_matchup_asymmetric_response_shadow_diagnostic.txt
+          git commit -m "Record asymmetric response diagnostics"
+          git push origin HEAD:agent/opponent-asymmetric-response-challenger
