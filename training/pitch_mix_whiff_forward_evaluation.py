@@ -180,8 +180,10 @@ def build_detail(scores: pd.DataFrame, projections: pd.DataFrame) -> pd.DataFram
 def build_summary(detail: pd.DataFrame) -> pd.DataFrame:
     detail = detail.copy() if detail is not None else pd.DataFrame(columns=DETAIL_COLUMNS)
     n = int(len(detail))
-    days = int(pd.Series(detail.get("game_date", dtype=object)).dropna().astype(str).nunique()) if n else 0
-    opponents = int(pd.Series(detail.get("opponent", dtype=object)).dropna().astype(str).nunique()) if n else 0
+    game_dates = detail["game_date"] if "game_date" in detail.columns else pd.Series(dtype=object)
+    opponent_values = detail["opponent"] if "opponent" in detail.columns else pd.Series(dtype=object)
+    days = int(game_dates.dropna().astype(str).nunique()) if n else 0
+    opponents = int(opponent_values.dropna().astype(str).nunique()) if n else 0
     delta = pd.to_numeric(detail.get("pitch_mix_whiff_delta"), errors="coerce") if n else pd.Series(dtype=float)
     residual = pd.to_numeric(detail.get("k_residual"), errors="coerce") if n else pd.Series(dtype=float)
     abs_residual = pd.to_numeric(detail.get("abs_k_residual"), errors="coerce") if n else pd.Series(dtype=float)
