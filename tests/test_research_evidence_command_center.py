@@ -89,6 +89,63 @@ def test_confirmed_lineup_preserves_source_status_metrics_and_reason(tmp_path: P
     assert row["Source_Reason"].startswith("Need at least 30 OOS pairs")
 
 
+def test_derivation_early_reads_never_replace_forward_metrics(tmp_path: Path) -> None:
+    _write(tmp_path, "opponent_matchup_asymmetric_response_shadow_gate.csv", [{
+        "Finding": "INCONCLUSIVE",
+        "Early_Read": "LEAN_SUPPORTED",
+        "Forward_Starts": 25,
+        "Forward_Days": 1,
+        "Forward_Opponents": 24,
+        "Forward_Changed_Starts": 9,
+        "Forward_Boost_Capped_Starts": 7,
+        "Forward_Weak_Reduce_Neutralized_Starts": 2,
+        "Changed_Relative_MAE_vs_Applied": -0.0093589,
+        "Changed_Win_Share_vs_Applied": 0.444444,
+        "Candidate_Bias_Abs_Change_vs_Applied": -0.036,
+        "Reason": "forward sample not mature",
+        "Recommended_Action": "KEEP_COMPOSITE_FROZEN_AND_LEARN",
+        "Manual_Review_Ready": False,
+        "Report_Only": True,
+        "Production_Authority": "NONE",
+        "Validation_Version": "asymmetric-v1",
+    }])
+    _write(tmp_path, "lineup_materiality_shadow_gate.csv", [{
+        "Finding": "INCONCLUSIVE",
+        "Early_Read": "LEAN_SUPPORTED",
+        "Forward_Pairs": 26,
+        "Forward_Days": 1,
+        "Forward_Opponents": 26,
+        "Forward_Changed_Pairs": 21,
+        "Changed_Relative_MAE_vs_Confirmed": -0.0058797,
+        "Changed_Win_Share_vs_Confirmed": 0.380952,
+        "Materiality_Relative_MAE_vs_Preconfirm": -0.0127783,
+        "Materiality_Bias_Abs_Change_vs_Confirmed": -0.0193,
+        "Reason": "forward sample not mature",
+        "Recommended_Action": "KEEP_MATERIALITY_THRESHOLD_FROZEN_AND_LEARN",
+        "Manual_Review_Ready": False,
+        "Report_Only": True,
+        "Production_Authority": "NONE",
+        "Validation_Version": "materiality-v1",
+    }])
+
+    center = build_command_center(tmp_path)
+    asymmetric = center.loc[center["Lane"].eq("Opponent Asymmetric Challenger")].iloc[0]
+    materiality = center.loc[center["Lane"].eq("Lineup Materiality Shadow")].iloc[0]
+
+    assert asymmetric["Status"] == "INCONCLUSIVE"
+    assert "changed_relative_mae=-0.94%" in asymmetric["Evidence_Direction"]
+    assert "changed_win_share=44.4%" in asymmetric["Evidence_Direction"]
+    assert "LEAN_SUPPORTED" not in asymmetric["Evidence_Direction"]
+    assert "derivation_read=LEAN_SUPPORTED" in asymmetric["Secondary_Progress"]
+
+    assert materiality["Status"] == "INCONCLUSIVE"
+    assert "changed_relative_mae=-0.59%" in materiality["Evidence_Direction"]
+    assert "changed_win_share=38.1%" in materiality["Evidence_Direction"]
+    assert "LEAN_SUPPORTED" not in materiality["Evidence_Direction"]
+    assert "materiality_vs_preconfirm=-1.28%" in materiality["Secondary_Progress"]
+    assert "derivation_read=LEAN_SUPPORTED" in materiality["Secondary_Progress"]
+
+
 def test_umpire_k_up_cap_uses_forward_row_only(tmp_path: Path) -> None:
     _write(tmp_path, "umpire_k_up_cap_shadow_summary.csv", [
         {
