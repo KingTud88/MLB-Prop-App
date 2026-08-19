@@ -12,16 +12,23 @@ def test_projection_uses_daily_lines_without_local_manual_market_editor():
     assert 'side_text=f"{projection_text} PROJ"' in source
 
 
-def test_daily_run_is_single_persistent_manual_line_source_for_all_three_markets():
+def test_daily_run_retires_manual_entry_ui_but_preserves_legacy_line_compatibility():
     projection = Path("streamlit_app.py").read_text(encoding="utf-8")
     daily = Path("pages/5_Daily_Projection_Run.py").read_text(encoding="utf-8")
+
+    # Historical MANUAL rows remain readable by Main Projection and durable
+    # storage even though new slates no longer expose hand-entry controls.
     assert "manual_k_line" in projection
     assert "manual_outs_line" in projection
     assert "manual_hits_line" in projection
-    assert "daily_manual_k_" in daily
-    assert "daily_manual_outs_" in daily
-    assert "daily_manual_hits_" in daily
-    assert "APPLY LINES + ADD TO PROJECTION ARCHIVE" in daily
+    assert "overlay_manual_market_lines" in daily
+    assert "commit_projection_archive" in daily
+
+    assert "📡 Automated sportsbook lines" in daily
+    assert "daily_manual_k_" not in daily
+    assert "daily_manual_outs_" not in daily
+    assert "daily_manual_hits_" not in daily
+    assert "daily_apply_archive" not in daily
 
 
 def test_manual_lines_do_not_enter_projection_feature_builder():
