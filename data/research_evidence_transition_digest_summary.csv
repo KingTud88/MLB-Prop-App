@@ -1,2 +1,2 @@
 Refresh_At_UTC,Digest_Status,Changed_Lanes,Status_Change_Lanes,Progress_Change_Lanes,Readiness_Change_Lanes,Action_Change_Lanes,Source_Version_Change_Lanes,Review_Ready_Changed_Lanes,Control_Violation_Lanes,Report_Only,Production_Authority,No_Auto_Promotion,Digest_Version
-2026-08-19T06:04:22.223290+00:00,NO_CHANGES,0,0,0,0,0,0,0,0,True,NONE,True,research-evidence-transition-digest-v1-report-only
+2026-08-19T13:46:03.818514+00:00,NO_CHANGES,0,0,0,0,0,0,0,0,True,NONE,True,research-evidence-transition-digest-v1-report-only
