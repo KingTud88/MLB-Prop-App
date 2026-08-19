@@ -132,6 +132,7 @@ def test_projection_log_overlay_preserves_manual_and_sets_all_three_real_lines()
     session = FakeSession([FakeResponse({"success": True, "data": [_event()], "nextCursor": None})])
     offers, _, _ = sgo.fetch_slate_offers("secret", "2026-08-19", session=session, sleep=lambda _: None)
     selected = sgo.select_preferred_book_pairs(offers)
+    selected["fetched_at_utc"] = "2026-08-19T18:00:00+00:00"
     log = pd.DataFrame([
         {
             "game_date": "2026-08-19", "player": "Tarik Skubal",
