@@ -15,3 +15,22 @@ jobs:
       - run: pip install -r requirements.txt pytest
       - run: python -m compileall -q streamlit_app.py navigation.py engine automation tests
       - run: pytest -q
+      - name: Live frozen pitch-mix score merge proof
+        run: PYTHONPATH=. python -m training.pitch_mix_whiff_score_capture
+      - name: Live frozen pitch-mix forward evaluation proof
+        run: PYTHONPATH=. python -m training.pitch_mix_whiff_forward_evaluation
+      - name: Report live proof counts
+        run: |
+          python - <<'PY'
+          import pandas as pd
+          scores = pd.read_csv('data/pitch_mix_whiff_score_log.csv')
+          detail = pd.read_csv('data/pitch_mix_whiff_forward_detail.csv')
+          gate = pd.read_csv('data/pitch_mix_whiff_forward_gate.csv')
+          eligible = scores['audit_eligible'].astype(str).str.lower().isin({'true','1','yes','y'}).sum()
+          print(f'LIVE_PROOF_SCORE_ROWS={len(scores)} ELIGIBLE_SCORE_ROWS={int(eligible)}')
+          print(f'LIVE_PROOF_RESOLVED_ROWS={len(detail)}')
+          if not detail.empty:
+              print('LIVE_PROOF_LINEUP_SOURCE_COUNTS=' + detail['lineup_source'].value_counts().sort_index().to_dict().__repr__())
+              print('LIVE_PROOF_PLAYERS=' + '|'.join(detail['player'].astype(str).tolist()))
+          print('LIVE_PROOF_GATE=' + gate.to_dict(orient='records').__repr__())
+          PY
