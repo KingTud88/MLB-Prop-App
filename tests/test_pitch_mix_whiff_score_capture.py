@@ -12,6 +12,7 @@ from training.pitch_mix_whiff_score_capture import (
     REPORT_ONLY,
     VERSION,
     build_score_frame,
+    merge_score_log,
     score_one_context,
 )
 
@@ -72,6 +73,12 @@ def whiff(
         "batter_pitch_counts_json": json.dumps(counts),
         "audit_eligible": eligible,
     }])
+
+
+def score_frame(lineup_source: str = "ACTIVE_ROSTER", lineup_hash: str = "", delta: float = 0.01) -> pd.DataFrame:
+    row = score_one_context(whiff(lineup_source, lineup_hash).iloc[0], arsenal().iloc[0])
+    row["pitch_mix_whiff_delta"] = delta
+    return pd.DataFrame([row])
 
 
 def test_confirmed_lineup_uses_equal_batter_weighting() -> None:
@@ -141,6 +148,31 @@ def test_matching_current_context_produces_report_only_score() -> None:
     assert row["formula_id"] == FORMULA_ID
     assert row["production_authority"] == "NONE"
     assert row["no_projection_adjustment"] in (True, 1)
+
+
+def test_existing_frozen_score_survives_when_current_lineage_changes() -> None:
+    existing = score_frame("ACTIVE_ROSTER", "", delta=0.01)
+    current = score_frame("CONFIRMED_LINEUP", "new-hash", delta=0.02)
+    merged = merge_score_log(existing, current)
+    assert len(merged) == 2
+    assert merged.iloc[0]["lineup_source"] == "ACTIVE_ROSTER"
+    assert merged.iloc[0]["pitch_mix_whiff_delta"] == pytest.approx(0.01)
+    assert merged.iloc[1]["lineup_source"] == "CONFIRMED_LINEUP"
+
+
+def test_same_context_rerun_cannot_overwrite_first_frozen_score() -> None:
+    existing = score_frame("ACTIVE_ROSTER", "", delta=0.01)
+    rerun = score_frame("ACTIVE_ROSTER", "", delta=0.99)
+    merged = merge_score_log(existing, rerun)
+    assert len(merged) == 1
+    assert merged.iloc[0]["pitch_mix_whiff_delta"] == pytest.approx(0.01)
+
+
+def test_empty_current_frame_does_not_erase_existing_frozen_scores() -> None:
+    existing = score_frame("ACTIVE_ROSTER", "", delta=-0.03)
+    merged = merge_score_log(existing, pd.DataFrame())
+    assert len(merged) == 1
+    assert merged.iloc[0]["pitch_mix_whiff_delta"] == pytest.approx(-0.03)
 
 
 def test_contract_is_report_only_and_preregistered() -> None:
