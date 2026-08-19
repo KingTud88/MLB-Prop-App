@@ -50,7 +50,7 @@ from engine.team_leash import build_team_leash_context, candidate_workload_field
 from engine.ml_shadow_ui import render_ml_shadow_dashboard
 from engine.bet_lean import aligned_bet_lean
 from engine.alt_k import best_alt_k
-from engine.odds_snapshot import load_pitcher_strikeout_odds
+from engine.sportsgameodds import load_pitcher_market_odds
 from engine.bet_tracker import make_bet_record, make_parlay_record
 from training.bet_storage import append_bet
 from training.projection_storage import load_projection_archive, overlay_manual_market_lines
@@ -906,7 +906,7 @@ active_hits_line=_durable_line("active_hits_allowed_line")
 active_k_source=_durable_source("active_strikeout_line_source")
 active_outs_source=_durable_source("active_outs_line_source")
 active_hits_source=_durable_source("active_hits_allowed_line_source")
-odds_rows=load_pitcher_strikeout_odds(game.pitcher_name,selected_date.isoformat())
+odds_rows=load_pitcher_market_odds(game.pitcher_name,selected_date.isoformat())
 odds_err=("" if odds_rows else "No current automated sportsbook line has been captured for this pitcher/slate yet.")
 
 def _saved_market_source(rows, market):
