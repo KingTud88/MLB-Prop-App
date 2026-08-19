@@ -1,13 +1,11 @@
 name: Research Context Readiness
 
 on:
-  workflow_run:
-    workflows: ["Daily Projection Capture and Resolver"]
-    types: [completed]
+  workflow_call:
   schedule:
     # Fallback self-heal windows run one hour after each resolver cron. The
     # resolver has a 20-minute timeout, so these avoid normal overlap while
-    # guaranteeing research evidence can refresh if workflow_run delivery is missed.
+    # guaranteeing research evidence can refresh if the direct resolver call is missed.
     - cron: "15 14 * * *"
     - cron: "15 17 * * *"
     - cron: "15 19 * * *"
@@ -25,19 +23,6 @@ concurrency:
 
 jobs:
   refresh:
-    # Suppress only bot-authored push recursion; user, schedule, and manual resolver runs must refresh research.
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'schedule' ||
-      (
-        github.event.workflow_run.conclusion == 'success' &&
-        github.event.workflow_run.head_branch == 'main' &&
-        (
-          github.event.workflow_run.event != 'push' ||
-          github.event.workflow_run.actor.login != 'github-actions[bot]' ||
-          !startsWith(github.event.workflow_run.head_commit.message, 'Automate projection capture and game resolution')
-        )
-      )
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
