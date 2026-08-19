@@ -161,8 +161,8 @@ game_date,game_pk,pitcher_id,player,team,team_id,catcher_id,catcher_name,catcher
 2026-08-18,823341,677952,Braxton Ashcraft,PIT,134,804668.0,Rafael Flores Jr.,MLB_POSTED_LINEUP,True,2026-08-18T21:02:44.392362+00:00,1.0,REPORT_ONLY,4.0,80.0,28.0,24.0,catcher-context-v1-report-only
 2026-08-18,824398,687931,Carson Whisenhunt,SFG,137,668800.0,Andrew Knizner,MLB_POSTED_LINEUP,True,2026-08-18T19:42:33.464873+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-18,824398,656492,Foster Griffin,CLE,114,672275.0,Patrick Bailey,MLB_POSTED_LINEUP,True,2026-08-18T19:42:33.464873+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
-2026-08-18,824475,681517,Kyle Leahy,STL,138,686780.0,Pedro Pagés,MLB_POSTED_LINEUP,True,2026-08-18T19:42:33.464873+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
-2026-08-18,824475,671096,Andrew Abbott,CIN,113,663886.0,Tyler Stephenson,MLB_POSTED_LINEUP,True,2026-08-18T19:42:33.464873+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-18,824475,681517,Kyle Leahy,STL,138,686780.0,Pedro Pagés,MLB_POSTED_LINEUP,True,2026-08-18T19:42:33.464873+00:00,1.0,REPORT_ONLY,6.0,90.0,18.0,15.0,catcher-context-v1-report-only
+2026-08-18,824475,671096,Andrew Abbott,CIN,113,663886.0,Tyler Stephenson,MLB_POSTED_LINEUP,True,2026-08-18T19:42:33.464873+00:00,1.0,REPORT_ONLY,6.0,98.0,26.0,19.0,catcher-context-v1-report-only
 2026-08-18,822938,667755,José Soriano,TOR,141,672386.0,Alejandro Kirk,MLB_POSTED_LINEUP,True,2026-08-18T19:42:33.464873+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-18,822938,607259,Nick Martinez,TBR,139,689414.0,Liam Hicks,MLB_POSTED_LINEUP,True,2026-08-18T19:42:33.464873+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-18,823423,806188,Cade Gibson,MIA,146,640459.0,Brian Navarreto,MLB_POSTED_LINEUP,True,2026-08-18T21:02:44.392362+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
