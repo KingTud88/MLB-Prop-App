@@ -155,3 +155,8 @@ jobs:
 
           echo "Projection/history-log push failed after 3 attempts."
           exit 1
+
+  research-context-readiness:
+    needs: projection-log
+    if: needs.projection-log.result == 'success'
+    uses: ./.github/workflows/research-context-readiness.yml
