@@ -891,23 +891,34 @@ hits_seed=int(hashlib.sha256(f"hits|{game.key}|{game.game_time}|{APP_VERSION}".e
 hits_proj=project_hits_allowed(log,expected_bf=features_for_hits["expected_bf"],bf_sd=workload_ctx.bf_sd,opponent_hit_rate=float(opponent_matchup.get("hit_rate",.235)),seed=hits_seed,draws=25000,lines=(3.5,4.5,5.5,6.5,7.5,8.5))
 # MAIN_PROJECTION_DURABLE_LINES_V1
 durable_archive=load_projection_archive(ARCHIVE_PATH,st.secrets)
-_manual_probe=pd.DataFrame([{"game_pk":game.game_pk,"pitcher_id":game.pitcher_id}])
-_manual_probe=overlay_manual_market_lines(_manual_probe,durable_archive)
-_manual_row=_manual_probe.iloc[0] if not _manual_probe.empty else pd.Series(dtype=object)
+_active_probe=pd.DataFrame([{"game_pk":game.game_pk,"pitcher_id":game.pitcher_id}])
+_active_probe=overlay_manual_market_lines(_active_probe,durable_archive)
+_active_row=_active_probe.iloc[0] if not _active_probe.empty else pd.Series(dtype=object)
 def _durable_line(col):
-    value=pd.to_numeric(pd.Series([_manual_row.get(col)]),errors="coerce").iloc[0]
+    value=pd.to_numeric(pd.Series([_active_row.get(col)]),errors="coerce").iloc[0]
     return None if pd.isna(value) else float(value)
 def _durable_source(col):
-    value=_manual_row.get(col,"")
+    value=_active_row.get(col,"")
     return "" if pd.isna(value) else str(value).strip().upper()
-manual_k_line=_durable_line("active_strikeout_line")
-manual_outs_line=_durable_line("active_outs_line")
-manual_hits_line=_durable_line("active_hits_allowed_line")
-manual_k_source=_durable_source("active_strikeout_line_source")
-manual_outs_source=_durable_source("active_outs_line_source")
-manual_hits_source=_durable_source("active_hits_allowed_line_source")
+active_k_line=_durable_line("active_strikeout_line")
+active_outs_line=_durable_line("active_outs_line")
+active_hits_line=_durable_line("active_hits_allowed_line")
+active_k_source=_durable_source("active_strikeout_line_source")
+active_outs_source=_durable_source("active_outs_line_source")
+active_hits_source=_durable_source("active_hits_allowed_line_source")
 odds_rows=load_pitcher_strikeout_odds(game.pitcher_name,selected_date.isoformat())
-odds_err=("" if odds_rows else "No saved strikeout odds for this pitcher/slate yet. Use the paid manual button on Daily Projection Run; this page never calls the Odds API.")
+odds_err=("" if odds_rows else "No current automated sportsbook line has been captured for this pitcher/slate yet.")
+
+def _saved_market_source(rows, market):
+    for row in rows:
+        if str(row.get("market", "")) != market:
+            continue
+        book = str(row.get("book", "") or "").strip()
+        provider = str(row.get("provider", "") or "").strip().upper()
+        if provider == "SPORTSGAMEODDS":
+            return f"SPORTSGAMEODDS · {book}" if book else "SPORTSGAMEODDS"
+        return f"ODDS API · {book}" if book else "ODDS API · SAVED BACKUP"
+    return "SAVED SNAPSHOT"
 k_reco=market_recommendation(proj,odds_rows,"pitcher_strikeouts_alternate",5.5,"k"); k_reco["label"]="STRIKEOUT BET LEAN"
 out_reco=market_recommendation(proj,odds_rows,"pitcher_outs_alternate",15.5,"outs"); out_reco["label"]="TOTAL OUTS BET LEAN"
 hit_rows=[r for r in odds_rows if r.get("market") in {"pitcher_hits_allowed","pitcher_hits_allowed_alternate"} and r.get("point") is not None]
@@ -921,24 +932,24 @@ hit_under_price=hit_under_offer.get("price") if hit_under_offer else None
 hit_decision=aligned_bet_lean(hits_proj.ensemble_mean,hit_line,hit_over,over_implied=implied_prob(hit_over_price) if hit_over_price is not None else None,under_implied=implied_prob(hit_under_price) if hit_under_price is not None else None,has_market=bool(hit_rows))
 hit_reco={"side":hit_decision.side,"line":hit_line,"model":hit_decision.model_probability,"edge":hit_decision.edge,"confidence":abs(hit_decision.model_probability-.5)*2,"has_market":bool(hit_rows),"label":"HITS ALLOWED BET LEAN","reason":hit_decision.reason,"projection_mean":hits_proj.ensemble_mean,"over_model":hit_over}
 
-if manual_k_line is not None:
-    k_reco=apply_active_line_to_recommendation(k_reco,proj,"pitcher_strikeouts",manual_k_line,hits_proj,manual_k_source or "MANUAL")
+if active_k_line is not None:
+    k_reco=apply_active_line_to_recommendation(k_reco,proj,"pitcher_strikeouts",active_k_line,hits_proj,active_k_source or "MANUAL")
 elif k_reco.get("has_market"):
-    k_reco["active_line_source"]="PAID API · SAVED SNAPSHOT"
+    k_reco["active_line_source"]=_saved_market_source(odds_rows,"pitcher_strikeouts")
 else:
     k_reco=no_active_line_recommendation("STRIKEOUT BET LEAN",proj.mean_k)
 
-if manual_outs_line is not None:
-    out_reco=apply_active_line_to_recommendation(out_reco,proj,"pitcher_outs",manual_outs_line,hits_proj,manual_outs_source or "MANUAL")
+if active_outs_line is not None:
+    out_reco=apply_active_line_to_recommendation(out_reco,proj,"pitcher_outs",active_outs_line,hits_proj,active_outs_source or "MANUAL")
 elif out_reco.get("has_market"):
-    out_reco["active_line_source"]="SAVED SNAPSHOT"
+    out_reco["active_line_source"]=_saved_market_source(odds_rows,"pitcher_outs")
 else:
     out_reco=no_active_line_recommendation("TOTAL OUTS BET LEAN",proj.mean_outs)
 
-if manual_hits_line is not None:
-    hit_reco=apply_active_line_to_recommendation(hit_reco,proj,"pitcher_hits_allowed",manual_hits_line,hits_proj,manual_hits_source or "MANUAL")
+if active_hits_line is not None:
+    hit_reco=apply_active_line_to_recommendation(hit_reco,proj,"pitcher_hits_allowed",active_hits_line,hits_proj,active_hits_source or "MANUAL")
 elif hit_reco.get("has_market"):
-    hit_reco["active_line_source"]="SAVED SNAPSHOT"
+    hit_reco["active_line_source"]=_saved_market_source(odds_rows,"pitcher_hits_allowed")
 else:
     hit_reco=no_active_line_recommendation("HITS ALLOWED BET LEAN",hits_proj.ensemble_mean)
 
@@ -1059,7 +1070,7 @@ for _col,_label,_line,_source in zip(
     with _col:
         st.markdown(f'<div class="{_cls}"><div class="label">{_label}</div><div class="value">{_value}</div><div class="source">{_source_text}</div></div>',unsafe_allow_html=True)
 explain_popover(static_explanation("active_lines"),label="ⓘ EXPLAIN ACTIVE LINES")
-st.caption("Manual Daily Run lines appear in orange; a saved paid K snapshot appears with its source label. No active line means the projection still shows, but the app will not manufacture a bet lean. Execution lines never alter the baseball projection.")
+st.caption("Automated real sportsbook lines show their provider/book source. Legacy MANUAL lines remain orange for historical clarity. No active line means the projection still shows, but the app will not manufacture a bet lean. Execution lines never alter the baseball projection.")
 st.markdown('<div class="section-head">PROJECTION SUMMARY</div>',unsafe_allow_html=True)
 alt_k_choice=best_alt_k([(int(str(row["Line"]).rstrip("+")),float(row["Probability"])) for _,row in kdf.iterrows()])
 alt_k_html=(f'<div class="alt-k-badge">BEST ALT K · {alt_k_choice.milestone}+ · {alt_k_choice.probability:.0%} HIT</div>' if alt_k_choice else '<div class="alt-k-badge">BEST ALT K · NO 70%+ ALT</div>')

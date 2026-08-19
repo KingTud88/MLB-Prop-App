@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import math
-import os
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
-import requests
 import streamlit as st
 
 from engine.ui_theme import apply_page_theme
@@ -25,6 +23,7 @@ from engine.hits_calibration import calibrate_hits_blend, hits_calibration_repor
 from engine.outs_calibration import calibrate_outs_blend, outs_calibration_report
 from engine.bet_lean import projection_side
 from engine.model_top_plays import build_model_board
+from engine.sportsgameodds import load_pitcher_market_odds
 from engine.model_health import health_from_walk_forward, market_health_map, walk_forward_top5
 from engine.decision_learning import attach_decision_profiles, decision_tier_report
 from engine.signal_validation import attach_signal_profiles, paired_signal_report
@@ -128,17 +127,6 @@ st.markdown(
 )
 
 EASTERN = ZoneInfo("America/New_York")
-ODDS_API = "https://api.the-odds-api.com/v4"
-TEAM_NAMES = {
-    "LAA":"Los Angeles Angels","ARI":"Arizona Diamondbacks","BAL":"Baltimore Orioles","BOS":"Boston Red Sox",
-    "CHC":"Chicago Cubs","CIN":"Cincinnati Reds","CLE":"Cleveland Guardians","COL":"Colorado Rockies",
-    "DET":"Detroit Tigers","HOU":"Houston Astros","KCR":"Kansas City Royals","LAD":"Los Angeles Dodgers",
-    "WSH":"Washington Nationals","NYM":"New York Mets","ATH":"Athletics","PIT":"Pittsburgh Pirates",
-    "SDP":"San Diego Padres","SEA":"Seattle Mariners","SFG":"San Francisco Giants","STL":"St. Louis Cardinals",
-    "TBR":"Tampa Bay Rays","TEX":"Texas Rangers","TOR":"Toronto Blue Jays","MIN":"Minnesota Twins",
-    "PHI":"Philadelphia Phillies","ATL":"Atlanta Braves","CHW":"Chicago White Sox","MIA":"Miami Marlins",
-    "NYY":"New York Yankees","MIL":"Milwaukee Brewers",
-}
 MAIN_MARKET_KEYS = {
     "Strikeouts": "pitcher_strikeouts",
     "Total Outs": "pitcher_outs",
@@ -149,14 +137,6 @@ BET_LOG = ROOT / "data" / "bet_log.csv"
 ARCHIVE_PATH = ROOT / "data" / "projection_archive.csv"
 
 
-def secret() -> str | None:
-    for key in ("ODDS_API_KEY", "THE_ODDS_API_KEY", "odds_api_key"):
-        try:
-            if key in st.secrets:
-                return str(st.secrets[key])
-        except Exception:
-            pass
-    return os.getenv("ODDS_API_KEY") or os.getenv("THE_ODDS_API_KEY")
 
 
 def implied(price: float) -> float:
@@ -178,77 +158,16 @@ def numeric(value: object) -> float | None:
     return None if pd.isna(parsed) else float(parsed)
 
 
-def normalize_team(value: str) -> str:
-    text = "".join(ch for ch in str(value).lower() if ch.isalnum())
-    for abbr, name in TEAM_NAMES.items():
-        if text in {"".join(ch for ch in abbr.lower() if ch.isalnum()), "".join(ch for ch in name.lower() if ch.isalnum())}:
-            return abbr
-    return text.upper()
 
 
-@st.cache_data(ttl=900, show_spinner=False)
-def odds_events(api_key: str) -> list[dict]:
-    r = requests.get(f"{ODDS_API}/sports/baseball_mlb/events", params={"apiKey": api_key}, timeout=20)
-    r.raise_for_status()
-    data = r.json()
-    return data if isinstance(data, list) else []
 
 
-@st.cache_data(ttl=900, show_spinner=False)
-def event_props(api_key: str, event_id: str, markets: tuple[str, ...]) -> tuple[dict, dict[str, int | None]]:
-    market_csv = ",".join(sorted(set(str(m) for m in markets if str(m))))
-    if not market_csv:
-        return {}, {"remaining": None, "used": None, "last": 0}
-    r = requests.get(
-        f"{ODDS_API}/sports/baseball_mlb/events/{event_id}/odds",
-        params={"apiKey": api_key, "regions": "us", "markets": market_csv, "oddsFormat": "american"},
-        timeout=20,
-    )
-    r.raise_for_status()
-    data = r.json()
-    def _header_int(name: str) -> int | None:
-        value = r.headers.get(name)
-        try:
-            return int(value) if value is not None else None
-        except (TypeError, ValueError):
-            return None
-    quota = {
-        "remaining": _header_int("x-requests-remaining"),
-        "used": _header_int("x-requests-used"),
-        "last": _header_int("x-requests-last"),
-    }
-    return (data if isinstance(data, dict) else {}), quota
 
 
-def match_event(events: list[dict], team: str, opponent: str) -> dict | None:
-    wanted = {normalize_team(team), normalize_team(opponent)}
-    for event in events:
-        got = {normalize_team(event.get("home_team", "")), normalize_team(event.get("away_team", ""))}
-        if got == wanted:
-            return event
-    return None
 
 
-def strikeout_over_probability(row: pd.Series, line: float, history: pd.DataFrame) -> float | None:
-    cutoff = int(math.floor(float(line)) + 1)
-    if cutoff < 3 or cutoff > 10:
-        return None
-    sim = numeric(row.get(f"sim_{cutoff}p"))
-    math_p = numeric(row.get(f"math_{cutoff}p"))
-    if sim is None or math_p is None:
-        return None
-    cal = calibrate_blend(history, cutoff)
-    return float(cal.weight_simulation * sim + cal.weight_math * math_p)
 
 
-def hits_over_probability(row: pd.Series, line: float, history: pd.DataFrame) -> float | None:
-    key = str(float(line)).replace(".", "_")
-    sim = numeric(row.get(f"hits_sim_over_{key}"))
-    math_p = numeric(row.get(f"hits_math_over_{key}"))
-    if sim is None or math_p is None:
-        return None
-    cal = calibrate_hits_blend(history, float(line))
-    return float(cal.weight_simulation * sim + cal.weight_math * math_p)
 
 
 def outs_projection_details(row: pd.Series, line: float, history: pd.DataFrame) -> dict[str, float] | None:
@@ -272,84 +191,73 @@ def outs_projection_details(row: pd.Series, line: float, history: pd.DataFrame) 
     }
 
 
-def outs_over_probability(row: pd.Series, line: float, history: pd.DataFrame) -> float | None:
-    details = outs_projection_details(row, line, history)
-    return None if details is None else details["probability"]
 
 
-def model_over_probability(row: pd.Series, market: str, line: float, history: pd.DataFrame) -> float | None:
-    if market.startswith("pitcher_strikeouts"):
-        return strikeout_over_probability(row, line, history)
-    if market.startswith("pitcher_hits_allowed"):
-        return hits_over_probability(row, line, history)
-    if market.startswith("pitcher_outs"):
-        return outs_over_probability(row, line, history)
-    return None
 
 
-def collect_legs(row: pd.Series, payload: dict, history: pd.DataFrame) -> list[dict]:
-    """Collect live offers for a pitcher without letting price determine the model ranking."""
-    player = " ".join(str(row.get("player", "")).lower().split())
-    groups: dict[tuple, dict] = {}
-    for book in payload.get("bookmakers", []):
-        for market in book.get("markets", []):
-            key = str(market.get("key", ""))
-            if not key.startswith(("pitcher_strikeouts", "pitcher_outs", "pitcher_hits_allowed")):
-                continue
-            for outcome in market.get("outcomes", []):
-                desc = " ".join(str(outcome.get("description", "")).lower().split())
-                if desc != player or outcome.get("point") is None or outcome.get("price") is None:
-                    continue
-                try:
-                    point = float(outcome["point"])
-                    price = float(outcome["price"])
-                except Exception:
-                    continue
-                g = groups.setdefault((book.get("title", book.get("key", "")), key, point), {})
-                g[str(outcome.get("name", "")).lower()] = price
 
-    legs = []
-    quality = float(pd.to_numeric(pd.Series([row.get("data_quality")]), errors="coerce").fillna(0).iloc[0])
-    for (book, market, point), prices in groups.items():
-        over_model = model_over_probability(row, market, point, history)
-        if over_model is None:
+
+
+def attach_sportsgameodds_prices(plays: pd.DataFrame, slate_date: str) -> pd.DataFrame:
+    """Attach exact saved SportsGameOdds prices without making an API call or changing rank."""
+    enriched = plays.copy()
+    for col, default in (
+        ("Book", ""),
+        ("Odds", np.nan),
+        ("No-Vig Implied", np.nan),
+        ("Edge", np.nan),
+        ("Live Offer", False),
+    ):
+        enriched[col] = default
+
+    cache: dict[str, list[dict[str, object]]] = {}
+    for idx, play in enriched.iterrows():
+        pitcher = str(play.get("Pitcher", "") or "").strip()
+        market_key = MAIN_MARKET_KEYS.get(str(play.get("Market", "") or ""))
+        line = numeric(play.get("Line"))
+        side = str(play.get("Side", "") or "").strip().lower()
+        if not pitcher or not market_key or line is None or side not in {"over", "under"}:
             continue
-        if market.startswith("pitcher_strikeouts"):
-            projection_mean = numeric(row.get("projection"))
-        elif market.startswith("pitcher_hits_allowed"):
-            projection_mean = numeric(row.get("hits_projection"))
-        else:
-            projection_mean = numeric(row.get("outs_projection"))
-        if projection_mean is None:
+
+        if pitcher not in cache:
+            cache[pitcher] = load_pitcher_market_odds(pitcher, slate_date)
+        offers = [
+            row for row in cache[pitcher]
+            if str(row.get("market", "")) == market_key
+            and numeric(row.get("point")) is not None
+            and abs(float(row.get("point")) - line) <= 1e-9
+        ]
+        if not offers:
             continue
-        direction = projection_side(projection_mean, point)
-        if direction == "PASS":
+
+        target = next((row for row in offers if str(row.get("name", "")).lower() == side), None)
+        if target is None:
             continue
-        side_key = direction.lower()
-        if side_key not in prices:
+        book = str(target.get("book", "") or "").strip()
+        same_book = [row for row in offers if str(row.get("book", "") or "").strip() == book]
+        over = next((row for row in same_book if str(row.get("name", "")).lower() == "over"), None)
+        under = next((row for row in same_book if str(row.get("name", "")).lower() == "under"), None)
+        price = numeric(target.get("price"))
+        if price is None:
             continue
-        model_p = over_model if direction == "OVER" else 1.0 - over_model
-        fair_p = np.nan
-        edge = np.nan
-        if "over" in prices and "under" in prices:
-            po = implied(prices["over"]); pu = implied(prices["under"]); total = po + pu
+
+        enriched.at[idx, "Book"] = book
+        enriched.at[idx, "Odds"] = price
+        enriched.at[idx, "Live Offer"] = True
+        over_price = numeric(over.get("price")) if over else None
+        under_price = numeric(under.get("price")) if under else None
+        if over_price is not None and under_price is not None:
+            po = implied(over_price)
+            pu = implied(under_price)
+            total = po + pu
             if total > 0:
                 fair_over = po / total
-                fair_p = fair_over if direction == "OVER" else 1.0 - fair_over
-                edge = model_p - fair_p
-        qualified = model_p >= 0.55 and quality >= 60
-        status = "MODEL PLAY" if qualified else "WATCH"
-        market_label = "Strikeouts" if "strikeouts" in market else "Total Outs" if "outs" in market else "Hits Allowed"
-        legs.append({
-            "Pitcher": row.get("player"), "Market": market_label, "Side": direction, "Line": point,
-            "Model Probability": model_p, "No-Vig Implied": fair_p, "Edge": edge,
-            "Book": book, "Odds": int(prices[side_key]), "Data Quality": int(round(quality)), "Score": model_p,
-            "Qualified": qualified, "Status": status,
-            "Game PK": row.get("game_pk"), "Pitcher ID": row.get("pitcher_id"), "Team": row.get("team"),
-            "Opponent": row.get("opponent"), "Market Key": market,
-        })
-    return legs
-
+                fair_side = fair_over if side == "over" else 1.0 - fair_over
+                enriched.at[idx, "No-Vig Implied"] = fair_side
+                model_p = numeric(play.get("Model Probability"))
+                if model_p is not None:
+                    enriched.at[idx, "Edge"] = model_p - fair_side
+    return enriched
 
 def find_snapshot(history: pd.DataFrame, play: pd.Series) -> pd.Series | None:
     if history.empty:
@@ -462,7 +370,6 @@ def render_projection_rationale(play: pd.Series, snapshot: pd.Series, history: p
     st.caption(f"Why it ranked: the calibrated model gives this {side_text} a {float(play['Model Probability']):.1%} chance. Top 5 order is based on model hit probability first and data quality second; sportsbook price and edge never enter the ranking. Frozen snapshot confidence: {confidence or '—'}. Captured: {captured or '—'}.")
 
 
-api_key = None  # Paid Odds API access is intentionally restricted to Daily Projection Run.
 
 if not LOG_PATH.exists():
     st.info("No projection log exists yet. Run the Daily Projection page first.")
@@ -490,114 +397,17 @@ signal_report = paired_signal_report(history)
 
 plays = build_model_board(slate, history, limit=5, market_health=health_map, require_market_lines=True)
 if plays.empty:
-    st.warning("No current market has both a valid model path and an active sportsbook line. Enter manual K / outs / hits lines on Daily Projection Run (or load the saved paid K snapshot) before Top Plays can rank a real bet.")
+    st.warning("No current market has both a valid model path and an authentic active sportsbook line yet. SportsGameOdds capture must supply a real pregame line before Top Plays can rank a bet.")
     st.stop()
 plays = attach_decision_profiles(plays, decision_report)
 plays = attach_signal_profiles(plays, history, signal_report)
 
 # TOP_PLAYS_REAL_LINE_GUARD_V1
-st.caption("Line integrity: every ranked leg below uses an active sportsbook line from Daily Run. MANUAL overrides the saved paid K snapshot; markets with no active line are excluded. Model-grid/default lines are diagnostics only and cannot become current Top Plays.")
+st.caption("Line integrity: every ranked leg below uses an authentic active sportsbook line. SportsGameOdds is primary; legacy MANUAL or backup rows keep their explicit source labels. Markets with no real line are excluded, and model-grid/default lines can never become Top Plays.")
 
-# The board exists before any paid sportsbook request. Credit Saver keeps paid
-# odds OFF by default and only asks for main markets represented in the Top 5.
-plays["Book"] = ""
-plays["Odds"] = np.nan
-plays["No-Vig Implied"] = np.nan
-plays["Edge"] = np.nan
-plays["Live Offer"] = False
-
-live_state_key = f"top_plays_live_overlay:{today}"
-quota_state_key = f"top_plays_live_quota:{today}"
-candidate_pool = pd.DataFrame(st.session_state.get(live_state_key, []))
-request_plan: dict[str, set[str]] = {}
-event_snapshots: dict[str, dict[str, pd.Series]] = {}
-
-if api_key:
-    try:
-        # /events is quota-free; it only maps MLB games to Odds API event ids.
-        events = odds_events(api_key)
-        for _, play in plays.iterrows():
-            snapshot = find_snapshot(history, play)
-            if snapshot is None:
-                continue
-            event_match = match_event(events, str(snapshot.get("team", "")), str(snapshot.get("opponent", "")))
-            market_key = MAIN_MARKET_KEYS.get(str(play.get("Market", "")))
-            if not event_match or not market_key:
-                continue
-            event_id = str(event_match.get("id", ""))
-            if not event_id:
-                continue
-            request_plan.setdefault(event_id, set()).add(market_key)
-            pitcher_key = str(play.get("Pitcher ID", play.get("Pitcher", "")))
-            event_snapshots.setdefault(event_id, {})[pitcher_key] = snapshot
-    except requests.RequestException as exc:
-        st.caption(f"Quota-free event matching is unavailable right now ({type(exc).__name__}). The model Top 5 is unaffected.")
-
-estimated_credits = sum(len(markets) for markets in request_plan.values())
-if api_key and request_plan:
-    st.caption(
-        f"💳 Credit Saver: sportsbook odds are OFF until requested. Loading this Top 5 asks only for "
-        f"{estimated_credits} main market/event combination(s) in the US region — at most {estimated_credits} credits if returned. "
-        "Alternate markets are disabled by default."
-    )
-    if st.button(
-        f"💳 Load / reuse live Top 5 prices · ≤{estimated_credits} credits",
-        key="load_top_plays_live_prices",
-        help="Paid Odds API call. Results are cached for 15 minutes; clicking again inside that window reuses the cache.",
-    ):
-        all_legs: list[dict] = []
-        quota_rows: list[dict[str, int | None]] = []
-        for event_id, market_keys in request_plan.items():
-            try:
-                payload, quota = event_props(api_key, event_id, tuple(sorted(market_keys)))
-                quota_rows.append(quota)
-            except requests.RequestException as exc:
-                st.caption(f"Live price request failed for one event ({type(exc).__name__}).")
-                continue
-            for snapshot in event_snapshots.get(event_id, {}).values():
-                all_legs.extend(collect_legs(snapshot, payload, history))
-        st.session_state[live_state_key] = all_legs
-        if quota_rows:
-            actual_cost = sum(int(q.get("last") or 0) for q in quota_rows)
-            final_quota = quota_rows[-1]
-            st.session_state[quota_state_key] = {
-                "last": actual_cost,
-                "remaining": final_quota.get("remaining"),
-                "used": final_quota.get("used"),
-            }
-        st.rerun()
-else:
-    if not api_key:
-        st.caption("Odds API key is not available, so the model Top 5 is shown without live execution prices. Ranking is unaffected.")
-
-quota_view = st.session_state.get(quota_state_key, {})
-if quota_view:
-    remaining = quota_view.get("remaining")
-    used = quota_view.get("used")
-    last = quota_view.get("last")
-    st.caption(
-        "Odds API usage from the last manual Top 5 load: "
-        + f"{last if last is not None else '—'} credit(s) · "
-        + f"{remaining if remaining is not None else '—'} remaining · "
-        + f"{used if used is not None else '—'} used this quota period."
-    )
-
-if not candidate_pool.empty:
-    for idx, play in plays.iterrows():
-        matches = candidate_pool.loc[
-            candidate_pool["Pitcher"].astype(str).eq(str(play["Pitcher"]))
-            & candidate_pool["Market"].astype(str).eq(str(play["Market"]))
-            & candidate_pool["Side"].astype(str).eq(str(play["Side"]))
-            & pd.to_numeric(candidate_pool["Line"], errors="coerce").eq(float(play["Line"]))
-        ]
-        if matches.empty:
-            continue
-        best = matches.sort_values("Odds", ascending=False).iloc[0]
-        plays.at[idx, "Book"] = best.get("Book", "")
-        plays.at[idx, "Odds"] = best.get("Odds", np.nan)
-        plays.at[idx, "No-Vig Implied"] = best.get("No-Vig Implied", np.nan)
-        plays.at[idx, "Edge"] = best.get("Edge", np.nan)
-        plays.at[idx, "Live Offer"] = True
+# Exact SportsGameOdds prices are read from the saved disk snapshot only.
+# This overlay cannot change the model-first Top 5 order.
+plays = attach_sportsgameodds_prices(plays, today)
 
 model_plays = int(((plays["Model Probability"] >= 0.55) & (plays["Data Quality"] >= 60)).sum())
 live_offers = int(plays["Live Offer"].fillna(False).sum())
@@ -691,7 +501,7 @@ for target_col, (_, play_row) in layout_slots:
                 book_value = str(play_row.get("Book", "") or "Live book")
                 st.markdown(f'<div class="tp-card-note"><strong>Execution:</strong> {book_value} · {odds_value:+d}</div>', unsafe_allow_html=True)
             elif model_ok:
-                st.markdown('<div class="tp-card-note"><strong>Execution:</strong> Model play · waiting for exact live line/price</div>', unsafe_allow_html=True)
+                st.markdown('<div class="tp-card-note"><strong>Execution:</strong> Model play · active real line captured · current price unavailable</div>', unsafe_allow_html=True)
             else:
                 st.markdown('<div class="tp-card-note"><strong>Action:</strong> WATCH · model/data quality below straight-bet threshold</div>', unsafe_allow_html=True)
 

@@ -228,7 +228,7 @@ def metric_help(key: str, *, current: str = "") -> str:
         # Projection History archive + actionable K scorecards.
         "history_archived_slates": "What it is: the number of different slate dates preserved in the durable Projection Archive.\n\nHow it is calculated: count of unique non-null game_date values in the user-facing frozen archive.\n\nHow to read it: this tells you how many daily slates are represented, not how many pitchers or bets were recorded.",
         "history_archived_pitchers": "What it is: the number of archived pitcher-game rows currently shown in the Projection Archive.\n\nHow it is calculated: count of rows in the durable user archive after archive-source filtering. The same pitcher can appear on multiple dates.\n\nHow to read it: this is evidence volume, not the number of unique MLB pitchers.",
-        "history_manual_lines": "What it is: sportsbook execution lines you manually attached to archived pitcher rows.\n\nHow it is calculated: count of non-null manual K lines + manual Outs lines + manual Hits Allowed lines. One pitcher row can contribute up to three attached lines.\n\nHow to read it: these lines are execution overlays only and never rewrite the frozen projection.",
+        "history_real_lines": "What it is: authentic sportsbook execution lines attached to archived pitcher rows.\n\nHow it is calculated: count of non-null active K lines + active Outs lines + active Hits Allowed lines. One pitcher row can contribute up to three real market lines.\n\nHow to read it: SportsGameOdds is the primary automated source; legacy MANUAL lines remain counted as historical execution evidence. Lines never rewrite the frozen projection.",
         "history_latest_slate": "What it is: the most recent game date represented in the Projection Archive.\n\nHow it is calculated: maximum non-null archived game_date.\n\nHow to read it: use this as a freshness check for the archive, not as proof that every game on that date is resolved.",
         "history_ladder_calls": "What it is: resolved strikeout projections that produced a supported whole-K ladder target inside the 3+–12+ ladder.\n\nHow it is calculated: rows with both frozen projected Ks and final actual Ks, where floor(Projected K) maps to a supported milestone.\n\nHow to read it: this is the denominator for ladder win rate; it is not sportsbook bet count.",
         "history_ladder_wins": "What it is: resolved ladder calls where final Ks reached or exceeded the model-supported whole-K target.\n\nHow it is calculated: count(actual Ks ≥ floor(Projected K)) for valid 3+–12+ targets.\n\nHow to read it: this grades model-supported milestones, not an OVER/UNDER sportsbook ticket unless that exact milestone was actually bet.",
@@ -282,8 +282,8 @@ def static_explanation(key: str) -> Explanation:
     specs: dict[str, Explanation] = {
         "active_lines": Explanation(
             "Active sportsbook lines",
-            "These are the real execution lines currently attached to this pitcher for Strikeouts, Total Outs, and Hits Allowed.",
-            "Daily Projection Run stores manual lines persistently. A saved paid strikeout snapshot can also supply the K line. Main Projection only reads those saved execution lines; it does not invent missing markets.",
+            "These are the authentic execution lines currently attached to this pitcher for Strikeouts, Total Outs, and Hits Allowed.",
+            "SportsGameOdds captures real pregame lines automatically and preserves the provider/book source. Legacy MANUAL or backup rows remain explicitly labeled. Main Projection only reads saved execution lines and never invents a missing market.",
             note="Sportsbook lines never create or move the baseball projection. They only give the model a real line to compare against.",
         ),
         "opposing_batters": Explanation(
@@ -380,27 +380,16 @@ def static_explanation(key: str) -> Explanation:
             decision="The counters describe capture integrity, not projection quality. Re-running a slate can legitimately increase the already-captured/refreshed count without creating duplicate model evidence.",
             note="Use each metric's ⓘ icon for its exact counting rule.",
         ),
-        "manual_lines": Explanation(
-            "Manual sportsbook lines",
-            "This is the single persistent place to attach the real K, Outs and Hits Allowed lines you actually see at the sportsbook.",
-            "The entered lines are saved as a durable execution overlay on top of the frozen projection row. Main Projection and Top Plays read this overlay later.",
-            note="Entering a line never changes the underlying projection. Blank markets remain excluded from real-line recommendations.",
-        ),
         "daily_table": Explanation(
             "Daily projection table",
             "This is the full frozen starter slate: model projections first, then execution lines and supporting context/audit fields.",
             "Projection, ranges and SIM/MATH probabilities come from the frozen pregame engine. Line/source fields come from the durable market overlay. Weather, lineup, workload and history fields document the context available at capture time.",
             note="The table intentionally preserves model-first / market-second separation.",
         ),
-        "odds_credits": Explanation(
-            "Odds API credits remaining",
-            "This shows the quota value returned by the most recent paid strikeout-line request.",
-            "The paid Daily Run button saves the API response headers locally. This display reads that saved quota snapshot and does not make another paid request just to show the number.",
-        ),
         "history_archive": Explanation(
             "Projection Archive",
             "The archive is the durable user-facing record of frozen pregame projections, any attached real sportsbook lines, and later MLB outcomes.",
-            "Daily Projection Run writes projection rows and the manual-line overlay. The resolver later attaches actual results. K Target is derived from the established model-supported milestone rule and K Result grades that target after resolution.",
+            "Daily Projection Run writes frozen projection rows, while automated sportsbook capture attaches authentic execution lines separately. Legacy MANUAL overlays remain preserved for historical evidence. The resolver later attaches actual results. K Target is derived from the established model-supported milestone rule and K Result grades that target after resolution.",
             note="Historical sportsbook lines are execution overlays; they never retroactively alter the frozen model projection.",
         ),
         "history_learning": Explanation(

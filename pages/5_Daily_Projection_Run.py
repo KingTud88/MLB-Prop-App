@@ -32,11 +32,8 @@ from automation.daily_projection_runner import (
 from engine.calibration import calibrate_blend
 from engine.hits_calibration import calibrate_hits_blend
 from engine.outs_calibration import calibrate_outs_blend
-from engine.execution_history import freeze_execution_decision, is_pregame_execution_window
-from engine.model_top_plays import MARKET_HITS, MARKET_OUTS
-from engine.odds_snapshot import load_quota_status, refresh_strikeout_snapshot, resolve_api_key
 from navigation import render_sidebar
-from training.projection_storage import load_projection_archive, overlay_manual_market_lines, save_projection_archive
+from training.projection_storage import load_projection_archive, overlay_manual_market_lines
 
 st.set_page_config(page_title="Daily Projection Run", page_icon="📊", layout="wide")
 apply_page_theme()
@@ -47,13 +44,6 @@ st.markdown(
     """
     <style>
     .block-container { padding-top: 3.25rem !important; }
-    /* daily-control-deck-v2: presentation only. */
-    .daily-hero { margin:.25rem 0 1.15rem; padding:.9rem 1rem; border:1px solid rgba(73,111,151,.48); border-left:3px solid #ff3655; border-radius:16px; background:linear-gradient(120deg,rgba(227,25,55,.08),rgba(10,29,54,.76) 42%,rgba(6,18,35,.78)); box-shadow:0 14px 34px rgba(0,0,0,.16); }
-    .daily-hero strong { color:#f8fbff; font-size:1rem; }
-    .daily-hero span { display:block; color:#9db0c5; font-size:.84rem; margin-top:.2rem; }
-    .daily-kicker { margin:1.35rem 0 .42rem; color:#aebfd2; font-size:.72rem; font-weight:900; letter-spacing:.13em; text-transform:uppercase; }
-    .daily-kicker::before { content:''; display:inline-block; width:22px; height:2px; margin-right:.5rem; vertical-align:middle; background:#ff3655; box-shadow:0 0 11px rgba(227,25,55,.42); }
-    .daily-paid-note { margin:.35rem 0 .8rem; padding:.72rem .85rem; border-radius:13px; border:1px solid rgba(250,204,21,.32); background:rgba(120,79,8,.08); color:#c9d7e5; font-size:.86rem; }
     /* DAILY_COMMAND_UI_V3 */
     .block-container{max-width:1540px!important;padding-top:2.05rem!important;padding-bottom:4rem!important}
     .daily-command-hero{position:relative;overflow:hidden;margin:.1rem 0 .75rem;padding:1.05rem 1.2rem 1.1rem;border:1px solid rgba(80,108,136,.78);border-radius:18px;background:linear-gradient(112deg,rgba(8,28,50,.99),rgba(5,19,35,.99));box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 18px 42px rgba(0,0,0,.30)}
@@ -65,7 +55,6 @@ st.markdown(
     .daily-command-rule{margin-top:.58rem;width:max-content;max-width:100%;padding:.25rem .58rem;border-top:1px solid rgba(236,22,56,.65);border-bottom:1px solid rgba(236,22,56,.65);color:#edf3f7;font:900 .67rem/1.2 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.09em;text-transform:uppercase}
     .daily-section-head{width:max-content;min-width:240px;max-width:92%;margin:1.15rem auto .65rem;padding:.44rem 1.65rem;border:1px solid #ff3151;border-bottom-color:#790b1d;border-radius:8px;background:linear-gradient(180deg,#f21b3d,#b70d29);box-shadow:0 7px 16px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.22);color:#fff;font:900 .90rem/1.15 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;letter-spacing:.04em;text-align:center;text-transform:uppercase}
     .daily-note{margin:.45rem 0 .78rem;padding:.78rem .88rem;border:1px solid rgba(73,111,151,.56);border-radius:13px;background:linear-gradient(110deg,rgba(10,34,59,.90),rgba(5,22,40,.92));color:#d2dde6;font:700 .84rem/1.45 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
-    .daily-note.paid{border-color:rgba(250,204,21,.42);background:linear-gradient(110deg,rgba(88,65,8,.24),rgba(29,29,16,.52));color:#e9dfb4}
     .daily-action-label{margin:.15rem 0 .32rem;color:#f4f7fa;font:900 1.12rem/1.2 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
     .daily-action-copy{margin:0 0 .62rem;color:#aebfd0;font:650 .83rem/1.42 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
     [data-testid="stMetric"]{min-height:108px;padding:.70rem .76rem!important;border:1px solid rgba(77,108,137,.72)!important;border-radius:14px!important;background:linear-gradient(145deg,rgba(9,31,55,.98),rgba(4,18,33,.98))!important}
@@ -78,7 +67,6 @@ st.markdown(
     .daily-run-status.error{border-color:rgba(255,71,98,.60)}
     .daily-run-status .main{color:#f5f8fb;font:900 .92rem/1.2 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
     .daily-run-status .meta{color:#aebfd0;font:700 .76rem/1.25 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;text-align:right}
-    @media (max-width:900px) { .daily-hero { padding:.78rem .85rem; } .daily-kicker { margin-top:1rem; } }
     </style>
     """,
     unsafe_allow_html=True,
@@ -164,28 +152,10 @@ def save_log(frame: pd.DataFrame) -> None:
     frame.to_csv(LOG_PATH, index=False)
 
 
-def _archive_row_key(row: pd.Series) -> str:
-    game_pk = str(row.get("game_pk", "")).split(".")[0]
-    pitcher_id = str(row.get("pitcher_id", "")).split(".")[0]
-    return f"{game_pk}:{pitcher_id}"
 
 
-def _parse_market_line(value: object) -> float:
-    text = str(value or "").strip()
-    if not text:
-        return np.nan
-    try:
-        return float(text)
-    except ValueError as exc:
-        raise ValueError(f"Invalid market line: {text}") from exc
 
 
-def _manual_input_default(row: pd.Series, line_col: str, source_col: str) -> str:
-    source = row.get(source_col, "")
-    if pd.isna(source) or str(source).strip().upper() != "MANUAL":
-        return ""
-    value = pd.to_numeric(pd.Series([row.get(line_col)]), errors="coerce").iloc[0]
-    return "" if pd.isna(value) else f"{float(value):g}"
 
 
 def _clean_saved_text(value: object) -> str:
@@ -194,176 +164,12 @@ def _clean_saved_text(value: object) -> str:
     return str(value).strip()
 
 
-def _same_market_line(left: object, right: object) -> bool:
-    a = pd.to_numeric(pd.Series([left]), errors="coerce").iloc[0]
-    b = pd.to_numeric(pd.Series([right]), errors="coerce").iloc[0]
-    return pd.notna(a) and pd.notna(b) and abs(float(a) - float(b)) <= 1e-9
 
 
-def commit_projection_archive(slate: pd.DataFrame, manual_lines: dict[str, dict[str, float]], slate_day: str) -> int:
-    if slate.empty:
-        return 0
-
-    existing = load_projection_archive(ARCHIVE_PATH, st.secrets)
-    if existing.empty:
-        existing = load_log()
-        if not existing.empty and "game_date" in existing.columns:
-            cutoff = pd.Timestamp(slate_day).date()
-            legacy_dates = pd.to_datetime(existing["game_date"], errors="coerce").dt.date
-            existing = existing.loc[legacy_dates < cutoff].copy()
-            if not existing.empty:
-                for col in (
-                    "manual_strikeout_line", "manual_outs_line", "manual_hits_allowed_line",
-                    "manual_outs_side", "manual_outs_decision_probability", "manual_outs_decision_reason", "manual_outs_side_frozen_at_utc",
-                    "manual_hits_allowed_side", "manual_hits_allowed_decision_probability", "manual_hits_allowed_decision_reason", "manual_hits_allowed_side_frozen_at_utc",
-                ):
-                    existing[col] = np.nan
-                existing["archive_source"] = "LEGACY_PRE_MANUAL_ARCHIVE"
-                existing["archive_committed_at_utc"] = existing.get("captured_at_utc", "")
-        else:
-            existing = pd.DataFrame()
-
-    source = slate.copy().reset_index(drop=True)
-    snapshot = source.copy()
-    history = load_log()
-    now_utc = datetime.now(ZoneInfo("UTC"))
-    frozen_at = now_utc.isoformat()
-
-    snapshot["manual_strikeout_line"] = [manual_lines.get(_archive_row_key(row), {}).get("k", np.nan) for _, row in source.iterrows()]
-    snapshot["manual_outs_line"] = [manual_lines.get(_archive_row_key(row), {}).get("outs", np.nan) for _, row in source.iterrows()]
-    snapshot["manual_hits_allowed_line"] = [manual_lines.get(_archive_row_key(row), {}).get("hits", np.nan) for _, row in source.iterrows()]
-    for col in (
-        "manual_outs_side", "manual_outs_decision_probability", "manual_outs_decision_reason", "manual_outs_side_frozen_at_utc",
-        "manual_hits_allowed_side", "manual_hits_allowed_decision_probability", "manual_hits_allowed_decision_reason", "manual_hits_allowed_side_frozen_at_utc",
-    ):
-        if col not in snapshot.columns:
-            snapshot[col] = np.nan
-
-    specs = (
-        ("outs", MARKET_OUTS, "manual_outs_line", "manual_outs_side", "manual_outs_decision_probability", "manual_outs_decision_reason", "manual_outs_side_frozen_at_utc"),
-        ("hits", MARKET_HITS, "manual_hits_allowed_line", "manual_hits_allowed_side", "manual_hits_allowed_decision_probability", "manual_hits_allowed_decision_reason", "manual_hits_allowed_side_frozen_at_utc"),
-    )
-    for idx, row in source.iterrows():
-        values = manual_lines.get(_archive_row_key(row), {})
-        pregame = is_pregame_execution_window(row, now_utc=now_utc)
-        for key, market, line_col, side_col, prob_col, reason_col, frozen_col in specs:
-            entered_line = values.get(key, np.nan)
-            if pd.isna(entered_line):
-                snapshot.at[idx, side_col] = np.nan
-                snapshot.at[idx, prob_col] = np.nan
-                snapshot.at[idx, reason_col] = ""
-                snapshot.at[idx, frozen_col] = ""
-                continue
-
-            old_line = row.get(line_col)
-            old_side = _clean_saved_text(row.get(side_col)).upper()
-            old_frozen = _clean_saved_text(row.get(frozen_col))
-            old_reason = _clean_saved_text(row.get(reason_col))
-            old_prob = pd.to_numeric(pd.Series([row.get(prob_col)]), errors="coerce").iloc[0]
-            has_frozen_decision = old_side in {"OVER", "UNDER", "PASS"} and bool(old_frozen)
-
-            if has_frozen_decision and (_same_market_line(old_line, entered_line) or not pregame):
-                # Once first pitch passes, preserve the certified decision and its original line.
-                snapshot.at[idx, line_col] = old_line
-                snapshot.at[idx, side_col] = old_side
-                snapshot.at[idx, prob_col] = old_prob
-                snapshot.at[idx, reason_col] = old_reason
-                snapshot.at[idx, frozen_col] = old_frozen
-                continue
-
-            if pregame:
-                decision = freeze_execution_decision(row, market, entered_line, history)
-                snapshot.at[idx, side_col] = decision.side
-                snapshot.at[idx, prob_col] = np.nan if decision.model_probability is None else float(decision.model_probability)
-                snapshot.at[idx, reason_col] = decision.reason
-                snapshot.at[idx, frozen_col] = frozen_at
-            else:
-                # Keep the historical line, but never reverse-engineer a side after first pitch.
-                snapshot.at[idx, side_col] = "UNGRADABLE"
-                snapshot.at[idx, prob_col] = np.nan
-                snapshot.at[idx, reason_col] = "side_not_frozen_pregame"
-                snapshot.at[idx, frozen_col] = ""
-
-    snapshot["archive_source"] = "DAILY_RUN_MANUAL"
-    snapshot["archive_committed_at_utc"] = frozen_at
-
-    if not existing.empty and {"game_pk", "pitcher_id"}.issubset(existing.columns) and {"game_pk", "pitcher_id"}.issubset(snapshot.columns):
-        new_keys = set(zip(snapshot["game_pk"].astype(str), snapshot["pitcher_id"].astype(str)))
-        keep_mask = [key not in new_keys for key in zip(existing["game_pk"].astype(str), existing["pitcher_id"].astype(str))]
-        existing = existing.loc[keep_mask].copy()
-
-    archive = pd.concat([existing, snapshot], ignore_index=True, sort=False)
-    save_projection_archive(ARCHIVE_PATH, archive, st.secrets)
-    return len(snapshot)
 
 
-def apply_active_market_lines(slate_day: str, manual_lines: dict[str, dict[str, float]]) -> int:
-    """Apply user-entered sportsbook lines to frozen rows used by current Top Plays."""
-    frame = load_log()
-    if frame.empty or "game_date" not in frame.columns:
-        return 0
-    for col in (
-        "active_strikeout_line", "active_outs_line", "active_hits_allowed_line",
-        "active_strikeout_line_source", "active_outs_line_source", "active_hits_allowed_line_source",
-    ):
-        if col not in frame.columns:
-            frame[col] = np.nan if col.endswith("_line") else ""
-
-    applied = 0
-    day_mask = frame["game_date"].astype(str).eq(str(slate_day))
-    for idx in frame.index[day_mask]:
-        row = frame.loc[idx]
-        values = manual_lines.get(_archive_row_key(row), {})
-        for key, line_col, source_col in (
-            ("k", "active_strikeout_line", "active_strikeout_line_source"),
-            ("outs", "active_outs_line", "active_outs_line_source"),
-            ("hits", "active_hits_allowed_line", "active_hits_allowed_line_source"),
-        ):
-            value = values.get(key, np.nan)
-            if pd.notna(value):
-                frame.at[idx, line_col] = float(value)
-                frame.at[idx, source_col] = "MANUAL"
-                applied += 1
-    save_log(frame)
-    return applied
 
 
-def apply_paid_strikeout_lines(odds_snapshot: pd.DataFrame, slate_day: str) -> int:
-    """Apply saved paid K lines without overwriting a deliberate manual line."""
-    if odds_snapshot.empty:
-        return 0
-    frame = load_log()
-    if frame.empty or "game_date" not in frame.columns:
-        return 0
-    for col, default in (("active_strikeout_line", np.nan), ("active_strikeout_line_source", "")):
-        if col not in frame.columns:
-            frame[col] = default
-
-    snap = odds_snapshot.copy()
-    snap["point"] = pd.to_numeric(snap.get("point"), errors="coerce")
-    snap = snap.dropna(subset=["point"])
-    snap["_name"] = snap.get("pitcher", pd.Series(index=snap.index, dtype=str)).fillna("").astype(str).map(lambda x: " ".join(x.lower().split()))
-    snap["_book"] = snap.get("book", pd.Series(index=snap.index, dtype=str)).fillna("").astype(str).str.lower()
-
-    applied = 0
-    day_mask = frame["game_date"].astype(str).eq(str(slate_day))
-    for idx in frame.index[day_mask]:
-        if str(frame.at[idx, "active_strikeout_line_source"] or "").upper() == "MANUAL":
-            continue
-        name = " ".join(str(frame.at[idx, "player"]).lower().split())
-        offers = snap.loc[snap["_name"].eq(name)]
-        if offers.empty:
-            continue
-        fanduel = offers.loc[offers["_book"].str.contains("fanduel", na=False)]
-        chosen = fanduel if not fanduel.empty else offers
-        mode = chosen["point"].mode()
-        if mode.empty:
-            continue
-        frame.at[idx, "active_strikeout_line"] = float(mode.iloc[0])
-        frame.at[idx, "active_strikeout_line_source"] = "PAID API · FANDUEL" if not fanduel.empty else "PAID API · CONSENSUS"
-        applied += 1
-    save_log(frame)
-    return applied
 
 
 def run_full_slate(day: str) -> tuple[pd.DataFrame, int, int, list[str], list[str]]:
@@ -828,35 +634,6 @@ if isinstance(slate, pd.DataFrame):
         st.warning("Some announced starters hit real capture errors:")
         for error in errors:
             st.write(f"- {error}")
-
-st.markdown('<div class="daily-section-head">Backup Paid Data</div>', unsafe_allow_html=True)
-st.markdown('<div class="daily-note paid">Emergency K-only backup · manual button · the automated SportsGameOdds feed remains primary for Ks, Outs, and Hits Allowed.</div>', unsafe_allow_html=True)
-st.markdown('<div class="daily-action-label">💳 Backup strikeout lines</div>', unsafe_allow_html=True)
-st.caption("Optional fallback only. This button requests pitcher_strikeouts from the legacy Odds API and saves the snapshot without changing the baseball projection. SportsGameOdds remains the primary automated execution-line source.")
-paid_quota = load_quota_status()
-if st.button("💳 LOAD STRIKEOUT LINES · BACKUP API", use_container_width=True, key="daily_paid_k_odds"):
-    api_key=resolve_api_key(st.secrets)
-    with st.spinner("Loading today's backup pitcher strikeout lines once and saving the snapshot..."):
-        odds_snapshot,quota,odds_error=refresh_strikeout_snapshot(api_key,slate_date.isoformat())
-    if odds_error:
-        st.error(odds_error)
-    else:
-        pitchers=int(odds_snapshot.get("pitcher",pd.Series(dtype=str)).nunique()) if not odds_snapshot.empty else 0
-        active_lines = apply_paid_strikeout_lines(odds_snapshot, slate_date.isoformat())
-        st.success(f"Saved {len(odds_snapshot)} backup strikeout offers for {pitchers} pitchers and applied {active_lines} active K line(s) where no legacy manual line existed.")
-        paid_quota = load_quota_status()
-
-remaining = paid_quota.get("remaining") if isinstance(paid_quota, dict) else None
-checked_at = str(paid_quota.get("checked_at_utc", "") or "") if isinstance(paid_quota, dict) else ""
-quota_col, quota_note = st.columns([1, 2])
-quota_col.metric("Odds API credits remaining", "—" if remaining is None else f"{int(remaining):,}")
-quota_note.caption(
-    "Saved from the response headers of the last backup pull"
-    + (f" · checked {checked_at}" if checked_at else " · no backup pull recorded yet")
-    + ". This meter never calls the Odds API by itself."
-)
-explain_popover(static_explanation("odds_credits"),label="ⓘ EXPLAIN ODDS CREDITS")
-
 
 st.markdown('<div class="daily-section-head">📚 Persistent history-only starter tracker</div>', unsafe_allow_html=True)
 explain_popover(Explanation("History-only starter tracker","This preserves real starter outcomes for pitchers who did not yet have enough legitimate history to receive a model projection.","The row is stored separately from projection history, then resolved with actual MLB starter statistics. Future starts may use it as fallback starter history, but it never becomes a fake historical projection or calibration row."),label="ⓘ EXPLAIN HISTORY-ONLY TRACKER")
