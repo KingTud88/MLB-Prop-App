@@ -17,11 +17,10 @@ from engine.explainability_ui import (
 )
 from engine.command_center_consistency import apply_command_center_consistency
 
-from automation.daily_projection_runner import LOG_PATH, game_log
+from automation.daily_projection_runner import LOG_PATH
 from engine.calibration import calibrate_blend
 from engine.hits_calibration import calibrate_hits_blend, hits_calibration_report
 from engine.outs_calibration import calibrate_outs_blend, outs_calibration_report
-from engine.bet_lean import projection_side
 from engine.model_top_plays import build_model_board
 from engine.sportsgameodds import load_pitcher_market_odds
 from engine.model_health import health_from_walk_forward, market_health_map, walk_forward_top5
@@ -144,13 +143,6 @@ def implied(price: float) -> float:
     return 100.0 / (price + 100.0) if price > 0 else abs(price) / (abs(price) + 100.0)
 
 
-def weighted(series: pd.Series, half: float, fallback: float) -> float:
-    x = pd.to_numeric(series, errors="coerce").dropna().to_numpy(float)
-    if not len(x):
-        return fallback
-    age = np.arange(len(x) - 1, -1, -1)
-    w = 0.5 ** (age / half)
-    return float(np.average(x, weights=w))
 
 
 def numeric(value: object) -> float | None:

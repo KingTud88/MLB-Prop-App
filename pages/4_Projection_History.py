@@ -209,9 +209,9 @@ else:
     user_archive = user_archive.copy()
     user_archive["_archive_date"] = pd.to_datetime(user_archive.get("game_date"), errors="coerce")
     for col in (
-        "manual_strikeout_line", "projection", "actual_strikeouts",
-        "manual_outs_line", "outs_projection", "actual_outs",
-        "manual_hits_allowed_line", "hits_projection", "actual_hits_allowed",
+        "manual_strikeout_line", "active_strikeout_line", "projection", "actual_strikeouts",
+        "manual_outs_line", "active_outs_line", "outs_projection", "actual_outs",
+        "manual_hits_allowed_line", "active_hits_allowed_line", "hits_projection", "actual_hits_allowed",
     ):
         if col in user_archive.columns:
             user_archive[col] = pd.to_numeric(user_archive[col], errors="coerce")

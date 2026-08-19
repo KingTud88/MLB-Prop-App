@@ -16,13 +16,18 @@ def test_daily_run_retires_manual_entry_ui_but_preserves_legacy_line_compatibili
     projection = Path("streamlit_app.py").read_text(encoding="utf-8")
     daily = Path("pages/5_Daily_Projection_Run.py").read_text(encoding="utf-8")
 
-    # Historical MANUAL rows remain readable by Main Projection and durable
-    # storage even though new slates no longer expose hand-entry controls.
-    assert "manual_k_line" in projection
-    assert "manual_outs_line" in projection
-    assert "manual_hits_line" in projection
+    # Historical MANUAL rows remain readable through the durable overlay even
+    # though current-page variables now use accurate active-line names.
+    storage = Path("training/projection_storage.py").read_text(encoding="utf-8")
+    assert "active_k_line" in projection
+    assert "active_outs_line" in projection
+    assert "active_hits_line" in projection
     assert "overlay_manual_market_lines" in daily
-    assert "commit_projection_archive" in daily
+    assert "commit_projection_archive" not in daily
+    assert 'result.at[idx, source_col] = "MANUAL"' in storage
+    assert "manual_strikeout_line" in storage
+    assert "manual_outs_line" in storage
+    assert "manual_hits_allowed_line" in storage
 
     assert "📡 Automated sportsbook lines" in daily
     assert "daily_manual_k_" not in daily

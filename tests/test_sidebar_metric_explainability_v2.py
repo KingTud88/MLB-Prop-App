@@ -31,7 +31,7 @@ def test_secondary_pages_no_longer_use_old_page_link_sidebar_shell():
 def test_history_metric_boxes_have_individual_help_keys():
     source = (ROOT / "pages/4_Projection_History.py").read_text(encoding="utf-8")
     for key in (
-        "history_archived_slates", "history_archived_pitchers", "history_manual_lines", "history_latest_slate",
+        "history_archived_slates", "history_archived_pitchers", "history_real_lines", "history_latest_slate",
         "history_evidence_rows", "history_resolved_games", "history_k_range_hits", "history_k_hit_rate",
         "history_hits_range_hits", "history_hits_hit_rate", "history_outs_range_hits", "history_outs_hit_rate",
         "history_k_mae", "history_hits_mae", "history_outs_mae",

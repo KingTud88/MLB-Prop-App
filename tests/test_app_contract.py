@@ -28,14 +28,18 @@ def test_projection_contains_two_path_engine_contract():
     assert '"market_used_for_forecast":False' in engine.replace(" ", "")
 
 
-def test_daily_run_owns_paid_odds_workflow_and_projection_reuses_snapshot():
+def test_automated_odds_workflow_is_background_owned_and_projection_reuses_snapshot():
     source = APP.read_text(encoding="utf-8")
     daily = (ROOT / "pages" / "5_Daily_Projection_Run.py").read_text(encoding="utf-8")
+    capture = (ROOT / ".github" / "workflows" / "sportsgameodds-capture.yml").read_text(encoding="utf-8")
+    provider = (ROOT / "engine" / "sportsgameodds.py").read_text(encoding="utf-8")
     assert "get_event_props" not in source
     assert "extract_player_odds" not in source
     assert "load_pitcher_strikeout_odds" in source
-    assert "refresh_strikeout_snapshot" in daily
-    assert "resolve_api_key" in daily
+    assert "refresh_strikeout_snapshot" not in daily
+    assert "resolve_api_key" not in daily
+    assert "SPORTSGAMEODDS_API_KEY" in capture
+    assert "pitcher_strikeouts" in provider and "pitcher_outs" in provider and "pitcher_hits_allowed" in provider
     assert "pitcher_strikeouts_alternate" in source
 
 

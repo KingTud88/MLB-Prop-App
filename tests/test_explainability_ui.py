@@ -43,7 +43,8 @@ def test_secondary_pages_cover_dynamic_decision_blocks():
     assert "leg_explanation(leg)" in tracker
     assert "📡 Automated sportsbook lines" in daily
     assert "static_explanation(\"daily_table\")" in daily
-    assert "static_explanation(\"odds_credits\")" in daily
+    assert "static_explanation(\"odds_credits\")" not in daily
+    assert "SportsGameOdds captures real pregame lines automatically" in (ROOT / "engine/explainability_ui.py").read_text(encoding="utf-8")
     assert "static_explanation(\"history_archive\")" in history
     assert "top_play_explanation(play_row)" in top
     assert "static_explanation(\"top_parlay\")" in top
