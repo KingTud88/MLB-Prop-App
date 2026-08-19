@@ -96,7 +96,7 @@ EASTERN = ZoneInfo("America/New_York")
 today = datetime.now(EASTERN).date()
 ARCHIVE_PATH = LOG_PATH.parent / "projection_archive.csv"
 slate_date = st.date_input("Slate date", value=today)
-explain_popover(Explanation("Slate date","This selects which MLB starter slate Daily Projection Run will capture, inspect or resolve.","The date scopes MLB schedule lookup, frozen projection rows, manual line overlays and result resolution. It does not change model formulas."),label="ⓘ EXPLAIN SLATE CONTROL")
+explain_popover(Explanation("Slate date","This selects which MLB starter slate Daily Projection Run will capture, inspect or resolve.","The date scopes MLB schedule lookup, frozen projection rows, sportsbook line overlays and result resolution. It does not change model formulas."),label="ⓘ EXPLAIN SLATE CONTROL")
 
 
 def load_log() -> pd.DataFrame:
@@ -613,50 +613,18 @@ if isinstance(slate, pd.DataFrame):
     explain_popover(static_explanation("daily_status"),label="ⓘ EXPLAIN SLATE STATUS")
 
     if not slate.empty:
-        st.markdown('<div class="daily-action-label">🎚️ Manual sportsbook lines</div>', unsafe_allow_html=True)
-        st.caption("Open each pitcher bar and enter the real sportsbook lines you want Top Plays to evaluate. Manual values override paid API lines. For Hits Allowed and Total Outs, saving a real line also freezes the app's current OVER / UNDER / PASS decision before first pitch so Projection History can grade it honestly later. A side is never reconstructed after first pitch. Saved manual lines reload automatically after an app restart.")
-        explain_popover(static_explanation("manual_lines"),label="ⓘ EXPLAIN MANUAL LINES")
-        durable_archive = load_projection_archive(ARCHIVE_PATH, st.secrets)
-        slate = overlay_manual_market_lines(slate, durable_archive)
-        st.session_state["daily_slate"] = slate
-        manual_line_values: dict[str, dict[str, str]] = {}
-        for _, manual_row in slate.reset_index(drop=True).iterrows():
-            row_key = _archive_row_key(manual_row)
-            player = str(manual_row.get("player", "Unknown"))
-            team = str(manual_row.get("team", "—"))
-            opponent = str(manual_row.get("opponent", "—"))
-            with st.expander(f"⚾ {player} · {team} vs {opponent}", expanded=False):
-                l1, l2, l3 = st.columns(3)
-                k_raw = l1.text_input("Strikeout line", value=_manual_input_default(manual_row, "active_strikeout_line", "active_strikeout_line_source"), placeholder="e.g. 4.5", key=f"daily_manual_k_{row_key}")
-                outs_raw = l2.text_input("Total outs line", value=_manual_input_default(manual_row, "active_outs_line", "active_outs_line_source"), placeholder="e.g. 15.5", key=f"daily_manual_outs_{row_key}")
-                hits_raw = l3.text_input("Hits allowed line", value=_manual_input_default(manual_row, "active_hits_allowed_line", "active_hits_allowed_line_source"), placeholder="e.g. 5.5", key=f"daily_manual_hits_{row_key}")
-                st.caption(f"Model: {float(manual_row.get('projection', float('nan'))):.2f} K · {float(manual_row.get('outs_projection', float('nan'))):.2f} outs · {float(manual_row.get('hits_projection', float('nan'))):.2f} hits allowed")
-            manual_line_values[row_key] = {"k": k_raw, "outs": outs_raw, "hits": hits_raw}
-
-        if st.button("✅ APPLY LINES + ADD TO PROJECTION ARCHIVE", type="primary", use_container_width=True, key="daily_apply_archive"):
-            try:
-                parsed_lines = {
-                    key: {
-                        "k": _parse_market_line(values.get("k")),
-                        "outs": _parse_market_line(values.get("outs")),
-                        "hits": _parse_market_line(values.get("hits")),
-                    }
-                    for key, values in manual_line_values.items()
-                }
-                filled_lines = sum(pd.notna(value) for values in parsed_lines.values() for value in values.values())
-                if filled_lines == 0:
-                    raise ValueError("Enter at least one sportsbook line before adding the slate to the Projection Archive.")
-                archived = commit_projection_archive(slate, parsed_lines, slate_date.isoformat())
-                applied = filled_lines
-                refreshed_log = load_log()
-                refreshed_slate = refreshed_log.loc[refreshed_log.get("game_date", pd.Series(dtype=str)).astype(str).eq(slate_date.isoformat())].copy()
-                durable_archive = load_projection_archive(ARCHIVE_PATH, st.secrets)
-                st.session_state["daily_slate"] = overlay_manual_market_lines(refreshed_slate, durable_archive)
-                st.session_state["daily_slate_date"] = slate_date.isoformat()
-                st.session_state["daily_archive_saved_at"] = datetime.now(EASTERN).strftime("%b %d, %Y · %I:%M:%S %p ET")
-                st.success(f"Persisted {applied} manual sportsbook line(s) for Top Plays and saved {archived} pitcher projection row(s) to restart-safe storage.")
-            except ValueError as exc:
-                st.error(str(exc))
+        st.markdown('<div class="daily-action-label">📡 Automated sportsbook lines</div>', unsafe_allow_html=True)
+        st.caption(
+            "SportsGameOdds captures real pregame Strikeouts, Total Outs, and Hits Allowed lines automatically. ESPN BET is preferred, with real-book fallback only when a complete Over/Under pair exists on the same number. No consensus, fair, stale, or post-start line can become an active execution line. Legacy MANUAL rows remain visible only where they were saved before automation."
+        )
+        auto_metric_cols = st.columns(3)
+        for metric_col, label, line_col in (
+            (auto_metric_cols[0], "K lines captured", "active_strikeout_line"),
+            (auto_metric_cols[1], "Outs lines captured", "active_outs_line"),
+            (auto_metric_cols[2], "Hits lines captured", "active_hits_allowed_line"),
+        ):
+            values = pd.to_numeric(slate.get(line_col, pd.Series(index=slate.index, dtype=float)), errors="coerce")
+            metric_col.metric(label, int(values.notna().sum()))
 
     if not slate.empty:
         # Keep the primary projection scan tight: pitcher/matchup first, then Ks.
@@ -804,9 +772,8 @@ if isinstance(slate, pd.DataFrame):
                 subset=projection_highlight_cols,
             )
 
-        # Make user-entered execution lines immediately visible without
-        # changing the frozen projection layer. Paid/API lines keep the
-        # standard table styling; MANUAL lines get the orange treatment.
+        # Legacy manually entered lines keep their historical visual marker.
+        # New automated SportsGameOdds lines use the standard market styling.
         manual_line_styles = pd.DataFrame("", index=display.index, columns=display.columns)
         for line_col, source_col in (
             ("K Line", "K Source"),
@@ -828,7 +795,7 @@ if isinstance(slate, pd.DataFrame):
         st.subheader(f"{slate_date:%B %d, %Y} starter slate")
         st.caption(
             "How to read: Projection = frozen expected average outcome · Line = active sportsbook execution line attached after projection capture · 80% Range = one central simulated interval (10th–90th percentile), not an 80% chance at each endpoint · "
-            "SIM/MATH = the probability from each independent model path. MANUAL/PAID API source labels show exactly where each line came from. Adding or changing a line never changes the frozen projection. Click a pitcher row for the full breakdown. Headline projections are green."
+            "SIM/MATH = the probability from each independent model path. Source labels show exactly where each real line came from; legacy MANUAL rows remain labeled. Adding or refreshing a line never changes the frozen projection. Click a pitcher row for the full breakdown. Headline projections are green."
         )
         event = st.dataframe(
             styled_display,
@@ -862,21 +829,21 @@ if isinstance(slate, pd.DataFrame):
         for error in errors:
             st.write(f"- {error}")
 
-st.markdown('<div class="daily-section-head">Manual Paid Data</div>', unsafe_allow_html=True)
-st.markdown('<div class="daily-note paid">Optional market-data pull · manual only · strikeout lines only · saved snapshot is reused elsewhere without another paid request.</div>', unsafe_allow_html=True)
-st.markdown('<div class="daily-action-label">💳 Paid strikeout lines</div>', unsafe_allow_html=True)
-st.caption("Manual only. This button is the ONLY paid Odds API path and requests pitcher_strikeouts only. The saved snapshot is reused by Main Projections without another API call.")
+st.markdown('<div class="daily-section-head">Backup Paid Data</div>', unsafe_allow_html=True)
+st.markdown('<div class="daily-note paid">Emergency K-only backup · manual button · the automated SportsGameOdds feed remains primary for Ks, Outs, and Hits Allowed.</div>', unsafe_allow_html=True)
+st.markdown('<div class="daily-action-label">💳 Backup strikeout lines</div>', unsafe_allow_html=True)
+st.caption("Optional fallback only. This button requests pitcher_strikeouts from the legacy Odds API and saves the snapshot without changing the baseball projection. SportsGameOdds remains the primary automated execution-line source.")
 paid_quota = load_quota_status()
-if st.button("💳 LOAD STRIKEOUT LINES · PAID API", use_container_width=True, key="daily_paid_k_odds"):
+if st.button("💳 LOAD STRIKEOUT LINES · BACKUP API", use_container_width=True, key="daily_paid_k_odds"):
     api_key=resolve_api_key(st.secrets)
-    with st.spinner("Loading today's main pitcher strikeout lines once and saving the snapshot..."):
+    with st.spinner("Loading today's backup pitcher strikeout lines once and saving the snapshot..."):
         odds_snapshot,quota,odds_error=refresh_strikeout_snapshot(api_key,slate_date.isoformat())
     if odds_error:
         st.error(odds_error)
     else:
         pitchers=int(odds_snapshot.get("pitcher",pd.Series(dtype=str)).nunique()) if not odds_snapshot.empty else 0
         active_lines = apply_paid_strikeout_lines(odds_snapshot, slate_date.isoformat())
-        st.success(f"Saved {len(odds_snapshot)} strikeout offers for {pitchers} pitchers and applied {active_lines} active K line(s) for Top Plays. Manual K lines override these paid lines.")
+        st.success(f"Saved {len(odds_snapshot)} backup strikeout offers for {pitchers} pitchers and applied {active_lines} active K line(s) where no legacy manual line existed.")
         paid_quota = load_quota_status()
 
 remaining = paid_quota.get("remaining") if isinstance(paid_quota, dict) else None
@@ -884,8 +851,8 @@ checked_at = str(paid_quota.get("checked_at_utc", "") or "") if isinstance(paid_
 quota_col, quota_note = st.columns([1, 2])
 quota_col.metric("Odds API credits remaining", "—" if remaining is None else f"{int(remaining):,}")
 quota_note.caption(
-    "Saved from the response headers of the last paid pull"
-    + (f" · checked {checked_at}" if checked_at else " · no paid pull recorded yet")
+    "Saved from the response headers of the last backup pull"
+    + (f" · checked {checked_at}" if checked_at else " · no backup pull recorded yet")
     + ". This meter never calls the Odds API by itself."
 )
 explain_popover(static_explanation("odds_credits"),label="ⓘ EXPLAIN ODDS CREDITS")
