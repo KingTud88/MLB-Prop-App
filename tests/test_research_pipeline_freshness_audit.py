@@ -5,6 +5,11 @@ from pathlib import Path
 import pandas as pd
 
 import training.research_pipeline_freshness_audit as freshness
+from training.calibration_shadow_gate import (
+    GATE_VERSION as CALIBRATION_GATE_VERSION,
+    MILESTONES as CALIBRATION_MILESTONES,
+    MIN_OOS_STARTS as CALIBRATION_MIN_OOS_STARTS,
+)
 from training.research_evidence_history import append_history
 from training.research_evidence_transition_digest import (
     DIGEST_COLUMNS,
@@ -21,6 +26,7 @@ from training.research_manual_review_queue import (
     append_review_queue,
     build_queue_summary,
 )
+from training.research_multicell_review_injector import inject_multicell_reviews
 
 
 def _center(secondary: str = "sample=1") -> pd.DataFrame:
@@ -73,6 +79,25 @@ def _write_pipeline(root: Path, center: pd.DataFrame, history: pd.DataFrame, ref
     build_queue_summary(queue, refresh).to_csv(root / "research_manual_review_queue_summary.csv", index=False)
 
 
+def _calibration_gate() -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "Milestone": int(milestone),
+                "OOS_Starts": int(CALIBRATION_MIN_OOS_STARTS),
+                "Relative_Brier_Improvement": -0.01,
+                "Baseline_Calibration_Gap": 0.01,
+                "Candidate_Calibration_Gap": 0.02,
+                "Candidate_Win_Share": 0.40,
+                "Promotion_Gate_Status": "FAIL",
+                "Reasons": "brier|calibration_gap|win_share",
+                "Gate_Version": CALIBRATION_GATE_VERSION,
+            }
+            for milestone in CALIBRATION_MILESTONES
+        ]
+    )
+
+
 def test_exact_recomputation_marks_full_pipeline_current(tmp_path: Path, monkeypatch) -> None:
     center = _center()
     history = append_history(center, observed_at_utc="2026-08-18T12:00:00+00:00")
@@ -86,6 +111,55 @@ def test_exact_recomputation_marks_full_pipeline_current(tmp_path: Path, monkeyp
     assert audit["Freshness_Status"].tolist() == [freshness.CURRENT] * 5
     assert summary["Overall_Status"] == "HEALTHY"
     assert summary["Current_Stages"] == 5
+
+
+def test_multicell_injection_and_later_human_close_remain_fresh(tmp_path: Path, monkeypatch) -> None:
+    center = _center()
+    history = append_history(center, observed_at_utc="2026-08-19T12:00:00+00:00")
+    refresh = "2026-08-19T13:46:03+00:00"
+    reviewed_at = "2026-08-19T13:51:31+00:00"
+    _write_pipeline(tmp_path, center, history, refresh)
+
+    calibration = _calibration_gate()
+    calibration.to_csv(tmp_path / "calibration_shadow_gate.csv", index=False)
+    digest = pd.read_csv(tmp_path / "research_evidence_transition_digest.csv")
+    base_packet = build_manual_review_packet(digest, history, center, refresh)
+    injected = inject_multicell_reviews(
+        base_packet,
+        pd.DataFrame(columns=QUEUE_COLUMNS),
+        calibration,
+        pd.DataFrame(),
+        refresh,
+    )
+    assert len(base_packet) == 0
+    assert len(injected) == 1
+    assert injected.iloc[0]["Review_Trigger"] == "MULTICELL_MATURITY_TRANSITION"
+
+    injected.to_csv(tmp_path / "research_manual_review_packet.csv", index=False)
+    build_packet_summary(injected, digest, refresh).to_csv(
+        tmp_path / "research_manual_review_packet_summary.csv", index=False
+    )
+
+    queue = append_review_queue(injected, pd.DataFrame(columns=QUEUE_COLUMNS), queued_at_utc=refresh)
+    queue.loc[0, "Review_Status"] = "CLOSED_BY_HUMAN"
+    queue.loc[0, "Reviewed_At_UTC"] = reviewed_at
+    queue.loc[0, "Reviewer"] = "owner"
+    queue.loc[0, "Review_Notes"] = "No promotion; preserve negative result."
+    queue.to_csv(tmp_path / "research_manual_review_queue.csv", index=False)
+    build_queue_summary(queue, reviewed_at).to_csv(
+        tmp_path / "research_manual_review_queue_summary.csv", index=False
+    )
+
+    monkeypatch.setattr(freshness, "build_command_center", lambda _root: center.copy())
+    audit = freshness.build_pipeline_freshness_audit(tmp_path).set_index("Stage")
+    summary = freshness.build_freshness_summary(audit.reset_index()).iloc[0]
+
+    assert audit.loc["MANUAL_REVIEW_PACKET", "Freshness_Status"] == freshness.CURRENT
+    assert int(audit.loc["MANUAL_REVIEW_PACKET", "Current_Items"]) == 1
+    assert int(audit.loc["MANUAL_REVIEW_PACKET", "Expected_Items"]) == 1
+    assert audit.loc["MANUAL_REVIEW_QUEUE", "Freshness_Status"] == freshness.CURRENT
+    assert summary["Overall_Status"] == "HEALTHY"
+    assert int(summary["Current_Stages"]) == 5
 
 
 def test_command_center_detects_current_source_mismatch_without_time_thresholds(tmp_path: Path, monkeypatch) -> None:
@@ -174,5 +248,5 @@ def test_freshness_contract_is_report_only_and_not_a_ninth_scoreboard_card() -> 
     assert freshness.PRODUCTION_AUTHORITY == "NONE"
     assert freshness.NO_AUTO_PROMOTION is True
     assert freshness.LOCKED_PROMOTION_SCOREBOARD_CARDS == 8
-    assert freshness.VERSION == "research-pipeline-freshness-v1-report-only"
+    assert freshness.VERSION == "research-pipeline-freshness-v2-multicell-aware-report-only"
     assert "Score" not in freshness.SUMMARY_COLUMNS

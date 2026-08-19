@@ -25,8 +25,9 @@ from training.research_manual_review_queue import (
     append_review_queue,
     build_queue_summary,
 )
+from training.research_multicell_review_injector import inject_multicell_reviews
 
-VERSION = "research-pipeline-freshness-v1-report-only"
+VERSION = "research-pipeline-freshness-v2-multicell-aware-report-only"
 REPORT_ONLY = True
 PRODUCTION_AUTHORITY = "NONE"
 NO_AUTO_PROMOTION = True
@@ -208,6 +209,19 @@ def _iso_max(values: pd.Series) -> pd.Timestamp | None:
     return None if parsed.empty else parsed.max()
 
 
+def _queue_before_refresh(queue: pd.DataFrame, refresh: str) -> pd.DataFrame:
+    """Return only review cases that existed before the exact refresh being reconstructed."""
+    if queue is None or queue.empty:
+        return pd.DataFrame(columns=QUEUE_COLUMNS)
+    if not refresh or "Queued_At_UTC" not in queue.columns:
+        return pd.DataFrame(columns=queue.columns)
+    refresh_ts = pd.to_datetime(refresh, utc=True, errors="coerce")
+    if pd.isna(refresh_ts):
+        return pd.DataFrame(columns=queue.columns)
+    queued = pd.to_datetime(queue["Queued_At_UTC"], utc=True, errors="coerce")
+    return queue.loc[queued.notna() & queued.lt(refresh_ts)].copy().reset_index(drop=True)
+
+
 def _build_command_center_stage(root: Path, expected_center: pd.DataFrame) -> tuple[dict[str, object], pd.DataFrame]:
     saved = _read_csv(root / "research_evidence_command_center.csv")
     source_missing = 0
@@ -334,17 +348,29 @@ def _build_packet_stage(
     if packet_refresh != refresh:
         return _stage("MANUAL_REVIEW_PACKET", "TRANSITION_DIGEST", SOURCE_NEWER, len(packet), len(packet), 1, f"Packet refresh {packet_refresh or 'MISSING'} does not match digest refresh {refresh}."), packet
 
+    queue = _read_csv(root / "research_manual_review_queue.csv")
+    prior_queue = _queue_before_refresh(queue, refresh)
+    calibration_gate = _read_csv(root / "calibration_shadow_gate.csv")
+    role_gate = _read_csv(root / "live_role_shadow_gate.csv")
+
     expected_packet = build_manual_review_packet(digest, history, expected_center, refresh)
+    expected_packet = inject_multicell_reviews(
+        expected_packet,
+        prior_queue,
+        calibration_gate,
+        role_gate,
+        refresh,
+    )
     expected_summary = build_packet_summary(expected_packet, digest, refresh)
     packet_match = _frame_signature(packet, PACKET_COLUMNS, ["Lane"]) == _frame_signature(expected_packet, PACKET_COLUMNS, ["Lane"])
     summary_match = _frame_signature(summary, PACKET_SUMMARY_COLUMNS) == _frame_signature(expected_summary, PACKET_SUMMARY_COLUMNS)
     mismatch = int(not packet_match) + int(not summary_match)
     if mismatch:
         status = DERIVED_DRIFT
-        detail = "Committed manual-review packet does not reproduce from the current exact-refresh digest/history state."
+        detail = "Committed manual-review packet does not reproduce from the exact-refresh digest/history plus one-time multicell review state."
     else:
         status = CURRENT
-        detail = f"Manual-review packet exactly reproduces for refresh {refresh}."
+        detail = f"Manual-review packet exactly reproduces for refresh {refresh}, including one-time multicell review injection."
     return _stage("MANUAL_REVIEW_PACKET", "TRANSITION_DIGEST", status, len(packet), len(expected_packet), mismatch, detail), packet
 
 
