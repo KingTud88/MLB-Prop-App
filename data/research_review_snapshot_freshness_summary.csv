@@ -1,0 +1,2 @@
+Overall_Status,Review_Artifacts,Current_Artifacts,Stale_Artifacts,Missing_Artifacts,Control_Violation_Artifacts,All_Report_Only,All_Production_Authority_None,No_Auto_Promotion,Automatic_Decision_Allowed,Freshness_Version
+HEALTHY,2,2,0,0,0,True,True,True,False,research-review-snapshot-freshness-v1-report-only
