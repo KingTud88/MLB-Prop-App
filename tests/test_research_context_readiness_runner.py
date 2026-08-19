@@ -19,6 +19,7 @@ def test_runner_keeps_one_shared_refresh_timestamp() -> None:
 def test_runner_orders_dependency_chain_before_freshness_audit() -> None:
     text = _text()
     stages = (
+        "training.umpire_k_up_cap_shadow",
         "training.research_evidence_command_center",
         "training.research_evidence_history",
         "training.research_evidence_transition_digest",
@@ -30,9 +31,11 @@ def test_runner_orders_dependency_chain_before_freshness_audit() -> None:
     assert positions == sorted(positions)
 
 
-def test_runner_persists_freshness_and_review_outputs() -> None:
+def test_runner_persists_freshness_review_and_umpire_shadow_outputs() -> None:
     text = _text()
     expected = (
+        "data/umpire_k_up_cap_shadow_detail.csv",
+        "data/umpire_k_up_cap_shadow_summary.csv",
         "data/research_evidence_command_center.csv",
         "data/research_evidence_history.csv",
         "data/research_evidence_transition_digest.csv",
@@ -47,6 +50,7 @@ def test_runner_persists_freshness_and_review_outputs() -> None:
 
 def test_runner_keeps_report_only_contract_tests_in_path() -> None:
     text = _text()
+    assert "tests/test_umpire_k_up_cap_shadow.py" in text
     assert "tests/test_research_pipeline_freshness_audit.py" in text
     assert "tests/test_research_evidence_command_center.py" in text
     assert "tests/test_research_manual_review_queue.py" in text
