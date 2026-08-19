@@ -12,7 +12,7 @@ def test_top_plays_has_no_paid_odds_runtime():
 
 def test_projection_page_reads_saved_k_odds_without_paid_api_call():
     source = Path("streamlit_app.py").read_text(encoding="utf-8")
-    assert 'load_pitcher_strikeout_odds' in source
+    assert 'load_pitcher_market_odds' in source
     assert 'LOAD LIVE ODDS · ≤3 credits' not in source
     assert 'odds_events,odds_err=get_odds_events()' not in source
     assert 'api.the-odds-api.com' not in source

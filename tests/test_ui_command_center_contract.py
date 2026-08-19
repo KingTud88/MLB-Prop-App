@@ -30,7 +30,7 @@ def test_main_projection_uses_v7_components_without_removing_model_flow():
     assert "weather_icon=_weather_icon" in source
     # Core projection and market-separation contracts remain in the page.
     assert "calculate_projection(" in source
-    assert "load_pitcher_strikeout_odds" in source
+    assert "load_pitcher_market_odds" in source
     assert "api.the-odds-api.com" not in source
     assert "No current automated sportsbook line has been captured" in source
 

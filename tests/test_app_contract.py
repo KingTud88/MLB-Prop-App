@@ -35,7 +35,7 @@ def test_automated_odds_workflow_is_background_owned_and_projection_reuses_snaps
     provider = (ROOT / "engine" / "sportsgameodds.py").read_text(encoding="utf-8")
     assert "get_event_props" not in source
     assert "extract_player_odds" not in source
-    assert "load_pitcher_strikeout_odds" in source
+    assert "load_pitcher_market_odds" in source
     assert "refresh_strikeout_snapshot" not in daily
     assert "resolve_api_key" not in daily
     assert "SPORTSGAMEODDS_API_KEY" in capture

@@ -12,7 +12,8 @@ def test_projection_has_no_direct_paid_odds_error_path():
     app = Path("streamlit_app.py").read_text(encoding="utf-8")
     odds = Path("engine/odds_snapshot.py").read_text(encoding="utf-8")
     assert 'get_event_props' not in app
-    assert 'load_pitcher_strikeout_odds' in app
+    assert 'load_pitcher_market_odds' in app
+    assert 'load_pitcher_strikeout_odds' not in app
     assert 'type(exc).__name__' in odds
 
 
