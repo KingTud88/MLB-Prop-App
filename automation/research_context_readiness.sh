@@ -18,6 +18,7 @@ PYTHONPATH=. pytest -q \
   tests/test_pitch_mix_whiff_forward_evaluation.py \
   tests/test_umpire_k_up_cap_shadow.py \
   tests/test_confirmed_lineup_review_snapshot.py \
+  tests/test_confirmed_lineup_review_pipeline.py \
   tests/test_research_evidence_command_center.py \
   tests/test_research_evidence_history.py \
   tests/test_research_evidence_transition_digest.py \
