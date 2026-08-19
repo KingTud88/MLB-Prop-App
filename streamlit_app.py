@@ -274,6 +274,34 @@ h1,h2,h3{letter-spacing:-.02em}
 .metric-card .cc-emblem.contact{background-position:80% 50%!important}
 .reco-card .cc-emblem.contact{background-position:100% 50%!important}
 
+/* PROJECTION_EMBLEM_SIZE_V10 · larger 128px-master rendering with crisper edge treatment */
+.metric-card,.reco-card{padding-right:132px!important}
+.metric-card .cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{
+    right:12px!important;
+    top:42px!important;
+    width:108px!important;
+    height:108px!important;
+    min-width:108px!important;
+    flex:0 0 108px!important;
+    background-size:600% 100%!important;
+    background-repeat:no-repeat!important;
+    image-rendering:auto!important;
+    filter:drop-shadow(0 2px 1px rgba(0,0,0,.30)) drop-shadow(0 0 1px rgba(236,22,56,.10))!important;
+    transform:translateZ(0)!important;
+}
+@media (max-width:900px){
+    .metric-card,.reco-card{padding-right:108px!important}
+    .metric-card .cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{
+        right:10px!important;top:48px!important;width:88px!important;height:88px!important;min-width:88px!important;flex-basis:88px!important;background-size:600% 100%!important
+    }
+}
+@media (max-width:620px){
+    .metric-card,.reco-card{padding-right:92px!important}
+    .metric-card .cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{
+        right:8px!important;top:49px!important;width:76px!important;height:76px!important;min-width:76px!important;flex-basis:76px!important;background-size:600% 100%!important
+    }
+}
+
 
 /* PROJECTION_SUMMARY_NO_LINE_V14 · compact no-market state; approved emblem geometry untouched */
 .reco-card.reco-neutral .reco-side{
