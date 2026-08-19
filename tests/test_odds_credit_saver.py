@@ -3,8 +3,11 @@ from pathlib import Path
 
 def test_top_plays_has_no_paid_odds_runtime():
     source = Path("pages/6_Top_Plays.py").read_text(encoding="utf-8")
-    assert 'api_key = None  # Paid Odds API access is intentionally restricted to Daily Projection Run.' in source
     assert 'api_key = secret()' not in source
+    assert 'api_key = None' not in source
+    assert 'api.the-odds-api.com' not in source
+    assert 'load_pitcher_market_odds' in source
+    assert 'attach_sportsgameodds_prices' in source
 
 
 def test_projection_page_reads_saved_k_odds_without_paid_api_call():
@@ -12,15 +15,16 @@ def test_projection_page_reads_saved_k_odds_without_paid_api_call():
     assert 'load_pitcher_strikeout_odds' in source
     assert 'LOAD LIVE ODDS · ≤3 credits' not in source
     assert 'odds_events,odds_err=get_odds_events()' not in source
-    assert 'this page never calls the Odds API' in source
+    assert 'api.the-odds-api.com' not in source
+    assert 'No current automated sportsbook line has been captured' in source
 
 
-def test_daily_projection_page_owns_legacy_paid_k_backup_button_only():
+def test_daily_projection_page_has_no_visible_legacy_paid_k_controls():
     source = Path("pages/5_Daily_Projection_Run.py").read_text(encoding="utf-8")
-    assert 'LOAD STRIKEOUT LINES · BACKUP API' in source
-    assert 'refresh_strikeout_snapshot' in source
-    assert 'Optional fallback only.' in source
-    assert 'SportsGameOdds remains the primary automated execution-line source.' in source
+    assert 'LOAD STRIKEOUT LINES · BACKUP API' not in source
+    assert 'refresh_strikeout_snapshot' not in source
+    assert 'Odds API credits remaining' not in source
+    assert '📡 Automated sportsbook lines' in source
 
 
 def test_paid_snapshot_request_is_strikeouts_only_and_tracks_quota_headers():

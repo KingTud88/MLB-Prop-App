@@ -30,11 +30,13 @@ def test_top_plays_is_model_first_and_odds_are_optional_overlay():
     source = path.read_text(encoding="utf-8")
     assert "build_model_board" in source
     assert "require_market_lines=True" in source
-    assert "Line integrity: every ranked leg below uses an active sportsbook line" in source
+    assert "Line integrity: every ranked leg below uses an authentic active sportsbook line" in source
     assert "Sportsbook lines and odds are execution information only" in source
     assert "market_health=health_map" in source
-    assert 'plays["Live Offer"] = False' in source
-    assert "api_key = None" in source
+    assert '("Live Offer", False)' in source
+    assert "load_pitcher_market_odds" in source
+    assert "api_key = None" not in source
+    assert "api.the-odds-api.com" not in source
     assert 'st.subheader("Today\'s five highest-probability model legs")' not in source
 
 

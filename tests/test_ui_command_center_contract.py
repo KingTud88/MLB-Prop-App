@@ -31,7 +31,8 @@ def test_main_projection_uses_v7_components_without_removing_model_flow():
     # Core projection and market-separation contracts remain in the page.
     assert "calculate_projection(" in source
     assert "load_pitcher_strikeout_odds" in source
-    assert "this page never calls the Odds API" in source
+    assert "api.the-odds-api.com" not in source
+    assert "No current automated sportsbook line has been captured" in source
 
 
 def test_main_projection_lower_command_center_is_presentation_only():
@@ -50,7 +51,8 @@ def test_main_projection_lower_command_center_is_presentation_only():
     assert "render_add_bet_button(add3,hit_reco" in source
     assert "build_market_table(proj,odds_rows,hits_proj)" in source
     assert "render_projection_parlay_builder()" in source
-    assert "this page never calls the Odds API" in source
+    assert "api.the-odds-api.com" not in source
+    assert "No current automated sportsbook line has been captured" in source
 
 
 def test_brand_pass_adds_team_marks_and_projection_icon_bubbles():
@@ -64,7 +66,8 @@ def test_brand_pass_adds_team_marks_and_projection_icon_bubbles():
     assert ".cc-sidebar-brand" in theme
     assert ".cc-team-logo" in theme
     assert "calculate_projection(" in source
-    assert "this page never calls the Odds API" in source
+    assert "api.the-odds-api.com" not in source
+    assert "No current automated sportsbook line has been captured" in source
 
 
 def test_v8_final_polish_locks_approved_header_tabs_and_lean_highlights():

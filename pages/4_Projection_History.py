@@ -94,7 +94,7 @@ st.markdown(
 st.markdown(
     '<div class="ph-command-hero"><div class="ph-command-kicker">StrikeOut King 9000 · Frozen Evidence Vault</div>'
     '<div class="ph-command-title">PROJECTION <span>HISTORY</span></div>'
-    '<div class="ph-command-sub">Your manually approved Projection Archive stays first. Frozen model evidence, resolved MLB outcomes, calibration, workload audits, and learning diagnostics remain underneath for deeper review.</div>'
+    '<div class="ph-command-sub">Your durable Projection Archive stays first. Frozen model evidence, authentic sportsbook lines, resolved MLB outcomes, calibration, workload audits, and learning diagnostics remain underneath for deeper review.</div>'
     '<div class="ph-command-rule">ARCHIVE FIRST · REAL LINES · FROZEN MODEL EVIDENCE</div></div>',
     unsafe_allow_html=True,
 )
@@ -200,7 +200,7 @@ for col in [
 
 # PROJECTION_HISTORY_ARCHIVE_COMMAND_V2
 st.markdown('<div class="history-section-head">Projection Archive</div>', unsafe_allow_html=True)
-st.markdown('<div class="history-primary-note">Every frozen daily projection slate appears here automatically. Your sportsbook lines are a durable execution overlay saved separately, so a reboot cannot remove the slate or detach previously saved manual lines.</div>', unsafe_allow_html=True)
+st.markdown('<div class="history-primary-note">Every frozen daily projection slate appears here automatically. Authentic sportsbook lines are preserved as execution evidence, while legacy MANUAL rows remain intact for historical accountability.</div>', unsafe_allow_html=True)
 explain_popover(static_explanation("history_archive"),label="ⓘ EXPLAIN PROJECTION ARCHIVE")
 user_archive = load_user_archive(df)
 if user_archive.empty:
@@ -209,9 +209,9 @@ else:
     user_archive = user_archive.copy()
     user_archive["_archive_date"] = pd.to_datetime(user_archive.get("game_date"), errors="coerce")
     for col in (
-        "manual_strikeout_line", "projection", "actual_strikeouts",
-        "manual_outs_line", "outs_projection", "actual_outs",
-        "manual_hits_allowed_line", "hits_projection", "actual_hits_allowed",
+        "manual_strikeout_line", "active_strikeout_line", "projection", "actual_strikeouts",
+        "manual_outs_line", "active_outs_line", "outs_projection", "actual_outs",
+        "manual_hits_allowed_line", "active_hits_allowed_line", "hits_projection", "actual_hits_allowed",
     ):
         if col in user_archive.columns:
             user_archive[col] = pd.to_numeric(user_archive[col], errors="coerce")
@@ -233,8 +233,8 @@ else:
 
     archive_dates = user_archive["_archive_date"].dt.date.dropna()
     archived_slates = int(archive_dates.nunique())
-    line_cols = [col for col in ("manual_strikeout_line", "manual_outs_line", "manual_hits_allowed_line") if col in user_archive.columns]
-    manual_lines = int(sum(user_archive[col].notna().sum() for col in line_cols))
+    line_cols = [col for col in ("active_strikeout_line", "active_outs_line", "active_hits_allowed_line") if col in user_archive.columns]
+    real_lines = int(sum(user_archive[col].notna().sum() for col in line_cols))
     actual_cols = [col for col in ("actual_strikeouts", "actual_outs", "actual_hits_allowed") if col in user_archive.columns]
     resolved_pitchers = int(user_archive[actual_cols].notna().any(axis=1).sum()) if actual_cols else 0
     latest_archive_date = max(archive_dates).strftime("%b %d") if len(archive_dates) else "—"
@@ -242,16 +242,16 @@ else:
     a1, a2, a3, a4 = st.columns(4)
     a1.metric("Archived slates", archived_slates, help=metric_help("history_archived_slates", current=f"{archived_slates} unique slate date(s)"))
     a2.metric("Archived pitchers", len(user_archive), help=metric_help("history_archived_pitchers", current=f"{len(user_archive)} archived pitcher-game row(s)"))
-    a3.metric("Manual lines attached", manual_lines, help=metric_help("history_manual_lines", current=f"{manual_lines} saved manual market line(s)"))
+    a3.metric("Real lines attached", real_lines, help=metric_help("history_real_lines", current=f"{real_lines} authentic sportsbook market line(s) attached"))
     a4.metric("Latest slate", latest_archive_date, help=metric_help("history_latest_slate", current=f"Most recent archive date: {latest_archive_date}"))
     explain_popover(static_explanation("history_archive"),label="ⓘ EXPLAIN ARCHIVE COUNTERS")
     st.caption(f"{resolved_pitchers} archived pitcher row(s) currently have at least one resolved MLB outcome attached.")
 
     archive_columns = [
         "player", "team", "opponent",
-        "projection", "archive_k_target", "actual_strikeouts", "archive_k_result", "manual_strikeout_line",
-        "outs_projection", "manual_outs_line", "manual_outs_side", "actual_outs", "archive_outs_bet_result",
-        "hits_projection", "manual_hits_allowed_line", "manual_hits_allowed_side", "actual_hits_allowed", "archive_hits_bet_result",
+        "projection", "archive_k_target", "actual_strikeouts", "archive_k_result", "active_strikeout_line", "active_strikeout_line_source",
+        "outs_projection", "active_outs_line", "active_outs_line_source", "manual_outs_side", "actual_outs", "archive_outs_bet_result",
+        "hits_projection", "active_hits_allowed_line", "active_hits_allowed_line_source", "manual_hits_allowed_side", "actual_hits_allowed", "archive_hits_bet_result",
         "confidence", "data_quality", "archive_source", "archive_committed_at_utc",
     ]
     archive_columns = [col for col in archive_columns if col in user_archive.columns]
@@ -262,14 +262,14 @@ else:
         day_line_count = int(sum(group[col].notna().sum() for col in line_cols if col in group.columns))
         day_resolved = int(group[[col for col in actual_cols if col in group.columns]].notna().any(axis=1).sum()) if actual_cols else 0
         with st.expander(
-            f"📅 {date_label} · {len(group)} pitcher{'s' if len(group) != 1 else ''} · {day_line_count} manual lines · {day_resolved} resolved",
+            f"📅 {date_label} · {len(group)} pitcher{'s' if len(group) != 1 else ''} · {day_line_count} real lines · {day_resolved} resolved",
             expanded=(idx == 0),
         ):
             view = group.rename(columns={
                 "player": "Pitcher", "team": "Team", "opponent": "Opp",
-                "projection": "Projected K", "archive_k_target": "K Target", "actual_strikeouts": "Actual K", "archive_k_result": "K Result", "manual_strikeout_line": "K Line",
-                "outs_projection": "Projected Outs", "actual_outs": "Actual Outs", "manual_outs_line": "Outs Line", "manual_outs_side": "Outs Side", "archive_outs_bet_result": "Outs Bet Result",
-                "manual_hits_allowed_line": "Hits Line", "manual_hits_allowed_side": "Hits Side", "hits_projection": "Projected Hits", "actual_hits_allowed": "Actual Hits", "archive_hits_bet_result": "Hits Bet Result",
+                "projection": "Projected K", "archive_k_target": "K Target", "actual_strikeouts": "Actual K", "archive_k_result": "K Result", "active_strikeout_line": "K Line", "active_strikeout_line_source": "K Source",
+                "outs_projection": "Projected Outs", "actual_outs": "Actual Outs", "active_outs_line": "Outs Line", "active_outs_line_source": "Outs Source", "manual_outs_side": "Outs Side", "archive_outs_bet_result": "Outs Bet Result",
+                "active_hits_allowed_line": "Hits Line", "active_hits_allowed_line_source": "Hits Source", "manual_hits_allowed_side": "Hits Side", "hits_projection": "Projected Hits", "actual_hits_allowed": "Actual Hits", "archive_hits_bet_result": "Hits Bet Result",
                 "confidence": "Confidence", "data_quality": "Quality",
                 "archive_source": "Archive Source", "archive_committed_at_utc": "Committed UTC",
             })
@@ -283,9 +283,9 @@ else:
             view = view[populated]
             preferred = [
                 "Pitcher", "Team", "Opp",
-                "Projected K", "K Target", "Actual K", "K Result", "K Line",
-                "Projected Outs", "Outs Line", "Outs Side", "Actual Outs", "Outs Bet Result",
-                "Projected Hits", "Hits Line", "Hits Side", "Actual Hits", "Hits Bet Result",
+                "Projected K", "K Target", "Actual K", "K Result", "K Line", "K Source",
+                "Projected Outs", "Outs Line", "Outs Source", "Outs Side", "Actual Outs", "Outs Bet Result",
+                "Projected Hits", "Hits Line", "Hits Source", "Hits Side", "Actual Hits", "Hits Bet Result",
                 "Confidence", "Quality", "Archive Source", "Committed UTC",
             ]
             ordered = [col for col in preferred if col in view.columns]
@@ -303,12 +303,17 @@ else:
                 if col in view.columns:
                     formatters[col] = "{:.0f}"
             styled = view.style.format(formatters, na_rep="—")
-            manual_cols = [col for col in ("K Line", "Outs Line", "Hits Line") if col in view.columns]
             projection_cols = [col for col in ("Projected K", "Projected Outs", "Projected Hits") if col in view.columns]
             actual_view_cols = [col for col in ("Actual K", "Actual Outs", "Actual Hits") if col in view.columns]
             target_view_cols = [col for col in ("K Target",) if col in view.columns]
-            if manual_cols:
-                styled = styled.map(lambda value: "color:#ff9f1c;font-weight:850;background-color:rgba(255,159,28,.10);" if pd.notna(value) else "", subset=manual_cols)
+            legacy_styles = pd.DataFrame("", index=view.index, columns=view.columns)
+            for line_col, source_col in (("K Line", "K Source"), ("Outs Line", "Outs Source"), ("Hits Line", "Hits Source")):
+                if line_col not in view.columns or source_col not in view.columns:
+                    continue
+                manual_mask = view[source_col].fillna("").astype(str).str.upper().eq("MANUAL") & view[line_col].notna()
+                legacy_styles.loc[manual_mask, line_col] = "color:#ff9f1c;font-weight:850;background-color:rgba(255,159,28,.10);"
+                legacy_styles.loc[manual_mask, source_col] = "color:#ff9f1c;font-weight:850;"
+            styled = styled.apply(lambda _: legacy_styles, axis=None)
             if projection_cols:
                 styled = styled.map(lambda value: "color:#22c55e;font-weight:800;" if pd.notna(value) else "", subset=projection_cols)
             if actual_view_cols:
@@ -327,7 +332,7 @@ else:
                         subset=[result_col],
                     )
             st.dataframe(styled, hide_index=True, width="stretch")
-            st.caption("Green = frozen projection · Blue = model-supported K target · Gold = resolved MLB result. K Result grades the model-supported K ladder target. Outs/Hits Bet Result grades only a real line plus a side that was frozen before first pitch; legacy/post-start lines remain UNGRADABLE, and PASS remains NO BET.")
+            st.caption("Green = frozen projection · Blue = model-supported K target · Gold = resolved MLB result. Line Source identifies the authentic provider/book; legacy MANUAL lines remain orange. K Result grades the model-supported K ladder target. Outs/Hits Bet Result grades only a real line plus a side frozen before first pitch; ambiguous/post-start rows remain UNGRADABLE, and PASS remains NO BET.")
 
 st.divider()
 if st.button("Resolve completed games", type="primary"):

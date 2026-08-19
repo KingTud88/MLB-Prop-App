@@ -17,7 +17,8 @@ def test_daily_run_uses_automated_market_line_ui_without_manual_entry_boxes():
     assert "daily_manual_hits_" not in source
     assert "daily_apply_archive" not in source
 
-    # Keep the explicitly labeled K-only emergency backup available without
-    # turning it back into the primary execution-line workflow.
-    assert "LOAD STRIKEOUT LINES · BACKUP API" in source
-    assert "SportsGameOdds remains the primary automated execution-line source." in source
+    # The reserve Odds API backend stays in the engine, but the normal Daily Run
+    # surface is now fully automated and exposes no paid/manual line controls.
+    assert "LOAD STRIKEOUT LINES · BACKUP API" not in source
+    assert "refresh_strikeout_snapshot" not in source
+    assert "Odds API credits remaining" not in source
