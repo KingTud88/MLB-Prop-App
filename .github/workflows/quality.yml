@@ -15,3 +15,5 @@ jobs:
       - run: pip install -r requirements.txt pytest
       - run: python -m compileall -q streamlit_app.py navigation.py engine automation tests
       - run: pytest -q
+      - name: Trace pitch-mix forward lineage exclusions
+        run: PYTHONPATH=. python training/_temp_pitch_mix_forward_lineage_proof.py
