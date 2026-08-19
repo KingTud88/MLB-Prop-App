@@ -1,6 +1,6 @@
 Stage,Depends_On,Freshness_Status,Current_Items,Expected_Items,Mismatch_Items,Detail,Report_Only,Production_Authority,No_Auto_Promotion,Freshness_Version
 COMMAND_CENTER,AUTHORITATIVE_EVIDENCE,CURRENT,13,13,0,Committed command center exactly matches a fresh recomputation from current authoritative inputs.,True,NONE,True,research-pipeline-freshness-v2-multicell-aware-report-only
 HISTORY,COMMAND_CENTER,CURRENT,13,13,0,Latest history fingerprint for every lane matches current authoritative evidence.,True,NONE,True,research-pipeline-freshness-v2-multicell-aware-report-only
-TRANSITION_DIGEST,HISTORY,CURRENT,0,0,0,Digest exactly reproduces from history for refresh 2026-08-19T17:40:14.137680+00:00.,True,NONE,True,research-pipeline-freshness-v2-multicell-aware-report-only
-MANUAL_REVIEW_PACKET,TRANSITION_DIGEST,CURRENT,0,0,0,"Manual-review packet exactly reproduces for refresh 2026-08-19T17:40:14.137680+00:00, including one-time multicell review injection.",True,NONE,True,research-pipeline-freshness-v2-multicell-aware-report-only
+TRANSITION_DIGEST,HISTORY,CURRENT,10,10,0,Digest exactly reproduces from history for refresh 2026-08-19T19:39:12.082522+00:00.,True,NONE,True,research-pipeline-freshness-v2-multicell-aware-report-only
+MANUAL_REVIEW_PACKET,TRANSITION_DIGEST,CURRENT,0,0,0,"Manual-review packet exactly reproduces for refresh 2026-08-19T19:39:12.082522+00:00, including one-time multicell review injection.",True,NONE,True,research-pipeline-freshness-v2-multicell-aware-report-only
 MANUAL_REVIEW_QUEUE,MANUAL_REVIEW_PACKET,CURRENT,1,1,0,Durable queue contains every current packet case and its operational summary reproduces exactly.,True,NONE,True,research-pipeline-freshness-v2-multicell-aware-report-only
