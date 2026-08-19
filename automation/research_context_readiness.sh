@@ -17,6 +17,7 @@ PYTHONPATH=. pytest -q \
   tests/test_pitch_mix_whiff_score_capture.py \
   tests/test_pitch_mix_whiff_forward_evaluation.py \
   tests/test_umpire_k_up_cap_shadow.py \
+  tests/test_confirmed_lineup_review_snapshot.py \
   tests/test_research_evidence_command_center.py \
   tests/test_research_evidence_history.py \
   tests/test_research_evidence_transition_digest.py \
@@ -36,6 +37,7 @@ PYTHONPATH=. python -m training.pitch_mix_whiff_score_capture
 PYTHONPATH=. python -m training.pitch_mix_whiff_forward_evaluation
 PYTHONPATH=. python -m training.catcher_prior_maturity
 PYTHONPATH=. python -m training.umpire_k_up_cap_shadow
+PYTHONPATH=. python -m training.confirmed_lineup_review_snapshot
 PYTHONPATH=. python -m training.research_evidence_command_center
 PYTHONPATH=. python -m training.research_evidence_history \
   --observed-at-utc "${RESEARCH_REFRESH_AT_UTC}"
@@ -67,6 +69,8 @@ git add \
   data/pitch_mix_whiff_forward_gate.csv \
   data/umpire_k_up_cap_shadow_detail.csv \
   data/umpire_k_up_cap_shadow_summary.csv \
+  data/confirmed_lineup_review_snapshot.csv \
+  data/confirmed_lineup_review_summary.csv \
   data/research_evidence_command_center.csv \
   data/research_evidence_command_center_summary.csv \
   data/research_evidence_history.csv \
