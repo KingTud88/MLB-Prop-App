@@ -283,22 +283,30 @@ h1,h2,h3{letter-spacing:-.02em}
     height:108px!important;
     min-width:108px!important;
     flex:0 0 108px!important;
-    background-size:600% 100%!important;
+    background-size:104px 104px!important;;
     background-repeat:no-repeat!important;
     image-rendering:auto!important;
     filter:drop-shadow(0 2px 1px rgba(0,0,0,.30)) drop-shadow(0 0 1px rgba(236,22,56,.10))!important;
     transform:translateZ(0)!important;
 }
+
+/* PROJECTION_EMBLEM_IMAGE_LOCK_V11 · individual approved art; no sprite-sheet scaling */
+.metric-card .cc-emblem.whiff{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_k.webp?v=11")!important;background-position:center!important}
+.reco-card .cc-emblem.whiff{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_k_plus.webp?v=11")!important;background-position:center!important}
+.metric-card .cc-emblem.glove{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_outs.webp?v=11")!important;background-position:center!important}
+.reco-card .cc-emblem.glove{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_outs_plus.webp?v=11")!important;background-position:center!important}
+.metric-card .cc-emblem.contact{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_hits.webp?v=11")!important;background-position:center!important}
+.reco-card .cc-emblem.contact{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_hits_plus.webp?v=11")!important;background-position:center!important}
 @media (max-width:900px){
     .metric-card,.reco-card{padding-right:108px!important}
     .metric-card .cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{
-        right:10px!important;top:48px!important;width:88px!important;height:88px!important;min-width:88px!important;flex-basis:88px!important;background-size:600% 100%!important
+        right:10px!important;top:48px!important;width:88px!important;height:88px!important;min-width:88px!important;flex-basis:88px!important;background-size:84px 84px!important
     }
 }
 @media (max-width:620px){
     .metric-card,.reco-card{padding-right:92px!important}
     .metric-card .cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{
-        right:8px!important;top:49px!important;width:76px!important;height:76px!important;min-width:76px!important;flex-basis:76px!important;background-size:600% 100%!important
+        right:8px!important;top:49px!important;width:76px!important;height:76px!important;min-width:76px!important;flex-basis:76px!important;background-size:72px 72px!important
     }
 }
 

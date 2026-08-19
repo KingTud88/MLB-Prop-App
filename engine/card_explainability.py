@@ -95,7 +95,10 @@ def apply_card_info_theme() -> None:
             background:linear-gradient(145deg,#451327,#281020)!important;
             box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 0 0 2px rgba(236,22,56,.12),0 7px 17px rgba(236,22,56,.22)!important;
         }
-        .stApp [class*="st-key-card-info-"] [data-testid="stPopover"] button svg{display:none!important}
+        .stApp [class*="st-key-card-info-"] [data-testid="stPopover"] button svg,
+        .stApp [class*="st-key-card-info-"] [data-testid="stPopover"] button [data-testid="stIconMaterial"],
+        .stApp [class*="st-key-card-info-"] [data-testid="stPopover"] button span[class*="material-symbols"]{display:none!important}
+        .stApp [class*="st-key-card-info-"] [data-testid="stPopover"] button{gap:0!important}
         .stApp [class*="st-key-card-info-"] [data-testid="stPopover"] button p,
         .stApp [class*="st-key-card-info-"] [data-testid="stPopover"] button [data-testid="stMarkdownContainer"] p{
             margin:0!important;
