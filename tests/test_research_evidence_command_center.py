@@ -21,8 +21,8 @@ def _write(root: Path, filename: str, rows: list[dict[str, object]]) -> None:
 
 def test_empty_archive_preserves_fixed_lane_registry_without_reconstruction(tmp_path: Path) -> None:
     center = build_command_center(tmp_path)
-    assert len(center) == 12
-    assert center["Lane"].nunique() == 12
+    assert len(center) == 13
+    assert center["Lane"].nunique() == 13
     assert set(center["Status"]) == {"SOURCE_MISSING"}
     assert center["Report_Only"].all()
     assert set(center["Production_Authority"]) == {"NONE"}
@@ -87,6 +87,63 @@ def test_confirmed_lineup_preserves_source_status_metrics_and_reason(tmp_path: P
     assert row["Breadth_Remaining"] == 0
     assert "relative_mae=+0.49%" in row["Evidence_Direction"]
     assert row["Source_Reason"].startswith("Need at least 30 OOS pairs")
+
+
+def test_umpire_k_up_cap_uses_forward_row_only(tmp_path: Path) -> None:
+    _write(tmp_path, "umpire_k_up_cap_shadow_summary.csv", [
+        {
+            "Evidence_Lane": "DERIVATION_BACKTEST",
+            "Evidence_Status": "DESCRIPTIVE_ONLY",
+            "Eligible_Starts": 999,
+            "Changed_Starts": 999,
+            "Observed_Days": 99,
+            "Distinct_Umpires": 99,
+            "Capped_Relative_MAE_vs_Incumbent": 0.50,
+            "Capped_Win_Share_vs_Incumbent": 0.99,
+            "Frozen_Max_K_Up_Factor": 1.015,
+            "Reason": "derivation only",
+            "Recommended_Action": "DO_NOT_COUNT",
+            "Manual_Review_Ready": False,
+            "Report_Only": True,
+            "Production_Authority": "NONE",
+            "Validation_Version": "umpire-cap-v1",
+        },
+        {
+            "Evidence_Lane": "FORWARD_OOS",
+            "Evidence_Status": "LEARNING",
+            "Eligible_Starts": 15,
+            "Changed_Starts": 7,
+            "Observed_Days": 3,
+            "Distinct_Umpires": 6,
+            "Capped_Relative_MAE_vs_Incumbent": 0.006,
+            "Capped_Win_Share_vs_Incumbent": 0.57,
+            "Frozen_Max_K_Up_Factor": 1.015,
+            "Reason": "Need 30 forward changed starts, 10 days, and 12 umpires.",
+            "Recommended_Action": "KEEP_K_UP_CAP_SHADOW_FROZEN_AND_LEARN",
+            "Manual_Review_Ready": False,
+            "Report_Only": True,
+            "Production_Authority": "NONE",
+            "Validation_Version": "umpire-cap-v1",
+        },
+    ])
+    center = build_command_center(tmp_path)
+    row = center.loc[center["Lane"].eq("Umpire K-UP Cap Shadow")].iloc[0]
+    assert row["Status"] == "LEARNING"
+    assert row["Current_Starts"] == 7
+    assert row["Required_Starts"] == 30
+    assert row["Starts_Remaining"] == 23
+    assert row["Current_Days"] == 3
+    assert row["Days_Remaining"] == 7
+    assert row["Current_Breadth"] == 6
+    assert row["Required_Breadth"] == 12
+    assert row["Breadth_Remaining"] == 6
+    assert "relative_mae=+0.60%" in row["Evidence_Direction"]
+    assert "win_share=57.0%" in row["Evidence_Direction"]
+    assert "eligible_starts=15" in row["Secondary_Progress"]
+    assert "frozen_max_factor=1.015" in row["Secondary_Progress"]
+    assert "999" not in str(row.to_dict())
+    assert row["Ready_For_Manual_Review"] in (False, 0)
+    assert row["Production_Authority"] == "NONE"
 
 
 def test_catcher_context_surfaces_maturity_without_changing_source_gate(tmp_path: Path) -> None:
@@ -200,8 +257,8 @@ def test_calibration_aggregates_existing_gate_results_without_new_decision_rule(
 def test_summary_is_operational_only_not_a_composite_research_score(tmp_path: Path) -> None:
     center = build_command_center(tmp_path)
     summary = build_summary(center).iloc[0]
-    assert summary["Total_Lanes"] == 12
-    assert summary["Source_Missing_Lanes"] == 12
+    assert summary["Total_Lanes"] == 13
+    assert summary["Source_Missing_Lanes"] == 13
     assert summary["All_Report_Only"] in (True, 1)
     assert summary["All_Production_Authority_None"] in (True, 1)
     assert summary["No_Auto_Promotion"] in (True, 1)
@@ -212,7 +269,7 @@ def test_summary_is_operational_only_not_a_composite_research_score(tmp_path: Pa
 def test_current_repository_evidence_sources_are_readable_and_non_authoritative() -> None:
     center = build_command_center(Path("data"))
     summary = build_summary(center).iloc[0]
-    assert len(center) == 12
+    assert len(center) == 13
     assert summary["Source_Missing_Lanes"] == 0
     assert summary["All_Report_Only"] in (True, 1)
     assert summary["All_Production_Authority_None"] in (True, 1)
