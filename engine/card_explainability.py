@@ -10,7 +10,7 @@ import streamlit as st
 from engine.explainability_ui import Explanation
 
 
-CARD_EXPLAINABILITY_VERSION = "card-info-v2"
+CARD_EXPLAINABILITY_VERSION = "card-info-v3"
 
 
 def _num(value: object) -> float | None:
@@ -57,47 +57,63 @@ def apply_card_info_theme() -> None:
         }
         .stApp [class*="st-key-card-info-"]{
             position:absolute!important;
-            top:.48rem!important;
-            right:.52rem!important;
+            top:.42rem!important;
+            right:.46rem!important;
             z-index:40!important;
-            width:1.78rem!important;
+            width:2.06rem!important;
             min-height:0!important;
             margin:0!important;
             padding:0!important;
         }
         .stApp [class*="st-key-card-info-"] [data-testid="stPopover"]{
-            width:1.78rem!important;
-            min-width:1.78rem!important;
+            width:2.06rem!important;
+            min-width:2.06rem!important;
             margin:0!important;
             padding:0!important;
         }
         .stApp [class*="st-key-card-info-"] [data-testid="stPopover"] button{
-            width:1.78rem!important;
-            min-width:1.78rem!important;
-            height:1.78rem!important;
-            min-height:1.78rem!important;
-            padding:0!important;
+            width:2.06rem!important;
+            min-width:2.06rem!important;
+            height:2.06rem!important;
+            min-height:2.06rem!important;
+            padding:0 0 .06rem!important;
+            display:flex!important;
+            align-items:center!important;
+            justify-content:center!important;
             border-radius:999px!important;
-            border:1px solid rgba(113,154,188,.78)!important;
-            background:rgba(7,25,43,.92)!important;
-            color:#d9ebf8!important;
-            font:900 .88rem/1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif!important;
+            border:1.5px solid rgba(151,192,222,.88)!important;
+            background:linear-gradient(145deg,rgba(12,39,63,.98),rgba(5,20,35,.98))!important;
+            color:#f3f9fd!important;
+            font:900 1.04rem/1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif!important;
             letter-spacing:0!important;
             text-transform:none!important;
-            box-shadow:0 4px 12px rgba(0,0,0,.22)!important;
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 5px 13px rgba(0,0,0,.28),0 0 0 1px rgba(77,135,179,.08)!important;
         }
         .stApp [class*="st-key-card-info-"] [data-testid="stPopover"] button:hover{
             border-color:#ff3655!important;
             color:#fff!important;
-            background:#351225!important;
-            box-shadow:0 0 0 1px rgba(236,22,56,.12),0 6px 15px rgba(236,22,56,.20)!important;
+            background:linear-gradient(145deg,#451327,#281020)!important;
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 0 0 2px rgba(236,22,56,.12),0 7px 17px rgba(236,22,56,.22)!important;
+        }
+        .stApp [class*="st-key-card-info-"] [data-testid="stPopover"] button svg{display:none!important}
+        .stApp [class*="st-key-card-info-"] [data-testid="stPopover"] button p,
+        .stApp [class*="st-key-card-info-"] [data-testid="stPopover"] button [data-testid="stMarkdownContainer"] p{
+            margin:0!important;
+            padding:0!important;
+            font:900 1.04rem/1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif!important;
+            transform:translateY(-.015rem)!important;
+        }
+        .stApp [class*="st-key-card-info-"] [data-testid="stPopover"] button:focus-visible{
+            outline:none!important;
+            border-color:#fff!important;
+            box-shadow:0 0 0 2px rgba(236,22,56,.34),0 7px 17px rgba(0,0,0,.30)!important;
         }
         @media (max-width:640px){
             .stApp [class*="st-key-card-info-"] [data-testid="stPopover"] button{
-                width:1.72rem!important;
-                min-width:1.72rem!important;
-                height:1.72rem!important;
-                min-height:1.72rem!important;
+                width:1.86rem!important;
+                min-width:1.86rem!important;
+                height:1.86rem!important;
+                min-height:1.86rem!important;
             }
         }
         </style>
@@ -136,7 +152,7 @@ def card_info_popover(explanation: Explanation, *, key: str) -> None:
     """Render a small top-right ⓘ for a card/metric. Read-only; never changes model state."""
     safe_key = re.sub(r"[^A-Za-z0-9_-]+", "-", str(key)).strip("-") or "detail"
     with st.popover(
-        "ⓘ",
+        "i",
         help=f"Explain {explanation.title}",
         type="tertiary",
         width="content",
