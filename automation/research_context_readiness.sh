@@ -21,6 +21,7 @@ PYTHONPATH=. pytest -q \
   tests/test_umpire_context_review_pipeline.py \
   tests/test_confirmed_lineup_review_snapshot.py \
   tests/test_confirmed_lineup_review_pipeline.py \
+  tests/test_research_review_snapshot_freshness.py \
   tests/test_research_evidence_command_center.py \
   tests/test_research_evidence_history.py \
   tests/test_research_evidence_transition_digest.py \
@@ -43,6 +44,7 @@ PYTHONPATH=. python -m training.catcher_prior_maturity
 PYTHONPATH=. python -m training.umpire_k_up_cap_shadow
 PYTHONPATH=. python -m training.umpire_context_review_snapshot
 PYTHONPATH=. python -m training.confirmed_lineup_review_snapshot
+PYTHONPATH=. python -m training.research_review_snapshot_freshness
 PYTHONPATH=. python -m training.research_evidence_command_center
 PYTHONPATH=. python -m training.research_evidence_history \
   --observed-at-utc "${RESEARCH_REFRESH_AT_UTC}"
@@ -80,6 +82,8 @@ git add \
   data/umpire_context_review_summary.csv \
   data/confirmed_lineup_review_snapshot.csv \
   data/confirmed_lineup_review_summary.csv \
+  data/research_review_snapshot_freshness.csv \
+  data/research_review_snapshot_freshness_summary.csv \
   data/research_evidence_command_center.csv \
   data/research_evidence_command_center_summary.csv \
   data/research_evidence_history.csv \
