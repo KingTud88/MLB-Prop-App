@@ -26,6 +26,7 @@ def test_runner_orders_dependency_chain_before_freshness_audit() -> None:
         "training.research_evidence_history",
         "training.research_evidence_transition_digest",
         "training.research_manual_review_packet",
+        "training.research_multicell_review_injector",
         "training.research_manual_review_queue",
         "training.research_pipeline_freshness_audit",
     )
@@ -60,6 +61,7 @@ def test_runner_keeps_report_only_contract_tests_in_path() -> None:
     assert "tests/test_umpire_context_review_snapshot.py" in text
     assert "tests/test_umpire_context_review_pipeline.py" in text
     assert "tests/test_confirmed_lineup_review_snapshot.py" in text
+    assert "tests/test_research_multicell_review_injector.py" in text
     assert "tests/test_research_pipeline_freshness_audit.py" in text
     assert "tests/test_research_evidence_command_center.py" in text
     assert "tests/test_research_manual_review_queue.py" in text
