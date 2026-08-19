@@ -347,6 +347,41 @@ h1,h2,h3{letter-spacing:-.02em}
     }
 }
 
+/* PROJECTION_EMBLEM_RECOVERY_V13 · reliable individual approved assets, larger footprint */
+.metric-card,.reco-card{padding-right:142px!important}
+.metric-card .cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{
+    right:8px!important;
+    top:36px!important;
+    width:120px!important;
+    height:120px!important;
+    min-width:120px!important;
+    flex:0 0 120px!important;
+    background-size:116px 116px!important;
+    background-repeat:no-repeat!important;
+    background-position:center!important;
+    image-rendering:auto!important;
+    filter:drop-shadow(0 1px 1px rgba(0,0,0,.22))!important;
+    transform:translateZ(0)!important;
+}
+.metric-card .cc-emblem.whiff{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_k.webp?v=13")!important}
+.reco-card .cc-emblem.whiff{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_k_plus.webp?v=13")!important}
+.metric-card .cc-emblem.glove{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_outs.webp?v=13")!important}
+.reco-card .cc-emblem.glove{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_outs_plus.webp?v=13")!important}
+.metric-card .cc-emblem.contact{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_hits.webp?v=13")!important}
+.reco-card .cc-emblem.contact{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_hits_plus.webp?v=13")!important}
+@media (max-width:900px){
+    .metric-card,.reco-card{padding-right:120px!important}
+    .metric-card .cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{
+        right:8px!important;top:42px!important;width:98px!important;height:98px!important;min-width:98px!important;flex-basis:98px!important;background-size:94px 94px!important
+    }
+}
+@media (max-width:620px){
+    .metric-card,.reco-card{padding-right:100px!important}
+    .metric-card .cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{
+        right:7px!important;top:46px!important;width:82px!important;height:82px!important;min-width:82px!important;flex-basis:82px!important;background-size:78px 78px!important
+    }
+}
+
 /* PROJECTION_SUMMARY_NO_LINE_V14 · compact no-market state; approved emblem geometry untouched */
 .reco-card.reco-neutral .reco-side{
     font-size:1.82rem!important;
