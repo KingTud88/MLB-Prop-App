@@ -1,6 +1,6 @@
 Requirement,Satisfied,Matched_Source,Matched_Column,Non_Null_Rows,Reason,Report_Only,Production_Authority,Validation_Version
 PITCHER_PITCH_TYPES,True,pitch_arsenal_context,arsenal_pitch_types,28,Persisted pregame field family is available through pitch_arsenal_context:arsenal_pitch_types.,True,NONE,pitch-mix-readiness-v3-report-only
 PITCHER_USAGE,True,pitch_arsenal_context,arsenal_usage,28,Persisted pregame field family is available through pitch_arsenal_context:arsenal_usage.,True,NONE,pitch-mix-readiness-v3-report-only
-BATTER_PITCH_WHIFF_RATES,True,batter_pitch_whiff_context,batter_pitch_whiff_rates_json,28,Persisted pregame field family is available through batter_pitch_whiff_context:batter_pitch_whiff_rates_json.,True,NONE,pitch-mix-readiness-v3-report-only
+BATTER_PITCH_WHIFF_RATES,True,batter_pitch_whiff_context,batter_pitch_whiff_rates_json,1,Persisted pregame field family is available through batter_pitch_whiff_context:batter_pitch_whiff_rates_json.,True,NONE,pitch-mix-readiness-v3-report-only
 PREGAME_CAPTURE_TIME,True,pitch_arsenal_context,arsenal_captured_at_utc,28,Persisted pregame field family is available through pitch_arsenal_context:arsenal_captured_at_utc.,True,NONE,pitch-mix-readiness-v3-report-only
-LINEUP_FINGERPRINT,True,projection_log,lineup_hash,154,Persisted pregame field family is available through projection_log:lineup_hash.,True,NONE,pitch-mix-readiness-v3-report-only
+LINEUP_FINGERPRINT,True,projection_log,lineup_hash,184,Persisted pregame field family is available through projection_log:lineup_hash.,True,NONE,pitch-mix-readiness-v3-report-only

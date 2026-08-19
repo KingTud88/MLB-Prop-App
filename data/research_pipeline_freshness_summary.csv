@@ -1,0 +1,2 @@
+Overall_Status,Total_Stages,Current_Stages,Stale_Stages,Missing_Stages,Control_Violation_Stages,All_Report_Only,All_Production_Authority_None,No_Auto_Promotion,Locked_Promotion_Scoreboard_Cards,Freshness_Version
+HEALTHY,5,5,0,0,0,True,True,True,8,research-pipeline-freshness-v1-report-only
