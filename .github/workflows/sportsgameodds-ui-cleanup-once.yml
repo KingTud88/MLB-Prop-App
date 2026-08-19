@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/sportsgameodds-ui-cleanup
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
