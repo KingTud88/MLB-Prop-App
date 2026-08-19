@@ -109,6 +109,11 @@ def _truthy(value: object) -> bool:
     return _clean(value).lower() in {"true", "1", "yes", "y"}
 
 
+def _normalized_number(number: float) -> int | float:
+    rounded = round(float(number), 12)
+    return int(rounded) if rounded.is_integer() else rounded
+
+
 def _normalize(value: object) -> object:
     if value is None:
         return None
@@ -120,8 +125,7 @@ def _normalize(value: object) -> object:
     if isinstance(value, bool):
         return value
     if isinstance(value, (int, float)) and not isinstance(value, bool):
-        number = float(value)
-        return int(number) if number.is_integer() else number
+        return _normalized_number(float(value))
     text = _clean(value)
     if not text:
         return None
@@ -129,8 +133,7 @@ def _normalize(value: object) -> object:
     if lowered in {"true", "false"}:
         return lowered == "true"
     try:
-        number = float(text)
-        return int(number) if number.is_integer() else number
+        return _normalized_number(float(text))
     except ValueError:
         return text
 
