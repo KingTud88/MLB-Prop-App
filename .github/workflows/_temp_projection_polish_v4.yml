@@ -1,0 +1,38 @@
+name: temp-projection-polish-v4
+
+on:
+  push:
+    branches:
+      - ui/info-emblem-polish-v4
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ui/info-emblem-polish-v4
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply UI-only polish
+        run: python automation/_temp_projection_polish_v4.py
+      - name: Compile focused files
+        run: python -m compileall -q streamlit_app.py engine/card_explainability.py tests/test_info_emblem_polish.py
+      - name: Install pytest
+        run: pip install -r requirements.txt pytest
+      - name: Run focused UI contracts
+        run: pytest -q tests/test_info_emblem_polish.py
+      - name: Commit polish and remove temporary scaffolding
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm automation/_temp_projection_polish_v4.py .github/workflows/_temp_projection_polish_v4.yml
+          git add streamlit_app.py engine/card_explainability.py tests/test_info_emblem_polish.py
+          git commit -m "Polish Projection info alignment and native emblems"
+          git push origin HEAD:ui/info-emblem-polish-v4
