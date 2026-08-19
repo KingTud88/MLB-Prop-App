@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Shared by the Resolver follow-up job and the scheduled/manual fallback so both
+# paths execute the same report-only research evidence pipeline.
 export RESEARCH_REFRESH_AT_UTC="${RESEARCH_REFRESH_AT_UTC:-$(python -c 'from datetime import datetime, timezone; print(datetime.now(timezone.utc).isoformat())')}"
 
 echo "research_refresh_at_utc=${RESEARCH_REFRESH_AT_UTC}"
