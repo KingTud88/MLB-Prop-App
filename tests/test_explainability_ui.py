@@ -21,17 +21,24 @@ def test_shared_explainability_is_attached_to_every_page():
     for filename in files:
         source = (ROOT / filename).read_text(encoding="utf-8")
         assert "apply_explainability_theme()" in source
+    assert "apply_card_info_theme()" in (ROOT / "streamlit_app.py").read_text(encoding="utf-8")
+    for filename in files[1:]:
+        source = (ROOT / filename).read_text(encoding="utf-8")
         assert "explain_popover(" in source
     assert EXPLAINABILITY_UI_VERSION == "explainability-popovers-v1"
 
 
-def test_projection_summary_has_metric_decision_and_weather_explainers():
+def test_projection_summary_has_card_level_metric_decision_and_weather_explainers():
     source = (ROOT / "streamlit_app.py").read_text(encoding="utf-8")
-    assert source.count("projection_metric_explanation(") >= 3
-    assert source.count("recommendation_explanation(") >= 3
+    assert source.count("pitcher_projection_explanation(") >= 3
+    assert source.count("market_decision_explanation(") >= 3
     assert "weather_explanation(" in source
-    assert "static_explanation(\"opposing_batters\")" in source
-    assert "static_explanation(\"active_lines\")" in source
+    assert "matchup_metric_explanation(\"k_rate\"" in source
+    assert "matchup_metric_explanation(\"hit_rate\"" in source
+    assert "active_market_explanation(" in source
+    assert "card_info_popover(" in source
+    assert "ⓘ WHY THIS K PROJECTION?" not in source
+    assert "ⓘ EXPLAIN ACTIVE LINES" not in source
 
 
 def test_secondary_pages_cover_dynamic_decision_blocks():
