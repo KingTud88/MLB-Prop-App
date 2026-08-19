@@ -186,3 +186,28 @@ game_date,game_pk,pitcher_id,player,team,team_id,catcher_id,catcher_name,catcher
 2026-08-18,824154,691946,George Klassen,LAA,108,623168.0,Tyler Heineman,MLB_POSTED_LINEUP,True,2026-08-18T21:02:44.392362+00:00,1.0,REPORT_ONLY,7.0,86.0,25.0,21.0,catcher-context-v1-report-only
 2026-08-18,824319,641778,Eric Lauer,LAD,119,676439.0,Hunter Feduccia,MLB_POSTED_LINEUP,True,2026-08-18T23:00:33.564943+00:00,1.0,REPORT_ONLY,6.0,87.0,22.0,15.0,catcher-context-v1-report-only
 2026-08-18,824319,663372,Ryan Feltner,COL,115,690924.0,Braxton Fulford,MLB_POSTED_LINEUP,True,2026-08-18T23:00:33.564943+00:00,1.0,REPORT_ONLY,3.0,83.0,26.0,15.0,catcher-context-v1-report-only
+2026-08-19,823342,695549,Jackson Jobe,DET,116,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,823342,694973,Paul Skenes,PIT,134,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,823587,650633,Michael King,SDP,135,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,823587,476594,Robert Stock,NYM,121,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,823664,700363,AJ Smith-Shawver,ATL,144,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,823664,671737,Taj Bradley,MIN,142,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,824640,605280,Clay Holmes,CHC,112,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,824722,694297,Brandon Pfaadt,ARI,109,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,824722,801139,Payton Tolle,BOS,111,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,823424,645261,Sandy Alcantara,MIA,146,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,823424,605400,Aaron Nola,PHI,143,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,824801,701542,Will Warren,NYY,147,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,824801,605135,Chris Bassitt,BAL,110,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,824394,800048,Parker Messick,CLE,114,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,824476,669461,Matthew Liberatore,STL,138,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,824476,695505,Chase Burns,CIN,113,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,822937,453286,Max Scherzer,TOR,141,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,822937,656876,Drew Rasmussen,TBR,139,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,823748,669302,Logan Gilbert,SEA,136,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,823748,669160,Dustin May,MIL,158,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,822860,676917,Cade Cavalli,WSH,120,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,822860,677958,Kumar Rocker,TEX,140,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,824155,700712,Walbert Ureña,LAA,108,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,824318,808963,Roki Sasaki,LAD,119,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,824318,607536,Kyle Freeland,COL,115,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only

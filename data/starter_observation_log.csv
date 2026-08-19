@@ -3,3 +3,5 @@ game_pk,game_date,pitcher_id,player,team,opponent,venue,game_time,captured_at_ut
 823187,2026-08-12,687911,Bryan King,HOU,SFG,Oracle Park,2026-08-12T19:45:00Z,2026-08-12T04:59:32.575911+00:00,no usable starter history,starter-only-v1,0,1.0,0.0,2.0,4.0,19.0,2026-08-12T22:25:08.420646+00:00
 824514,2026-08-17,592288,Kent Emanuel,CIN,STL,Great American Ball Park,2026-08-17T17:40:00Z,2026-08-17T14:30:04.322171+00:00,no usable starter history,starter-only-v1,0,4.0,5.0,15.0,23.0,96.0,2026-08-17T21:04:56.302014+00:00
 824725,2026-08-17,687941,Alec Gamboa,BOS,ARI,Fenway Park,2026-08-17T23:10:00Z,2026-08-17T15:50:14.856789+00:00,no usable starter history,starter-only-v1,0,1.0,0.0,4.0,4.0,14.0,2026-08-18T02:20:23.831706+00:00
+824394,2026-08-19,683363,Matt Wilkinson,SFG,CLE,Progressive Field,2026-08-19T22:40:00Z,2026-08-19T04:22:50.645196+00:00,no usable starter history,starter-only-v1,0,,,,,,
+824155,2026-08-19,814490,Ethan Pecko,HOU,LAA,Daikin Park,2026-08-20T00:10:00Z,2026-08-19T04:24:06.818123+00:00,no usable starter history,starter-only-v1,0,,,,,,

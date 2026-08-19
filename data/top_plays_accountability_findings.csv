@@ -1,6 +1,6 @@
 Finding,Status,Evidence,Conclusion,Report Only,Production Authority,Accountability Version
 OVERALL ACCOUNTABILITY STATE,LEARNING,10 settled real-line Top Plays across 2 observed real-line slate(s),Observed hit rate 60.0% versus average model probability 75.6% (calibration gap 15.6%). Current sample is too small to change ranking or trust labels.,True,NONE,top-plays-accountability-v1
-REAL-LINE COVERAGE,LEARNING,2 of 7 frozen slate date(s) currently contain persisted real lines,Older slates without observed real lines are intentionally excluded rather than reconstructed from model defaults.,True,NONE,top-plays-accountability-v1
+REAL-LINE COVERAGE,LEARNING,2 of 8 frozen slate date(s) currently contain persisted real lines,Older slates without observed real lines are intentionally excluded rather than reconstructed from model defaults.,True,NONE,top-plays-accountability-v1
 STRIKEOUTS SAMPLE,LEARNING,5 settled Top Play leg(s),No market-specific conclusion is allowed yet.,True,NONE,top-plays-accountability-v1
 TOTAL OUTS SAMPLE,LEARNING,3 settled Top Play leg(s),No market-specific conclusion is allowed yet.,True,NONE,top-plays-accountability-v1
 HITS ALLOWED SAMPLE,LEARNING,2 settled Top Play leg(s),No market-specific conclusion is allowed yet.,True,NONE,top-plays-accountability-v1
