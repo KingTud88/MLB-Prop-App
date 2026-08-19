@@ -37,6 +37,12 @@ def test_daily_resolver_calls_research_readiness_only_after_success() -> None:
     assert "    uses: ./.github/workflows/research-context-readiness.yml" in text
 
 
+def test_daily_resolver_passes_write_permission_to_reusable_research_job() -> None:
+    text = _resolver_text()
+    block = text.split("  research-context-readiness:\n", 1)[1]
+    assert "    permissions:\n      contents: write\n" in block
+
+
 def test_resolver_bot_push_guard_prevents_research_commit_recursion() -> None:
     text = _resolver_text()
     assert f"!startsWith(github.event.head_commit.message, '{BOT_PREFIX}')" in text
