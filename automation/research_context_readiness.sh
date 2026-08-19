@@ -25,6 +25,7 @@ PYTHONPATH=. pytest -q \
   tests/test_research_evidence_history.py \
   tests/test_research_evidence_transition_digest.py \
   tests/test_research_manual_review_packet.py \
+  tests/test_research_multicell_review_injector.py \
   tests/test_research_manual_review_queue.py \
   tests/test_research_pipeline_freshness_audit.py \
   tests/test_research_context_readiness_workflow.py \
@@ -48,6 +49,8 @@ PYTHONPATH=. python -m training.research_evidence_history \
 PYTHONPATH=. python -m training.research_evidence_transition_digest \
   --refresh-at-utc "${RESEARCH_REFRESH_AT_UTC}"
 PYTHONPATH=. python -m training.research_manual_review_packet \
+  --refresh-at-utc "${RESEARCH_REFRESH_AT_UTC}"
+PYTHONPATH=. python -m training.research_multicell_review_injector \
   --refresh-at-utc "${RESEARCH_REFRESH_AT_UTC}"
 PYTHONPATH=. python -m training.research_manual_review_queue \
   --queued-at-utc "${RESEARCH_REFRESH_AT_UTC}"
