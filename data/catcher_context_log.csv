@@ -189,7 +189,6 @@ game_date,game_pk,pitcher_id,player,team,team_id,catcher_id,catcher_name,catcher
 2026-08-19,823587,650633,Michael King,SDP,135,669134.0,Luis Campusano,MLB_POSTED_LINEUP,True,2026-08-19T14:01:17.698078+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-19,823664,700363,AJ Smith-Shawver,ATL,144,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-19,823664,671737,Taj Bradley,MIN,142,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
-2026-08-19,824640,605280,Clay Holmes,CHC,112,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-19,824722,694297,Brandon Pfaadt,ARI,109,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-19,824722,801139,Payton Tolle,BOS,111,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-19,823424,645261,Sandy Alcantara,MIA,146,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
@@ -208,7 +207,8 @@ game_date,game_pk,pitcher_id,player,team,team_id,catcher_id,catcher_name,catcher
 2026-08-19,824155,700712,Walbert Ureña,LAA,108,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-19,824318,808963,Roki Sasaki,LAD,119,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-19,824318,607536,Kyle Freeland,COL,115,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
-2026-08-19,824640,656794,Sean Newcomb,CHW,145,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,824640,656794,Sean Newcomb,CHW,145,668670.0,Jake Rogers,MLB_POSTED_LINEUP,True,2026-08-19T14:37:15.746491+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-19,823342,694973,Paul Skenes,PIT,134,680779.0,Henry Davis,MLB_POSTED_LINEUP,True,2026-08-19T14:14:11.646874+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-19,823587,476594,Robert Stock,NYM,121,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-19,823342,695549,Jackson Jobe,DET,116,693307.0,Dillon Dingler,MLB_POSTED_LINEUP,True,2026-08-19T14:01:17.698078+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,824640,605280,Clay Holmes,CHC,112,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
