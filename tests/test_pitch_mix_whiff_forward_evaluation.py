@@ -29,6 +29,7 @@ def score(
     lineup_hash: str = "abc",
     delta: float = 0.02,
     eligible: bool = True,
+    captured_at: str = "2026-08-18T12:00:00Z",
 ) -> pd.DataFrame:
     return pd.DataFrame([{
         "game_date": game_date,
@@ -39,7 +40,7 @@ def score(
         "opponent": "BBB",
         "lineup_source": source,
         "lineup_hash": lineup_hash,
-        "whiff_context_captured_at_utc": "2026-08-18T12:00:00Z",
+        "whiff_context_captured_at_utc": captured_at,
         "pitch_mix_whiff_score": 0.27,
         "baseline_whiff_rate": 0.25,
         "pitch_mix_whiff_delta": delta,
@@ -87,6 +88,32 @@ def projection_rows() -> pd.DataFrame:
     ])
 
 
+def mutated_projection_row() -> pd.DataFrame:
+    return pd.DataFrame([{
+        "game_pk": 1,
+        "pitcher_id": 2,
+        "lineup_source": "CONFIRMED_LINEUP",
+        "lineup_hash": "abc",
+        "captured_at_utc": "2026-08-18T13:00:00Z",
+        "projection": 5.5,
+        "lineup_preconfirm_projection": 4.25,
+        "actual_strikeouts": 7,
+        "resolved_at_utc": "2026-08-19T04:00:00Z",
+    }])
+
+
+def active_whiff_context(*, eligible: bool = True) -> pd.DataFrame:
+    return pd.DataFrame([{
+        "game_pk": 1,
+        "pitcher_id": 2,
+        "lineup_source": "ACTIVE_ROSTER",
+        "lineup_hash": "",
+        "projection_captured_at_utc": "2026-08-18T10:00:00Z",
+        "whiff_context_captured_at_utc": "2026-08-18T12:00:00Z",
+        "audit_eligible": eligible,
+    }])
+
+
 def test_exact_lineup_lineage_and_pre_score_projection_are_used() -> None:
     detail = build_detail(score(), projection_rows())
     assert len(detail) == 1
@@ -106,6 +133,49 @@ def test_stale_or_future_projection_state_is_not_substituted() -> None:
     ]
     detail = build_detail(score(), projections)
     assert detail.empty
+
+
+def test_active_roster_score_uses_frozen_preconfirm_projection_with_exact_whiff_proof() -> None:
+    active_score = score(source="ACTIVE_ROSTER", lineup_hash="")
+    detail = build_detail(active_score, mutated_projection_row(), active_whiff_context())
+    assert len(detail) == 1
+    row = detail.iloc[0]
+    assert row["lineup_source"] == "ACTIVE_ROSTER"
+    assert row["projection"] == pytest.approx(4.25)
+    assert row["projection_captured_at_utc"] == "2026-08-18T10:00:00+00:00"
+    assert row["actual_strikeouts"] == 7.0
+    assert row["k_residual"] == pytest.approx(2.75)
+
+
+def test_active_roster_preconfirm_fallback_requires_eligible_exact_whiff_proof() -> None:
+    active_score = score(source="ACTIVE_ROSTER", lineup_hash="")
+    assert build_detail(active_score, mutated_projection_row()).empty
+    assert build_detail(active_score, mutated_projection_row(), active_whiff_context(eligible=False)).empty
+    wrong_capture = active_whiff_context()
+    wrong_capture.loc[0, "whiff_context_captured_at_utc"] = "2026-08-18T12:01:00Z"
+    assert build_detail(active_score, mutated_projection_row(), wrong_capture).empty
+
+
+def test_confirmed_hash_mismatch_cannot_use_active_roster_preconfirm_fallback() -> None:
+    confirmed_score = score(source="CONFIRMED_LINEUP", lineup_hash="different")
+    assert build_detail(confirmed_score, mutated_projection_row(), active_whiff_context()).empty
+
+
+def test_latest_score_context_is_only_context_evaluated_per_start() -> None:
+    active = score(source="ACTIVE_ROSTER", lineup_hash="", captured_at="2026-08-18T10:30:00Z", delta=-0.04)
+    confirmed = score(source="CONFIRMED_LINEUP", lineup_hash="abc", captured_at="2026-08-18T12:00:00Z", delta=0.03)
+    scores = pd.concat([active, confirmed], ignore_index=True)
+    detail = build_detail(scores, projection_rows())
+    assert len(detail) == 1
+    assert detail.iloc[0]["lineup_source"] == "CONFIRMED_LINEUP"
+    assert detail.iloc[0]["pitch_mix_whiff_delta"] == pytest.approx(0.03)
+
+
+def test_later_ineligible_score_context_blocks_stale_eligible_context() -> None:
+    active = score(source="ACTIVE_ROSTER", lineup_hash="", captured_at="2026-08-18T10:30:00Z", eligible=True)
+    confirmed = score(source="CONFIRMED_LINEUP", lineup_hash="abc", captured_at="2026-08-18T12:00:00Z", eligible=False)
+    scores = pd.concat([active, confirmed], ignore_index=True)
+    assert build_detail(scores, projection_rows(), active_whiff_context()).empty
 
 
 def test_only_preregistered_eligible_score_rows_are_evaluated() -> None:
