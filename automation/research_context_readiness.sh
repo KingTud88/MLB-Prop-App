@@ -23,6 +23,7 @@ PYTHONPATH=. pytest -q \
   tests/test_confirmed_lineup_review_pipeline.py \
   tests/test_research_review_snapshot_freshness.py \
   tests/test_research_evidence_command_center.py \
+  tests/test_research_milestone_watch.py \
   tests/test_research_evidence_history.py \
   tests/test_research_evidence_transition_digest.py \
   tests/test_research_manual_review_packet.py \
@@ -46,6 +47,7 @@ PYTHONPATH=. python -m training.umpire_context_review_snapshot
 PYTHONPATH=. python -m training.confirmed_lineup_review_snapshot
 PYTHONPATH=. python -m training.research_review_snapshot_freshness
 PYTHONPATH=. python -m training.research_evidence_command_center
+PYTHONPATH=. python -m training.research_milestone_watch
 PYTHONPATH=. python -m training.research_evidence_history \
   --observed-at-utc "${RESEARCH_REFRESH_AT_UTC}"
 PYTHONPATH=. python -m training.research_evidence_transition_digest \
@@ -86,6 +88,8 @@ git add \
   data/research_review_snapshot_freshness_summary.csv \
   data/research_evidence_command_center.csv \
   data/research_evidence_command_center_summary.csv \
+  data/research_milestone_watch.csv \
+  data/research_milestone_watch_summary.csv \
   data/research_evidence_history.csv \
   data/research_evidence_history_summary.csv \
   data/research_evidence_transition_digest.csv \
