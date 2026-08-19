@@ -64,8 +64,11 @@ def _history() -> pd.DataFrame:
             "Status": "LEARNING",
             "Evidence_Direction": "relative_mae=+0.49%; win_share=51.7%",
             "Current_Starts": 120,
+            "Required_Starts": 30,
             "Current_Days": 5,
+            "Required_Days": 10,
             "Current_Breadth": 30,
+            "Required_Breadth": 8,
             "Secondary_Progress": "authentic_pairs=148",
             "Ready_For_Manual_Review": False,
             "Recommended_Action": "KEEP_LEARNING",
@@ -83,8 +86,11 @@ def _history() -> pd.DataFrame:
             "Status": "READY_FOR_MANUAL_RESEARCH_REVIEW",
             "Evidence_Direction": "relative_mae=+0.60%; win_share=52.5%",
             "Current_Starts": 180,
+            "Required_Starts": 30,
             "Current_Days": 10,
+            "Required_Days": 10,
             "Current_Breadth": 30,
+            "Required_Breadth": 8,
             "Secondary_Progress": "authentic_pairs=205",
             "Ready_For_Manual_Review": True,
             "Recommended_Action": "MANUAL_RESEARCH_REVIEW",
@@ -111,16 +117,132 @@ def test_no_digest_changes_produce_no_review_trigger() -> None:
     assert int(summary.iloc[0]["Triggered_Lanes"]) == 0
 
 
-def test_progress_only_change_is_excluded() -> None:
+def test_progress_only_change_below_primary_milestone_is_excluded() -> None:
     digest = pd.DataFrame([_digest_row(
         Status="LEARNING",
         Status_Changed=False,
         Readiness_Changed=False,
+        Action_Changed=False,
         Ready_For_Manual_Review=False,
-        Change_Summary="Current_Starts:120->121",
+        Current_Starts=121,
+        Current_Days=6,
+        Recommended_Action="KEEP_LEARNING",
+        Change_Summary="Current_Starts:120->121; Current_Days:5->6",
     )])
     packet = build_manual_review_packet(digest, _history(), _center(), REFRESH)
     assert packet.empty
+
+
+def test_primary_milestone_crossing_triggers_review_without_status_change() -> None:
+    history = _history()
+    history.loc[0, "Lane"] = "Opponent Asymmetric Challenger"
+    history.loc[0, "Category"] = "OPPONENT"
+    history.loc[0, "Status"] = "INCONCLUSIVE"
+    history.loc[0, "Current_Starts"] = 59
+    history.loc[0, "Required_Starts"] = 60
+    history.loc[0, "Current_Days"] = 9
+    history.loc[0, "Required_Days"] = 10
+    history.loc[0, "Current_Breadth"] = 15
+    history.loc[0, "Required_Breadth"] = 15
+    history.loc[0, "Recommended_Action"] = "KEEP_COMPOSITE_FROZEN_AND_LEARN"
+    history.loc[1, "Lane"] = "Opponent Asymmetric Challenger"
+    center = pd.DataFrame([{
+        "Lane": "Opponent Asymmetric Challenger",
+        "Source_Path": "data/opponent_matchup_asymmetric_response_shadow_gate.csv",
+    }])
+    digest = pd.DataFrame([_digest_row(
+        Lane="Opponent Asymmetric Challenger",
+        Category="OPPONENT",
+        Previous_Status="INCONCLUSIVE",
+        Status="INCONCLUSIVE",
+        Status_Changed=False,
+        Readiness_Changed=False,
+        Action_Changed=False,
+        Ready_For_Manual_Review=False,
+        Current_Starts=60,
+        Required_Starts=60,
+        Starts_Remaining=0,
+        Current_Days=10,
+        Required_Days=10,
+        Days_Remaining=0,
+        Current_Breadth=15,
+        Required_Breadth=15,
+        Breadth_Remaining=0,
+        Recommended_Action="KEEP_COMPOSITE_FROZEN_AND_LEARN",
+        Change_Summary="Current_Starts:59->60; Current_Days:9->10",
+    )])
+    packet = build_manual_review_packet(digest, history, center, REFRESH)
+    assert len(packet) == 1
+    row = packet.iloc[0]
+    assert row["Review_Trigger"] == "PRIMARY_MILESTONE_TRANSITION"
+    assert row["Previous_Status"] == "INCONCLUSIVE"
+    assert row["Status"] == "INCONCLUSIVE"
+    assert bool(row["Human_Review_Required"]) is True
+    assert bool(row["Automatic_Decision_Allowed"]) is False
+    assert row["Production_Authority"] == "NONE"
+
+
+def test_action_transition_triggers_review_without_status_or_readiness_change() -> None:
+    digest = pd.DataFrame([_digest_row(
+        Status="INCONCLUSIVE",
+        Status_Changed=False,
+        Readiness_Changed=False,
+        Action_Changed=True,
+        Ready_For_Manual_Review=False,
+        Current_Starts=27,
+        Required_Starts=60,
+        Current_Days=1,
+        Required_Days=10,
+        Current_Breadth=26,
+        Required_Breadth=15,
+        Recommended_Action="KEEP_COMPOSITE_UNCHANGED_PENDING_MANUAL_REVIEW",
+        Change_Summary="Recommended_Action:KEEP_COMPOSITE_FROZEN_AND_LEARN->KEEP_COMPOSITE_UNCHANGED_PENDING_MANUAL_REVIEW",
+    )])
+    packet = build_manual_review_packet(digest, _history(), _center(), REFRESH)
+    assert len(packet) == 1
+    assert packet.iloc[0]["Review_Trigger"] == "ACTION_TRANSITION"
+
+
+def test_single_dimension_primary_milestone_is_supported() -> None:
+    history = _history()
+    history.loc[0, "Lane"] = "Top Plays Accountability"
+    history.loc[0, "Category"] = "EXECUTION"
+    history.loc[0, "Status"] = "LEARNING"
+    history.loc[0, "Current_Starts"] = 19
+    history.loc[0, "Required_Starts"] = 20
+    history.loc[0, "Current_Days"] = None
+    history.loc[0, "Required_Days"] = None
+    history.loc[0, "Current_Breadth"] = None
+    history.loc[0, "Required_Breadth"] = None
+    history.loc[0, "Recommended_Action"] = "KEEP_TOP_PLAYS_ACCOUNTABILITY_LEARNING"
+    history.loc[1, "Lane"] = "Top Plays Accountability"
+    center = pd.DataFrame([{
+        "Lane": "Top Plays Accountability",
+        "Source_Path": "data/top_plays_accountability_summary.csv",
+    }])
+    digest = pd.DataFrame([_digest_row(
+        Lane="Top Plays Accountability",
+        Category="EXECUTION",
+        Status="LEARNING",
+        Status_Changed=False,
+        Readiness_Changed=False,
+        Action_Changed=False,
+        Ready_For_Manual_Review=False,
+        Current_Starts=20,
+        Required_Starts=20,
+        Starts_Remaining=0,
+        Current_Days=None,
+        Required_Days=None,
+        Days_Remaining=None,
+        Current_Breadth=None,
+        Required_Breadth=None,
+        Breadth_Remaining=None,
+        Recommended_Action="KEEP_TOP_PLAYS_ACCOUNTABILITY_LEARNING",
+        Change_Summary="Current_Starts:19->20",
+    )])
+    packet = build_manual_review_packet(digest, history, center, REFRESH)
+    assert len(packet) == 1
+    assert packet.iloc[0]["Review_Trigger"] == "PRIMARY_MILESTONE_TRANSITION"
 
 
 def test_status_and_readiness_transition_builds_before_after_packet() -> None:

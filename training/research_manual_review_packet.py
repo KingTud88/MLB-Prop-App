@@ -85,6 +85,11 @@ def _clean(value: object) -> str:
     return str(value).strip()
 
 
+def _number(value: object) -> float | None:
+    parsed = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+    return None if pd.isna(parsed) else float(parsed)
+
+
 def _control_violation(row: pd.Series) -> bool:
     return not (
         _truthy(row.get("Report_Only"))
@@ -93,15 +98,45 @@ def _control_violation(row: pd.Series) -> bool:
     )
 
 
-def _trigger(row: pd.Series) -> str:
+def _primary_milestone_ready(row: pd.Series) -> bool:
+    requirements = (
+        ("Current_Starts", "Required_Starts"),
+        ("Current_Days", "Required_Days"),
+        ("Current_Breadth", "Required_Breadth"),
+    )
+    evaluated = 0
+    for current_field, required_field in requirements:
+        required = _number(row.get(required_field))
+        if required is None or required <= 0:
+            continue
+        evaluated += 1
+        current = _number(row.get(current_field))
+        if current is None or current < required:
+            return False
+    return evaluated > 0
+
+
+def _primary_milestone_crossed(current: pd.Series, previous: pd.Series) -> bool:
+    if previous is None or previous.empty:
+        return False
+    return _primary_milestone_ready(current) and not _primary_milestone_ready(previous)
+
+
+def _trigger(row: pd.Series, previous: pd.Series) -> str:
     status = _truthy(row.get("Status_Changed"))
     readiness = _truthy(row.get("Readiness_Changed"))
+    action = _truthy(row.get("Action_Changed"))
+    milestone = _primary_milestone_crossed(row, previous)
     if status and readiness:
         return "STATUS_AND_READINESS_TRANSITION"
     if status:
         return "STATUS_TRANSITION"
     if readiness:
         return "READINESS_TRANSITION"
+    if action:
+        return "ACTION_TRANSITION"
+    if milestone:
+        return "PRIMARY_MILESTONE_TRANSITION"
     return ""
 
 
@@ -147,11 +182,11 @@ def build_manual_review_packet(
 
     rows: list[dict[str, object]] = []
     for _, current in digest_frame.iterrows():
-        trigger = _trigger(current)
-        if not trigger:
-            continue
         lane = _clean(current.get("Lane"))
         previous = _previous_history_row(history, lane, refresh_at_utc)
+        trigger = _trigger(current, previous)
+        if not trigger:
+            continue
         center = _center_row(command_center, lane)
         violation = _control_violation(current)
         rows.append({
@@ -255,7 +290,9 @@ def _read_csv(path: Path) -> pd.DataFrame:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Build gated report-only manual review packets from exact-refresh evidence transitions.")
+    parser = argparse.ArgumentParser(
+        description="Build gated report-only manual review packets from exact-refresh evidence transitions and milestones."
+    )
     parser.add_argument("--digest", default="data/research_evidence_transition_digest.csv")
     parser.add_argument("--history", default="data/research_evidence_history.csv")
     parser.add_argument("--command-center", default="data/research_evidence_command_center.csv")
@@ -277,7 +314,7 @@ def main() -> None:
     summary_output.parent.mkdir(parents=True, exist_ok=True)
     packet.to_csv(output, index=False)
     summary.to_csv(summary_output, index=False)
-    print(packet.to_string(index=False) if not packet.empty else "NO_STATUS_OR_READINESS_REVIEW_TRIGGER_THIS_REFRESH")
+    print(packet.to_string(index=False) if not packet.empty else "NO_RESEARCH_REVIEW_TRIGGER_THIS_REFRESH")
     print(summary.to_string(index=False))
     print(
         f"report_only={REPORT_ONLY} production_authority={PRODUCTION_AUTHORITY} "
