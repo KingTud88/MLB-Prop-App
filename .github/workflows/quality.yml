@@ -15,3 +15,31 @@ jobs:
       - run: pip install -r requirements.txt pytest
       - run: python -m compileall -q streamlit_app.py navigation.py engine automation tests
       - run: pytest -q
+      - name: Build effective handedness context
+        run: PYTHONPATH=. python -m training.handedness_matchup_lineage_guard
+      - name: Refresh handedness audit
+        run: PYTHONPATH=. python -m training.handedness_matchup_audit --context-log data/handedness_matchup_effective_context.csv
+      - name: Capture pitcher arsenal
+        run: PYTHONPATH=. python -m training.pitch_arsenal_capture
+      - name: Capture batter pitch whiff
+        run: PYTHONPATH=. python -m training.batter_pitch_whiff_capture
+      - name: Refresh pitch mix readiness
+        run: PYTHONPATH=. python -m training.pitch_mix_readiness_audit
+      - name: Capture pitch mix score
+        run: PYTHONPATH=. python -m training.pitch_mix_whiff_score_capture
+      - name: Refresh pitch mix forward evaluation
+        run: PYTHONPATH=. python -m training.pitch_mix_whiff_forward_evaluation
+      - name: Refresh catcher maturity
+        run: PYTHONPATH=. python -m training.catcher_prior_maturity
+      - name: Refresh command center
+        run: PYTHONPATH=. python -m training.research_evidence_command_center
+      - name: Append history
+        run: PYTHONPATH=. python -m training.research_evidence_history --observed-at-utc "2026-08-19T01:20:00+00:00"
+      - name: Build transition digest
+        run: PYTHONPATH=. python -m training.research_evidence_transition_digest --refresh-at-utc "2026-08-19T01:20:00+00:00"
+      - name: Build review packet
+        run: PYTHONPATH=. python -m training.research_manual_review_packet --refresh-at-utc "2026-08-19T01:20:00+00:00"
+      - name: Append review queue
+        run: PYTHONPATH=. python -m training.research_manual_review_queue --queued-at-utc "2026-08-19T01:20:00+00:00"
+      - name: Audit research freshness
+        run: PYTHONPATH=. python -m training.research_pipeline_freshness_audit
