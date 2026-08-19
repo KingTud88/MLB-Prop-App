@@ -138,7 +138,7 @@ def test_execution_history_integration_contracts():
     execution = open("engine/execution_history.py", encoding="utf-8").read()
     assert "manual_outs_side" not in daily and "manual_hits_allowed_side" not in daily
     assert "manual_outs_side" in storage and "manual_hits_allowed_side" in storage
-    assert "side_not_frozen_pregame" in execution
+    assert "legacy_line_not_certified_pregame" in execution
     assert "grade_frozen_execution" in history
     assert "backfill_legacy_execution_sides" in history
     assert '"Outs Side"' in history and '"Outs Bet Result"' in history
