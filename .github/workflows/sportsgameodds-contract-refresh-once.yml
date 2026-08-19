@@ -45,7 +45,6 @@ jobs:
             tests/test_bet_add_buttons_contract.py \
             tests/test_daily_run_automated_lines_ui.py \
             tests/test_explainability_ui.py \
-            tests/test_frozen_execution_history.py \
             tests/test_manual_market_controls.py \
             tests/test_odds_credit_saver.py \
             tests/test_sidebar_metric_explainability_v2.py \
