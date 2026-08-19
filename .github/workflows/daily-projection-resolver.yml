@@ -161,4 +161,27 @@ jobs:
     if: needs.projection-log.result == 'success'
     permissions:
       contents: write
-    uses: ./.github/workflows/research-context-readiness.yml
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Sync to current main
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest
+
+      - name: Refresh and persist report-only research context
+        run: bash automation/research_context_readiness.sh
