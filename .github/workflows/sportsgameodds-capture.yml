@@ -1,0 +1,92 @@
+name: SportsGameOdds MLB Line Capture
+
+on:
+  schedule:
+    # Four bounded pregame snapshots per day. The API query is restricted to
+    # today's MLB events and three pitcher markets; started games are excluded.
+    - cron: "5 14 * * *"
+    - cron: "5 17 * * *"
+    - cron: "5 20 * * *"
+    - cron: "35 22 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sportsgameodds-mlb-line-capture
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SPORTSGAMEODDS_API_KEY: ${{ secrets.SPORTSGAMEODDS_API_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Sync to latest main
+        run: |
+          git fetch origin main
+          git rebase origin/main
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify SportsGameOdds secret is available
+        shell: bash
+        run: |
+          if [ -z "$SPORTSGAMEODDS_API_KEY" ]; then
+            echo "SPORTSGAMEODDS_API_KEY is not configured in GitHub Actions repository secrets."
+            exit 2
+          fi
+          echo "SportsGameOdds API secret is available to the capture runner."
+
+      - name: Capture authentic MLB pitcher prop lines
+        run: PYTHONPATH=. python -m automation.sportsgameodds_capture
+
+      - name: Commit sportsbook evidence
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            data/sportsgameodds_snapshot.csv \
+            data/sportsbook_line_history.csv \
+            data/sportsgameodds_status.json \
+            data/projection_log.csv
+          if git diff --cached --quiet; then
+            echo "No sportsbook line changes to commit."
+            exit 0
+          fi
+          git commit -m "Capture authentic MLB sportsbook lines"
+
+          for attempt in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main; then
+              if git push origin HEAD:main; then
+                exit 0
+              fi
+            else
+              git rebase --abort || true
+              echo "Rebase conflict while persisting sportsbook lines; refusing to overwrite main."
+              exit 1
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Sportsbook line push failed after 3 attempts."
+              exit 1
+            fi
+            echo "Push race on attempt ${attempt}; retrying against latest main."
+            sleep $((attempt * 2))
+          done
