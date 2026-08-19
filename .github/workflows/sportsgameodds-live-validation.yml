@@ -13,6 +13,17 @@ on:
       - .github/workflows/sportsgameodds-live-validation.yml
       - tests/test_sportsgameodds.py
       - tests/test_odds_snapshot.py
+  pull_request:
+    branches:
+      - main
+    paths:
+      - engine/sportsgameodds.py
+      - engine/odds_snapshot.py
+      - automation/sportsgameodds_capture.py
+      - .github/workflows/sportsgameodds-capture.yml
+      - .github/workflows/sportsgameodds-live-validation.yml
+      - tests/test_sportsgameodds.py
+      - tests/test_odds_snapshot.py
   workflow_dispatch:
 
 permissions:
@@ -20,6 +31,7 @@ permissions:
 
 jobs:
   validate-live-feed:
+    if: github.event_name != 'pull_request' || github.head_ref == 'agent/sportsgameodds-auto-lines'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
