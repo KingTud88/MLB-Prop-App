@@ -402,6 +402,46 @@ def _umpire(data_dir: Path) -> dict[str, object]:
     )
 
 
+def _umpire_k_up_cap(data_dir: Path) -> dict[str, object]:
+    source = "data/umpire_k_up_cap_shadow_summary.csv"
+    frame = _read(data_dir, Path(source).name)
+    if frame.empty:
+        return _missing("Umpire K-UP Cap Shadow", "CONTEXT", source)
+    if "Evidence_Lane" in frame.columns:
+        selected = frame.loc[frame["Evidence_Lane"].astype(str).eq("FORWARD_OOS")]
+        row = _first(selected if not selected.empty else frame.tail(1))
+    else:
+        row = _first(frame.tail(1))
+    report_only, authority = _source_contract(row)
+    return _base(
+        lane="Umpire K-UP Cap Shadow",
+        category="CONTEXT",
+        source_path=source,
+        status=_clean(row.get("Evidence_Status")),
+        direction=(
+            f"relative_mae={_pct(row.get('Capped_Relative_MAE_vs_Incumbent'))}; "
+            f"win_share={_ratio(row.get('Capped_Win_Share_vs_Incumbent'))}"
+        ),
+        current_starts=_integer(row.get("Changed_Starts")),
+        required_starts=30,
+        current_days=_integer(row.get("Observed_Days")),
+        required_days=10,
+        breadth_label="UMPIRES",
+        current_breadth=_integer(row.get("Distinct_Umpires")),
+        required_breadth=12,
+        secondary=(
+            f"eligible_starts={_integer(row.get('Eligible_Starts')) or 0}; "
+            f"frozen_max_factor={_number(row.get('Frozen_Max_K_Up_Factor')) if _number(row.get('Frozen_Max_K_Up_Factor')) is not None else 'NA'}"
+        ),
+        ready=_truthy(row.get("Manual_Review_Ready")),
+        action=_clean(row.get("Recommended_Action")),
+        reason=_clean(row.get("Reason")),
+        report_only=report_only,
+        authority=authority,
+        source_version=_clean(row.get("Validation_Version")),
+    )
+
+
 def _catcher(data_dir: Path) -> dict[str, object]:
     source = "data/catcher_context_validation_gate.csv"
     row = _first(_read(data_dir, Path(source).name))
@@ -568,6 +608,7 @@ ADAPTERS: tuple[Callable[[Path], dict[str, object]], ...] = (
     _handedness,
     _pitch_mix,
     _umpire,
+    _umpire_k_up_cap,
     _catcher,
     _calibration,
     _starter_role,
