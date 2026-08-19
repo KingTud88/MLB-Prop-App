@@ -78,20 +78,112 @@ def _spearman(x: pd.Series, y: pd.Series) -> float:
 
 
 def _score_rows(scores: pd.DataFrame | None) -> pd.DataFrame:
+    """Select one latest frozen score context per start before applying audit eligibility."""
     scores = scores.copy() if scores is not None else pd.DataFrame()
     if scores.empty:
         return scores
-    if "audit_eligible" in scores.columns:
-        scores = scores.loc[scores["audit_eligible"].map(_truthy)].copy()
     if "no_projection_adjustment" in scores.columns:
         scores = scores.loc[scores["no_projection_adjustment"].map(_truthy)].copy()
     dates = pd.to_datetime(scores.get("game_date"), errors="coerce")
     cutoff = pd.Timestamp(PREREGISTERED_GAME_DATE)
     scores = scores.loc[dates.notna() & dates.ge(cutoff)].copy()
-    return scores
+    if scores.empty:
+        return scores
+
+    scores["_game_pk"] = pd.to_numeric(scores.get("game_pk"), errors="coerce")
+    scores["_pitcher_id"] = pd.to_numeric(scores.get("pitcher_id"), errors="coerce")
+    scores["_score_capture"] = pd.to_datetime(scores.get("whiff_context_captured_at_utc"), errors="coerce", utc=True)
+    scores["_row_order"] = np.arange(len(scores))
+    scores = scores.loc[
+        scores["_game_pk"].notna() & scores["_pitcher_id"].notna() & scores["_score_capture"].notna()
+    ].copy()
+    if scores.empty:
+        return scores
+    scores = scores.sort_values(["_game_pk", "_pitcher_id", "_score_capture", "_row_order"])
+    scores = scores.drop_duplicates(subset=["_game_pk", "_pitcher_id"], keep="last")
+    if "audit_eligible" in scores.columns:
+        scores = scores.loc[scores["audit_eligible"].map(_truthy)].copy()
+    return scores.drop(columns=["_game_pk", "_pitcher_id", "_score_capture", "_row_order"], errors="ignore")
 
 
-def _matching_projection(score: pd.Series, projections: pd.DataFrame) -> pd.Series | None:
+def _game_pitcher_matches(frame: pd.DataFrame, game_pk: int, pitcher_id: int) -> pd.DataFrame:
+    if frame is None or frame.empty:
+        return pd.DataFrame()
+    game_col = pd.to_numeric(frame.get("game_pk"), errors="coerce")
+    pitcher_col = pd.to_numeric(frame.get("pitcher_id"), errors="coerce")
+    return frame.loc[game_col.eq(int(game_pk)) & pitcher_col.eq(int(pitcher_id))].copy()
+
+
+def _matching_preconfirm_projection(
+    score: pd.Series,
+    projections: pd.DataFrame,
+    whiff_context: pd.DataFrame | None,
+) -> pd.Series | None:
+    """Recover a frozen active-roster projection only from preserved preconfirm lineage."""
+    source = _clean(score.get("lineup_source")) or "ACTIVE_ROSTER"
+    lineup_hash = _clean(score.get("lineup_hash"))
+    if source != "ACTIVE_ROSTER" or lineup_hash:
+        return None
+
+    game_pk = _num(score.get("game_pk"))
+    pitcher_id = _num(score.get("pitcher_id"))
+    score_capture = _utc(score.get("whiff_context_captured_at_utc"))
+    if not np.isfinite(game_pk) or not np.isfinite(pitcher_id) or pd.isna(score_capture):
+        return None
+
+    contexts = _game_pitcher_matches(
+        whiff_context.copy() if whiff_context is not None else pd.DataFrame(),
+        int(game_pk),
+        int(pitcher_id),
+    )
+    if contexts.empty:
+        return None
+    context_source = contexts.get("lineup_source", pd.Series("ACTIVE_ROSTER", index=contexts.index)).fillna("ACTIVE_ROSTER").astype(str).str.strip().replace("", "ACTIVE_ROSTER")
+    context_hash = contexts.get("lineup_hash", pd.Series("", index=contexts.index)).fillna("").astype(str).str.strip().replace("nan", "")
+    context_capture = pd.to_datetime(contexts.get("whiff_context_captured_at_utc"), errors="coerce", utc=True)
+    eligible = contexts.get("audit_eligible", pd.Series(False, index=contexts.index)).map(_truthy)
+    contexts = contexts.loc[
+        context_source.eq("ACTIVE_ROSTER")
+        & context_hash.eq("")
+        & context_capture.eq(score_capture)
+        & eligible
+    ].copy()
+    if contexts.empty:
+        return None
+
+    frozen_projection_capture = _utc(contexts.iloc[-1].get("projection_captured_at_utc"))
+    if pd.isna(frozen_projection_capture) or frozen_projection_capture > score_capture:
+        return None
+
+    matches = _game_pitcher_matches(projections, int(game_pk), int(pitcher_id))
+    if matches.empty:
+        return None
+    if "lineup_source" in matches.columns:
+        current_source = matches["lineup_source"].fillna("").astype(str).str.strip()
+        matches = matches.loc[current_source.eq("CONFIRMED_LINEUP")].copy()
+    if matches.empty:
+        return None
+
+    matches["_preconfirm"] = pd.to_numeric(matches.get("lineup_preconfirm_projection"), errors="coerce")
+    matches["_actual"] = pd.to_numeric(matches.get("actual_strikeouts"), errors="coerce")
+    matches = matches.loc[matches["_preconfirm"].notna() & matches["_actual"].notna()].copy()
+    if matches.empty:
+        return None
+    if "captured_at_utc" in matches.columns:
+        matches["_current_capture"] = pd.to_datetime(matches["captured_at_utc"], errors="coerce", utc=True)
+        matches = matches.sort_values("_current_capture")
+
+    row = matches.iloc[-1].copy()
+    row["projection"] = float(row["_preconfirm"])
+    row["captured_at_utc"] = frozen_projection_capture.isoformat()
+    return row
+
+
+def _matching_projection(
+    score: pd.Series,
+    projections: pd.DataFrame,
+    whiff_context: pd.DataFrame | None = None,
+) -> pd.Series | None:
     if projections.empty:
         return None
     game_pk = _num(score.get("game_pk"))
@@ -99,9 +191,7 @@ def _matching_projection(score: pd.Series, projections: pd.DataFrame) -> pd.Seri
     if not np.isfinite(game_pk) or not np.isfinite(pitcher_id):
         return None
 
-    game_col = pd.to_numeric(projections.get("game_pk"), errors="coerce")
-    pitcher_col = pd.to_numeric(projections.get("pitcher_id"), errors="coerce")
-    matches = projections.loc[game_col.eq(int(game_pk)) & pitcher_col.eq(int(pitcher_id))].copy()
+    matches = _game_pitcher_matches(projections, int(game_pk), int(pitcher_id))
     if matches.empty:
         return None
 
@@ -109,39 +199,41 @@ def _matching_projection(score: pd.Series, projections: pd.DataFrame) -> pd.Seri
     if "lineup_source" in matches.columns:
         source_mask = matches["lineup_source"].fillna("ACTIVE_ROSTER").astype(str).str.strip().replace("", "ACTIVE_ROSTER").eq(source)
         matches = matches.loc[source_mask].copy()
-    if matches.empty:
-        return None
-
-    lineup_hash = _clean(score.get("lineup_hash"))
-    if "lineup_hash" in matches.columns:
-        hash_text = matches["lineup_hash"].fillna("").astype(str).str.strip().replace("nan", "")
-        matches = matches.loc[hash_text.eq(lineup_hash)].copy()
-    if matches.empty:
-        return None
+    if not matches.empty:
+        lineup_hash = _clean(score.get("lineup_hash"))
+        if "lineup_hash" in matches.columns:
+            hash_text = matches["lineup_hash"].fillna("").astype(str).str.strip().replace("nan", "")
+            matches = matches.loc[hash_text.eq(lineup_hash)].copy()
 
     score_capture = _utc(score.get("whiff_context_captured_at_utc"))
-    if "captured_at_utc" in matches.columns and not pd.isna(score_capture):
+    if not matches.empty and "captured_at_utc" in matches.columns and not pd.isna(score_capture):
         captured = pd.to_datetime(matches["captured_at_utc"], errors="coerce", utc=True)
         eligible_time = captured.notna() & captured.le(score_capture)
         matches = matches.loc[eligible_time].copy()
-        if matches.empty:
-            return None
-        matches = matches.assign(_captured=captured.loc[matches.index]).sort_values("_captured")
-    elif "captured_at_utc" in matches.columns:
+        if not matches.empty:
+            matches = matches.assign(_captured=captured.loc[matches.index]).sort_values("_captured")
+    elif not matches.empty and "captured_at_utc" in matches.columns:
         matches = matches.assign(_captured=pd.to_datetime(matches["captured_at_utc"], errors="coerce", utc=True)).sort_values("_captured")
 
-    row = matches.iloc[-1].copy()
-    if not np.isfinite(_num(row.get("projection"))) or not np.isfinite(_num(row.get("actual_strikeouts"))):
-        return None
-    return row
+    if not matches.empty:
+        row = matches.iloc[-1].copy()
+        if np.isfinite(_num(row.get("projection"))) and np.isfinite(_num(row.get("actual_strikeouts"))):
+            return row
+
+    return _matching_preconfirm_projection(score, projections, whiff_context)
 
 
-def build_detail(scores: pd.DataFrame, projections: pd.DataFrame) -> pd.DataFrame:
+def build_detail(
+    scores: pd.DataFrame,
+    projections: pd.DataFrame,
+    whiff_context: pd.DataFrame | None = None,
+) -> pd.DataFrame:
     scores = _score_rows(scores)
     projections = projections.copy() if projections is not None else pd.DataFrame()
+    whiff_context = whiff_context.copy() if whiff_context is not None else pd.DataFrame()
     rows: list[dict[str, object]] = []
     for _, score in scores.iterrows():
-        projection_row = _matching_projection(score, projections)
+        projection_row = _matching_projection(score, projections, whiff_context)
         if projection_row is None:
             continue
         projection = _num(projection_row.get("projection"))
@@ -264,6 +356,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate preregistered pitch-mix Whiff score against forward K residuals.")
     parser.add_argument("--score-log", default="data/pitch_mix_whiff_score_log.csv")
     parser.add_argument("--projection-log", default="data/projection_log.csv")
+    parser.add_argument("--whiff-context", default="data/batter_pitch_whiff_context_log.csv")
     parser.add_argument("--detail-output", default="data/pitch_mix_whiff_forward_detail.csv")
     parser.add_argument("--summary-output", default="data/pitch_mix_whiff_forward_summary.csv")
     parser.add_argument("--gate-output", default="data/pitch_mix_whiff_forward_gate.csv")
@@ -271,7 +364,8 @@ def main() -> None:
 
     scores = pd.read_csv(args.score_log) if Path(args.score_log).exists() else pd.DataFrame()
     projections = pd.read_csv(args.projection_log) if Path(args.projection_log).exists() else pd.DataFrame()
-    detail = build_detail(scores, projections)
+    whiff_context = pd.read_csv(args.whiff_context) if Path(args.whiff_context).exists() else pd.DataFrame()
+    detail = build_detail(scores, projections, whiff_context)
     summary = build_summary(detail)
     gate = build_gate(summary)
     for path, frame in (
