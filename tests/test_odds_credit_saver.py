@@ -15,11 +15,12 @@ def test_projection_page_reads_saved_k_odds_without_paid_api_call():
     assert 'this page never calls the Odds API' in source
 
 
-def test_daily_projection_page_owns_manual_paid_k_button_only():
+def test_daily_projection_page_owns_legacy_paid_k_backup_button_only():
     source = Path("pages/5_Daily_Projection_Run.py").read_text(encoding="utf-8")
-    assert 'LOAD STRIKEOUT LINES · PAID API' in source
+    assert 'LOAD STRIKEOUT LINES · BACKUP API' in source
     assert 'refresh_strikeout_snapshot' in source
-    assert 'requests pitcher_strikeouts only' in source
+    assert 'Optional fallback only.' in source
+    assert 'SportsGameOdds remains the primary automated execution-line source.' in source
 
 
 def test_paid_snapshot_request_is_strikeouts_only_and_tracks_quota_headers():
@@ -32,7 +33,7 @@ def test_paid_snapshot_request_is_strikeouts_only_and_tracks_quota_headers():
     assert 'x-requests-last' in source
 
 
-def test_scheduled_projection_automation_never_calls_odds_api():
+def test_scheduled_projection_automation_never_calls_legacy_odds_api():
     workflow = Path(".github/workflows/daily-projection-resolver.yml").read_text(encoding="utf-8")
     runner = Path("automation/daily_projection_runner.py").read_text(encoding="utf-8")
     resolver = Path("automation/resolve_projection_log.py").read_text(encoding="utf-8")

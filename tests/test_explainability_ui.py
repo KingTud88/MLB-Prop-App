@@ -41,7 +41,7 @@ def test_secondary_pages_cover_dynamic_decision_blocks():
     top = (ROOT / "pages/6_Top_Plays.py").read_text(encoding="utf-8")
     assert "ticket_explanation(ticket)" in tracker
     assert "leg_explanation(leg)" in tracker
-    assert "static_explanation(\"manual_lines\")" in daily
+    assert "📡 Automated sportsbook lines" in daily
     assert "static_explanation(\"daily_table\")" in daily
     assert "static_explanation(\"odds_credits\")" in daily
     assert "static_explanation(\"history_archive\")" in history
