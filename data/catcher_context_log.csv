@@ -211,3 +211,4 @@ game_date,game_pk,pitcher_id,player,team,team_id,catcher_id,catcher_name,catcher
 2026-08-19,824155,700712,Walbert Ureña,LAA,108,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-19,824318,808963,Roki Sasaki,LAD,119,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-19,824318,607536,Kyle Freeland,COL,115,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,824640,656794,Sean Newcomb,CHW,145,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
