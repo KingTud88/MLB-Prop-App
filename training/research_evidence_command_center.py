@@ -186,7 +186,10 @@ def _asymmetric(data_dir: Path) -> dict[str, object]:
         category="OPPONENT",
         source_path=source,
         status=_clean(row.get("Finding")),
-        direction=_clean(row.get("Early_Read")),
+        direction=(
+            f"changed_relative_mae={_pct(row.get('Changed_Relative_MAE_vs_Applied'))}; "
+            f"changed_win_share={_ratio(row.get('Changed_Win_Share_vs_Applied'))}"
+        ),
         current_starts=_integer(row.get("Forward_Starts")),
         required_starts=60,
         current_days=_integer(row.get("Forward_Days")),
@@ -197,7 +200,8 @@ def _asymmetric(data_dir: Path) -> dict[str, object]:
         secondary=(
             f"changed={_integer(row.get('Forward_Changed_Starts')) or 0}; "
             f"boost_capped={_integer(row.get('Forward_Boost_Capped_Starts')) or 0}/15; "
-            f"weak_reduce_neutralized={_integer(row.get('Forward_Weak_Reduce_Neutralized_Starts')) or 0}/15"
+            f"weak_reduce_neutralized={_integer(row.get('Forward_Weak_Reduce_Neutralized_Starts')) or 0}/15; "
+            f"derivation_read={_clean(row.get('Early_Read')) or 'NA'}"
         ),
         ready=_truthy(row.get("Manual_Review_Ready")),
         action=_clean(row.get("Recommended_Action")),
@@ -294,7 +298,10 @@ def _lineup_materiality(data_dir: Path) -> dict[str, object]:
         category="LINEUP",
         source_path=source,
         status=_clean(row.get("Finding")),
-        direction=_clean(row.get("Early_Read")),
+        direction=(
+            f"changed_relative_mae={_pct(row.get('Changed_Relative_MAE_vs_Confirmed'))}; "
+            f"changed_win_share={_ratio(row.get('Changed_Win_Share_vs_Confirmed'))}"
+        ),
         current_starts=_integer(row.get("Forward_Pairs")),
         required_starts=30,
         current_days=_integer(row.get("Forward_Days")),
@@ -302,7 +309,11 @@ def _lineup_materiality(data_dir: Path) -> dict[str, object]:
         breadth_label="OPPONENTS",
         current_breadth=_integer(row.get("Forward_Opponents")),
         required_breadth=12,
-        secondary=f"immaterial_changed_pairs={_integer(row.get('Forward_Changed_Pairs')) or 0}/20",
+        secondary=(
+            f"immaterial_changed_pairs={_integer(row.get('Forward_Changed_Pairs')) or 0}/20; "
+            f"materiality_vs_preconfirm={_pct(row.get('Materiality_Relative_MAE_vs_Preconfirm'))}; "
+            f"derivation_read={_clean(row.get('Early_Read')) or 'NA'}"
+        ),
         ready=_truthy(row.get("Manual_Review_Ready")),
         action=_clean(row.get("Recommended_Action")),
         reason=_clean(row.get("Reason")),
