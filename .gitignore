@@ -1,0 +1,18 @@
+# Python bytecode / test caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local environments and secrets
+.venv/
+venv/
+.env
+.streamlit/secrets.toml
+
+# OS/editor noise
+.DS_Store
+*.swp

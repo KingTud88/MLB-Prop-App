@@ -5,6 +5,10 @@ from __future__ import annotations
 import inspect as _inspect
 import requests as _requests
 
+from runtime_http import install_requests_resilience as _install_requests_resilience
+
+_install_requests_resilience()
+
 _TEAM_NAMES_TO_ABBR = {
     "Los Angeles Angels": "LAA", "Arizona Diamondbacks": "ARI", "Baltimore Orioles": "BAL",
     "Boston Red Sox": "BOS", "Chicago Cubs": "CHC", "Cincinnati Reds": "CIN",
