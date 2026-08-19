@@ -12,6 +12,7 @@ from training.pitch_mix_whiff_score_capture import (
     REPORT_ONLY,
     VERSION,
     build_score_frame,
+    merge_frozen_score_frame,
     score_one_context,
 )
 
@@ -72,6 +73,14 @@ def whiff(
         "batter_pitch_counts_json": json.dumps(counts),
         "audit_eligible": eligible,
     }])
+
+
+def score_frame(lineup_source: str = "CONFIRMED_LINEUP", lineup_hash: str = "abc") -> pd.DataFrame:
+    return build_score_frame(
+        whiff(lineup_source, lineup_hash),
+        arsenal(),
+        hand(lineup_source, lineup_hash),
+    )
 
 
 def test_confirmed_lineup_uses_equal_batter_weighting() -> None:
@@ -141,6 +150,39 @@ def test_matching_current_context_produces_report_only_score() -> None:
     assert row["formula_id"] == FORMULA_ID
     assert row["production_authority"] == "NONE"
     assert row["no_projection_adjustment"] in (True, 1)
+
+
+def test_existing_frozen_score_survives_empty_current_lineage() -> None:
+    existing = score_frame()
+    result = merge_frozen_score_frame(existing, pd.DataFrame())
+    assert len(result) == 1
+    assert result.iloc[0]["pitch_mix_whiff_score"] == pytest.approx(existing.iloc[0]["pitch_mix_whiff_score"])
+
+
+def test_first_frozen_score_wins_for_same_lineup_state() -> None:
+    existing = score_frame()
+    existing.loc[0, "pitch_mix_whiff_score"] = 0.111
+    current = score_frame()
+    current.loc[0, "pitch_mix_whiff_score"] = 0.999
+    current.loc[0, "whiff_context_captured_at_utc"] = "2026-08-18T06:00:00Z"
+
+    result = merge_frozen_score_frame(existing, current)
+
+    assert len(result) == 1
+    assert result.iloc[0]["pitch_mix_whiff_score"] == pytest.approx(0.111)
+    assert result.iloc[0]["whiff_context_captured_at_utc"] == "2026-08-18T05:05:00Z"
+
+
+def test_new_lineup_state_appends_without_rewriting_existing_score() -> None:
+    existing = score_frame("ACTIVE_ROSTER", "")
+    confirmed = score_frame("CONFIRMED_LINEUP", "confirmed-hash")
+
+    result = merge_frozen_score_frame(existing, confirmed)
+
+    assert len(result) == 2
+    assert result.iloc[0]["lineup_source"] == "ACTIVE_ROSTER"
+    assert result.iloc[1]["lineup_source"] == "CONFIRMED_LINEUP"
+    assert result.iloc[1]["lineup_hash"] == "confirmed-hash"
 
 
 def test_contract_is_report_only_and_preregistered() -> None:
