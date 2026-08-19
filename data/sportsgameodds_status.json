@@ -1,0 +1,21 @@
+{
+  "consensus_line_fallback": false,
+  "error": "",
+  "event_count": 10,
+  "fetched_at_utc": "2026-08-19T21:00:05.530875+00:00",
+  "notice": "",
+  "offer_count": 434,
+  "pages": 1,
+  "production_authority": "MARKET_INPUT_ONLY",
+  "projection_adjustment": false,
+  "provider": "SPORTSGAMEODDS",
+  "selected_markets": [
+    "pitcher_hits_allowed",
+    "pitcher_outs",
+    "pitcher_strikeouts"
+  ],
+  "selected_offer_count": 100,
+  "selected_pair_count": 50,
+  "selected_pitchers": 17,
+  "slate_date": "2026-08-19"
+}
