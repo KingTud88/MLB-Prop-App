@@ -158,7 +158,7 @@ game_date,game_pk,pitcher_id,player,team,team_id,catcher_id,catcher_name,catcher
 2026-08-18,824075,678022,Jack Perkins,ATH,133,641680.0,Jonah Heim,MLB_POSTED_LINEUP,True,2026-08-18T21:02:44.392362+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-18,824803,607074,Carlos Rodón,NYY,147,669224.0,Austin Wells,MLB_POSTED_LINEUP,True,2026-08-18T19:42:33.464873+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-18,824803,669358,Shane Baz,BAL,110,665966.0,Carlos Narváez,MLB_POSTED_LINEUP,True,2026-08-18T19:42:33.464873+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
-2026-08-18,823341,677952,Braxton Ashcraft,PIT,134,804668.0,Rafael Flores Jr.,MLB_POSTED_LINEUP,True,2026-08-18T21:02:44.392362+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-18,823341,677952,Braxton Ashcraft,PIT,134,804668.0,Rafael Flores Jr.,MLB_POSTED_LINEUP,True,2026-08-18T21:02:44.392362+00:00,1.0,REPORT_ONLY,4.0,80.0,28.0,24.0,catcher-context-v1-report-only
 2026-08-18,824398,687931,Carson Whisenhunt,SFG,137,668800.0,Andrew Knizner,MLB_POSTED_LINEUP,True,2026-08-18T19:42:33.464873+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-18,824398,656492,Foster Griffin,CLE,114,672275.0,Patrick Bailey,MLB_POSTED_LINEUP,True,2026-08-18T19:42:33.464873+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-18,824475,681517,Kyle Leahy,STL,138,686780.0,Pedro Pagés,MLB_POSTED_LINEUP,True,2026-08-18T19:42:33.464873+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
@@ -173,7 +173,7 @@ game_date,game_pk,pitcher_id,player,team,team_id,catcher_id,catcher_name,catcher
 2026-08-18,824075,669620,Brady Basso,ATH,133,641680.0,Jonah Heim,MLB_POSTED_LINEUP,True,2026-08-18T21:02:44.392362+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-18,824075,663738,Daniel Lynch IV,KCR,118,695600.0,Carter Jensen,MLB_POSTED_LINEUP,True,2026-08-18T21:02:44.392362+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-18,824639,663542,Bryan Hudson,CHW,145,691011.0,Drew Romo,MLB_POSTED_LINEUP,True,2026-08-18T21:02:44.392362+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
-2026-08-18,823341,672456,Keider Montero,DET,116,680664.0,Eduardo Valencia,MLB_POSTED_LINEUP,True,2026-08-18T19:42:33.464873+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-18,823341,672456,Keider Montero,DET,116,680664.0,Eduardo Valencia,MLB_POSTED_LINEUP,True,2026-08-18T19:42:33.464873+00:00,1.0,REPORT_ONLY,3.0,78.0,20.0,15.0,catcher-context-v1-report-only
 2026-08-18,823423,554430,Zack Wheeler,PHI,143,592663.0,J.T. Realmuto,MLB_POSTED_LINEUP,True,2026-08-18T19:42:33.464873+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-18,823586,804267,Zac Thornton,NYM,121,620443.0,Luis Torrens,MLB_POSTED_LINEUP,True,2026-08-18T19:42:33.464873+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-18,823667,805673,Zebby Matthews,MIN,142,680777.0,Ryan Jeffers,MLB_POSTED_LINEUP,True,2026-08-18T19:42:33.464873+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
