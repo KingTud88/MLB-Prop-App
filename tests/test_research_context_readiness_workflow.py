@@ -30,21 +30,27 @@ def test_research_readiness_has_no_cross_workflow_or_reusable_dependency() -> No
     assert "github.event.workflow_run" not in text
 
 
-def test_daily_resolver_runs_research_job_only_after_projection_success() -> None:
+def test_daily_resolver_runs_research_sequentially_in_projection_job() -> None:
     text = _resolver_text()
-    block = text.split("  research-context-readiness:\n", 1)[1]
-    assert "    needs: projection-log" in block
-    assert "    if: needs.projection-log.result == 'success'" in block
-    assert "    permissions:\n      contents: write\n" in block
-    assert "    runs-on: ubuntu-latest" in block
-    assert RUNNER in block
-    assert "uses: ./.github/workflows/research-context-readiness.yml" not in block
+    assert "  research-context-readiness:" not in text
+    assert text.count(RUNNER) == 1
+    assert "      - name: Refresh and persist report-only research context\n        run: " + RUNNER in text
+    assert text.index("git commit -m \"Automate projection capture and game resolution\"") < text.index(RUNNER)
+    assert "    timeout-minutes: 40" in text
+
+
+def test_projection_no_change_path_does_not_exit_before_research_refresh() -> None:
+    text = _resolver_text()
+    start = text.index("      - name: Commit updated projection")
+    end = text.index("      - name: Refresh and persist report-only research context")
+    commit_block = text[start:end]
+    assert "git diff --cached --quiet" in commit_block
+    assert "exit 0" not in commit_block
 
 
 def test_resolver_bot_push_guard_prevents_research_commit_recursion() -> None:
     text = _resolver_text()
     assert f"!startsWith(github.event.head_commit.message, '{BOT_PREFIX}')" in text
-    assert "needs.projection-log.result == 'success'" in text
 
 
 def test_fallback_workflow_uses_same_shared_runner() -> None:
@@ -58,6 +64,6 @@ def test_fallback_workflow_uses_same_shared_runner() -> None:
 
 def test_both_research_paths_have_write_permission() -> None:
     workflow = _workflow_text()
-    resolver = _resolver_text().split("  research-context-readiness:\n", 1)[1]
+    resolver = _resolver_text()
     assert "permissions:\n  contents: write" in workflow
-    assert "permissions:\n      contents: write" in resolver
+    assert "permissions:\n  contents: write" in resolver
