@@ -159,4 +159,6 @@ jobs:
   research-context-readiness:
     needs: projection-log
     if: needs.projection-log.result == 'success'
+    permissions:
+      contents: write
     uses: ./.github/workflows/research-context-readiness.yml
