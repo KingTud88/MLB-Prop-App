@@ -71,9 +71,10 @@ def test_refresh_requests_only_main_strikeout_market(tmp_path, monkeypatch):
     assert saved_quota["last"] == 1
 
 
-def test_main_page_loader_is_disk_only(tmp_path, monkeypatch):
+def test_main_page_loader_is_disk_only_when_primary_is_empty(tmp_path, monkeypatch):
     path = tmp_path / "odds.csv"
     monkeypatch.setattr(odds, "SNAPSHOT_PATH", path)
+    monkeypatch.setattr(odds, "load_pitcher_market_odds", lambda *_: [])
     pd.DataFrame([
         {
             "slate_date": "2026-08-14", "event_id": "evt1", "commence_time": "", "home_team": "",
@@ -83,3 +84,25 @@ def test_main_page_loader_is_disk_only(tmp_path, monkeypatch):
     ]).to_csv(path, index=False)
     rows = odds.load_pitcher_strikeout_odds("  Chris   Sale ", "2026-08-14")
     assert rows == [{"book": "ExampleBook", "market": "pitcher_strikeouts", "name": "Over", "point": 6.5, "price": -110.0}]
+
+
+def test_sportsgameodds_primary_k_suppresses_paid_backup_but_keeps_all_three_markets(tmp_path, monkeypatch):
+    path = tmp_path / "odds.csv"
+    monkeypatch.setattr(odds, "SNAPSHOT_PATH", path)
+    paid = pd.DataFrame([
+        {
+            "slate_date": "2026-08-14", "event_id": "evt1", "commence_time": "", "home_team": "",
+            "away_team": "", "pitcher": "Chris Sale", "book": "PaidBook", "market": "pitcher_strikeouts",
+            "name": "Over", "point": 7.5, "price": -110, "fetched_at_utc": "now",
+        }
+    ])
+    paid.to_csv(path, index=False)
+    primary = [
+        {"book": "ESPN BET", "market": "pitcher_strikeouts", "name": "Over", "point": 6.5, "price": -115.0, "provider": "SPORTSGAMEODDS"},
+        {"book": "ESPN BET", "market": "pitcher_outs", "name": "Over", "point": 17.5, "price": -110.0, "provider": "SPORTSGAMEODDS"},
+        {"book": "ESPN BET", "market": "pitcher_hits_allowed", "name": "Under", "point": 5.5, "price": -105.0, "provider": "SPORTSGAMEODDS"},
+    ]
+    monkeypatch.setattr(odds, "load_pitcher_market_odds", lambda *_: primary)
+    rows = odds.load_pitcher_strikeout_odds("Chris Sale", "2026-08-14")
+    assert rows == primary
+    assert all(row.get("book") != "PaidBook" for row in rows)
