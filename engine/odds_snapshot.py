@@ -9,6 +9,8 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import requests
 
+from engine.sportsgameodds import load_pitcher_market_odds
+
 ODDS_API = "https://api.the-odds-api.com/v4"
 EASTERN = ZoneInfo("America/New_York")
 ROOT = Path(__file__).resolve().parents[1]
@@ -106,7 +108,7 @@ def _parse_event(event: dict, payload: dict, slate_date: str, fetched_at: str) -
 
 
 def refresh_strikeout_snapshot(api_key: str, slate_date: str, *, session: requests.Session | None = None) -> tuple[pd.DataFrame, dict[str, int | None], str | None]:
-    """Paid path: fetch only MLB pitcher_strikeouts after an explicit UI action."""
+    """Paid backup path: fetch only MLB pitcher_strikeouts after an explicit UI action."""
     key = str(api_key or "").strip()
     if not key:
         return pd.DataFrame(columns=SNAPSHOT_COLUMNS), {}, "Odds API key not found in Streamlit secrets."
@@ -161,8 +163,7 @@ def load_snapshot() -> pd.DataFrame:
     return frame[SNAPSHOT_COLUMNS].copy()
 
 
-def load_pitcher_strikeout_odds(pitcher_name: str, slate_date: str) -> list[dict[str, object]]:
-    """Free path: disk-only read used by Main Projections; never calls the API."""
+def _load_paid_strikeout_rows(pitcher_name: str, slate_date: str) -> list[dict[str, object]]:
     frame = load_snapshot()
     if frame.empty:
         return []
@@ -182,3 +183,17 @@ def load_pitcher_strikeout_odds(pitcher_name: str, slate_date: str) -> list[dict
         }
         for _, row in rows.iterrows()
     ]
+
+
+def load_pitcher_strikeout_odds(pitcher_name: str, slate_date: str) -> list[dict[str, object]]:
+    """Disk-only market loader used by Main Projections; never calls either API.
+
+    SportsGameOdds is primary and can supply Ks, outs, and hits allowed. The
+    legacy Odds API snapshot remains a strikeout-only backup when SportsGameOdds
+    has no current K pair for the pitcher.
+    """
+    primary = load_pitcher_market_odds(pitcher_name, slate_date)
+    paid_backup = _load_paid_strikeout_rows(pitcher_name, slate_date)
+    if any(str(row.get("market")) == "pitcher_strikeouts" for row in primary):
+        paid_backup = []
+    return list(primary) + paid_backup
