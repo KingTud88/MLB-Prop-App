@@ -246,6 +246,34 @@ def build_score_frame(
     return pd.DataFrame(rows, columns=COLUMNS)
 
 
+def merge_frozen_score_frame(
+    existing: pd.DataFrame | None,
+    current: pd.DataFrame | None,
+) -> pd.DataFrame:
+    """Preserve the first frozen score for each exact lineup state and append only new states."""
+    existing_frame = existing.copy() if existing is not None else pd.DataFrame()
+    current_frame = current.copy() if current is not None else pd.DataFrame()
+    existing_frame = existing_frame.reindex(columns=COLUMNS)
+    current_frame = current_frame.reindex(columns=COLUMNS)
+
+    rows: list[dict[str, object]] = []
+    seen: set[tuple[int, int, str, str]] = set()
+
+    for frame, preserve_unkeyed in ((existing_frame, True), (current_frame, False)):
+        for _, row in frame.iterrows():
+            key = _key(row)
+            if key is None:
+                if preserve_unkeyed:
+                    rows.append({column: row.get(column) for column in COLUMNS})
+                continue
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append({column: row.get(column) for column in COLUMNS})
+
+    return pd.DataFrame(rows, columns=COLUMNS)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Capture preregistered report-only pitch-mix Whiff scores.")
     parser.add_argument("--whiff-context", default="data/batter_pitch_whiff_context_log.csv")
@@ -257,8 +285,10 @@ def main() -> None:
     whiff = pd.read_csv(args.whiff_context) if Path(args.whiff_context).exists() else pd.DataFrame()
     arsenal = pd.read_csv(args.arsenal_context) if Path(args.arsenal_context).exists() else pd.DataFrame()
     hand = pd.read_csv(args.hand_context) if Path(args.hand_context).exists() else pd.DataFrame()
-    result = build_score_frame(whiff, arsenal, hand)
+    current = build_score_frame(whiff, arsenal, hand)
     output = Path(args.output)
+    existing = pd.read_csv(output) if output.exists() else pd.DataFrame(columns=COLUMNS)
+    result = merge_frozen_score_frame(existing, current)
     output.parent.mkdir(parents=True, exist_ok=True)
     result.to_csv(output, index=False)
     eligible = int(result.get("audit_eligible", pd.Series(dtype=bool)).map(_truthy).sum()) if not result.empty else 0
