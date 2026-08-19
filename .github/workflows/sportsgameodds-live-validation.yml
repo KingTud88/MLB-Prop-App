@@ -1,0 +1,76 @@
+name: SportsGameOdds Live Validation
+
+on:
+  push:
+    branches:
+      - agent/sportsgameodds-auto-lines
+    paths:
+      - engine/sportsgameodds.py
+      - engine/odds_snapshot.py
+      - automation/sportsgameodds_capture.py
+      - .github/workflows/sportsgameodds-capture.yml
+      - .github/workflows/sportsgameodds-live-validation.yml
+      - tests/test_sportsgameodds.py
+      - tests/test_odds_snapshot.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-live-feed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SPORTSGAMEODDS_API_KEY: ${{ secrets.SPORTSGAMEODDS_API_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify GitHub Actions secret
+        shell: bash
+        run: |
+          if [ -z "$SPORTSGAMEODDS_API_KEY" ]; then
+            echo "SPORTSGAMEODDS_API_KEY is not available to GitHub Actions yet."
+            exit 2
+          fi
+          echo "SPORTSGAMEODDS_API_KEY is available."
+
+      - name: Query live MLB feed without touching repository data
+        run: |
+          PYTHONPATH=. python -m automation.sportsgameodds_capture \
+            --projection-log /tmp/nonexistent_projection_log.csv \
+            --snapshot /tmp/sportsgameodds_snapshot.csv \
+            --history /tmp/sportsbook_line_history.csv \
+            --status /tmp/sportsgameodds_status.json
+
+      - name: Report real-market coverage
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import pandas as pd
+
+          status = json.loads(Path('/tmp/sportsgameodds_status.json').read_text())
+          selected = pd.read_csv('/tmp/sportsgameodds_snapshot.csv') if Path('/tmp/sportsgameodds_snapshot.csv').exists() else pd.DataFrame()
+          print('Authentication/feed query: OK')
+          print('Events returned:', status.get('event_count', 0))
+          print('Offers returned:', status.get('offer_count', 0))
+          print('Selected real O/U pairs:', status.get('selected_pair_count', 0))
+          print('Selected markets:', ', '.join(status.get('selected_markets') or []) or 'none currently posted')
+          if status.get('notice'):
+              print('Provider notice:', status['notice'])
+          if not selected.empty:
+              summary = selected.groupby(['market', 'book']).size().rename('sides').reset_index()
+              print(summary.to_string(index=False))
+          PY
