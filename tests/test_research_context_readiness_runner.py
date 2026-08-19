@@ -20,6 +20,7 @@ def test_runner_orders_dependency_chain_before_freshness_audit() -> None:
     text = _text()
     stages = (
         "training.umpire_k_up_cap_shadow",
+        "training.umpire_context_review_snapshot",
         "training.confirmed_lineup_review_snapshot",
         "training.research_evidence_command_center",
         "training.research_evidence_history",
@@ -37,6 +38,8 @@ def test_runner_persists_freshness_review_and_shadow_outputs() -> None:
     expected = (
         "data/umpire_k_up_cap_shadow_detail.csv",
         "data/umpire_k_up_cap_shadow_summary.csv",
+        "data/umpire_context_review_snapshot.csv",
+        "data/umpire_context_review_summary.csv",
         "data/confirmed_lineup_review_snapshot.csv",
         "data/confirmed_lineup_review_summary.csv",
         "data/research_evidence_command_center.csv",
@@ -54,6 +57,8 @@ def test_runner_persists_freshness_review_and_shadow_outputs() -> None:
 def test_runner_keeps_report_only_contract_tests_in_path() -> None:
     text = _text()
     assert "tests/test_umpire_k_up_cap_shadow.py" in text
+    assert "tests/test_umpire_context_review_snapshot.py" in text
+    assert "tests/test_umpire_context_review_pipeline.py" in text
     assert "tests/test_confirmed_lineup_review_snapshot.py" in text
     assert "tests/test_research_pipeline_freshness_audit.py" in text
     assert "tests/test_research_evidence_command_center.py" in text
