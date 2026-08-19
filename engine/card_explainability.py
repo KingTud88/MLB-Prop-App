@@ -10,7 +10,7 @@ import streamlit as st
 from engine.explainability_ui import Explanation
 
 
-CARD_EXPLAINABILITY_VERSION = "card-info-v4"
+CARD_EXPLAINABILITY_VERSION = "card-info-v5"
 
 
 def _num(value: object) -> float | None:
@@ -139,6 +139,32 @@ def apply_card_info_theme() -> None:
             font:900 1.02rem/1 Arial,"Helvetica Neue",sans-serif!important;
             color:#f6fbff!important;
             letter-spacing:0!important;
+            pointer-events:none!important;
+        }
+
+        /* CARD_INFO_GEOMETRIC_V5 · exact centered dot + stem, no font-baseline dependency */
+        .stApp [class*="st-key-card-info-"] [data-testid="stPopover"] button::before{
+            content:""!important;
+            position:absolute!important;
+            left:50%!important;
+            top:6px!important;
+            transform:translateX(-50%)!important;
+            width:3.5px!important;
+            height:3.5px!important;
+            border-radius:50%!important;
+            background:#f6fbff!important;
+            pointer-events:none!important;
+        }
+        .stApp [class*="st-key-card-info-"] [data-testid="stPopover"] button::after{
+            content:""!important;
+            position:absolute!important;
+            left:50%!important;
+            top:11px!important;
+            transform:translateX(-50%)!important;
+            width:3px!important;
+            height:8px!important;
+            border-radius:2px!important;
+            background:#f6fbff!important;
             pointer-events:none!important;
         }
         @media (max-width:640px){
