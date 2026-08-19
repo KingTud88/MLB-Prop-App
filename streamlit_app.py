@@ -311,6 +311,42 @@ h1,h2,h3{letter-spacing:-.02em}
 }
 
 
+
+/* PROJECTION_EMBLEM_NATIVE_V12 · native 128px sprite tiles, larger and sharper */
+.metric-card,.reco-card{padding-right:150px!important}
+.metric-card .cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{
+    right:8px!important;
+    top:34px!important;
+    width:128px!important;
+    height:128px!important;
+    min-width:128px!important;
+    flex:0 0 128px!important;
+    background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_summary_emblems_v2.webp?v=12")!important;
+    background-size:600% 100%!important;
+    background-repeat:no-repeat!important;
+    image-rendering:auto!important;
+    filter:drop-shadow(0 1px 1px rgba(0,0,0,.28)) drop-shadow(0 0 1px rgba(236,22,56,.08))!important;
+    transform:translateZ(0)!important;
+}
+.metric-card .cc-emblem.whiff{background-position:0% 50%!important}
+.reco-card .cc-emblem.whiff{background-position:20% 50%!important}
+.metric-card .cc-emblem.glove{background-position:40% 50%!important}
+.reco-card .cc-emblem.glove{background-position:60% 50%!important}
+.metric-card .cc-emblem.contact{background-position:80% 50%!important}
+.reco-card .cc-emblem.contact{background-position:100% 50%!important}
+@media (max-width:900px){
+    .metric-card,.reco-card{padding-right:126px!important}
+    .metric-card .cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{
+        right:8px!important;top:40px!important;width:104px!important;height:104px!important;min-width:104px!important;flex-basis:104px!important;background-size:600% 100%!important
+    }
+}
+@media (max-width:620px){
+    .metric-card,.reco-card{padding-right:106px!important}
+    .metric-card .cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{
+        right:7px!important;top:45px!important;width:88px!important;height:88px!important;min-width:88px!important;flex-basis:88px!important;background-size:600% 100%!important
+    }
+}
+
 /* PROJECTION_SUMMARY_NO_LINE_V14 · compact no-market state; approved emblem geometry untouched */
 .reco-card.reco-neutral .reco-side{
     font-size:1.82rem!important;

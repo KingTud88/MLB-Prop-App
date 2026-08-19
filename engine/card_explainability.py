@@ -10,7 +10,7 @@ import streamlit as st
 from engine.explainability_ui import Explanation
 
 
-CARD_EXPLAINABILITY_VERSION = "card-info-v3"
+CARD_EXPLAINABILITY_VERSION = "card-info-v4"
 
 
 def _num(value: object) -> float | None:
@@ -60,22 +60,22 @@ def apply_card_info_theme() -> None:
             top:.42rem!important;
             right:.46rem!important;
             z-index:40!important;
-            width:2.06rem!important;
+            width:1.96rem!important;
             min-height:0!important;
             margin:0!important;
             padding:0!important;
         }
         .stApp [class*="st-key-card-info-"] [data-testid="stPopover"]{
-            width:2.06rem!important;
-            min-width:2.06rem!important;
+            width:1.96rem!important;
+            min-width:1.96rem!important;
             margin:0!important;
             padding:0!important;
         }
         .stApp [class*="st-key-card-info-"] [data-testid="stPopover"] button{
-            width:2.06rem!important;
-            min-width:2.06rem!important;
-            height:2.06rem!important;
-            min-height:2.06rem!important;
+            width:1.96rem!important;
+            min-width:1.96rem!important;
+            height:1.96rem!important;
+            min-height:1.96rem!important;
             padding:0 0 .06rem!important;
             display:flex!important;
             align-items:center!important;
@@ -110,6 +110,36 @@ def apply_card_info_theme() -> None:
             outline:none!important;
             border-color:#fff!important;
             box-shadow:0 0 0 2px rgba(236,22,56,.34),0 7px 17px rgba(0,0,0,.30)!important;
+        }
+
+        /* CARD_INFO_CENTER_V4 · optically centered plain-i control */
+        .stApp [class*="st-key-card-info-"] [data-testid="stPopover"] button{
+            position:relative!important;
+            padding:0!important;
+            line-height:0!important;
+            font-size:0!important;
+        }
+        .stApp [class*="st-key-card-info-"] [data-testid="stPopover"] button p,
+        .stApp [class*="st-key-card-info-"] [data-testid="stPopover"] button [data-testid="stMarkdownContainer"] p{
+            margin:0!important;
+            padding:0!important;
+            font-size:0!important;
+            line-height:0!important;
+            color:transparent!important;
+            transform:none!important;
+        }
+        .stApp [class*="st-key-card-info-"] [data-testid="stPopover"] button::before{
+            content:"i";
+            position:absolute!important;
+            left:50%!important;
+            top:49%!important;
+            transform:translate(-50%,-50%)!important;
+            width:100%!important;
+            text-align:center!important;
+            font:900 1.02rem/1 Arial,"Helvetica Neue",sans-serif!important;
+            color:#f6fbff!important;
+            letter-spacing:0!important;
+            pointer-events:none!important;
         }
         @media (max-width:640px){
             .stApp [class*="st-key-card-info-"] [data-testid="stPopover"] button{
