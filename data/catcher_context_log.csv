@@ -214,3 +214,4 @@ game_date,game_pk,pitcher_id,player,team,team_id,catcher_id,catcher_name,catcher
 2026-08-19,824076,607625,Seth Lugo,KCR,118,695600.0,Carter Jensen,MLB_POSTED_LINEUP,True,2026-08-19T19:38:21.486098+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-19,824318,607536,Kyle Freeland,COL,115,664954.0,Brett Sullivan,MLB_POSTED_LINEUP,True,2026-08-19T22:09:26.006477+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-19,824318,808963,Roki Sasaki,LAD,119,666163.0,Ben Rortvedt,MLB_POSTED_LINEUP,True,2026-08-19T21:31:19.467068+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-19,824394,683363,Matt Wilkinson,SFG,137,701852.0,Drew Cavanaugh,MLB_POSTED_LINEUP,True,2026-08-19T23:00:39.371182+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
