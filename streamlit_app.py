@@ -1,6 +1,7 @@
 from __future__ import annotations
 import hashlib, math, os, re
 from dataclasses import dataclass
+from functools import wraps
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -541,7 +542,23 @@ def weighted(s,half,fallback):
 
 def shrink(rate,opp,prior=.224,weight=120): return (rate*opp+prior*weight)/max(opp+weight,1)
 
-@st.cache_data(ttl=1800,show_spinner=False)
+def _process_cache(ttl_seconds):
+    def decorate(func):
+        cache={}
+        @wraps(func)
+        def wrapped(*args,**kwargs):
+            key=(args,tuple(sorted(kwargs.items())))
+            now=datetime.now(EASTERN).timestamp()
+            cached=cache.get(key)
+            if cached is not None and now-float(cached[0]) < float(ttl_seconds):
+                return cached[1]
+            value=func(*args,**kwargs)
+            cache[key]=(now,value)
+            return value
+        return wrapped
+    return decorate
+
+@_process_cache(1800)
 def get_pitcher_hand(pid):
     try:
         payload=MLBClient().get(f"people/{int(pid)}",{})
@@ -554,7 +571,7 @@ def get_pitcher_hand(pid):
     except Exception:
         return ""
 
-@st.cache_data(ttl=21600,show_spinner=False)
+@_process_cache(21600)
 def get_venue_coordinates(venue_id):
     if not venue_id: return None
     target_id=int(venue_id)
@@ -587,7 +604,7 @@ def get_venue_coordinates(venue_id):
         pass
     return None
 
-@st.cache_data(ttl=21600,show_spinner=False)
+@_process_cache(21600)
 def get_venue_roof_type(venue_id):
     if not venue_id:
         return ""
@@ -614,7 +631,7 @@ def get_venue_roof_type(venue_id):
         pass
     return ""
 
-@st.cache_data(ttl=900,show_spinner=False)
+@_process_cache(900)
 def get_game_weather(venue_id,game_time,latitude=None,longitude=None):
     coords=None
     try:
