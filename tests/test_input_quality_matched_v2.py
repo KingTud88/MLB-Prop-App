@@ -10,6 +10,7 @@ from training.input_quality_matched_v2 import (
     SAME_PITCHER_RULE,
     match_metric,
     preregistration_manifest,
+    prepare_future_cohort,
     run_audit,
 )
 
@@ -22,12 +23,19 @@ def _row(
     projection: float,
     actual: float,
     *,
+    game_pk: int | None = None,
+    captured_at_utc: str | None = None,
+    game_time: str | None = None,
     expected_outs: float = 16.0,
     opponent_k_pct: float = 22.0,
     role: str = "MID",
 ) -> dict[str, object]:
+    day = pd.Timestamp(game_date)
     return {
+        "game_pk": game_pk if game_pk is not None else 100000 + pitcher_id,
         "game_date": game_date,
+        "game_time": game_time or f"{day.date().isoformat()}T23:00:00Z",
+        "captured_at_utc": captured_at_utc or f"{day.date().isoformat()}T18:00:00Z",
         "pitcher_id": pitcher_id,
         "player": player,
         "starter_history_games": history,
@@ -55,6 +63,27 @@ def test_future_only_cutoff_excludes_pre_preregistered_outcomes() -> None:
     assert pairs.iloc[0]["Shallow_Pitcher"] == "New Shallow"
     assert pairs.iloc[0]["Deep_Pitcher"] == "New Deep"
     assert pd.Timestamp("2026-08-20") == FUTURE_ONLY_START
+
+
+def test_latest_valid_pregame_capture_is_the_unique_unit_of_analysis() -> None:
+    frame = pd.DataFrame([
+        _row(
+            "2026-08-20", 1, "Pitcher", 4, 4.0, 5.0, game_pk=777,
+            captured_at_utc="2026-08-20T17:00:00Z", game_time="2026-08-20T23:00:00Z",
+        ),
+        _row(
+            "2026-08-20", 1, "Pitcher", 4, 5.0, 5.0, game_pk=777,
+            captured_at_utc="2026-08-20T22:30:00Z", game_time="2026-08-20T23:00:00Z",
+        ),
+        _row(
+            "2026-08-20", 1, "Pitcher", 4, 99.0, 5.0, game_pk=777,
+            captured_at_utc="2026-08-20T23:30:00Z", game_time="2026-08-20T23:00:00Z",
+        ),
+    ])
+    prepared = prepare_future_cohort(frame)
+    assert len(prepared) == 1
+    assert float(prepared.iloc[0]["projection"]) == 5.0
+    assert prepared.iloc[0]["_captured_at"] == pd.Timestamp("2026-08-20T22:30:00Z")
 
 
 def test_primary_matching_respects_frozen_pregame_calipers_and_role() -> None:
@@ -103,9 +132,9 @@ def test_pair_selection_is_outcome_blind() -> None:
 
 def test_same_pitcher_sensitivity_rejects_cross_pitcher_pairs() -> None:
     frame = pd.DataFrame([
-        _row("2026-08-20", 7, "Same Pitcher", 3, 5.0, 5.0),
-        _row("2026-08-27", 7, "Same Pitcher", 6, 5.2, 5.0),
-        _row("2026-08-21", 8, "Different Pitcher", 6, 5.0, 5.0),
+        _row("2026-08-20", 7, "Same Pitcher", 3, 5.0, 5.0, game_pk=701),
+        _row("2026-08-27", 7, "Same Pitcher", 6, 5.2, 5.0, game_pk=702),
+        _row("2026-08-21", 8, "Different Pitcher", 6, 5.0, 5.0, game_pk=703),
     ])
     pairs = match_metric(frame, "STRIKEOUTS", SAME_PITCHER_RULE)
     assert len(pairs) == 1
@@ -132,6 +161,9 @@ def test_preregistration_manifest_freezes_outcome_blind_report_only_contract() -
     assert manifest["audit_version"] == AUDIT_VERSION
     assert manifest["production_authority"] == "NONE"
     assert manifest["future_only_start"] == "2026-08-20"
+    assert manifest["unit_of_analysis"] == "unique pitcher-game start"
+    assert manifest["capture_selection"] == "latest valid capture at or before game_time"
+    assert manifest["post_first_pitch_rows_excluded"] == "True"
     assert manifest["matching_replacement"] == "False"
     assert manifest["pairing_uses_outcomes"] == "False"
     assert manifest["weather_authority"] == "INFORMATIONAL_ONLY"
