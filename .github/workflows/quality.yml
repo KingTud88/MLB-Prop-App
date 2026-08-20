@@ -14,6 +14,4 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements.txt pytest
       - run: python -m compileall -q streamlit_app.py navigation.py engine automation tests
-      - run: pytest -q tests/test_runtime_performance_profile.py
-      - run: python -m automation.runtime_performance_profile --draws 25000 --repeats 3 --warmups 1 --top-hotspots 12
       - run: pytest -q
