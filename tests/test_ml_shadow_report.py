@@ -2,6 +2,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from engine.starter_history import HISTORY_SEMANTICS
 from training import ml_shadow_report as shadow
@@ -54,6 +55,14 @@ def _frame(days: int = 90) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+@pytest.fixture(scope="module")
+def oos_frame_and_detail() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Build the identical expensive 90-day walk-forward replay once per module."""
+    frame = _frame()
+    detail = shadow.build_oos_detail(frame)
+    return frame, detail
+
+
 def test_shadow_feature_contract_excludes_market_outcome_and_existing_model_outputs():
     shadow.validate_feature_contract()
     lowered = " ".join(shadow.FEATURE_COLUMNS).lower()
@@ -66,9 +75,8 @@ def test_shadow_feature_contract_excludes_market_outcome_and_existing_model_outp
     assert "math_" not in lowered
 
 
-def test_walk_forward_predictions_only_start_after_prior_sample_and_use_earlier_dates():
-    frame = _frame()
-    detail = shadow.build_oos_detail(frame)
+def test_walk_forward_predictions_only_start_after_prior_sample_and_use_earlier_dates(oos_frame_and_detail):
+    frame, detail = oos_frame_and_detail
     eligible = detail.loc[detail["OOS_Eligible"].astype(bool)].copy()
     assert not eligible.empty
     assert int(eligible["Prior_Resolved_Starts"].min()) >= shadow.MIN_PRIOR_RESOLVED
@@ -77,17 +85,17 @@ def test_walk_forward_predictions_only_start_after_prior_sample_and_use_earlier_
     assert int((prior_dates < first_eligible_date).sum()) >= shadow.MIN_PRIOR_RESOLVED
 
 
-def test_shadow_and_three_path_are_report_only_and_never_live_inputs():
-    summary = shadow.summarize_oos(shadow.build_oos_detail(_frame()))
+def test_shadow_and_three_path_are_report_only_and_never_live_inputs(oos_frame_and_detail):
+    _, detail = oos_frame_and_detail
+    summary = shadow.summarize_oos(detail.copy())
     assert set(summary["Challenger"]) == {"ML_SHADOW", "SIM_MATH_ML_EQUAL_THIRDS"}
     assert summary["Report_Only"].all()
     assert (~summary["Live_Projection_Use"]).all()
     assert (~summary["Market_Features_Used"]).all()
 
 
-def test_three_path_candidate_requires_raw_sim_and_math_means():
-    frame = _frame()
-    detail = shadow.build_oos_detail(frame)
+def test_three_path_candidate_requires_raw_sim_and_math_means(oos_frame_and_detail):
+    frame, detail = oos_frame_and_detail
     assert detail.loc[detail["OOS_Eligible"].astype(bool), "Three_Path_Eligible"].any()
 
     without_raw = frame.drop(columns=["sim_mean_k", "math_mean_k"])
