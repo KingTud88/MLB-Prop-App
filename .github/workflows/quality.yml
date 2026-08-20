@@ -31,7 +31,8 @@ jobs:
 
           assets = Path('assets')
           encoded = ''.join((assets / 'projection_summary_emblems_v2.webp').read_text(encoding='utf-8').split())
-          decoded = base64.b64decode(encoded, validate=True)
+          encoded += '=' * (-len(encoded) % 4)
+          decoded = base64.b64decode(encoded)
           master = Image.open(io.BytesIO(decoded)).convert('RGBA')
           assert master.size == (768, 128), f'Unexpected master size: {master.size}'
 
