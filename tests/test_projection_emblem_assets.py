@@ -8,9 +8,13 @@ NAMES = [
     "projection_hits.webp", "projection_hits_plus.webp",
 ]
 
+
 def test_projection_emblems_are_high_resolution_assets():
     for name in NAMES:
-        assert Image.open(Path("assets") / name).size == (256, 256)
+        image = Image.open(Path("assets") / name)
+        assert image.size == (256, 256)
+        assert image.format == "WEBP"
+
 
 def test_projection_page_uses_v14_highres_asset_cache_key():
     source = Path("streamlit_app.py").read_text(encoding="utf-8")
