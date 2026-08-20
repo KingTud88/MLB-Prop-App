@@ -1,0 +1,26 @@
+Field,Frozen_Value
+audit_version,calibration-common-mode-v2-report-only
+production_authority,NONE
+future_only_start,2026-08-21
+challenger_type,post-blend additive residual correction
+baseline,saved production strikeout projection
+training_pool,expanding strictly earlier resolved game dates
+same_day_training_excluded,True
+unit_of_analysis,unique pitcher-game start
+capture_selection,latest valid capture at or before game_time
+post_first_pitch_rows_excluded,True
+history_semantics_required,starter-history-v2-mlb-observations
+minimum_prior_resolved_starts,30
+residual_definition,actual_strikeouts - projection
+residual_estimator,expanding mean
+shrinkage,n / (n + 30)
+correction_cap_k,0.5
+sim_math_reweighting,False
+minimum_oos_starts,30
+minimum_evidence_days,5
+minimum_distinct_pitchers,15
+helping_relative_mae_min,0.01
+helping_win_share_min,0.52
+bias_must_not_worsen_for_helping,True
+weather_authority,INFORMATIONAL_ONLY
+automatic_activation,False
