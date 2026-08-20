@@ -27,6 +27,7 @@ def test_ui_polish_does_not_change_projection_or_market_contracts():
     assert "aligned_bet_lean(" in source
 
 
+# Keep the six delivery assets large enough for clean browser downsampling.
 def test_projection_emblem_assets_are_high_resolution():
     from PIL import Image
 
