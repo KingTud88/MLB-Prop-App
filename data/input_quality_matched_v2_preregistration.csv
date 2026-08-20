@@ -1,0 +1,18 @@
+Field,Frozen_Value
+audit_version,input-quality-matched-v2-report-only
+production_authority,NONE
+future_only_start,2026-08-20
+unit_of_analysis,unique pitcher-game start
+capture_selection,latest valid capture at or before game_time
+post_first_pitch_rows_excluded,True
+shallow_history_definition,starter_history_games <= 4
+deep_history_definition,starter_history_games >= 5
+minimum_matched_pairs,20
+primary_projection_caliper,0.75
+primary_expected_outs_caliper,1.5
+primary_opponent_k_pct_caliper,2.0
+primary_same_role_required,True
+same_pitcher_sensitivity_enabled,True
+matching_replacement,False
+pairing_uses_outcomes,False
+weather_authority,INFORMATIONAL_ONLY
