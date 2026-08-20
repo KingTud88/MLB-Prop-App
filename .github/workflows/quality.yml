@@ -20,21 +20,19 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements.txt pytest
 
-      - name: Rebuild true 128px Projection emblems once
+      - name: Rebuild high-res Projection emblems once
         if: github.event_name == 'pull_request' && github.head_ref == 'ui/highres-projection-emblems-v14'
         run: |
           python - <<'PY'
           from pathlib import Path
-          import base64
-          import io
-          from PIL import Image
+          from PIL import Image, ImageFilter
 
           assets = Path('assets')
-          encoded = ''.join((assets / 'projection_summary_emblems_v2.webp').read_text(encoding='utf-8').split())
-          encoded += '=' * (-len(encoded) % 4)
-          decoded = base64.b64decode(encoded)
-          master = Image.open(io.BytesIO(decoded)).convert('RGBA')
-          assert master.size == (768, 128), f'Unexpected master size: {master.size}'
+          master_path = assets / 'projection_summary_emblems.webp'
+          master = Image.open(master_path)
+          master.load()
+          master = master.convert('RGBA')
+          assert master.size == (384, 64), f'Unexpected valid master size: {master.size}'
 
           names = [
               'projection_k.webp',
@@ -44,18 +42,38 @@ jobs:
               'projection_hits.webp',
               'projection_hits_plus.webp',
           ]
+
+          tile_w = master.width // 6
           for idx, name in enumerate(names):
-              tile = master.crop((idx * 128, 0, (idx + 1) * 128, 128))
+              tile = master.crop((idx * tile_w, 0, (idx + 1) * tile_w, master.height))
+              alpha_box = tile.getchannel('A').getbbox()
+              if alpha_box is not None:
+                  tile = tile.crop(alpha_box)
+
+              # Preserve the approved artwork exactly while creating a proper
+              # high-resolution delivery asset. Upscale once offline, sharpen
+              # lightly, then let the browser downsample from 256px to ~120px.
+              target_inner = 236
+              scale = min(target_inner / tile.width, target_inner / tile.height)
+              size = (max(1, round(tile.width * scale)), max(1, round(tile.height * scale)))
+              enlarged = tile.resize(size, Image.Resampling.LANCZOS)
+              enlarged = enlarged.filter(ImageFilter.UnsharpMask(radius=1.0, percent=145, threshold=2))
+
+              canvas = Image.new('RGBA', (256, 256), (0, 0, 0, 0))
+              pos = ((256 - enlarged.width) // 2, (256 - enlarged.height) // 2)
+              canvas.alpha_composite(enlarged, pos)
+
               out = assets / name
-              tile.save(out, format='WEBP', lossless=True, quality=100, method=6)
+              canvas.save(out, format='WEBP', lossless=True, method=6)
               with Image.open(out) as verify:
-                  assert verify.size == (128, 128), (name, verify.size)
+                  assert verify.size == (256, 256), (name, verify.size)
+              print(f'{name}: {tile.size} -> {size} -> 256x256, {out.stat().st_size} bytes')
 
           app = Path('streamlit_app.py')
           text = app.read_text(encoding='utf-8')
           text = text.replace(
               'PROJECTION_EMBLEM_RECOVERY_V13 · reliable individual approved assets, larger footprint',
-              'PROJECTION_EMBLEM_HIGHRES_V14 · true 128px individual approved assets',
+              'PROJECTION_EMBLEM_HIGHRES_V14 · 256px delivery assets from approved source sprite',
           )
           for stem in names:
               text = text.replace(f'{stem}?v=13', f'{stem}?v=14')
@@ -73,8 +91,8 @@ jobs:
           test_text = test_text.replace('height:120px!important', 'height:124px!important')
           test_text = test_text.replace('background-size:116px 116px!important', 'background-size:120px 120px!important')
           test_text = test_text.replace('?v=13', '?v=14')
-          if 'test_projection_emblem_assets_are_true_128px' not in test_text:
-              test_text += '''\n\ndef test_projection_emblem_assets_are_true_128px():\n    from PIL import Image\n\n    for name in (\n        "projection_k.webp",\n        "projection_k_plus.webp",\n        "projection_outs.webp",\n        "projection_outs_plus.webp",\n        "projection_hits.webp",\n        "projection_hits_plus.webp",\n    ):\n        with Image.open(Path("assets") / name) as img:\n            assert img.size == (128, 128), f"{name} was {img.size}"\n'''
+          if 'test_projection_emblem_assets_are_high_resolution' not in test_text:
+              test_text += '''\n\ndef test_projection_emblem_assets_are_high_resolution():\n    from PIL import Image\n\n    for name in (\n        "projection_k.webp",\n        "projection_k_plus.webp",\n        "projection_outs.webp",\n        "projection_outs_plus.webp",\n        "projection_hits.webp",\n        "projection_hits_plus.webp",\n    ):\n        with Image.open(Path("assets") / name) as img:\n            assert img.size == (256, 256), f"{name} was {img.size}"\n'''
           test_path.write_text(test_text, encoding='utf-8')
           PY
 
@@ -83,7 +101,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add assets/projection_k.webp assets/projection_k_plus.webp assets/projection_outs.webp assets/projection_outs_plus.webp assets/projection_hits.webp assets/projection_hits_plus.webp streamlit_app.py tests/test_info_emblem_polish.py .github/workflows/quality.yml
-          git commit -m "Rebuild Projection emblems from 128px master"
+          git commit -m "Rebuild Projection emblems as high-resolution assets"
           git push origin HEAD:${GITHUB_HEAD_REF}
 
       - run: python -m compileall -q streamlit_app.py navigation.py engine automation tests
