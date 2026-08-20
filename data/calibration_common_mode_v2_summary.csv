@@ -1,0 +1,2 @@
+Audit_Version,Production_Authority,Future_Only_Start,Eligible_Future_Starts,OOS_Starts,Evidence_Days,Distinct_Pitchers,Baseline_MAE,Candidate_MAE,Relative_MAE_Improvement,Baseline_Bias,Candidate_Bias,Candidate_Win_Share,Tie_Rate,Status
+calibration-common-mode-v2-report-only,NONE,2026-08-21,0,0,0,0,,,,,,,,LEARNING
