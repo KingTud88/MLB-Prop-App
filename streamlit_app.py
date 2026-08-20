@@ -954,8 +954,12 @@ with st.sidebar:
     locked_key=st.session_state.get("locked_pitcher"); st.caption("Select a probable starter, then lock the projection 🔒")
 
 schedule,err=get_schedule(selected_date.isoformat())
-if err: st.error(err)
-if not schedule: st.warning("No announced probable pitchers are available for this date."); st.stop()
+if err:
+    st.error(err)
+    st.stop()
+if not schedule:
+    st.warning("No announced probable pitchers are available for this date.")
+    st.stop()
 locked_game=next((g for g in schedule if g.key==locked_key),None) if locked_key else None
 if locked_key and locked_game is None: st.session_state["locked_pitcher"]=None; locked_key=None
 matches=schedule if locked_game is None else [locked_game]

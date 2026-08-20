@@ -101,3 +101,17 @@ def test_milestone_report_covers_3_plus_through_10_plus():
     assert list(report["Line"]) == [f"{line}+" for line in range(3, 11)]
     assert len(report) == 8
     assert set(["Simulation Brier", "Math Brier", "Calibrated Brier", "Simulation Weight", "Math Weight"]).issubset(report.columns)
+
+
+def test_schedule_api_error_stops_before_empty_slate_warning():
+    source = APP.read_text(encoding="utf-8")
+    expected = (
+                  'schedule,err=get_schedule(selected_date.isoformat())\n'
+                  'if err:\n'
+                  '    st.error(err)\n'
+                  '    st.stop()\n'
+                  'if not schedule:\n'
+                  '    st.warning("No announced probable pitchers are available for this date.")\n'
+                  '    st.stop()'
+              )
+    assert expected in source
