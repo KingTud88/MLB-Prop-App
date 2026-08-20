@@ -118,7 +118,7 @@ try:
             response = _original_requests_get(
                 f"https://statsapi.mlb.com/api/v1/people/{int(pitcher_id)}",
                 timeout=10,
-                headers={"Accept":"application/json","User-Agent":"StrikeOutKing9000/3.5"},
+                headers={"Accept": "application/json", "User-Agent": "StrikeOutKing9000/3.5"},
             )
             response.raise_for_status()
             person = (response.json().get("people") or [{}])[0]
