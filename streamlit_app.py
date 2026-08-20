@@ -693,7 +693,7 @@ def queue_projection_parlay_leg(leg):
     if any(_projection_leg_key(existing)==key for existing in legs):
         return False,"That exact leg is already in the Projection Parlay Builder."
     legs.append(dict(leg)); st.session_state[PROJECTION_PARLAY_KEY]=legs
-    return True,f"Added to Projection Parlay Builder ({len(legs)} leg" + ("" if len(legs)==1 else "s") + ")."
+    return True,f"Queued {leg.get('player','')} · {leg.get('market','')} · {leg.get('side','')} {float(leg.get('line',0.0)):g} · {len(legs)} leg" + ("" if len(legs)==1 else "s")
 
 def save_projection_straight(*,game,game_date,market,line,side,projection,model_probability,stake,confidence,data_quality,offer,source):
     price=float(offer.get("price")) if offer is not None and offer.get("price") is not None else None
@@ -713,32 +713,41 @@ def render_add_bet_button(container,reco,market_label,market_keys,projection_mea
     side=str(reco.get("side","NO LINE")).upper()
     no_line=reco.get("line") is None or side=="NO LINE"
     tradable=side in {"OVER","UNDER"} and not no_line
-    offer=best_market_offer(odds_rows,market_keys,reco.get("line"),side) if tradable else None
+    line=None if no_line else float(reco.get("line"))
+    offer=best_market_offer(odds_rows,market_keys,line,side) if tradable else None
+    bet_label="NO ACTIVE LINE" if no_line else ("PASS" if side=="PASS" else f"{side} {line:g}")
     with container:
+        st.markdown(f"**{game.pitcher_name} · {market_label}**")
         if offer is not None:
-            st.caption(f"Best posted: {offer.get('book','')} {float(offer.get('price')):+.0f}")
+            st.caption(f"{bet_label} · {offer.get('book','')} · {float(offer.get('price')):+.0f}")
         elif no_line:
-            st.caption("Projection shown · add an active sportsbook line on Daily Projection Run to quick-add this market")
+            st.caption("NO ACTIVE LINE · projection stays visible, betting actions stay disabled")
         elif side=="PASS":
-            st.caption("Active line exists, but the model does not have an aligned play")
+            st.caption(f"Line {line:g} is active · model recommendation is PASS")
         else:
-            st.caption("Active line loaded · sportsbook price optional")
+            source=str(reco.get("active_line_source","") or "ACTIVE SPORTSBOOK LINE")
+            st.caption(f"{bet_label} · {source} · price not captured")
         straight_col,parlay_col=st.columns(2)
-        straight_clicked=straight_col.button("➕ Straight",key=f"{key}_straight",use_container_width=True,disabled=not tradable)
-        parlay_clicked=parlay_col.button("🎟️ Parlay",key=f"{key}_parlay",use_container_width=True,disabled=not tradable)
+        straight_clicked=straight_col.button(
+            f"➕ Straight · {bet_label}",key=f"{key}_straight",use_container_width=True,disabled=not tradable
+        )
+        parlay_clicked=parlay_col.button(
+            f"🎟️ Parlay · {bet_label}",key=f"{key}_parlay",use_container_width=True,disabled=not tradable
+        )
         if straight_clicked:
             try:
                 price=save_projection_straight(
-                    game=game,game_date=game_date,market=market_label,line=float(reco.get("line")),side=side,
+                    game=game,game_date=game_date,market=market_label,line=line,side=side,
                     projection=projection_mean,model_probability=float(reco.get("model")),stake=stake,
                     confidence=confidence,data_quality=data_quality,offer=offer,source="Projection Recommendation",
                 )
-                st.success("Added to Bet Tracker" if price is not None else "Added unpriced model straight to Bet Tracker · result will grade, P/L stays blank because no sportsbook price was assumed.")
+                price_text="unpriced" if price is None else f"{price:+.0f}"
+                st.success(f"Saved straight · {game.pitcher_name} · {market_label} · {side} {line:g} · {price_text}")
             except Exception as exc:
                 st.error(f"Could not add bet: {exc}")
         if parlay_clicked:
             leg=projection_parlay_leg(
-                game,game_date,market_label,float(reco.get("line")),side,projection_mean,float(reco.get("model")),data_quality
+                game,game_date,market_label,line,side,projection_mean,float(reco.get("model")),data_quality
             )
             added,message=queue_projection_parlay_leg(leg)
             (st.success if added else st.info)(message)
@@ -747,8 +756,8 @@ def render_projection_parlay_builder():
     legs=list(st.session_state.get(PROJECTION_PARLAY_KEY,[]))
     with st.expander(f"🎟️ Projection Parlay Builder · {len(legs)} leg" + ("" if len(legs)==1 else "s"),expanded=bool(legs)):
         st.caption(
-            "Add model legs from recommendations or the Strikeout Ladder, then move between pitchers on the same slate. "
-            "Sportsbook availability never gates this builder; saved model parlays are unpriced and the sportsbook label is recordkeeping only."
+            "Recommendation legs require a real active line; Strikeout Ladder milestone legs remain model-only and may be unpriced. "
+            "Every queued leg is labeled with pitcher, market, side, and line before the ticket is saved."
         )
         if not legs:
             st.info("No parlay legs queued yet. Use any 🎟️ Parlay button on this Projection page.")
@@ -770,9 +779,9 @@ def render_projection_parlay_builder():
         remove_col,clear_col=st.columns([2,1])
         remove_idx=remove_col.selectbox("Remove leg",range(len(legs)),format_func=lambda i:f"#{i+1} {legs[i].get('player','')} · {legs[i].get('market','')} · {legs[i].get('side','')} {float(legs[i].get('line',0.0)):g}",key="projection_parlay_remove")
         if clear_col.button("🗑️ Remove selected",use_container_width=True,key="projection_parlay_remove_button"):
-            legs.pop(int(remove_idx)); st.session_state[PROJECTION_PARLAY_KEY]=legs; st.rerun()
+            legs.pop(int(remove_idx)); st.session_state[PROJECTION_PARLAY_KEY]=legs; st.rerun(scope="fragment")
         if st.button("Clear Projection Parlay Builder",use_container_width=True,key="projection_parlay_clear"):
-            st.session_state[PROJECTION_PARLAY_KEY]=[]; st.rerun()
+            st.session_state[PROJECTION_PARLAY_KEY]=[]; st.rerun(scope="fragment")
         if len(legs)>=10:
             st.warning(f"🎰 {len(legs)}-leg lotto · very high variance. The app grades every leg but does not multiply model probabilities or claim the legs are independent.")
         duplicate_pitchers=pd.Series([str(leg.get("player","")) for leg in legs]).value_counts()
@@ -926,12 +935,135 @@ def build_market_table(proj,odds_rows,hits_proj=None):
     for r in odds_rows:
         try: line=float(r["point"])
         except Exception: continue
-        key=(r["book"],r["market"],line); grouped.setdefault(key,{})[str(r.get("name","")).lower()]=r.get("price")
+        key=(str(r.get("book","") or ""),str(r.get("provider","") or ""),r.get("market",""),line)
+        slot=grouped.setdefault(key,{"prices":{},"fetched_at_utc":""})
+        slot["prices"][str(r.get("name","")).lower()]=r.get("price")
+        fetched=str(r.get("fetched_at_utc","") or "")
+        if fetched and fetched>str(slot.get("fetched_at_utc","") or ""):
+            slot["fetched_at_utc"]=fetched
     rows=[]
-    for (book,market,line),prices in grouped.items():
-        model=market_model_probability(proj,market,line,hits_proj); over=prices.get("over"); under=prices.get("under"); op=implied_prob(over) if over is not None else None; up=implied_prob(under) if under is not None else None; oe=model-op if op is not None else None; ue=(1-model)-up if up is not None else None; best=max([e for e in (oe,ue) if e is not None],default=None)
-        rows.append({"Market":"K" if "strikeouts" in market else "HITS" if "hits_allowed" in market else "OUTS","Type":"ALT" if market.endswith("_alternate") else "MAIN","Book":book,"Line":f"{line:g}","Over":over,"Under":under,"Model":model,"Over Edge":oe,"Under Edge":ue,"Best Edge":best})
+    for (book,provider,market,line),slot in grouped.items():
+        prices=slot["prices"]
+        model=market_model_probability(proj,market,line,hits_proj)
+        over=prices.get("over"); under=prices.get("under")
+        op=implied_prob(over) if over is not None else None
+        up=implied_prob(under) if under is not None else None
+        oe=model-op if op is not None else None
+        ue=(1-model)-up if up is not None else None
+        candidates=[("OVER",oe),("UNDER",ue)]
+        candidates=[item for item in candidates if item[1] is not None]
+        best_side,best_edge=max(candidates,key=lambda item:item[1]) if candidates else ("—",None)
+        captured=pd.to_datetime(slot.get("fetched_at_utc"),utc=True,errors="coerce")
+        captured_text="—" if pd.isna(captured) else captured.strftime("%H:%M:%S UTC")
+        rows.append({
+            "Market":"K" if "strikeouts" in market else "HITS" if "hits_allowed" in market else "OUTS",
+            "Book":book or "—","Provider":provider or "—","Line":f"{line:g}",
+            "Over Odds":over,"Under Odds":under,"Model Over":model,
+            "Over Edge":oe,"Under Edge":ue,"Best Side":best_side,"Best Edge":best_edge,
+            "Captured":captured_text,
+        })
     return pd.DataFrame(rows).sort_values(["Market","Line","Book"]) if rows else pd.DataFrame()
+
+
+@st.fragment
+def render_projection_betting_workspace(
+    game,selected_date,proj,hits_proj,kdf,k_reco,out_reco,hit_reco,
+    odds_rows,odds_err,odds_source,
+):
+    st.markdown('<div class="section-head">BET ACTIONS</div>',unsafe_allow_html=True)
+    with st.container(border=True,key="cc_bet_action_panel"):
+        card_info_popover(static_explanation("projection_actions"),key="bet-actions")
+        st.caption(
+            "Every action names the pitcher, market, side, and line. Recommendation buttons require an authentic active line; "
+            "no line means disabled, never fabricated."
+        )
+        quick_add_stake=st.number_input(
+            "Straight-bet stake (units)",min_value=0.0,value=1.0,step=0.5,key=f"projection_quick_stake_{game.key}"
+        )
+        add1,add2,add3=st.columns(3,gap="medium")
+        render_add_bet_button(add1,k_reco,"Strikeouts",{"pitcher_strikeouts","pitcher_strikeouts_alternate"},proj.mean_k,quick_add_stake,game,selected_date.isoformat(),odds_rows,proj.confidence,proj.quality,f"add_k_{game.key}")
+        render_add_bet_button(add2,out_reco,"Total Outs",{"pitcher_outs","pitcher_outs_alternate"},proj.mean_outs,quick_add_stake,game,selected_date.isoformat(),odds_rows,proj.confidence,proj.quality,f"add_outs_{game.key}")
+        render_add_bet_button(add3,hit_reco,"Hits Allowed",{"pitcher_hits_allowed","pitcher_hits_allowed_alternate"},hits_proj.ensemble_mean,quick_add_stake,game,selected_date.isoformat(),odds_rows,proj.confidence,proj.quality,f"add_hits_{game.key}")
+
+    market_command_row=st.container(border=True,key="cc_market_command_row")
+    left,right=market_command_row.columns([1.35,1],gap="large")
+    with left:
+        st.markdown('<div class="section-head">STRIKEOUT MILESTONE LADDER</div>',unsafe_allow_html=True)
+        view=kdf[["Line","Probability","Fair Odds","Simulation","Math","Sim Weight"]].copy()
+        view["Probability"]=view["Probability"].map(lambda x:f"{x:.1%}")
+        view["Simulation"]=view["Simulation"].map(lambda x:f"{x:.1%}")
+        view["Math"]=view["Math"].map(lambda x:f"{x:.1%}")
+        view["Sim Weight"]=view["Sim Weight"].map(lambda x:f"{x:.1%}")
+        ladder_event=st.dataframe(
+            view,use_container_width=True,hide_index=True,on_select="rerun",selection_mode="single-row",key=f"projection_k_ladder_{game.key}"
+        )
+        st.caption(
+            "Select a 3+ through 12+ milestone. Only this betting workspace reruns; the full projection page stays in place. "
+            "Milestones are model-only tracker bets: 5+ is stored as Over 4.5, and Fair Odds are never saved as sportsbook prices."
+        )
+        try:
+            ladder_selected=list(ladder_event.selection.rows)
+        except Exception:
+            ladder_selected=list((ladder_event.get("selection",{}) or {}).get("rows",[])) if isinstance(ladder_event,dict) else []
+        if ladder_selected:
+            ladder_idx=int(ladder_selected[0])
+            if 0<=ladder_idx<len(kdf):
+                ladder_row=kdf.iloc[ladder_idx]
+                milestone=int(str(ladder_row["Line"]).replace("+",""))
+                tracker_line=float(milestone)-0.5
+                model_probability=float(ladder_row["Probability"])
+                ladder_offer=best_market_offer(odds_rows,{"pitcher_strikeouts","pitcher_strikeouts_alternate"},tracker_line,"OVER")
+                offer_text=(
+                    f" · posted {ladder_offer.get('book','')} {float(ladder_offer.get('price')):+.0f}"
+                    if ladder_offer is not None else " · model-only / unpriced"
+                )
+                st.markdown(
+                    f"**{game.pitcher_name} · {milestone}+ Strikeouts · tracker OVER {tracker_line:g} · "
+                    f"model {model_probability:.1%} · fair {ladder_row['Fair Odds']}**{offer_text}"
+                )
+                ladder_straight,ladder_parlay=st.columns(2)
+                if ladder_straight.button(
+                    f"➕ Straight · {milestone}+ K",use_container_width=True,key=f"ladder_straight_{game.key}_{milestone}"
+                ):
+                    try:
+                        price=save_projection_straight(
+                            game=game,game_date=selected_date.isoformat(),market="Strikeouts",line=tracker_line,side="OVER",
+                            projection=proj.mean_k,model_probability=model_probability,stake=quick_add_stake,
+                            confidence=proj.confidence,data_quality=proj.quality,offer=ladder_offer,source="Projection Strikeout Ladder",
+                        )
+                        price_text="unpriced" if price is None else f"{price:+.0f}"
+                        st.success(
+                            f"Saved straight · {game.pitcher_name} · {milestone}+ Strikeouts · OVER {tracker_line:g} · {price_text}"
+                        )
+                    except Exception as exc:
+                        st.error(f"Could not add ladder straight: {exc}")
+                if ladder_parlay.button(
+                    f"🎟️ Parlay · {milestone}+ K",use_container_width=True,key=f"ladder_parlay_{game.key}_{milestone}"
+                ):
+                    leg=projection_parlay_leg(
+                        game,selected_date.isoformat(),"Strikeouts",tracker_line,"OVER",proj.mean_k,model_probability,proj.quality
+                    )
+                    added,message=queue_projection_parlay_leg(leg)
+                    (st.success if added else st.info)(message)
+    with right:
+        st.markdown('<div class="section-head">MARKET ODDS / EDGE</div>',unsafe_allow_html=True)
+        st.caption(f"Execution source: {odds_source}. Provider and sportsbook are shown separately; prices never feed the forecast.")
+        market_df=build_market_table(proj,odds_rows,hits_proj)
+        if not market_df.empty:
+            for c in ("Model Over","Over Edge","Under Edge","Best Edge"):
+                market_df[c]=market_df[c].map(lambda x:"—" if pd.isna(x) else f"{x:.1%}")
+            for c in ("Over Odds","Under Odds"):
+                market_df[c]=market_df[c].map(lambda x:"—" if pd.isna(x) else f"{float(x):+.0f}")
+            st.dataframe(market_df,use_container_width=True,hide_index=True)
+            st.caption(
+                "Best Side is the larger model-vs-implied edge at that authentic line. This is execution information only and does not alter the projection."
+            )
+        else:
+            st.warning(odds_err or "No eligible pregame SportsGameOdds pair is available for this pitcher/slate right now.")
+
+    st.markdown('<div class="section-head">PROJECTION PARLAY BUILDER</div>',unsafe_allow_html=True)
+    with st.container(border=True,key="cc_parlay_panel"):
+        render_projection_parlay_builder()
 
 with st.sidebar:
     render_sidebar_brand()
@@ -1027,7 +1159,13 @@ active_k_source=_durable_source("active_strikeout_line_source")
 active_outs_source=_durable_source("active_outs_line_source")
 active_hits_source=_durable_source("active_hits_allowed_line_source")
 odds_rows=load_pitcher_market_odds(game.pitcher_name,selected_date.isoformat())
-odds_err=("" if odds_rows else "No current automated sportsbook line has been captured for this pitcher/slate yet.")
+odds_source="Central SportsGameOdds snapshot"
+odds_err=(
+    "" if odds_rows else
+    "No current centralized SportsGameOdds snapshot contains an eligible pregame line for this pitcher/slate yet. "
+    "Main Projection does not call paid odds APIs; scheduled capture distributes one saved slate snapshot to every page."
+)
+
 
 def _saved_market_source(rows, market):
     for row in rows:
@@ -1306,6 +1444,11 @@ with h3:
         unsafe_allow_html=True,
     )
 
+render_projection_betting_workspace(
+    game,selected_date,proj,hits_proj,kdf,k_reco,out_reco,hit_reco,
+    odds_rows,odds_err,odds_source,
+)
+
 st.markdown('<div class="section-head">OPPOSING BATTER BOX</div>',unsafe_allow_html=True)
 lineup_label="✅ CONFIRMED BATTING ORDER" if lineup_context.confirmed else "ACTIVE ROSTER FALLBACK · lineup not posted yet"
 st.caption(f"{lineup_label} · {game.opponent} hitters vs a {pitcher_hand or 'unknown-hand'} pitcher. Pitcher-hand K% and H/PA feed the baseball matchup; incomplete hitter splits shrink safely toward league rates.")
@@ -1350,68 +1493,4 @@ else:
         },
     )
 
-st.markdown('<div class="section-head">BET TRACKER / PARLAY ACTIONS</div>',unsafe_allow_html=True)
-action_panel=st.container(border=True,key="cc_bet_action_panel")
-with action_panel:
-    card_info_popover(static_explanation("projection_actions"),key="bet-actions")
-action_panel.caption("Quick-add uses the real active line shown above. A sportsbook price may remain unpriced, but the app will not quick-add a fabricated/default market line.")
-quick_add_stake=action_panel.number_input("Quick-add stake",min_value=0.0,value=1.0,step=0.5,key=f"projection_quick_stake_{game.key}")
-add1,add2,add3=action_panel.columns(3,gap="medium")
-render_add_bet_button(add1,k_reco,"Strikeouts",{"pitcher_strikeouts","pitcher_strikeouts_alternate"},proj.mean_k,quick_add_stake,game,selected_date.isoformat(),odds_rows,proj.confidence,proj.quality,f"add_k_{game.key}")
-render_add_bet_button(add2,out_reco,"Total Outs",{"pitcher_outs","pitcher_outs_alternate"},proj.mean_outs,quick_add_stake,game,selected_date.isoformat(),odds_rows,proj.confidence,proj.quality,f"add_outs_{game.key}")
-render_add_bet_button(add3,hit_reco,"Hits Allowed",{"pitcher_hits_allowed","pitcher_hits_allowed_alternate"},hits_proj.ensemble_mean,quick_add_stake,game,selected_date.isoformat(),odds_rows,proj.confidence,proj.quality,f"add_hits_{game.key}")
-market_command_row=st.container(border=True,key="cc_market_command_row")
-left,right=market_command_row.columns([1.35,1],gap="large")
-with left:
-    st.markdown('<div class="section-head">STRIKEOUT MILESTONE LADDER</div>',unsafe_allow_html=True)
-    view=kdf[["Line","Probability","Fair Odds","Simulation","Math","Sim Weight"]].copy()
-    view["Probability"]=view["Probability"].map(lambda x:f"{x:.1%}")
-    view["Simulation"]=view["Simulation"].map(lambda x:f"{x:.1%}")
-    view["Math"]=view["Math"].map(lambda x:f"{x:.1%}")
-    view["Sim Weight"]=view["Sim Weight"].map(lambda x:f"{x:.1%}")
-    ladder_event=st.dataframe(
-        view,use_container_width=True,hide_index=True,on_select="rerun",selection_mode="single-row",key=f"projection_k_ladder_{game.key}"
-    )
-    st.caption("Click any 3+ through 12+ milestone to add it as a straight or parlay leg. A milestone like 5+ is tracked as Over 4.5 so Bet Tracker grading matches K ≥ 5. Fair Odds are model-only and are never saved as a sportsbook price.")
-    try:
-        ladder_selected=list(ladder_event.selection.rows)
-    except Exception:
-        ladder_selected=list((ladder_event.get("selection",{}) or {}).get("rows",[])) if isinstance(ladder_event,dict) else []
-    if ladder_selected:
-        ladder_idx=int(ladder_selected[0])
-        if 0<=ladder_idx<len(kdf):
-            ladder_row=kdf.iloc[ladder_idx]
-            milestone=int(str(ladder_row["Line"]).replace("+",""))
-            tracker_line=float(milestone)-0.5
-            model_probability=float(ladder_row["Probability"])
-            ladder_offer=best_market_offer(odds_rows,{"pitcher_strikeouts","pitcher_strikeouts_alternate"},tracker_line,"OVER")
-            offer_text=f" · exact posted {ladder_offer.get('book','')} {float(ladder_offer.get('price')):+.0f}" if ladder_offer is not None else " · no sportsbook price required"
-            st.markdown(f"**Selected: {milestone}+ Ks · model {model_probability:.1%} · fair {ladder_row['Fair Odds']}**{offer_text}")
-            ladder_straight,ladder_parlay=st.columns(2)
-            if ladder_straight.button("➕ Add selected as straight",use_container_width=True,key=f"ladder_straight_{game.key}_{milestone}"):
-                try:
-                    price=save_projection_straight(
-                        game=game,game_date=selected_date.isoformat(),market="Strikeouts",line=tracker_line,side="OVER",
-                        projection=proj.mean_k,model_probability=model_probability,stake=quick_add_stake,
-                        confidence=proj.confidence,data_quality=proj.quality,offer=ladder_offer,source="Projection Strikeout Ladder",
-                    )
-                    st.success(f"Added {milestone}+ K as Over {tracker_line:g} to Bet Tracker"+("" if price is not None else " · unpriced model straight"))
-                except Exception as exc:
-                    st.error(f"Could not add ladder straight: {exc}")
-            if ladder_parlay.button("🎟️ Add selected to parlay",use_container_width=True,key=f"ladder_parlay_{game.key}_{milestone}"):
-                leg=projection_parlay_leg(game,selected_date.isoformat(),"Strikeouts",tracker_line,"OVER",proj.mean_k,model_probability,proj.quality)
-                added,message=queue_projection_parlay_leg(leg)
-                (st.success if added else st.info)(message)
-with right:
-    st.markdown('<div class="section-head">MARKET ODDS / EDGE</div>',unsafe_allow_html=True)
-    if odds_err: st.caption(odds_err)
-    market_df=build_market_table(proj,odds_rows,hits_proj)
-    if not market_df.empty:
-        for c in ("Model","Over Edge","Under Edge","Best Edge"): market_df[c]=market_df[c].map(lambda x:"—" if pd.isna(x) else f"{x:.1%}")
-        st.dataframe(market_df,use_container_width=True,hide_index=True)
-        st.caption("Live sportsbook prices are shown for strikeouts, total outs, and hits allowed markets. Edge compares the independent model probability with implied probability; market prices never feed the forecast.")
-    else: st.info("Live market data will populate here when the saved SportsGameOdds snapshot contains an eligible pregame pitcher prop pair.")
-st.markdown('<div class="section-head">PROJECTION PARLAY BUILDER</div>',unsafe_allow_html=True)
-with st.container(border=True,key="cc_parlay_panel"):
-    render_projection_parlay_builder()
 st.markdown(f'<div class="search-note">Data status: {proj.confidence} confidence · quality {proj.quality}/100 · locked: {locked} · engine v{APP_VERSION}</div>',unsafe_allow_html=True)
