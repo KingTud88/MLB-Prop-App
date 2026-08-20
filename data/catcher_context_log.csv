@@ -216,8 +216,7 @@ game_date,game_pk,pitcher_id,player,team,team_id,catcher_id,catcher_name,catcher
 2026-08-19,824318,808963,Roki Sasaki,LAD,119,666163.0,Ben Rortvedt,MLB_POSTED_LINEUP,True,2026-08-19T21:31:19.467068+00:00,1.0,REPORT_ONLY,6.0,99.0,22.0,15.0,catcher-context-v1-report-only
 2026-08-19,824394,683363,Matt Wilkinson,SFG,137,701852.0,Drew Cavanaugh,MLB_POSTED_LINEUP,True,2026-08-19T23:00:39.371182+00:00,1.0,REPORT_ONLY,0.0,25.0,7.0,6.0,catcher-context-v1-report-only
 2026-08-19,824155,814490,Ethan Pecko,HOU,117,543877.0,Christian Vázquez,MLB_POSTED_LINEUP,True,2026-08-20T00:16:28.648872+00:00,1.0,REPORT_ONLY,4.0,89.0,18.0,11.0,catcher-context-v1-report-only
-2026-08-20,824474,700241,Michael McGreevy,STL,138,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
-2026-08-20,824474,663903,Brady Singer,CIN,113,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-20,824474,700241,Michael McGreevy,STL,138,699625.0,Jimmy Crooks,MLB_POSTED_LINEUP,True,2026-08-20T13:37:48.439525+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-20,824395,694738,Landen Roupp,SFG,137,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-20,824395,668909,Gavin Williams,CLE,114,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-20,822934,669456,Shane Bieber,TOR,141,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
@@ -234,3 +233,4 @@ game_date,game_pk,pitcher_id,player,team,team_id,catcher_id,catcher_name,catcher
 2026-08-20,822861,594798,Jacob deGrom,TEX,140,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-20,824153,680570,Grayson Rodriguez,LAA,108,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-20,824153,663567,Peter Lambert,HOU,117,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-20,824474,663903,Brady Singer,CIN,113,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
