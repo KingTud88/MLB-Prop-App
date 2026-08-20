@@ -1,2 +1,2 @@
 Status,Resolved_Starts,Required_Starts,Resolved_Days,Required_Days,Opponents,Required_Opponents,Primary_Metric,Reason,Recommended_Action,Report_Only,Production_Authority,No_Projection_Adjustment,Evaluation_Version
-LEARNING,50,60,2,10,28,15,SPEARMAN_SCORE_DELTA_VS_K_RESIDUAL,Need 60 resolved starts / 10 days / 15 opponents; currently 50 / 2 / 28.,COLLECT_FORWARD_OUTCOMES_WITH_FROZEN_SCORE_AND_EVALUATION_PROTOCOL,True,NONE,True,pitch-mix-whiff-forward-eval-v1-preregistered-report-only
+LEARNING,52,60,2,10,28,15,SPEARMAN_SCORE_DELTA_VS_K_RESIDUAL,Need 60 resolved starts / 10 days / 15 opponents; currently 52 / 2 / 28.,COLLECT_FORWARD_OUTCOMES_WITH_FROZEN_SCORE_AND_EVALUATION_PROTOCOL,True,NONE,True,pitch-mix-whiff-forward-eval-v1-preregistered-report-only
