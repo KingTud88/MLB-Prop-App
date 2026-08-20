@@ -1,2 +1,2 @@
 Generated_At_UTC,Queue_Status,Total_Cases,Pending_Cases,Pending_Lanes,Non_Pending_Cases,Control_Violation_Cases,Report_Only,Production_Authority,No_Auto_Promotion,Automatic_Decision_Allowed,Queue_Version
-2026-08-20T13:38:47.309896+00:00,NO_PENDING_REVIEW,1,0,0,1,0,True,NONE,True,False,research-manual-review-queue-v1-report-only
+2026-08-20T15:09:49.122090+00:00,NO_PENDING_REVIEW,1,0,0,1,0,True,NONE,True,False,research-manual-review-queue-v1-report-only
