@@ -4,77 +4,14 @@ on:
   push:
   pull_request:
 
-permissions:
-  contents: write
-
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
-      - name: Apply branch-only Streamlit replay-cache repair
-        if: github.event_name == 'pull_request' && github.head_ref == 'fix/streamlit-cache-replay-all'
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          app = Path("streamlit_app.py")
-          source = app.read_text(encoding="utf-8")
-          if source.count("@st.cache_data(") != 4:
-              raise SystemExit(f"expected exactly four remaining Streamlit cache_data decorators, found {source.count('@st.cache_data(')}")
-          if "from functools import wraps\n" not in source:
-              source = source.replace("from dataclasses import dataclass\n", "from dataclasses import dataclass\nfrom functools import wraps\n", 1)
-          marker = "@st.cache_data(ttl=1800,show_spinner=False)\ndef get_pitcher_hand(pid):"
-          helper = '''def _process_cache(ttl_seconds):
-              def decorate(func):
-                  cache={}
-                  @wraps(func)
-                  def wrapped(*args,**kwargs):
-                      key=(args,tuple(sorted(kwargs.items())))
-                      now=datetime.now(EASTERN).timestamp()
-                      cached=cache.get(key)
-                      if cached is not None and now-float(cached[0]) < float(ttl_seconds):
-                          return cached[1]
-                      value=func(*args,**kwargs)
-                      cache[key]=(now,value)
-                      return value
-                  return wrapped
-              return decorate
-
-          @_process_cache(1800)
-          def get_pitcher_hand(pid):'''
-          if marker not in source:
-              raise SystemExit("get_pitcher_hand cache marker not found")
-          source = source.replace(marker, helper, 1)
-          source = source.replace("@st.cache_data(ttl=21600,show_spinner=False)", "@_process_cache(21600)")
-          source = source.replace("@st.cache_data(ttl=900,show_spinner=False)", "@_process_cache(900)")
-          if "@st.cache_data(" in source:
-              raise SystemExit("Streamlit cache_data decorator remained after targeted replacement")
-          app.write_text(source, encoding="utf-8")
-
-          test_path = Path("tests/test_get_log_cache_replay_contract.py")
-          test_source = test_path.read_text(encoding="utf-8")
-          addition = '''\n\ndef test_main_projection_fetch_helpers_use_process_cache_not_streamlit_replay():\n    source=Path("streamlit_app.py").read_text(encoding="utf-8")\n    tree=ast.parse(source)\n    assert "@st.cache_data(" not in source\n    nodes={node.name:node for node in tree.body if isinstance(node,ast.FunctionDef)}\n    expected={\n        "get_pitcher_hand":"_process_cache(1800)",\n        "get_venue_coordinates":"_process_cache(21600)",\n        "get_venue_roof_type":"_process_cache(21600)",\n        "get_game_weather":"_process_cache(900)",\n    }\n    for name,decorator in expected.items():\n        assert len(nodes[name].decorator_list)==1\n        assert ast.unparse(nodes[name].decorator_list[0])==decorator\n\n\ndef test_process_cache_wrapper_never_calls_streamlit():\n    source=Path("streamlit_app.py").read_text(encoding="utf-8")\n    tree=ast.parse(source)\n    node=next(node for node in tree.body if isinstance(node,ast.FunctionDef) and node.name=="_process_cache")\n    calls=[ast.unparse(call.func) for call in ast.walk(node) if isinstance(call,ast.Call)]\n    assert not any(name.startswith("st.") for name in calls)\n'''
-          if "test_main_projection_fetch_helpers_use_process_cache_not_streamlit_replay" not in test_source:
-              test_path.write_text(test_source + addition, encoding="utf-8")
-          PY
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt pytest
       - run: python -m compileall -q streamlit_app.py navigation.py engine automation tests
       - run: pytest -q --durations=20
-      - name: Commit validated generated repair
-        if: github.event_name == 'pull_request' && github.head_ref == 'fix/streamlit-cache-replay-all'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add streamlit_app.py tests/test_get_log_cache_replay_contract.py
-          if git diff --cached --quiet; then
-            echo "No generated replay-cache repair changes to commit."
-          else
-            git commit -m "Remove Streamlit replay caching from projection fetch helpers"
-            git push origin HEAD:fix/streamlit-cache-replay-all
-          fi
