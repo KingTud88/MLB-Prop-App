@@ -5,7 +5,10 @@ from __future__ import annotations
 import inspect as _inspect
 import requests as _requests
 
-from runtime_http import install_requests_resilience as _install_requests_resilience
+from runtime_http import (
+    install_requests_resilience as _install_requests_resilience,
+    set_source_health_observer as _set_source_health_observer,
+)
 
 _install_requests_resilience()
 
@@ -63,13 +66,59 @@ try:
     _slot_reserved = False
     _profile_rendering = False
     _last_profile_key = None
+    _source_health_slots = {}
+
+    def _source_health_session_id():
+        try:
+            from streamlit.runtime.scriptrunner import get_script_run_ctx
+            try:
+                context = get_script_run_ctx(suppress_warning=True)
+            except TypeError:
+                context = get_script_run_ctx()
+            return str(getattr(context, "session_id", "") or "")
+        except Exception:
+            return ""
+
+    def _source_health_checked_text(row):
+        value = str(row.get("last_attempt_at_utc") or "").strip()
+        if not value:
+            return "not checked"
+        if "T" in value:
+            value = value.split("T", 1)[1]
+        return value.replace("Z", " UTC")
+
+    def _render_source_health(snapshot, event_host):
+        """Refresh a presentation-only health slot after tracked source calls."""
+        session_id = _source_health_session_id()
+        if not session_id:
+            return
+        rows = {str(row.get("host") or ""): row for row in snapshot}
+        event = rows.get(str(event_host or ""), {})
+        if (
+            event_host == "statsapi.mlb.com"
+            and str(event.get("last_path") or "") == "/api/v1/schedule"
+        ):
+            _source_health_slots[session_id] = _st.sidebar.empty()
+        slot = _source_health_slots.get(session_id)
+        if slot is None:
+            return
+        with slot.container():
+            _original_markdown("#### SOURCE HEALTH")
+            for host in ("statsapi.mlb.com", "api.open-meteo.com"):
+                row = rows.get(host, {})
+                service = str(row.get("service") or host)
+                status = str(row.get("status") or "NOT CHECKED")
+                checked = _source_health_checked_text(row)
+                _st.caption(f"{service}: {status} · {checked}")
+
+    _set_source_health_observer(_render_source_health)
 
     def _pitcher_hand(pitcher_id):
         try:
             response = _original_requests_get(
                 f"https://statsapi.mlb.com/api/v1/people/{int(pitcher_id)}",
                 timeout=10,
-                headers={"Accept": "application/json", "User-Agent": "StrikeOutKing9000/3.5"},
+                headers={"Accept":"application/json","User-Agent":"StrikeOutKing9000/3.5"},
             )
             response.raise_for_status()
             person = (response.json().get("people") or [{}])[0]
