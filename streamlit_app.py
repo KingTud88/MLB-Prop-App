@@ -516,16 +516,23 @@ def parse_ip(v):
         whole,frac=str(v).split("."); return int(whole)+int(frac)/3
     except Exception: return 0.0
 
-@st.cache_data(ttl=1800,show_spinner=False)
+_GAME_LOG_CACHE={}
+_GAME_LOG_CACHE_TTL_SECONDS=1800
+
 def get_log(pid,season):
+    key=(int(pid),int(season)); now=datetime.now(EASTERN).timestamp(); cached=_GAME_LOG_CACHE.get(key)
+    if cached is not None and now-float(cached[0]) < _GAME_LOG_CACHE_TTL_SECONDS:
+        return cached[1].copy(),cached[2]
     try:p=MLBClient().get(f"people/{pid}/stats",{"stats":"gameLog","group":"pitching","season":season,"gameType":"R"})
-    except Exception as e:return pd.DataFrame(),str(e)
+    except Exception as e:
+        result=(pd.DataFrame(),str(e)); _GAME_LOG_CACHE[key]=(now,result[0].copy(),result[1]); return result
     rec=[]
     for sb in p.get("stats",[]):
         for sp in sb.get("splits",[]):
             s=sp.get("stat",{}); bf=float(s.get("battersFaced",0) or 0)
             rec.append({"date":pd.to_datetime(sp.get("date"),errors="coerce"),"opponent":sp.get("opponent",{}).get("name",""),"bf":bf,"k":float(s.get("strikeOuts",0) or 0),"hits":float(s.get("hits",0) or 0),"pitches":float(s.get("numberOfPitches",0) or 0),"outs":parse_ip(s.get("inningsPitched","0.0"))*3,"games_started":int(float(s.get("gamesStarted",0) or 0))})
-    df=pd.DataFrame(rec); starts=starter_only(df); return (starts,None) if not starts.empty else (starts,"No regular-season starter game log returned.")
+    df=pd.DataFrame(rec); starts=starter_only(df); result=(starts,None) if not starts.empty else (starts,"No regular-season starter game log returned.")
+    _GAME_LOG_CACHE[key]=(now,result[0].copy(),result[1]); return result[0].copy(),result[1]
 
 def weighted(s,half,fallback):
     x=pd.to_numeric(s,errors="coerce").dropna().to_numpy(float)
