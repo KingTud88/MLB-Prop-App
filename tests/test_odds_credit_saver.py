@@ -16,7 +16,11 @@ def test_projection_page_reads_saved_k_odds_without_paid_api_call():
     assert 'LOAD LIVE ODDS · ≤3 credits' not in source
     assert 'odds_events,odds_err=get_odds_events()' not in source
     assert 'api.the-odds-api.com' not in source
-    assert 'No current automated sportsbook line has been captured' in source
+    assert 'Central SportsGameOdds snapshot' in source
+    assert 'scheduled capture distributes one saved slate snapshot to every page' in source
+    assert 'fetch_live_pitcher_market_odds' not in source
+    assert 'resolve_sgo_api_key' not in source
+    assert 'api.the-odds-api.com' not in source
 
 
 def test_daily_projection_page_has_no_visible_legacy_paid_k_controls():

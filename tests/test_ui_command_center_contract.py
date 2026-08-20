@@ -32,7 +32,8 @@ def test_main_projection_uses_v7_components_without_removing_model_flow():
     assert "calculate_projection(" in source
     assert "load_pitcher_market_odds" in source
     assert "api.the-odds-api.com" not in source
-    assert "No current automated sportsbook line has been captured" in source
+    assert "Central SportsGameOdds snapshot" in source
+    assert "fetch_live_pitcher_market_odds" not in source
 
 
 def test_main_projection_lower_command_center_is_presentation_only():
@@ -41,7 +42,9 @@ def test_main_projection_lower_command_center_is_presentation_only():
     assert 'key="cc_bet_action_panel"' in source
     assert 'key="cc_market_command_row"' in source
     assert 'key="cc_parlay_panel"' in source
-    assert "BET TRACKER / PARLAY ACTIONS" in source
+    assert "BET ACTIONS" in source
+    assert "BET TRACKER / PARLAY ACTIONS" not in source
+    assert "@st.fragment" in source
     assert "PROJECTION PARLAY BUILDER" in source
     assert ".st-key-cc_bet_action_panel" in theme
     assert ".st-key-cc_market_command_row" in theme
@@ -52,7 +55,8 @@ def test_main_projection_lower_command_center_is_presentation_only():
     assert "build_market_table(proj,odds_rows,hits_proj)" in source
     assert "render_projection_parlay_builder()" in source
     assert "api.the-odds-api.com" not in source
-    assert "No current automated sportsbook line has been captured" in source
+    assert "Central SportsGameOdds snapshot" in source
+    assert "fetch_live_pitcher_market_odds" not in source
 
 
 def test_brand_pass_adds_team_marks_and_projection_icon_bubbles():
@@ -67,7 +71,8 @@ def test_brand_pass_adds_team_marks_and_projection_icon_bubbles():
     assert ".cc-team-logo" in theme
     assert "calculate_projection(" in source
     assert "api.the-odds-api.com" not in source
-    assert "No current automated sportsbook line has been captured" in source
+    assert "Central SportsGameOdds snapshot" in source
+    assert "fetch_live_pitcher_market_odds" not in source
 
 
 def test_v8_final_polish_locks_approved_header_tabs_and_lean_highlights():

@@ -40,15 +40,19 @@ def test_top_plays_is_model_first_and_odds_are_optional_overlay():
     assert 'st.subheader("Today\'s five highest-probability model legs")' not in source
 
 
-def test_projection_page_has_unpriced_straight_and_parlay_actions():
+def test_projection_page_has_fragment_scoped_labeled_bet_actions():
     path = Path(__file__).resolve().parents[1] / "streamlit_app.py"
     source = path.read_text(encoding="utf-8")
     compile(source, str(path), "exec")
-    assert "render_add_bet_button" in source
-    assert 'button("➕ Straight"' in source
-    assert 'button("🎟️ Parlay"' in source
+    assert "@st.fragment" in source
+    assert "def render_projection_betting_workspace(" in source
+    assert "BET ACTIONS" in source
+    assert "BET TRACKER / PARLAY ACTIONS" not in source
+    assert 'f"➕ Straight · {bet_label}"' in source
+    assert 'f"🎟️ Parlay · {bet_label}"' in source
     assert 'tradable=side in {"OVER","UNDER"} and not no_line' in source
     assert "disabled=not tradable" in source
+    assert 'st.rerun(scope="fragment")' in source
     assert "render_projection_parlay_builder" in source
     assert "make_parlay_record" in source
     assert "Projection Page Model Parlay" in source
@@ -68,17 +72,17 @@ def test_projection_bet_leans_require_real_lines_and_manual_editor_is_gone():
 
 
 
-def test_projection_strikeout_ladder_is_clickable_and_actionable():
+def test_projection_strikeout_ladder_is_fragment_scoped_and_explicitly_labeled():
     source = (Path(__file__).resolve().parents[1] / "streamlit_app.py").read_text(encoding="utf-8")
-    assert 'key=f"projection_k_ladder_{game.key}"' in source
+    fragment_pos=source.index("def render_projection_betting_workspace(")
+    ladder_pos=source.index('key=f"projection_k_ladder_{game.key}"')
+    builder_pos=source.index("render_projection_parlay_builder()",ladder_pos)
+    assert fragment_pos < ladder_pos < builder_pos
     assert 'selection_mode="single-row"' in source
-    assert '"➕ Add selected as straight"' in source
-    assert '"🎟️ Add selected to parlay"' in source
+    assert 'f"➕ Straight · {milestone}+ K"' in source
+    assert 'f"🎟️ Parlay · {milestone}+ K"' in source
     assert 'tracker_line=float(milestone)-0.5' in source
-    assert "Fair Odds are model-only and are never saved as a sportsbook price" in source
-    ladder_pos = source.index('key=f"projection_k_ladder_{game.key}"')
-    builder_pos = source.rindex("render_projection_parlay_builder()")
-    assert ladder_pos < builder_pos
+    assert "Fair Odds are never saved as sportsbook prices" in source
     assert "kdf=ladder(proj,12)" in source
     assert "3+ through 12+" in source
 

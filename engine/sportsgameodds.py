@@ -428,6 +428,28 @@ def apply_selected_lines_to_projection_log(
     return work, applied
 
 
+def _market_odds_rows(rows: pd.DataFrame) -> list[dict[str, object]]:
+    if rows.empty:
+        return []
+    work = rows.copy()
+    work["point"] = pd.to_numeric(work["point"], errors="coerce")
+    work["price"] = pd.to_numeric(work["price"], errors="coerce")
+    work = work.loc[work["point"].notna() & work["price"].notna()]
+    return [
+        {
+            "book": row.get("book", ""),
+            "market": row.get("market", ""),
+            "name": row.get("side", ""),
+            "point": float(row.get("point")),
+            "price": float(row.get("price")),
+            "provider": str(row.get("provider") or PROVIDER),
+            "bookmaker_id": row.get("bookmaker_id", ""),
+            "fetched_at_utc": row.get("fetched_at_utc", ""),
+        }
+        for _, row in work.iterrows()
+    ]
+
+
 def load_pitcher_market_odds(
     pitcher_name: str,
     slate_date: str,
@@ -449,19 +471,4 @@ def load_pitcher_market_odds(
     now = pd.Timestamp(now_utc or datetime.now(timezone.utc))
     if pd.isna(newest) or now - newest > MAX_SNAPSHOT_AGE:
         return []
-    rows["point"] = pd.to_numeric(rows["point"], errors="coerce")
-    rows["price"] = pd.to_numeric(rows["price"], errors="coerce")
-    rows = rows.loc[rows["point"].notna() & rows["price"].notna()]
-    return [
-        {
-            "book": row.get("book", ""),
-            "market": row.get("market", ""),
-            "name": row.get("side", ""),
-            "point": float(row.get("point")),
-            "price": float(row.get("price")),
-            "provider": PROVIDER,
-            "bookmaker_id": row.get("bookmaker_id", ""),
-            "fetched_at_utc": row.get("fetched_at_utc", ""),
-        }
-        for _, row in rows.iterrows()
-    ]
+    return _market_odds_rows(rows)
