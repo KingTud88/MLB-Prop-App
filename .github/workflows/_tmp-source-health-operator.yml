@@ -1,0 +1,336 @@
+name: Temporary Source Health Operator Patch
+
+on:
+  push:
+    branches: [polish/source-health-operator]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-validate:
+    if: github.event.head_commit.message != 'Add source-health operator display'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest
+
+      - name: Apply observability-only source-health patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          runtime = Path("runtime_http.py")
+          source = runtime.read_text(encoding="utf-8")
+          source = source.replace(
+              "import logging\nimport time\n",
+              "import logging\nimport time\nfrom datetime import datetime, timezone\nfrom threading import RLock\n",
+              1,
+          )
+          anchor = "BACKOFF_SECONDS = (0.20, 0.40)\n\n\n@dataclass(frozen=True)\nclass ServiceFailure:"
+          replacement = '''BACKOFF_SECONDS = (0.20, 0.40)
+
+_SOURCE_HEALTH_LOCK = RLock()
+_SOURCE_HEALTH = {
+    host: {
+        "service": service,
+        "host": host,
+        "status": "NOT CHECKED",
+        "last_attempt_at_utc": None,
+        "last_success_at_utc": None,
+        "last_failure_at_utc": None,
+    }
+    for host, service in TRACKED_SERVICES.items()
+}
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _record_attempt(host: str) -> None:
+    with _SOURCE_HEALTH_LOCK:
+        if host in _SOURCE_HEALTH:
+            _SOURCE_HEALTH[host]["last_attempt_at_utc"] = _utc_now()
+
+
+def _record_success(host: str) -> None:
+    now = _utc_now()
+    with _SOURCE_HEALTH_LOCK:
+        if host in _SOURCE_HEALTH:
+            _SOURCE_HEALTH[host]["status"] = "OK"
+            _SOURCE_HEALTH[host]["last_success_at_utc"] = now
+
+
+def _record_failure(host: str) -> None:
+    now = _utc_now()
+    with _SOURCE_HEALTH_LOCK:
+        if host in _SOURCE_HEALTH:
+            _SOURCE_HEALTH[host]["status"] = "ERROR"
+            _SOURCE_HEALTH[host]["last_failure_at_utc"] = now
+
+
+def source_health_snapshot() -> list[dict[str, str | None]]:
+    """Return a defensive, operator-only snapshot of tracked source health."""
+    with _SOURCE_HEALTH_LOCK:
+        return [dict(_SOURCE_HEALTH[host]) for host in TRACKED_SERVICES]
+
+
+def _reset_source_health_for_tests() -> None:
+    """Reset in-memory telemetry without changing request behavior."""
+    with _SOURCE_HEALTH_LOCK:
+        for host, service in TRACKED_SERVICES.items():
+            _SOURCE_HEALTH[host] = {
+                "service": service,
+                "host": host,
+                "status": "NOT CHECKED",
+                "last_attempt_at_utc": None,
+                "last_success_at_utc": None,
+                "last_failure_at_utc": None,
+            }
+
+
+@dataclass(frozen=True)
+class ServiceFailure:'''
+          if source.count(anchor) != 1:
+              raise SystemExit(f"runtime health anchor count={source.count(anchor)}")
+          source = source.replace(anchor, replacement, 1)
+
+          failure_anchor = '''    LOGGER.warning(
+        "%s request failed host=%s method=%s status=%s detail=%s",'''
+          failure_replacement = '''    _record_failure(host)
+    LOGGER.warning(
+        "%s request failed host=%s method=%s status=%s detail=%s",'''
+          if source.count(failure_anchor) != 1:
+              raise SystemExit(f"failure anchor count={source.count(failure_anchor)}")
+          source = source.replace(failure_anchor, failure_replacement, 1)
+
+          tracked_anchor = '''    host, service = tracked
+    last_exception: BaseException | None = None
+
+    for attempt in range(MAX_ATTEMPTS):'''
+          tracked_replacement = '''    host, service = tracked
+    last_exception: BaseException | None = None
+    _record_attempt(host)
+
+    for attempt in range(MAX_ATTEMPTS):'''
+          if source.count(tracked_anchor) != 1:
+              raise SystemExit(f"tracked anchor count={source.count(tracked_anchor)}")
+          source = source.replace(tracked_anchor, tracked_replacement, 1)
+
+          success_anchor = '''        except ValueError as exc:
+            _raise_safe_failure(
+                service=service,
+                host=host,
+                method=method,
+                status_code=status or None,
+                detail=f"Invalid JSON: {exc}",
+                cause=exc,
+            )
+        return response
+'''
+          success_replacement = '''        except ValueError as exc:
+            _raise_safe_failure(
+                service=service,
+                host=host,
+                method=method,
+                status_code=status or None,
+                detail=f"Invalid JSON: {exc}",
+                cause=exc,
+            )
+        _record_success(host)
+        return response
+'''
+          if source.count(success_anchor) != 1:
+              raise SystemExit(f"success anchor count={source.count(success_anchor)}")
+          source = source.replace(success_anchor, success_replacement, 1)
+          runtime.write_text(source, encoding="utf-8")
+
+          runtime_tests = Path("tests/test_runtime_http.py")
+          tests = runtime_tests.read_text(encoding="utf-8")
+          import_anchor = '''from runtime_http import (
+    BACKOFF_SECONDS,
+    ExternalServiceError,
+    MAX_ATTEMPTS,
+    request_with_resilience,
+)'''
+          import_replacement = '''from runtime_http import (
+    BACKOFF_SECONDS,
+    ExternalServiceError,
+    MAX_ATTEMPTS,
+    _reset_source_health_for_tests,
+    request_with_resilience,
+    source_health_snapshot,
+)'''
+          if tests.count(import_anchor) != 1:
+              raise SystemExit(f"runtime test import anchor count={tests.count(import_anchor)}")
+          tests = tests.replace(import_anchor, import_replacement, 1)
+          test_name = "test_source_health_snapshot_is_observability_only_and_defensive"
+          if test_name not in tests:
+              tests += '''
+
+
+def test_source_health_snapshot_is_observability_only_and_defensive():
+    _reset_source_health_for_tests()
+    initial = source_health_snapshot()
+    assert [(row["service"], row["status"]) for row in initial] == [
+        ("MLB data", "NOT CHECKED"),
+        ("Weather data", "NOT CHECKED"),
+    ]
+    initial[0]["status"] = "MUTATED"
+    assert source_health_snapshot()[0]["status"] == "NOT CHECKED"
+
+    request_func, _ = scripted(FakeResponse(200, {"dates": []}))
+    request_with_resilience(
+        requests.Session(),
+        "GET",
+        "https://statsapi.mlb.com/api/v1/schedule",
+        request_func=request_func,
+        sleep=lambda _: None,
+    )
+    snapshot = source_health_snapshot()
+    assert snapshot[0]["status"] == "OK"
+    assert snapshot[0]["last_attempt_at_utc"]
+    assert snapshot[0]["last_success_at_utc"]
+    assert snapshot[0]["last_failure_at_utc"] is None
+    assert snapshot[1]["status"] == "NOT CHECKED"
+
+
+def test_source_health_records_final_failure_without_changing_safe_error():
+    _reset_source_health_for_tests()
+    request_func, _ = scripted(
+        requests.ConnectionError("private one"),
+        requests.ConnectionError("private two"),
+        requests.ConnectionError("private three"),
+    )
+    with pytest.raises(ExternalServiceError) as exc_info:
+        request_with_resilience(
+            requests.Session(),
+            "GET",
+            "https://api.open-meteo.com/v1/forecast",
+            request_func=request_func,
+            sleep=lambda _: None,
+        )
+    assert str(exc_info.value) == "Weather data temporarily unavailable. Please try again."
+    snapshot = source_health_snapshot()
+    assert snapshot[0]["status"] == "NOT CHECKED"
+    assert snapshot[1]["status"] == "ERROR"
+    assert snapshot[1]["last_attempt_at_utc"]
+    assert snapshot[1]["last_failure_at_utc"]
+    assert snapshot[1]["last_success_at_utc"] is None
+
+
+def test_untracked_requests_do_not_create_source_health_rows():
+    _reset_source_health_for_tests()
+    before = source_health_snapshot()
+    request_func, _ = scripted(FakeResponse(200, {"ok": True}))
+    request_with_resilience(
+        requests.Session(),
+        "GET",
+        "https://example.com/api",
+        request_func=request_func,
+        sleep=lambda _: None,
+    )
+    assert source_health_snapshot() == before
+'''
+          runtime_tests.write_text(tests, encoding="utf-8")
+
+          app = Path("streamlit_app.py")
+          app_source = app.read_text(encoding="utf-8")
+          import_anchor = "import streamlit as st\n\nfrom engine.ui_theme import apply_page_theme"
+          import_replacement = "import streamlit as st\n\nfrom runtime_http import source_health_snapshot\nfrom engine.ui_theme import apply_page_theme"
+          if app_source.count(import_anchor) != 1:
+              raise SystemExit(f"app import anchor count={app_source.count(import_anchor)}")
+          app_source = app_source.replace(import_anchor, import_replacement, 1)
+
+          sidebar_anchor = '''with st.sidebar:
+    render_sidebar_brand()
+    _nav_options='''
+          sidebar_replacement = '''def render_source_health(slot) -> None:
+    rows = source_health_snapshot()
+    with slot.container():
+        st.markdown("### SOURCE HEALTH")
+        for row in rows:
+            checked = row.get("last_attempt_at_utc") or "not checked"
+            if checked != "not checked":
+                checked = str(checked).replace("T", " ").replace("Z", " UTC")
+            st.caption(f"{row['service']}: {row['status']} · {checked}")
+
+
+with st.sidebar:
+    render_sidebar_brand()
+    _nav_options='''
+          if app_source.count(sidebar_anchor) != 1:
+              raise SystemExit(f"sidebar anchor count={app_source.count(sidebar_anchor)}")
+          app_source = app_source.replace(sidebar_anchor, sidebar_replacement, 1)
+
+          slot_anchor = '''    st.divider(); selected_date=st.date_input("Slate date",value=datetime.now(EASTERN).date()); st.markdown("### PITCHER")
+    locked_key=st.session_state.get("locked_pitcher"); st.caption("Select a probable starter, then lock the projection 🔒")
+
+schedule,err=get_schedule(selected_date.isoformat())
+if err:'''
+          slot_replacement = '''    st.divider(); selected_date=st.date_input("Slate date",value=datetime.now(EASTERN).date()); st.markdown("### PITCHER")
+    locked_key=st.session_state.get("locked_pitcher"); st.caption("Select a probable starter, then lock the projection 🔒")
+    st.divider()
+    source_health_slot=st.empty()
+    render_source_health(source_health_slot)
+
+schedule,err=get_schedule(selected_date.isoformat())
+render_source_health(source_health_slot)
+if err:'''
+          if app_source.count(slot_anchor) != 1:
+              raise SystemExit(f"slot anchor count={app_source.count(slot_anchor)}")
+          app_source = app_source.replace(slot_anchor, slot_replacement, 1)
+
+          weather_anchor = '''weather_risk=get_game_weather(game.venue_id,game.game_time,game.venue_latitude,game.venue_longitude)
+if not weather_risk.available:'''
+          weather_replacement = '''weather_risk=get_game_weather(game.venue_id,game.game_time,game.venue_latitude,game.venue_longitude)
+render_source_health(source_health_slot)
+if not weather_risk.available:'''
+          if app_source.count(weather_anchor) != 1:
+              raise SystemExit(f"weather anchor count={app_source.count(weather_anchor)}")
+          app_source = app_source.replace(weather_anchor, weather_replacement, 1)
+          app.write_text(app_source, encoding="utf-8")
+
+          app_tests = Path("tests/test_app_contract.py")
+          app_test_source = app_tests.read_text(encoding="utf-8")
+          app_test_name = "test_source_health_operator_display_is_informational_only"
+          if app_test_name not in app_test_source:
+              app_test_source += '''
+
+
+def test_source_health_operator_display_is_informational_only():
+    source = APP.read_text(encoding="utf-8")
+    assert "from runtime_http import source_health_snapshot" in source
+    assert 'st.markdown("### SOURCE HEALTH")' in source
+    assert "source_health_slot=st.empty()" in source
+    assert "schedule,err=get_schedule(selected_date.isoformat())\\nrender_source_health(source_health_slot)" in source
+    assert "weather_risk=get_game_weather(game.venue_id,game.game_time,game.venue_latitude,game.venue_longitude)\\nrender_source_health(source_health_slot)" in source
+'''
+          app_tests.write_text(app_test_source, encoding="utf-8")
+          PY
+
+      - name: Targeted validation
+        run: |
+          python -m compileall -q runtime_http.py streamlit_app.py
+          pytest -q tests/test_runtime_http.py tests/test_app_contract.py
+
+      - name: Remove temporary scaffolding and persist only telemetry/UI/tests
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -- .github/workflows/_tmp-source-health-operator.yml
+          git add -- runtime_http.py streamlit_app.py tests/test_runtime_http.py tests/test_app_contract.py
+          git diff --cached --check
+          git commit -m "Add source-health operator display"
+          git push origin HEAD:polish/source-health-operator
