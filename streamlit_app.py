@@ -347,28 +347,28 @@ h1,h2,h3{letter-spacing:-.02em}
     }
 }
 
-/* PROJECTION_EMBLEM_RECOVERY_V13 · reliable individual approved assets, larger footprint */
-.metric-card,.reco-card{padding-right:142px!important}
+/* PROJECTION_EMBLEM_HIGHRES_V14 · 256px delivery assets from approved source sprite */
+.metric-card,.reco-card{padding-right:146px!important}
 .metric-card .cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{
     right:8px!important;
     top:36px!important;
-    width:120px!important;
-    height:120px!important;
-    min-width:120px!important;
-    flex:0 0 120px!important;
-    background-size:116px 116px!important;
+    width:124px!important;
+    height:124px!important;
+    min-width:124px!important;
+    flex:0 0 124px!important;
+    background-size:120px 120px!important;
     background-repeat:no-repeat!important;
     background-position:center!important;
     image-rendering:auto!important;
     filter:drop-shadow(0 1px 1px rgba(0,0,0,.22))!important;
     transform:translateZ(0)!important;
 }
-.metric-card .cc-emblem.whiff{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_k.webp?v=13")!important}
-.reco-card .cc-emblem.whiff{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_k_plus.webp?v=13")!important}
-.metric-card .cc-emblem.glove{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_outs.webp?v=13")!important}
-.reco-card .cc-emblem.glove{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_outs_plus.webp?v=13")!important}
-.metric-card .cc-emblem.contact{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_hits.webp?v=13")!important}
-.reco-card .cc-emblem.contact{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_hits_plus.webp?v=13")!important}
+.metric-card .cc-emblem.whiff{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_k.webp?v=14")!important}
+.reco-card .cc-emblem.whiff{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_k_plus.webp?v=14")!important}
+.metric-card .cc-emblem.glove{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_outs.webp?v=14")!important}
+.reco-card .cc-emblem.glove{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_outs_plus.webp?v=14")!important}
+.metric-card .cc-emblem.contact{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_hits.webp?v=14")!important}
+.reco-card .cc-emblem.contact{background-image:url("https://raw.githubusercontent.com/KingTud88/MLB-Prop-App/main/assets/projection_hits_plus.webp?v=14")!important}
 @media (max-width:900px){
     .metric-card,.reco-card{padding-right:120px!important}
     .metric-card .cc-card-icon.cc-emblem,.reco-card .cc-card-icon.cc-emblem{
