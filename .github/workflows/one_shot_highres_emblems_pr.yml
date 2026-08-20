@@ -21,14 +21,23 @@ jobs:
           python-version: '3.12'
       - name: Install Pillow and pytest
         run: pip install pillow pytest
-      - name: Split master into six true 128px assets
+      - name: Decode master and split six true 128px assets
         run: |
           python - <<'PY'
           from pathlib import Path
           from PIL import Image
+          import base64
+          import io
 
           assets = Path('assets')
-          master = Image.open(assets / 'projection_summary_emblems_v2.webp').convert('RGBA')
+          master_path = assets / 'projection_summary_emblems_v2.webp'
+          raw = master_path.read_bytes().strip()
+          try:
+              master = Image.open(io.BytesIO(raw)).convert('RGBA')
+          except Exception:
+              decoded = base64.b64decode(raw)
+              master = Image.open(io.BytesIO(decoded)).convert('RGBA')
+
           assert master.size == (768, 128), master.size
 
           names = [
@@ -39,7 +48,9 @@ jobs:
           for i, name in enumerate(names):
               tile = master.crop((i * 128, 0, (i + 1) * 128, 128))
               tile.save(assets / name, format='WEBP', lossless=True, method=6)
-              assert Image.open(assets / name).size == (128, 128)
+              check = Image.open(assets / name)
+              assert check.size == (128, 128), (name, check.size)
+              print(name, check.size, (assets / name).stat().st_size)
 
           app = Path('streamlit_app.py')
           text = app.read_text(encoding='utf-8')
@@ -59,9 +70,9 @@ jobs:
         run: |
           python -m compileall -q streamlit_app.py engine tests
           pytest -q tests/test_info_emblem_polish.py tests/test_projection_emblem_assets.py
-      - name: Commit generated assets and delete temporary workflows
+      - name: Commit generated assets and delete temporary workflow
         run: |
-          rm -f .github/workflows/one_shot_highres_emblems.yml .github/workflows/one_shot_highres_emblems_pr.yml
+          rm -f .github/workflows/one_shot_highres_emblems_pr.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add assets/projection_k.webp assets/projection_k_plus.webp assets/projection_outs.webp assets/projection_outs_plus.webp assets/projection_hits.webp assets/projection_hits_plus.webp streamlit_app.py tests/test_info_emblem_polish.py tests/test_projection_emblem_assets.py .github/workflows
