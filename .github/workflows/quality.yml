@@ -4,76 +4,14 @@ on:
   push:
   pull_request:
 
-permissions:
-  contents: write
-
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
-      - name: Apply branch-only get_log cache replay repair
-        if: github.event_name == 'pull_request' && github.head_ref == 'fix/streamlit-get-log-cache-replay'
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path("streamlit_app.py")
-          source = path.read_text(encoding="utf-8")
-          old = '''@st.cache_data(ttl=1800,show_spinner=False)
-          def get_log(pid,season):
-              try:p=MLBClient().get(f"people/{pid}/stats",{"stats":"gameLog","group":"pitching","season":season,"gameType":"R"})
-              except Exception as e:return pd.DataFrame(),str(e)
-              rec=[]
-              for sb in p.get("stats",[]):
-                  for sp in sb.get("splits",[]):
-                      s=sp.get("stat",{}); bf=float(s.get("battersFaced",0) or 0)
-                      rec.append({"date":pd.to_datetime(sp.get("date"),errors="coerce"),"opponent":sp.get("opponent",{}).get("name",""),"bf":bf,"k":float(s.get("strikeOuts",0) or 0),"hits":float(s.get("hits",0) or 0),"pitches":float(s.get("numberOfPitches",0) or 0),"outs":parse_ip(s.get("inningsPitched","0.0"))*3,"games_started":int(float(s.get("gamesStarted",0) or 0))})
-              df=pd.DataFrame(rec); starts=starter_only(df); return (starts,None) if not starts.empty else (starts,"No regular-season starter game log returned.")
-          '''
-          new = '''_GAME_LOG_CACHE={}
-          _GAME_LOG_CACHE_TTL_SECONDS=1800
-
-          def get_log(pid,season):
-              key=(int(pid),int(season)); now=datetime.now(EASTERN).timestamp(); cached=_GAME_LOG_CACHE.get(key)
-              if cached is not None and now-float(cached[0]) < _GAME_LOG_CACHE_TTL_SECONDS:
-                  return cached[1].copy(),cached[2]
-              try:p=MLBClient().get(f"people/{pid}/stats",{"stats":"gameLog","group":"pitching","season":season,"gameType":"R"})
-              except Exception as e:
-                  result=(pd.DataFrame(),str(e)); _GAME_LOG_CACHE[key]=(now,result[0].copy(),result[1]); return result
-              rec=[]
-              for sb in p.get("stats",[]):
-                  for sp in sb.get("splits",[]):
-                      s=sp.get("stat",{}); bf=float(s.get("battersFaced",0) or 0)
-                      rec.append({"date":pd.to_datetime(sp.get("date"),errors="coerce"),"opponent":sp.get("opponent",{}).get("name",""),"bf":bf,"k":float(s.get("strikeOuts",0) or 0),"hits":float(s.get("hits",0) or 0),"pitches":float(s.get("numberOfPitches",0) or 0),"outs":parse_ip(s.get("inningsPitched","0.0"))*3,"games_started":int(float(s.get("gamesStarted",0) or 0))})
-              df=pd.DataFrame(rec); starts=starter_only(df); result=(starts,None) if not starts.empty else (starts,"No regular-season starter game log returned.")
-              _GAME_LOG_CACHE[key]=(now,result[0].copy(),result[1]); return result[0].copy(),result[1]
-          '''
-          if old in source:
-              path.write_text(source.replace(old, new, 1), encoding="utf-8")
-          elif new not in source:
-              raise SystemExit("expected get_log cache block not found; refusing broad rewrite")
-
-          test_path = Path("tests/test_get_log_cache_replay_contract.py")
-          test_path.write_text('''from __future__ import annotations\n\nimport ast\nfrom pathlib import Path\n\n\ndef _get_log_node():\n    source=Path("streamlit_app.py").read_text(encoding="utf-8")\n    tree=ast.parse(source)\n    return source,next(node for node in tree.body if isinstance(node,ast.FunctionDef) and node.name=="get_log")\n\n\ndef test_get_log_does_not_use_streamlit_cache_replay():\n    source,node=_get_log_node()\n    assert not node.decorator_list\n    calls=[ast.unparse(call.func) for call in ast.walk(node) if isinstance(call,ast.Call)]\n    assert not any(name.startswith("st.") for name in calls)\n    assert "_GAME_LOG_CACHE_TTL_SECONDS=1800" in source\n\n\ndef test_get_log_process_cache_returns_dataframe_copies():\n    source,_=_get_log_node()\n    assert "_GAME_LOG_CACHE.get(key)" in source\n    assert "return cached[1].copy(),cached[2]" in source\n    assert "_GAME_LOG_CACHE[key]=(now,result[0].copy(),result[1])" in source\n''', encoding="utf-8")
-          PY
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt pytest
       - run: python -m compileall -q streamlit_app.py navigation.py engine automation tests
       - run: pytest -q --durations=20
-      - name: Commit validated generated repair
-        if: github.event_name == 'pull_request' && github.head_ref == 'fix/streamlit-get-log-cache-replay'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add streamlit_app.py tests/test_get_log_cache_replay_contract.py
-          if git diff --cached --quiet; then
-            echo "No generated cache-replay repair changes to commit."
-          else
-            git commit -m "Fix Streamlit game-log cache replay crash"
-            git push origin HEAD:fix/streamlit-get-log-cache-replay
-          fi
