@@ -9,7 +9,7 @@ same_day_training_excluded,True
 unit_of_analysis,unique pitcher-game start
 capture_selection,latest valid capture at or before game_time
 post_first_pitch_rows_excluded,True
-history_semantics_required,starter-history-v2-mlb-observations
+history_semantics_required,starter-only-v1
 minimum_prior_resolved_starts,30
 residual_definition,actual_strikeouts - projection
 residual_estimator,expanding mean
