@@ -108,6 +108,11 @@ fi
 
 git commit -m "Automate projection capture and game resolution: refresh research context readiness"
 
+if [ "${RESEARCH_CONTEXT_NO_PUSH:-0}" = "1" ]; then
+  echo "Research context committed locally; caller owns final push."
+  exit 0
+fi
+
 for attempt in 1 2 3; do
   git fetch origin main
   if git rebase origin/main; then

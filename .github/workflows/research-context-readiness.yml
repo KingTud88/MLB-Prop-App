@@ -36,13 +36,26 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
 
+      - name: Check whether primary resolver already refreshed research context
+        id: primary-refresh
+        run: |
+          if git log origin/main --since="90 minutes ago" --format="%s" --grep="^Automate projection capture and game resolution: refresh research context readiness$" -1 | grep -q .; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Recent primary resolver research refresh found; skipping redundant fallback push."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up Python
+        if: steps.primary-refresh.outputs.skip != 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install dependencies
+        if: steps.primary-refresh.outputs.skip != 'true'
         run: pip install -r requirements.txt pytest
 
       - name: Refresh and persist report-only research context
+        if: steps.primary-refresh.outputs.skip != 'true'
         run: bash automation/research_context_readiness.sh
