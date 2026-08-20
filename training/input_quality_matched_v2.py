@@ -86,13 +86,42 @@ def _role_bucket(frame: pd.DataFrame) -> pd.Series:
     return explicit.where(explicit.ne(""), fallback)
 
 
+def _latest_pregame_starts(frame: pd.DataFrame) -> pd.DataFrame:
+    """Keep one latest valid pregame capture per pitcher-game.
+
+    Repeated automated captures must not make one MLB start count multiple times.
+    Missing/invalid timing or captures after first pitch fail closed for v2.
+    """
+    if frame.empty:
+        return frame.copy()
+    work = frame.copy()
+    work["_captured_at"] = pd.to_datetime(work.get("captured_at_utc"), utc=True, errors="coerce")
+    work["_game_time"] = pd.to_datetime(work.get("game_time"), utc=True, errors="coerce")
+    work = work.loc[
+        work["_captured_at"].notna()
+        & work["_game_time"].notna()
+        & work["_captured_at"].le(work["_game_time"])
+    ].copy()
+    if work.empty:
+        return work
+
+    game_pk = _text(work, "game_pk")
+    pitcher_id = _text(work, "pitcher_id")
+    pitcher_name = _text(work, "player").str.lower()
+    pitcher_key = pitcher_id.where(pitcher_id.ne(""), pitcher_name)
+    fallback_game = work["_game_date"].dt.strftime("%Y-%m-%d") + "|" + pitcher_key
+    game_key = game_pk.where(game_pk.ne(""), fallback_game)
+    work["_start_key"] = game_key + "|" + pitcher_key
+    work = work.sort_values(["_start_key", "_captured_at"], kind="stable")
+    return work.drop_duplicates("_start_key", keep="last").reset_index(drop=True)
+
+
 def prepare_future_cohort(frame: pd.DataFrame) -> pd.DataFrame:
-    """Return only outcome-eligible, future OOS rows with pregame matching fields."""
+    """Return unique outcome-eligible future OOS starts with pregame matching fields."""
     if frame is None or frame.empty:
         return pd.DataFrame()
     work = frame.copy()
-    dates = pd.to_datetime(work.get("game_date"), errors="coerce").dt.normalize()
-    work["_game_date"] = dates
+    work["_game_date"] = pd.to_datetime(work.get("game_date"), errors="coerce").dt.normalize()
     work["_history"] = _num(work, "starter_history_games")
     work["_expected_outs"] = _num(work, "expected_outs")
     work["_opponent_k_pct"] = _num(work, "opponent_k_pct")
@@ -105,7 +134,10 @@ def prepare_future_cohort(frame: pd.DataFrame) -> pd.DataFrame:
         & work["_expected_outs"].notna()
         & work["_opponent_k_pct"].notna()
     ].copy()
-    return work.sort_values(["_game_date", "_pitcher_id", "_pitcher"], kind="stable")
+    work = _latest_pregame_starts(work)
+    if work.empty:
+        return work
+    return work.sort_values(["_game_date", "_pitcher_id", "_pitcher"], kind="stable").reset_index(drop=True)
 
 
 def _candidate_cost(shallow: pd.Series, deep: pd.Series, rule: MatchRule) -> float | None:
@@ -126,7 +158,6 @@ def _candidate_cost(shallow: pd.Series, deep: pd.Series, rule: MatchRule) -> flo
         same_name = str(shallow["_pitcher"]).lower() == str(deep["_pitcher"]).lower()
         if not (same_id or same_name):
             return None
-    # Normalize by frozen calipers; deterministic tie-breaking happens later.
     return (
         projection_diff / rule.projection_caliper
         + workload_diff / rule.workload_caliper
@@ -277,6 +308,9 @@ def preregistration_manifest() -> pd.DataFrame:
         ("audit_version", AUDIT_VERSION),
         ("production_authority", PRODUCTION_AUTHORITY),
         ("future_only_start", FUTURE_ONLY_START.date().isoformat()),
+        ("unit_of_analysis", "unique pitcher-game start"),
+        ("capture_selection", "latest valid capture at or before game_time"),
+        ("post_first_pitch_rows_excluded", True),
         ("shallow_history_definition", f"starter_history_games <= {SHALLOW_MAX_HISTORY}"),
         ("deep_history_definition", f"starter_history_games >= {DEEP_MIN_HISTORY}"),
         ("minimum_matched_pairs", MIN_MATCHED_PAIRS),
