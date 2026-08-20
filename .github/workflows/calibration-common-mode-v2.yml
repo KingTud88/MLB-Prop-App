@@ -1,0 +1,85 @@
+name: Calibration Common-Mode v2 Evidence
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - training/calibration_common_mode_v2.py
+      - tests/test_calibration_common_mode_v2.py
+      - data/projection_log.csv
+      - .github/workflows/calibration-common-mode-v2.yml
+  schedule:
+    - cron: "45 13 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: calibration-common-mode-v2
+  cancel-in-progress: false
+
+jobs:
+  report-only-evidence:
+    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'Refresh calibration common-mode v2 evidence')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Sync trigger snapshot to latest main
+        run: |
+          git fetch origin main
+          git rebase origin/main
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+
+      - name: Calibration v2 report-only contract
+        run: PYTHONPATH=. pytest -q tests/test_calibration_common_mode_v2.py
+
+      - name: Refresh preregistered common-mode v2 evidence
+        run: PYTHONPATH=. python -m training.calibration_common_mode_v2
+
+      - name: Commit report-only evidence
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- \
+            data/calibration_common_mode_v2_detail.csv \
+            data/calibration_common_mode_v2_summary.csv \
+            data/calibration_common_mode_v2_preregistration.csv
+          if git diff --cached --quiet; then
+            echo "No calibration common-mode v2 evidence changes to commit."
+            exit 0
+          fi
+          git commit -m "Refresh calibration common-mode v2 evidence"
+
+          for attempt in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main; then
+              if git push origin HEAD:main; then
+                break
+              fi
+            else
+              git rebase --abort || true
+              echo "Rebase conflict while updating calibration v2 evidence; refusing to overwrite main."
+              exit 1
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Calibration v2 evidence push failed after 3 attempts."
+              exit 1
+            fi
+            echo "Push race on attempt ${attempt}; retrying against latest main."
+            sleep $((attempt * 2))
+          done
