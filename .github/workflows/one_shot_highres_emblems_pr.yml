@@ -30,14 +30,22 @@ jobs:
           import io
 
           assets = Path('assets')
-          master_path = assets / 'projection_summary_emblems_v2.webp'
-          raw = master_path.read_bytes().strip()
-          try:
-              master = Image.open(io.BytesIO(raw)).convert('RGBA')
-          except Exception:
-              decoded = base64.b64decode(raw)
-              master = Image.open(io.BytesIO(decoded)).convert('RGBA')
+          payload = (assets / 'projection_summary_emblems_v2.webp').read_bytes().strip()
+          master = None
+          for depth in range(4):
+              try:
+                  candidate = Image.open(io.BytesIO(payload)).convert('RGBA')
+                  master = candidate
+                  print(f'Image decoded at layer {depth}:', candidate.size)
+                  break
+              except Exception:
+                  clean = b''.join(payload.split())
+                  clean += b'=' * (-len(clean) % 4)
+                  payload = base64.b64decode(clean, validate=False)
+                  print(f'Unwrapped base64 layer {depth + 1}: {len(payload)} bytes')
 
+          if master is None:
+              raise SystemExit('Could not decode Projection emblem master after 4 layers')
           assert master.size == (768, 128), master.size
 
           names = [
