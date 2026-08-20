@@ -453,7 +453,8 @@ def build_capture_records(
         existing_keys.add(key)
 
     if additions:
-        existing = pd.concat([existing, pd.DataFrame(additions)], ignore_index=True)
+        added = pd.DataFrame(additions)
+        existing = added if existing.empty else pd.concat([existing, added], ignore_index=True)
     for column in COLUMNS:
         if column not in existing.columns:
             existing[column] = np.nan

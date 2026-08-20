@@ -15,7 +15,7 @@ def _pool(days: int = 35) -> pd.DataFrame:
     rows = []
     game_pk = 1
     for i in range(days):
-        day = pd.Timestamp("2026-04-01") + pd.Timedelta(days=i)
+        day = pd.Timestamp("2026-04-01") + pd.Timedelta(i, unit="D")
         for team, pitcher_id, pitches, bf, outs in (
             ("AAA", 1001, 80.0, 20.0, 14.0),
             ("BBB", 2002, 100.0, 24.0, 18.0),

@@ -11,7 +11,7 @@ def _frame(days: int = 90) -> pd.DataFrame:
     rows = []
     start = pd.Timestamp("2026-04-01")
     for i in range(days):
-        date = start + pd.Timedelta(days=i)
+        date = start + pd.Timedelta(i, unit="D")
         opponent_k = 18.0 + (i % 12) * 0.8
         expected_bf = 18.0 + (i % 9) * 0.9
         actual = max(0.0, round(0.235 * expected_bf + (opponent_k - 22.0) * 0.08 + ((i % 5) - 2) * 0.25))

@@ -13,7 +13,7 @@ def _history(days=50):
     rows = []
     pk = 1000
     for i in range(days):
-        day = pd.Timestamp("2026-04-01") + pd.Timedelta(days=i)
+        day = pd.Timestamp("2026-04-01") + pd.Timedelta(i, unit="D")
         for team, pitches, bf, outs in (("AAA", 80.0, 20.0, 14.0), ("BBB", 100.0, 24.0, 18.0)):
             rows.append({
                 "game_pk": pk,
@@ -35,7 +35,7 @@ def _history(days=50):
 
 def test_small_team_sample_is_neutral_and_context_only():
     frame = _history(MIN_TEAM_STARTS - 1)
-    target = (pd.Timestamp("2026-04-01") + pd.Timedelta(days=MIN_TEAM_STARTS)).date().isoformat()
+    target = (pd.Timestamp("2026-04-01") + pd.Timedelta(MIN_TEAM_STARTS, unit="D")).date().isoformat()
     ctx = build_team_leash_context(frame, pd.DataFrame(), "AAA", target)
     assert ctx.status == "LEARNING"
     assert ctx.role == "CONTEXT_ONLY"

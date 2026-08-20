@@ -50,7 +50,7 @@ def test_same_day_and_future_starts_cannot_change_context() -> None:
     leaked = pd.concat([
         base,
         pd.DataFrame({
-            "date": [target, target + pd.Timedelta(days=5)],
+            "date": [target, target + pd.Timedelta(5, unit="D")],
             "games_started": [1, 1],
             "pitches": [110, 115],
             "bf": [30, 31],

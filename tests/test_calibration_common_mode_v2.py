@@ -49,7 +49,7 @@ def _prior_rows(n: int = MIN_PRIOR_RESOLVED_STARTS, residual: float = -1.0) -> l
     rows: list[dict[str, object]] = []
     start = pd.Timestamp("2026-07-01")
     for i in range(n):
-        day = start + pd.Timedelta(days=i)
+        day = start + pd.Timedelta(i, unit="D")
         projection = 6.0
         rows.append(
             _row(
