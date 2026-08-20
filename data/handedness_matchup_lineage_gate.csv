@@ -1,2 +1,2 @@
 Status,Total_Captures,Pregame_Captures,Distinct_Starts,Multi_State_Starts,Roster_To_Confirmed_Starts,Latest_Eligible_Starts,Latest_Ineligible_Starts,Stale_Fallback_Blocked_Starts,Reason,Recommended_Action,Report_Only,Production_Authority,Validation_Version
-CLEAN,143,143,77,66,66,77,0,0,Latest pregame handedness state is authoritative for each start; invalid later states cannot fall back to older roster evidence.,USE_EFFECTIVE_CONTEXT_FOR_HANDEDNESS_AUDIT,True,NONE,handedness-matchup-lineage-guard-v1-report-only
+CLEAN,144,144,77,67,67,77,0,0,Latest pregame handedness state is authoritative for each start; invalid later states cannot fall back to older roster evidence.,USE_EFFECTIVE_CONTEXT_FOR_HANDEDNESS_AUDIT,True,NONE,handedness-matchup-lineage-guard-v1-report-only
