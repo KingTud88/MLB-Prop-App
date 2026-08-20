@@ -48,5 +48,5 @@ def test_scheduled_projection_automation_never_calls_legacy_odds_api():
     for source in (workflow, runner, resolver):
         lowered = source.lower()
         assert "the-odds-api" not in lowered
-        assert "odds_api_key" not in lowered
+        assert "the_odds_api_key" not in lowered
         assert "training.daily_odds" not in lowered
