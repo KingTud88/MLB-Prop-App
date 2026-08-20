@@ -24,7 +24,7 @@ def _row(
     projection: float = 5.0,
     actual: float = 6.0,
 ) -> dict[str, object]:
-    game_time = pd.Timestamp("2026-06-01T23:00:00Z") + pd.Timedelta(days=day)
+    game_time = pd.Timestamp("2026-06-01T23:00:00Z") + pd.Timedelta(day, unit="D")
     return {
         "game_date": game_time.date().isoformat(),
         "game_pk": 100000 + day,
@@ -36,7 +36,7 @@ def _row(
         "umpire_id": umpire_id,
         "umpire_name": f"Ump {umpire_id}",
         "umpire_source": source,
-        "umpire_captured_at_utc": (game_time + pd.Timedelta(hours=capture_offset_hours)).isoformat(),
+        "umpire_captured_at_utc": (game_time + pd.Timedelta(capture_offset_hours, unit="h")).isoformat(),
         "umpire_prior_games": prior_games,
         "umpire_prior_bf": prior_games * 72,
         "umpire_candidate_status": status,
@@ -44,7 +44,7 @@ def _row(
         "umpire_k_factor_candidate": factor,
         "projection": projection,
         "actual_strikeouts": actual,
-        "resolved_at_utc": (game_time + pd.Timedelta(hours=resolved_offset_hours)).isoformat(),
+        "resolved_at_utc": (game_time + pd.Timedelta(resolved_offset_hours, unit="h")).isoformat(),
         "data_quality": 82,
         "starter_history_games": 12,
     }

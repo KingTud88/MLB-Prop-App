@@ -99,7 +99,12 @@ def resolved_starter_workloads(projections: pd.DataFrame, observations: pd.DataF
     """
     projected = _resolved_rows(projections, "PROJECTION")
     observed = _resolved_rows(observations if observations is not None else pd.DataFrame(), "OBSERVATION")
-    combined = pd.concat([projected, observed], ignore_index=True)
+    if projected.empty:
+        combined = observed.copy()
+    elif observed.empty:
+        combined = projected.copy()
+    else:
+        combined = pd.concat([projected, observed], ignore_index=True)
     if combined.empty:
         return combined
     combined["game_pk"] = pd.to_numeric(combined["game_pk"], errors="coerce")

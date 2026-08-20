@@ -35,8 +35,8 @@ def test_short_rest_conservatively_reduces_expected_exposure():
         dates=pd.date_range("2026-07-01", periods=6, freq="6D"),
     )
     last = pd.Timestamp(history["date"].iloc[-1])
-    short = build_workload_context(history, last + pd.Timedelta(days=4))
-    normal = build_workload_context(history, last + pd.Timedelta(days=6))
+    short = build_workload_context(history, last + pd.Timedelta(4, unit="D"))
+    normal = build_workload_context(history, last + pd.Timedelta(6, unit="D"))
     assert short.rest_multiplier < 1.0
     assert normal.rest_multiplier == 1.0
     assert short.expected_pitches < normal.expected_pitches

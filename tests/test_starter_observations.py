@@ -72,6 +72,7 @@ def test_resolved_observation_becomes_fallback_starter_history(tmp_path, monkeyp
     frame.loc[0, "actual_outs"] = 17
     frame.loc[0, "actual_batters_faced"] = 23
     frame.loc[0, "actual_pitches"] = 91
+    frame["resolved_at_utc"] = frame["resolved_at_utc"].astype(object)
     frame.loc[0, "resolved_at_utc"] = "2026-08-13T03:00:00+00:00"
     runner.save_observation_log(frame)
 

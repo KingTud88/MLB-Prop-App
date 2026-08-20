@@ -28,7 +28,7 @@ def _row(
     data_quality: float = 78.0,
 ) -> dict[str, object]:
     day = i if day is None else day
-    game_time = pd.Timestamp("2026-06-01T23:00:00Z") + pd.Timedelta(days=day)
+    game_time = pd.Timestamp("2026-06-01T23:00:00Z") + pd.Timedelta(day, unit="D")
     return {
         "game_date": game_time.date().isoformat(),
         "game_pk": 900000 + i,
@@ -37,8 +37,8 @@ def _row(
         "team": "CLE",
         "opponent": opponent or f"OPP{i % 20:02d}",
         "game_time": game_time.isoformat(),
-        "captured_at_utc": (game_time - pd.Timedelta(hours=5)).isoformat(),
-        "resolved_at_utc": (game_time + pd.Timedelta(hours=4)).isoformat(),
+        "captured_at_utc": (game_time - pd.Timedelta(5, unit="h")).isoformat(),
+        "resolved_at_utc": (game_time + pd.Timedelta(4, unit="h")).isoformat(),
         "projection": projection,
         "actual_strikeouts": actual,
         "opponent_k_pct": opponent_k_pct,

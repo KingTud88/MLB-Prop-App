@@ -25,7 +25,7 @@ def _row(
     resolved_offset_hours: float = 4.0,
     lineup_confirmed: bool = False,
 ) -> dict[str, object]:
-    game_time = pd.Timestamp("2026-06-01T23:00:00Z") + pd.Timedelta(days=day)
+    game_time = pd.Timestamp("2026-06-01T23:00:00Z") + pd.Timedelta(day, unit="D")
     return {
         "game_date": game_time.date().isoformat(),
         "game_pk": 800000 + day,
@@ -34,8 +34,8 @@ def _row(
         "team": "CLE",
         "opponent": opponent or f"OPP{day % 30:02d}",
         "game_time": game_time.isoformat(),
-        "captured_at_utc": (game_time + pd.Timedelta(hours=capture_offset_hours)).isoformat(),
-        "resolved_at_utc": (game_time + pd.Timedelta(hours=resolved_offset_hours)).isoformat(),
+        "captured_at_utc": (game_time + pd.Timedelta(capture_offset_hours, unit="h")).isoformat(),
+        "resolved_at_utc": (game_time + pd.Timedelta(resolved_offset_hours, unit="h")).isoformat(),
         "projection": projection,
         "actual_strikeouts": actual,
         "opponent_k_pct": opponent_k_pct,
