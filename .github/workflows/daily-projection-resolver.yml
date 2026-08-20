@@ -1,8 +1,6 @@
 name: Daily Projection Capture and Resolver
 
 on:
-  push:
-    branches: [main]
   schedule:
     # Multiple pregame refreshes keep the durable archive in sync with late
     # probable-starter announcements. Existing (game_pk, pitcher_id) snapshots
@@ -24,7 +22,6 @@ concurrency:
 
 jobs:
   projection-log:
-    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'Automate projection capture and game resolution')
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -138,26 +135,33 @@ jobs:
             echo "No projection/history/shadow/calibration/ML/Top-Plays/catcher/lineup/lineup-materiality/umpire/matchup/handedness-matchup/matchup-boost/boost-cap/reduce-stress/weak-reduce-shadow/asymmetric-response report changes to commit."
           else
             git commit -m "Automate projection capture and game resolution"
-
-            for attempt in 1 2 3; do
-              git fetch origin main
-              if git rebase origin/main; then
-                if git push origin HEAD:main; then
-                  break
-                fi
-              else
-                git rebase --abort || true
-                echo "Rebase conflict while updating projection/history logs; refusing to overwrite main."
-                exit 1
-              fi
-              if [ "$attempt" -eq 3 ]; then
-                echo "Projection/history-log push failed after 3 attempts."
-                exit 1
-              fi
-              echo "Push race on attempt ${attempt}; retrying against latest main."
-              sleep $((attempt * 2))
-            done
           fi
 
       - name: Refresh and persist report-only research context
-        run: bash automation/research_context_readiness.sh
+        run: RESEARCH_CONTEXT_NO_PUSH=1 bash automation/research_context_readiness.sh
+
+      - name: Push all resolver and research updates once
+        run: |
+          if git diff --quiet origin/main...HEAD; then
+            echo "No resolver or research commits to push."
+            exit 0
+          fi
+
+          for attempt in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main; then
+              if git push origin HEAD:main; then
+                exit 0
+              fi
+            else
+              git rebase --abort || true
+              echo "Rebase conflict while publishing resolver/research updates; refusing to overwrite main."
+              exit 1
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Resolver/research push failed after 3 attempts."
+              exit 1
+            fi
+            echo "Push race on attempt ${attempt}; retrying against latest main."
+            sleep $((attempt * 2))
+          done
