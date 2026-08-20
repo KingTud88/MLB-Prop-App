@@ -1,2 +1,2 @@
 Refresh_At_UTC,Packet_Status,Triggered_Lanes,Status_Transition_Lanes,Readiness_Transition_Lanes,Newly_Review_Ready_Lanes,Control_Violation_Lanes,Report_Only,Production_Authority,No_Auto_Promotion,Automatic_Decision_Allowed,Packet_Version
-2026-08-20T00:31:41.897122+00:00,NO_REVIEW_TRIGGER,0,0,0,0,0,True,NONE,True,False,research-manual-review-packet-v1-report-only
+2026-08-20T02:38:55.985955+00:00,NO_REVIEW_TRIGGER,0,0,0,0,0,True,NONE,True,False,research-manual-review-packet-v1-report-only
