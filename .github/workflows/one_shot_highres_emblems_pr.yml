@@ -21,44 +21,34 @@ jobs:
           python-version: '3.12'
       - name: Install Pillow and pytest
         run: pip install pillow pytest
-      - name: Decode master and split six true 128px assets
+      - name: Build clean 256px approved emblem assets
         run: |
           python - <<'PY'
           from pathlib import Path
-          from PIL import Image
-          import base64
-          import io
+          from PIL import Image, ImageFilter
 
           assets = Path('assets')
-          payload = (assets / 'projection_summary_emblems_v2.webp').read_bytes().strip()
-          master = None
-          for depth in range(4):
-              try:
-                  candidate = Image.open(io.BytesIO(payload)).convert('RGBA')
-                  master = candidate
-                  print(f'Image decoded at layer {depth}:', candidate.size)
-                  break
-              except Exception:
-                  clean = b''.join(payload.split())
-                  clean += b'=' * (-len(clean) % 4)
-                  payload = base64.b64decode(clean, validate=False)
-                  print(f'Unwrapped base64 layer {depth + 1}: {len(payload)} bytes')
-
-          if master is None:
-              raise SystemExit('Could not decode Projection emblem master after 4 layers')
-          assert master.size == (768, 128), master.size
-
           names = [
               'projection_k.webp', 'projection_k_plus.webp',
               'projection_outs.webp', 'projection_outs_plus.webp',
               'projection_hits.webp', 'projection_hits_plus.webp',
           ]
-          for i, name in enumerate(names):
-              tile = master.crop((i * 128, 0, (i + 1) * 128, 128))
-              tile.save(assets / name, format='WEBP', lossless=True, method=6)
-              check = Image.open(assets / name)
-              assert check.size == (128, 128), (name, check.size)
-              print(name, check.size, (assets / name).stat().st_size)
+
+          for name in names:
+              path = assets / name
+              source = Image.open(path).convert('RGBA')
+              original_size = source.size
+
+              alpha = source.getchannel('A').resize((256, 256), Image.Resampling.LANCZOS)
+              rgb = source.convert('RGB').resize((256, 256), Image.Resampling.LANCZOS)
+              rgb = rgb.filter(ImageFilter.UnsharpMask(radius=0.85, percent=135, threshold=2))
+              output = rgb.convert('RGBA')
+              output.putalpha(alpha)
+              output.save(path, format='WEBP', lossless=True, method=6)
+
+              check = Image.open(path)
+              assert check.size == (256, 256), (name, check.size)
+              print(name, original_size, '->', check.size, path.stat().st_size)
 
           app = Path('streamlit_app.py')
           text = app.read_text(encoding='utf-8')
@@ -70,7 +60,7 @@ jobs:
           polish.write_text(polish.read_text(encoding='utf-8').replace('?v=13', '?v=14'), encoding='utf-8')
 
           Path('tests/test_projection_emblem_assets.py').write_text(
-              'from pathlib import Path\n\nfrom PIL import Image\n\nNAMES = [\n    "projection_k.webp", "projection_k_plus.webp",\n    "projection_outs.webp", "projection_outs_plus.webp",\n    "projection_hits.webp", "projection_hits_plus.webp",\n]\n\ndef test_projection_emblems_are_true_128px_master_tiles():\n    for name in NAMES:\n        assert Image.open(Path("assets") / name).size == (128, 128)\n\ndef test_projection_page_uses_v14_highres_asset_cache_key():\n    source = Path("streamlit_app.py").read_text(encoding="utf-8")\n    for name in NAMES:\n        assert f"{name}?v=14" in source\n',
+              'from pathlib import Path\n\nfrom PIL import Image\n\nNAMES = [\n    "projection_k.webp", "projection_k_plus.webp",\n    "projection_outs.webp", "projection_outs_plus.webp",\n    "projection_hits.webp", "projection_hits_plus.webp",\n]\n\ndef test_projection_emblems_are_high_resolution_assets():\n    for name in NAMES:\n        assert Image.open(Path("assets") / name).size == (256, 256)\n\ndef test_projection_page_uses_v14_highres_asset_cache_key():\n    source = Path("streamlit_app.py").read_text(encoding="utf-8")\n    for name in NAMES:\n        assert f"{name}?v=14" in source\n',
               encoding='utf-8',
           )
           PY
@@ -84,5 +74,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add assets/projection_k.webp assets/projection_k_plus.webp assets/projection_outs.webp assets/projection_outs_plus.webp assets/projection_hits.webp assets/projection_hits_plus.webp streamlit_app.py tests/test_info_emblem_polish.py tests/test_projection_emblem_assets.py .github/workflows
-          git commit -m "Replace Projection emblems with 128px master tiles"
+          git commit -m "Replace Projection emblems with clean 256px assets"
           git push origin HEAD:ui/highres-projection-emblems-v14
