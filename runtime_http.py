@@ -4,6 +4,8 @@ import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from threading import RLock
 from urllib.parse import urlparse
 
 import requests
@@ -17,6 +19,21 @@ TRACKED_SERVICES = {
 RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
 MAX_ATTEMPTS = 3
 BACKOFF_SECONDS = (0.20, 0.40)
+
+_SOURCE_HEALTH_LOCK = RLock()
+_SOURCE_HEALTH = {
+    host: {
+        "service": service,
+        "host": host,
+        "status": "NOT CHECKED",
+        "last_path": None,
+        "last_attempt_at_utc": None,
+        "last_success_at_utc": None,
+        "last_failure_at_utc": None,
+    }
+    for host, service in TRACKED_SERVICES.items()
+}
+_SOURCE_HEALTH_OBSERVER: Callable[[list[dict[str, str | None]], str], None] | None = None
 
 
 @dataclass(frozen=True)
@@ -34,6 +51,88 @@ class ExternalServiceError(RuntimeError):
     def __init__(self, failure: ServiceFailure):
         self.failure = failure
         super().__init__(f"{failure.service} temporarily unavailable. Please try again.")
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def source_health_snapshot() -> list[dict[str, str | None]]:
+    """Return a defensive operator-only snapshot of tracked source health."""
+    with _SOURCE_HEALTH_LOCK:
+        return [dict(_SOURCE_HEALTH[host]) for host in TRACKED_SERVICES]
+
+
+def set_source_health_observer(
+    observer: Callable[[list[dict[str, str | None]], str], None] | None,
+) -> None:
+    """Register one fail-safe presentation observer for health changes.
+
+    The observer is intentionally outside request semantics: observer failures
+    are logged at debug level and can never turn a successful upstream request
+    into an application failure.
+    """
+    global _SOURCE_HEALTH_OBSERVER
+    with _SOURCE_HEALTH_LOCK:
+        _SOURCE_HEALTH_OBSERVER = observer
+
+
+def _notify_source_health(host: str) -> None:
+    with _SOURCE_HEALTH_LOCK:
+        observer = _SOURCE_HEALTH_OBSERVER
+    if observer is None:
+        return
+    snapshot = source_health_snapshot()
+    try:
+        observer(snapshot, host)
+    except Exception as exc:  # presentation telemetry must never affect data access
+        LOGGER.debug("source-health observer failed host=%s detail=%s", host, exc)
+
+
+def _record_attempt(host: str, url: str) -> None:
+    parsed = urlparse(str(url))
+    with _SOURCE_HEALTH_LOCK:
+        if host not in _SOURCE_HEALTH:
+            return
+        _SOURCE_HEALTH[host]["last_path"] = parsed.path or "/"
+        _SOURCE_HEALTH[host]["last_attempt_at_utc"] = _utc_now()
+
+
+def _record_success(host: str) -> None:
+    now = _utc_now()
+    with _SOURCE_HEALTH_LOCK:
+        if host not in _SOURCE_HEALTH:
+            return
+        _SOURCE_HEALTH[host]["status"] = "OK"
+        _SOURCE_HEALTH[host]["last_success_at_utc"] = now
+    _notify_source_health(host)
+
+
+def _record_failure(host: str) -> None:
+    now = _utc_now()
+    with _SOURCE_HEALTH_LOCK:
+        if host not in _SOURCE_HEALTH:
+            return
+        _SOURCE_HEALTH[host]["status"] = "ERROR"
+        _SOURCE_HEALTH[host]["last_failure_at_utc"] = now
+    _notify_source_health(host)
+
+
+def _reset_source_health_for_tests() -> None:
+    """Reset in-memory telemetry and its observer for isolated contract tests."""
+    global _SOURCE_HEALTH_OBSERVER
+    with _SOURCE_HEALTH_LOCK:
+        _SOURCE_HEALTH_OBSERVER = None
+        for host, service in TRACKED_SERVICES.items():
+            _SOURCE_HEALTH[host] = {
+                "service": service,
+                "host": host,
+                "status": "NOT CHECKED",
+                "last_path": None,
+                "last_attempt_at_utc": None,
+                "last_success_at_utc": None,
+                "last_failure_at_utc": None,
+            }
 
 
 def _tracked_service(method: str, url: str) -> tuple[str, str] | None:
@@ -60,6 +159,7 @@ def _raise_safe_failure(
         status_code=status_code,
         detail=detail,
     )
+    _record_failure(host)
     LOGGER.warning(
         "%s request failed host=%s method=%s status=%s detail=%s",
         service,
@@ -88,7 +188,7 @@ def request_with_resilience(
 
     All other hosts and all non-GET methods pass through unchanged. Successful
     responses are returned as-is; no cached/stale/fabricated payload is ever
-    substituted.
+    substituted. Source-health telemetry is observational only.
     """
     tracked = _tracked_service(method, url)
     if tracked is None:
@@ -96,6 +196,7 @@ def request_with_resilience(
 
     host, service = tracked
     last_exception: BaseException | None = None
+    _record_attempt(host, url)
 
     for attempt in range(MAX_ATTEMPTS):
         try:
@@ -149,6 +250,7 @@ def request_with_resilience(
                 detail=f"Invalid JSON: {exc}",
                 cause=exc,
             )
+        _record_success(host)
         return response
 
     # Defensive only; all loop exits above either return or raise.
