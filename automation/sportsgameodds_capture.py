@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -19,6 +20,17 @@ from engine.sportsgameodds import (
 )
 
 EASTERN = ZoneInfo("America/New_York")
+
+
+def status_covers_slate(slate_date: str, status_path: Path = STATUS_PATH) -> bool:
+    """Return True only when the durable central SGO status already covers this slate."""
+    if not status_path.exists():
+        return False
+    try:
+        payload = json.loads(status_path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return False
+    return str(payload.get("slate_date") or "").strip() == str(slate_date).strip()
 
 
 def run_capture(
@@ -67,13 +79,23 @@ def main() -> None:
     parser.add_argument("--snapshot", type=Path, default=SNAPSHOT_PATH)
     parser.add_argument("--history", type=Path, default=HISTORY_PATH)
     parser.add_argument("--status", type=Path, default=STATUS_PATH)
+    parser.add_argument(
+        "--skip-if-current-slate",
+        action="store_true",
+        help="Exit without an API call when the durable central status already covers the target slate.",
+    )
     args = parser.parse_args()
+
+    slate_date = str(args.slate_date)
+    if args.skip_if_current_slate and status_covers_slate(slate_date, args.status):
+        print(f"SportsGameOdds capture skipped: centralized snapshot already covers {slate_date}.")
+        return
 
     api_key = resolve_api_key()
     if not api_key:
         raise SystemExit("SPORTSGAMEODDS_API_KEY is not configured for this runner.")
     result = run_capture(
-        str(args.slate_date),
+        slate_date,
         api_key=api_key,
         projection_log_path=args.projection_log,
         snapshot_path=args.snapshot,
