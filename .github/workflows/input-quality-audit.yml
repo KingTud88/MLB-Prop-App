@@ -7,6 +7,8 @@ on:
       - input-quality-audit
     paths:
       - training/input_quality_audit.py
+      - training/input_quality_matched_v2.py
+      - tests/test_input_quality_matched_v2.py
       - .github/workflows/input-quality-audit.yml
 
 permissions:
@@ -25,8 +27,10 @@ jobs:
       - run: pip install -r requirements.txt pytest
       - name: Existing quality suite
         run: pytest -q
-      - name: Report-only input quality audit
+      - name: Report-only input quality audit v1
         run: python -m training.input_quality_audit
+      - name: Preregistered matched-cohort input quality audit v2
+        run: python -m training.input_quality_matched_v2
       - name: Commit audit evidence to branch
         run: |
           git config user.name "github-actions[bot]"
@@ -35,7 +39,10 @@ jobs:
             data/input_quality_summary.csv \
             data/input_quality_components.csv \
             data/input_quality_cohorts.csv \
-            data/input_quality_cohort_summary.csv
+            data/input_quality_cohort_summary.csv \
+            data/input_quality_matched_v2_pairs.csv \
+            data/input_quality_matched_v2_summary.csv \
+            data/input_quality_matched_v2_preregistration.csv
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "Refresh cohort-controlled input quality evidence"
           git push origin HEAD:input-quality-audit
