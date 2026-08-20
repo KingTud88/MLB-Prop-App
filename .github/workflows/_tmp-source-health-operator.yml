@@ -1,21 +1,21 @@
 name: Temporary Source Health Operator Patch
 
 on:
-  push:
-    branches: [polish/source-health-operator]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
 
 jobs:
   apply-and-validate:
-    if: github.event.head_commit.message != 'Add source-health operator display'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout feature branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
