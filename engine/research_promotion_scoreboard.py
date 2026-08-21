@@ -197,7 +197,7 @@ def render_research_promotion_scoreboard(root: Path) -> None:
                 )
 
     with st.expander("ⓘ How to read the Research Promotion Command Center", expanded=False):
-        st.markdown("**Status is source-owned.** Native research verdicts are displayed as written by each validator; the scoreboard does not recalculate them.")
+        st.markdown("**Status is source-owned.** Native research verdicts are displayed as written by each validator. The scoreboard does not recalculate them.")
         st.markdown("**Gate Progress shows the evidence bottleneck.** Starts alone are not enough; time diversity, entity breadth, probability coverage, matched pairs, seasons, or other source-owned requirements can keep a lane from review.")
         st.markdown("**Manual Review Ready is also source/control-plane owned.** A positive-looking status alone does not silently authorize production.")
         st.markdown("**Production Authority is the hard boundary.** NONE means the lane cannot change live projections, probabilities, Top Plays, recommendation thresholds, or sportsbook execution.")
