@@ -38,15 +38,17 @@ def test_runner_orders_research_sources_before_control_plane_and_freshness() -> 
     assert positions == sorted(positions)
 
 
-def test_runner_routes_milestones_and_history_through_all_lane_promotion_center() -> None:
+def test_runner_routes_milestones_history_and_review_packet_through_all_lane_promotion_center() -> None:
     text = _text()
     command_center_arg = "--command-center data/research_promotion_command_center.csv"
-    assert text.count(command_center_arg) == 2
+    assert text.count(command_center_arg) == 3
     milestone_pos = text.index("training.research_milestone_watch")
     history_pos = text.index("training.research_evidence_history")
+    packet_pos = text.index("training.research_manual_review_packet")
     first_arg_pos = text.index(command_center_arg, milestone_pos)
     second_arg_pos = text.index(command_center_arg, history_pos)
-    assert milestone_pos < first_arg_pos < history_pos < second_arg_pos
+    third_arg_pos = text.index(command_center_arg, packet_pos)
+    assert milestone_pos < first_arg_pos < history_pos < second_arg_pos < packet_pos < third_arg_pos
 
 
 def test_runner_persists_freshness_review_watch_and_shadow_outputs() -> None:
