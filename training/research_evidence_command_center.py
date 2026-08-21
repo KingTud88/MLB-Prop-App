@@ -10,7 +10,6 @@ VERSION = "research-evidence-command-center-v1-report-only"
 REPORT_ONLY = True
 PRODUCTION_AUTHORITY = "NONE"
 NO_AUTO_PROMOTION = True
-LOCKED_PROMOTION_SCOREBOARD_CARDS = 8
 
 COLUMNS = [
     "Lane",
@@ -48,7 +47,6 @@ SUMMARY_COLUMNS = [
     "All_Report_Only",
     "All_Production_Authority_None",
     "No_Auto_Promotion",
-    "Locked_Promotion_Scoreboard_Cards",
     "Command_Center_Version",
 ]
 
@@ -648,7 +646,6 @@ def build_summary(command_center: pd.DataFrame) -> pd.DataFrame:
         "All_Report_Only": bool(report_only.all()) if not report_only.empty else True,
         "All_Production_Authority_None": bool(authority.eq("NONE").all()) if not authority.empty else True,
         "No_Auto_Promotion": NO_AUTO_PROMOTION,
-        "Locked_Promotion_Scoreboard_Cards": LOCKED_PROMOTION_SCOREBOARD_CARDS,
         "Command_Center_Version": VERSION,
     }], columns=SUMMARY_COLUMNS)
 
@@ -672,7 +669,7 @@ def main() -> None:
     print(summary.to_string(index=False))
     print(
         f"report_only={REPORT_ONLY} production_authority={PRODUCTION_AUTHORITY} "
-        f"no_auto_promotion={NO_AUTO_PROMOTION} locked_scoreboard_cards={LOCKED_PROMOTION_SCOREBOARD_CARDS}"
+        f"no_auto_promotion={NO_AUTO_PROMOTION}"
     )
 
 
