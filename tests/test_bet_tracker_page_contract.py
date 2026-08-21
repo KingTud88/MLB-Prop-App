@@ -51,3 +51,25 @@ def test_bet_tracker_avoids_streamlit_cache_replay_for_data_helpers():
     assert "@_local_ttl_cache(120)\ndef todays_slate(" in source
     assert "@_local_ttl_cache(30)\ndef frozen_snapshot(" in source
     assert "live_pitcher_prop.clear()" in source
+
+def test_bet_tracker_delete_and_filters_are_fragment_scoped():
+    path = Path(__file__).resolve().parents[1] / "pages" / "2_Bet_Tracker.py"
+    source = path.read_text(encoding="utf-8")
+    compile(source, str(path), "exec")
+    marker = "# BET_TRACKER_FRAGMENT_WORKSPACE_V1"
+    assert marker in source
+    start = source.index(marker)
+    block = source[start:]
+    assert "@st.fragment\ndef render_tracker_workspace(" in block
+    assert 'selectbox("Status", ["All", "Open / Live", "Settled", "Invalid"]' in block
+    assert 'with st.expander("🗑️ Delete a saved bet"' in block
+    assert '"Confirm deletion of this saved ticket"' in block
+    assert '"🗑️ Delete selected bet"' in block
+    assert 'st.rerun(scope="fragment")' in block
+    delete_start = block.index('with st.expander("🗑️ Delete a saved bet"')
+    delete_end = block.index("# BET_TRACKER_TICKET_CARDS_V1", delete_start)
+    delete_block = block[delete_start:delete_end]
+    assert "st.rerun()" not in delete_block
+    assert 'st.session_state["_bet_tracker_deleted_keys"]' in delete_block
+    assert source.rstrip().endswith("render_tracker_workspace(results, tracker)")
+

@@ -694,243 +694,260 @@ _status_priority = {
 }
 results["_StatusPriority"] = results["Result"].astype(str).str.upper().map(_status_priority).fillna(1).astype(int)
 results = results.sort_values(["_StatusPriority", "Date"], ascending=[True, False], kind="stable").reset_index(drop=True)
-wins = int((results["Result"] == "WIN").sum())
-losses = int((results["Result"] == "LOSS").sum())
-pushes = int(results["Result"].isin(["PUSH", "PUSH LEG"]).sum())
-invalid = int((results["Result"] == "INVALID LINE").sum())
-pending = int((~results["Result"].isin(["WIN", "LOSS", "PUSH", "PUSH LEG", "INVALID LINE"])).sum())
-profit_series = pd.to_numeric(results["Profit/Loss"], errors="coerce")
-stake_series = pd.to_numeric(results["Stake"], errors="coerce")
-graded_mask = results["Result"].isin(["WIN", "LOSS", "PUSH"]) & stake_series.notna()
-net = float(profit_series.fillna(0).sum())
-risked = float(stake_series.loc[graded_mask].sum()) if graded_mask.any() else 0.0
-roi = net / risked if risked > 0 else None
+# BET_TRACKER_FRAGMENT_WORKSPACE_V1
+@st.fragment
+def render_tracker_workspace(results: pd.DataFrame, tracker: pd.DataFrame) -> None:
+    deleted_keys = set(st.session_state.get("_bet_tracker_deleted_keys", []))
+    if deleted_keys:
+        results = results.loc[~results["_BetKey"].astype(str).isin(deleted_keys)].copy()
+        if not tracker.empty:
+            keep_mask = [bet_row_key(row) not in deleted_keys for _, row in tracker.iterrows()]
+            tracker = tracker.loc[keep_mask].copy()
+    if st.session_state.pop("_bet_tracker_reset_delete_confirm", False):
+        st.session_state["bet_tracker_delete_confirm"] = False
 
-m1, m2, m3, m4, m5 = st.columns(5)
-m1.metric("Tracked bets", len(results), help=metric_help("tracker_bets"))
-m2.metric("Record", f"{wins}-{losses}-{pushes}", help=metric_help("tracker_record"))
-m3.metric("Pending / Live", pending, help=metric_help("tracker_pending"))
-m4.metric("Net P/L", f"{net:+.2f}" if profit_series.notna().any() else "—", help=metric_help("tracker_net"))
-m5.metric("ROI", f"{roi:+.1%}" if roi is not None else "—", help=metric_help("tracker_roi"))
-explain_popover(static_explanation("tracker_summary"),label="ⓘ EXPLAIN TRACKER SUMMARY")
+    wins = int((results["Result"] == "WIN").sum())
+    losses = int((results["Result"] == "LOSS").sum())
+    pushes = int(results["Result"].isin(["PUSH", "PUSH LEG"]).sum())
+    invalid = int((results["Result"] == "INVALID LINE").sum())
+    pending = int((~results["Result"].isin(["WIN", "LOSS", "PUSH", "PUSH LEG", "INVALID LINE"])).sum())
+    profit_series = pd.to_numeric(results["Profit/Loss"], errors="coerce")
+    stake_series = pd.to_numeric(results["Stake"], errors="coerce")
+    graded_mask = results["Result"].isin(["WIN", "LOSS", "PUSH"]) & stake_series.notna()
+    net = float(profit_series.fillna(0).sum())
+    risked = float(stake_series.loc[graded_mask].sum()) if graded_mask.any() else 0.0
+    roi = net / risked if risked > 0 else None
 
-if invalid:
-    st.warning(f"{invalid} legacy model-only ticket(s) are marked INVALID LINE and excluded from the real win/loss record because their saved legs used synthetic/default lines rather than verified sportsbook lines.")
-if stake_series.isna().any():
-    st.caption("Older saved bets without a stake are still graded, but they are excluded from P/L and ROI calculations.")
-if "american_odds" in tracker.columns and pd.to_numeric(tracker["american_odds"], errors="coerce").isna().any():
-    st.caption("Unpriced model tickets are still graded WIN/LOSS from MLB results, but they stay excluded from P/L and ROI because no sportsbook price was assumed.")
+    m1, m2, m3, m4, m5 = st.columns(5)
+    m1.metric("Tracked bets", len(results), help=metric_help("tracker_bets"))
+    m2.metric("Record", f"{wins}-{losses}-{pushes}", help=metric_help("tracker_record"))
+    m3.metric("Pending / Live", pending, help=metric_help("tracker_pending"))
+    m4.metric("Net P/L", f"{net:+.2f}" if profit_series.notna().any() else "—", help=metric_help("tracker_net"))
+    m5.metric("ROI", f"{roi:+.1%}" if roi is not None else "—", help=metric_help("tracker_roi"))
+    explain_popover(static_explanation("tracker_summary"),label="ⓘ EXPLAIN TRACKER SUMMARY")
 
-# BET_TRACKER_FILTERS_V1
-def _ticket_has_pitcher(legs: object, pitcher: str) -> bool:
-    if not isinstance(legs, list):
-        return False
-    target = str(pitcher or "").strip().lower()
-    return any(str(leg.get("Player", "")).strip().lower() == target for leg in legs if isinstance(leg, dict))
+    if invalid:
+        st.warning(f"{invalid} legacy model-only ticket(s) are marked INVALID LINE and excluded from the real win/loss record because their saved legs used synthetic/default lines rather than verified sportsbook lines.")
+    if stake_series.isna().any():
+        st.caption("Older saved bets without a stake are still graded, but they are excluded from P/L and ROI calculations.")
+    if "american_odds" in tracker.columns and pd.to_numeric(tracker["american_odds"], errors="coerce").isna().any():
+        st.caption("Unpriced model tickets are still graded WIN/LOSS from MLB results, but they stay excluded from P/L and ROI because no sportsbook price was assumed.")
 
-
-def _ticket_section(ticket: pd.Series) -> str:
-    if str(ticket.get("_TicketType", "Straight")) == "Parlay":
-        return "PARLAY TICKETS"
-    result = str(ticket.get("Result", "PENDING")).upper()
-    if result == "INVALID LINE":
-        return "LEGACY INVALID"
-    if result in {"WIN", "LOSS", "PUSH", "PUSH LEG"}:
-        return "SETTLED STRAIGHTS"
-    return "OPEN / LIVE STRAIGHTS"
-
-
-st.markdown('<div class="bt-section">Ticket Filters</div>', unsafe_allow_html=True)
-settled_states = {"WIN", "LOSS", "PUSH", "PUSH LEG"}
-pitcher_options = sorted({
-    str(leg.get("Player", "")).strip()
-    for legs in results["_Legs"]
-    if isinstance(legs, list)
-    for leg in legs
-    if isinstance(leg, dict) and str(leg.get("Player", "")).strip()
-})
-date_options = sorted({str(value) for value in results["Date"].dropna().tolist() if str(value).strip()}, reverse=True)
-f1, f2, f3, f4 = st.columns([1.0, 1.0, 1.45, 1.0])
-status_filter = f1.selectbox("Status", ["All", "Open / Live", "Settled", "Invalid"], key="bet_tracker_status_filter")
-type_filter = f2.selectbox("Ticket type", ["All", "Straight", "Parlay"], key="bet_tracker_type_filter")
-pitcher_filter = f3.selectbox("Pitcher", ["All"] + pitcher_options, key="bet_tracker_pitcher_filter")
-date_filter = f4.selectbox("Game date", ["All"] + date_options, key="bet_tracker_date_filter")
-
-display_results = results.copy()
-result_upper = display_results["Result"].astype(str).str.upper()
-if status_filter == "Open / Live":
-    display_results = display_results.loc[~result_upper.isin(settled_states | {"INVALID LINE"})]
-elif status_filter == "Settled":
-    display_results = display_results.loc[result_upper.isin(settled_states)]
-elif status_filter == "Invalid":
-    display_results = display_results.loc[result_upper.eq("INVALID LINE")]
-if type_filter != "All":
-    display_results = display_results.loc[display_results["_TicketType"].eq(type_filter)]
-if pitcher_filter != "All":
-    display_results = display_results.loc[display_results["_Legs"].map(lambda legs: _ticket_has_pitcher(legs, pitcher_filter))]
-if date_filter != "All":
-    display_results = display_results.loc[display_results["Date"].astype(str).eq(date_filter)]
-section_order = {"OPEN / LIVE STRAIGHTS": 0, "PARLAY TICKETS": 1, "SETTLED STRAIGHTS": 2, "LEGACY INVALID": 3}
-display_results = display_results.copy()
-display_results["_SectionOrder"] = display_results.apply(lambda row: section_order[_ticket_section(row)], axis=1)
-display_results = display_results.sort_values(["_SectionOrder", "_StatusPriority", "Date"], ascending=[True, True, False], kind="stable")
-st.caption(f"Showing {len(display_results)} of {len(results)} saved tickets. Summary metrics above remain all-time; filters only change the ticket cards below.")
-
-ticket_labels: dict[str, str] = {}
-for _, ticket in results.iterrows():
-    key = str(ticket.get("_BetKey", ""))
-    if not key:
-        continue
-    date = str(ticket.get("Date", ""))
-    pitcher = str(ticket.get("Pitcher", "Unknown"))
-    market = str(ticket.get("Market", ""))
-    bet = str(ticket.get("Bet", ""))
-    book = str(ticket.get("Book", "") or "—")
-    ticket_labels[key] = f"{date} · {pitcher} · {market} · {bet} · {book}"
-
-with st.expander("🗑️ Delete a saved bet", expanded=False):
-    if ticket_labels:
-        delete_key = st.selectbox(
-            "Saved ticket",
-            options=list(ticket_labels),
-            format_func=lambda key: ticket_labels[key],
-            key="bet_tracker_delete_key",
-        )
-        confirm_delete = st.checkbox(
-            "Confirm deletion of this saved ticket",
-            value=False,
-            key="bet_tracker_delete_confirm",
-            help="Deletion permanently removes this tracked ticket from the persistent bet ledger.",
-        )
-        if st.button(
-            "🗑️ Delete selected bet",
-            disabled=not confirm_delete,
-            use_container_width=True,
-            key="bet_tracker_delete_button",
-        ):
-            try:
-                if delete_bet(BET_LOG, delete_key, st.secrets):
-                    st.success("Deleted the selected bet from Bet Tracker.")
-                    st.cache_data.clear()
-                    st.rerun()
-                else:
-                    st.warning("That saved bet could not be found. Refresh the tracker and try again.")
-            except Exception as exc:
-                st.error(f"Could not delete bet: {exc}")
-    else:
-        st.caption("No saved tickets are available to delete.")
-
-# BET_TRACKER_TICKET_CARDS_V1
-# The resolver above remains the source of truth. This presentation preserves
-# each resolved leg so live progress is visible instead of flattened into one row.
-
-def _ticket_icon(result: object) -> str:
-    state = str(result or "").upper()
-    if state == "WIN":
-        return "✅"
-    if state == "LOSS":
-        return "❌"
-    if state == "LIVE AHEAD":
-        return "🟢"
-    if state == "LIVE BEHIND":
-        return "🟠"
-    if state in {"PUSH", "PUSH LEG"}:
-        return "🟡"
-    if state == "INVALID LINE":
-        return "⚠️"
-    return "⏳"
+    # BET_TRACKER_FILTERS_V1
+    def _ticket_has_pitcher(legs: object, pitcher: str) -> bool:
+        if not isinstance(legs, list):
+            return False
+        target = str(pitcher or "").strip().lower()
+        return any(str(leg.get("Player", "")).strip().lower() == target for leg in legs if isinstance(leg, dict))
 
 
-def _progress_value(actual: object, line: object) -> float:
-    current = _num(actual)
-    target = _num(line)
-    if current is None or target is None or target <= 0:
-        return 0.0
-    return max(0.0, min(float(current) / float(target), 1.0))
+    def _ticket_section(ticket: pd.Series) -> str:
+        if str(ticket.get("_TicketType", "Straight")) == "Parlay":
+            return "PARLAY TICKETS"
+        result = str(ticket.get("Result", "PENDING")).upper()
+        if result == "INVALID LINE":
+            return "LEGACY INVALID"
+        if result in {"WIN", "LOSS", "PUSH", "PUSH LEG"}:
+            return "SETTLED STRAIGHTS"
+        return "OPEN / LIVE STRAIGHTS"
 
 
-st.caption("Open any ticket to see each pitcher leg, live stat progress, line, game status, projection, and current grade.")
-if display_results.empty:
-    st.info("No saved tickets match the current filters.")
-_last_ticket_section = None
-for ticket_index, (_, ticket) in enumerate(display_results.iterrows()):
-    current_section = _ticket_section(ticket)
-    if current_section != _last_ticket_section:
-        st.markdown(f'<div class="bt-section">{current_section}</div>', unsafe_allow_html=True)
-        _last_ticket_section = current_section
-    ticket_result = str(ticket.get("Result", "PENDING"))
-    ticket_pitcher = str(ticket.get("Pitcher", "Unknown"))
-    ticket_date = str(ticket.get("Date", ""))
-    ticket_market = str(ticket.get("Market", ""))
-    label = f"{_ticket_icon(ticket_result)} {ticket_date} · {ticket_pitcher} · {ticket_market} · {ticket_result}"
-    with st.expander(label, expanded=ticket_result in {"LIVE AHEAD", "LIVE BEHIND"}):
-        # BET_TRACKER_POTENTIAL_WIN_V1
-        state_upper = ticket_result.upper()
-        state_class = "win" if state_upper == "WIN" else "loss" if state_upper == "LOSS" else "live" if state_upper.startswith("LIVE") else "pending"
-        st.markdown(
-            f'<div class="bt-ticket-state {state_class}"><div class="name">{ticket_pitcher} · {ticket_market}</div><div class="status">{ticket_result}</div></div>',
-            unsafe_allow_html=True,
-        )
-        explain_popover(ticket_explanation(ticket),label="ⓘ WHY THIS TICKET STATUS?")
-        st.caption(f"{ticket.get('_TrackingMode', 'TRACKED BET')} · Source: {ticket.get('Source', '—')}")
-        h1, h2, h3, h4, h5, h6 = st.columns(6)
-        h1.metric("Book", str(ticket.get("Book", "") or "—"))
-        stake_value = _num(ticket.get("Stake"))
-        h2.metric("Stake", "—" if stake_value is None else f"{stake_value:.2f}u")
-        odds_value = _num(str(ticket.get("Odds", "")).replace("+", ""))
-        h3.metric("Odds", str(ticket.get("Odds", "—")))
-        potential_win = None
-        if stake_value is not None and odds_value not in (None, 0):
-            potential_win = stake_value * (odds_value / 100.0) if odds_value > 0 else stake_value * (100.0 / abs(odds_value))
-        h4.metric("Potential Win", "—" if potential_win is None else f"+{potential_win:.2f}u")
-        profit_value = _num(ticket.get("Profit/Loss"))
-        h5.metric("P/L", "—" if profit_value is None else f"{profit_value:+.2f}u")
-        h6.metric("Status", ticket_result)
+    st.markdown('<div class="bt-section">Ticket Filters</div>', unsafe_allow_html=True)
+    settled_states = {"WIN", "LOSS", "PUSH", "PUSH LEG"}
+    pitcher_options = sorted({
+        str(leg.get("Player", "")).strip()
+        for legs in results["_Legs"]
+        if isinstance(legs, list)
+        for leg in legs
+        if isinstance(leg, dict) and str(leg.get("Player", "")).strip()
+    })
+    date_options = sorted({str(value) for value in results["Date"].dropna().tolist() if str(value).strip()}, reverse=True)
+    f1, f2, f3, f4 = st.columns([1.0, 1.0, 1.45, 1.0])
+    status_filter = f1.selectbox("Status", ["All", "Open / Live", "Settled", "Invalid"], key="bet_tracker_status_filter")
+    type_filter = f2.selectbox("Ticket type", ["All", "Straight", "Parlay"], key="bet_tracker_type_filter")
+    pitcher_filter = f3.selectbox("Pitcher", ["All"] + pitcher_options, key="bet_tracker_pitcher_filter")
+    date_filter = f4.selectbox("Game date", ["All"] + date_options, key="bet_tracker_date_filter")
 
-        legs = ticket.get("_Legs", [])
-        if not isinstance(legs, list) or not legs:
-            st.caption("No leg detail is available for this older ticket.")
-        for leg_number, leg in enumerate(legs, start=1):
-            player = str(leg.get("Player", "Unknown"))
-            market = str(leg.get("Market", ""))
-            side = str(leg.get("Side", ""))
-            line = _num(leg.get("Line")) or 0.0
-            actual = _num(leg.get("Actual"))
-            leg_result = str(leg.get("Result", "PENDING"))
-            status = str(leg.get("Game Status", "Pending"))
-            projection = _num(leg.get("Projection"))
-            model_probability = _num(leg.get("Model Probability"))
-            side_color = "#49efb0" if side.upper() == "OVER" else "#ff4b4b"
+    display_results = results.copy()
+    result_upper = display_results["Result"].astype(str).str.upper()
+    if status_filter == "Open / Live":
+        display_results = display_results.loc[~result_upper.isin(settled_states | {"INVALID LINE"})]
+    elif status_filter == "Settled":
+        display_results = display_results.loc[result_upper.isin(settled_states)]
+    elif status_filter == "Invalid":
+        display_results = display_results.loc[result_upper.eq("INVALID LINE")]
+    if type_filter != "All":
+        display_results = display_results.loc[display_results["_TicketType"].eq(type_filter)]
+    if pitcher_filter != "All":
+        display_results = display_results.loc[display_results["_Legs"].map(lambda legs: _ticket_has_pitcher(legs, pitcher_filter))]
+    if date_filter != "All":
+        display_results = display_results.loc[display_results["Date"].astype(str).eq(date_filter)]
+    section_order = {"OPEN / LIVE STRAIGHTS": 0, "PARLAY TICKETS": 1, "SETTLED STRAIGHTS": 2, "LEGACY INVALID": 3}
+    display_results = display_results.copy()
+    display_results["_SectionOrder"] = display_results.apply(lambda row: section_order[_ticket_section(row)], axis=1)
+    display_results = display_results.sort_values(["_SectionOrder", "_StatusPriority", "Date"], ascending=[True, True, False], kind="stable")
+    st.caption(f"Showing {len(display_results)} of {len(results)} saved tickets. Summary metrics above remain all-time; filters only change the ticket cards below.")
+
+    ticket_labels: dict[str, str] = {}
+    for _, ticket in results.iterrows():
+        key = str(ticket.get("_BetKey", ""))
+        if not key:
+            continue
+        date = str(ticket.get("Date", ""))
+        pitcher = str(ticket.get("Pitcher", "Unknown"))
+        market = str(ticket.get("Market", ""))
+        bet = str(ticket.get("Bet", ""))
+        book = str(ticket.get("Book", "") or "—")
+        ticket_labels[key] = f"{date} · {pitcher} · {market} · {bet} · {book}"
+
+    with st.expander("🗑️ Delete a saved bet", expanded=False):
+        if ticket_labels:
+            delete_key = st.selectbox(
+                "Saved ticket",
+                options=list(ticket_labels),
+                format_func=lambda key: ticket_labels[key],
+                key="bet_tracker_delete_key",
+            )
+            confirm_delete = st.checkbox(
+                "Confirm deletion of this saved ticket",
+                value=False,
+                key="bet_tracker_delete_confirm",
+                help="Deletion permanently removes this tracked ticket from the persistent bet ledger.",
+            )
+            if st.button(
+                "🗑️ Delete selected bet",
+                disabled=not confirm_delete,
+                use_container_width=True,
+                key="bet_tracker_delete_button",
+            ):
+                try:
+                    if delete_bet(BET_LOG, delete_key, st.secrets):
+                        deleted_keys.add(str(delete_key))
+                        st.session_state["_bet_tracker_deleted_keys"] = sorted(deleted_keys)
+                        st.session_state["_bet_tracker_reset_delete_confirm"] = True
+                        st.success("Deleted the selected bet from Bet Tracker.")
+                        st.rerun(scope="fragment")
+                    else:
+                        st.warning("That saved bet could not be found. Refresh the tracker and try again.")
+                except Exception as exc:
+                    st.error(f"Could not delete bet: {exc}")
+        else:
+            st.caption("No saved tickets are available to delete.")
+
+    # BET_TRACKER_TICKET_CARDS_V1
+    # The resolver above remains the source of truth. This presentation preserves
+    # each resolved leg so live progress is visible instead of flattened into one row.
+
+    def _ticket_icon(result: object) -> str:
+        state = str(result or "").upper()
+        if state == "WIN":
+            return "✅"
+        if state == "LOSS":
+            return "❌"
+        if state == "LIVE AHEAD":
+            return "🟢"
+        if state == "LIVE BEHIND":
+            return "🟠"
+        if state in {"PUSH", "PUSH LEG"}:
+            return "🟡"
+        if state == "INVALID LINE":
+            return "⚠️"
+        return "⏳"
+
+
+    def _progress_value(actual: object, line: object) -> float:
+        current = _num(actual)
+        target = _num(line)
+        if current is None or target is None or target <= 0:
+            return 0.0
+        return max(0.0, min(float(current) / float(target), 1.0))
+
+
+    st.caption("Open any ticket to see each pitcher leg, live stat progress, line, game status, projection, and current grade.")
+    if display_results.empty:
+        st.info("No saved tickets match the current filters.")
+    _last_ticket_section = None
+    for ticket_index, (_, ticket) in enumerate(display_results.iterrows()):
+        current_section = _ticket_section(ticket)
+        if current_section != _last_ticket_section:
+            st.markdown(f'<div class="bt-section">{current_section}</div>', unsafe_allow_html=True)
+            _last_ticket_section = current_section
+        ticket_result = str(ticket.get("Result", "PENDING"))
+        ticket_pitcher = str(ticket.get("Pitcher", "Unknown"))
+        ticket_date = str(ticket.get("Date", ""))
+        ticket_market = str(ticket.get("Market", ""))
+        label = f"{_ticket_icon(ticket_result)} {ticket_date} · {ticket_pitcher} · {ticket_market} · {ticket_result}"
+        with st.expander(label, expanded=ticket_result in {"LIVE AHEAD", "LIVE BEHIND"}):
+            # BET_TRACKER_POTENTIAL_WIN_V1
+            state_upper = ticket_result.upper()
+            state_class = "win" if state_upper == "WIN" else "loss" if state_upper == "LOSS" else "live" if state_upper.startswith("LIVE") else "pending"
             st.markdown(
-                f'<div style="border:1px solid #294b6c;border-radius:10px;padding:10px 12px;margin:8px 0 5px">'
-                f'<div style="font-size:1.05rem;font-weight:900">{leg_number}. {player}</div>'
-                f'<div style="margin-top:2px">{market} · <span style="color:{side_color};font-weight:900">{side.upper()}</span> {line:g}</div>'
-                f'</div>',
+                f'<div class="bt-ticket-state {state_class}"><div class="name">{ticket_pitcher} · {ticket_market}</div><div class="status">{ticket_result}</div></div>',
                 unsafe_allow_html=True,
             )
-            p1, p2, p3, p4 = st.columns(4)
-            p1.metric("Current", "—" if actual is None else f"{actual:g}")
-            p2.metric("Target line", f"{line:g}")
-            p3.metric("Projection", "—" if projection is None else f"{projection:.2f}")
-            p4.metric("Model %", "—" if model_probability is None else f"{model_probability:.1%}")
-            st.progress(_progress_value(actual, line))
-            if actual is None:
-                progress_text = "Waiting for MLB pitching stats"
-            elif side.upper() == "OVER":
-                needed = max(0.0, line - actual)
-                progress_text = f"{actual:g} current · {needed:g} to the listed line" if needed > 0 else f"{actual:g} current · above the listed line"
-            else:
-                room = line - actual
-                progress_text = f"{actual:g} current · {max(0.0, room):g} below the listed line" if room > 0 else f"{actual:g} current · at/above the listed line"
-            st.caption(f"{_ticket_icon(leg_result)} {leg_result} · {status} · {progress_text}")
-            explain_popover(leg_explanation(leg),label="ⓘ EXPLAIN THIS LEG")
+            explain_popover(ticket_explanation(ticket),label="ⓘ WHY THIS TICKET STATUS?")
+            st.caption(f"{ticket.get('_TrackingMode', 'TRACKED BET')} · Source: {ticket.get('Source', '—')}")
+            h1, h2, h3, h4, h5, h6 = st.columns(6)
+            h1.metric("Book", str(ticket.get("Book", "") or "—"))
+            stake_value = _num(ticket.get("Stake"))
+            h2.metric("Stake", "—" if stake_value is None else f"{stake_value:.2f}u")
+            odds_value = _num(str(ticket.get("Odds", "")).replace("+", ""))
+            h3.metric("Odds", str(ticket.get("Odds", "—")))
+            potential_win = None
+            if stake_value is not None and odds_value not in (None, 0):
+                potential_win = stake_value * (odds_value / 100.0) if odds_value > 0 else stake_value * (100.0 / abs(odds_value))
+            h4.metric("Potential Win", "—" if potential_win is None else f"+{potential_win:.2f}u")
+            profit_value = _num(ticket.get("Profit/Loss"))
+            h5.metric("P/L", "—" if profit_value is None else f"{profit_value:+.2f}u")
+            h6.metric("Status", ticket_result)
 
-        st.caption("Live progress comes from MLB pitching stats. Sportsbook prices and stakes remain tracking-only inputs and never feed the projection model.")
+            legs = ticket.get("_Legs", [])
+            if not isinstance(legs, list) or not legs:
+                st.caption("No leg detail is available for this older ticket.")
+            for leg_number, leg in enumerate(legs, start=1):
+                player = str(leg.get("Player", "Unknown"))
+                market = str(leg.get("Market", ""))
+                side = str(leg.get("Side", ""))
+                line = _num(leg.get("Line")) or 0.0
+                actual = _num(leg.get("Actual"))
+                leg_result = str(leg.get("Result", "PENDING"))
+                status = str(leg.get("Game Status", "Pending"))
+                projection = _num(leg.get("Projection"))
+                model_probability = _num(leg.get("Model Probability"))
+                side_color = "#49efb0" if side.upper() == "OVER" else "#ff4b4b"
+                st.markdown(
+                    f'<div style="border:1px solid #294b6c;border-radius:10px;padding:10px 12px;margin:8px 0 5px">'
+                    f'<div style="font-size:1.05rem;font-weight:900">{leg_number}. {player}</div>'
+                    f'<div style="margin-top:2px">{market} · <span style="color:{side_color};font-weight:900">{side.upper()}</span> {line:g}</div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+                p1, p2, p3, p4 = st.columns(4)
+                p1.metric("Current", "—" if actual is None else f"{actual:g}")
+                p2.metric("Target line", f"{line:g}")
+                p3.metric("Projection", "—" if projection is None else f"{projection:.2f}")
+                p4.metric("Model %", "—" if model_probability is None else f"{model_probability:.1%}")
+                st.progress(_progress_value(actual, line))
+                if actual is None:
+                    progress_text = "Waiting for MLB pitching stats"
+                elif side.upper() == "OVER":
+                    needed = max(0.0, line - actual)
+                    progress_text = f"{actual:g} current · {needed:g} to the listed line" if needed > 0 else f"{actual:g} current · above the listed line"
+                else:
+                    room = line - actual
+                    progress_text = f"{actual:g} current · {max(0.0, room):g} below the listed line" if room > 0 else f"{actual:g} current · at/above the listed line"
+                st.caption(f"{_ticket_icon(leg_result)} {leg_result} · {status} · {progress_text}")
+                explain_popover(leg_explanation(leg),label="ⓘ EXPLAIN THIS LEG")
 
-st.download_button(
-    "Download bet tracker CSV",
-    results.drop(columns=["_BetKey", "_StatusPriority", "_SectionOrder"], errors="ignore").to_csv(index=False),
-    file_name="bet_tracker.csv",
-    mime="text/csv",
-)
-st.caption("Sportsbook prices and stakes are tracking inputs only. They do not feed the pitcher projection models.")
+            st.caption("Live progress comes from MLB pitching stats. Sportsbook prices and stakes remain tracking-only inputs and never feed the projection model.")
+
+    st.download_button(
+        "Download bet tracker CSV",
+        results.drop(columns=["_BetKey", "_StatusPriority", "_SectionOrder"], errors="ignore").to_csv(index=False),
+        file_name="bet_tracker.csv",
+        mime="text/csv",
+    )
+    st.caption("Sportsbook prices and stakes are tracking inputs only. They do not feed the pitcher projection models.")
+
+
+render_tracker_workspace(results, tracker)
