@@ -15,8 +15,9 @@ from training.input_quality_matched_v2 import (
     PRIMARY_RULE as INPUT_QUALITY_PRIMARY_RULE,
 )
 from training.research_evidence_command_center import COLUMNS, build_command_center
+from training.research_governance_v2 import apply_promotion_governance
 
-VERSION = "research-promotion-command-center-v3-all-lanes"
+VERSION = "research-promotion-command-center-v4-governance-v2"
 REPORT_ONLY = True
 PRODUCTION_AUTHORITY = "NONE"
 NO_AUTO_PROMOTION = True
@@ -393,7 +394,8 @@ def build_promotion_command_center(data_dir: Path | str = "data") -> pd.DataFram
     if not base.empty:
         base = base.loc[~base["Lane"].astype(str).isin(extra_names)].copy()
     rows = base.to_dict("records") + extra.to_dict("records")
-    return pd.DataFrame(rows, columns=COLUMNS)
+    center = pd.DataFrame(rows, columns=COLUMNS)
+    return apply_promotion_governance(center, root)
 
 
 def build_summary(command_center: pd.DataFrame) -> pd.DataFrame:

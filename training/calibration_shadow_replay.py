@@ -19,7 +19,8 @@ MIN_WIN_SHARE = 0.50
 
 def _empty_detail() -> pd.DataFrame:
     return pd.DataFrame(columns=[
-        "game_date", "captured_at_utc", "Milestone", "Actual_Hit",
+        "game_date", "captured_at_utc", "game_pk", "pitcher_id", "player", "opponent",
+        "Milestone", "Actual_Hit",
         "Prior_Eligible_Starts", "Candidate_SIM_Weight", "Candidate_MATH_Weight",
         "Baseline_Probability", "Candidate_Probability", "Baseline_Brier",
         "Candidate_Brier", "Candidate_Won", "Replay_Version",
@@ -72,6 +73,10 @@ def build_walk_forward_detail(frame: pd.DataFrame) -> pd.DataFrame:
             rows.append({
                 "game_date": str(current.get("game_date", "")),
                 "captured_at_utc": str(current.get("captured_at_utc", "")),
+                "game_pk": current.get("game_pk"),
+                "pitcher_id": current.get("pitcher_id"),
+                "player": current.get("player"),
+                "opponent": current.get("opponent"),
                 "Milestone": int(milestone),
                 "Actual_Hit": actual_hit,
                 "Prior_Eligible_Starts": int(candidate.observations),
