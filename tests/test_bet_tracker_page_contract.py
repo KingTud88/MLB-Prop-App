@@ -73,3 +73,13 @@ def test_bet_tracker_delete_and_filters_are_fragment_scoped():
     assert 'st.session_state["_bet_tracker_deleted_keys"]' in delete_block
     assert source.rstrip().endswith("render_tracker_workspace(results, tracker)")
 
+def test_bet_tracker_preserves_raw_persisted_key_before_display_normalization():
+    path = Path(__file__).resolve().parents[1] / "pages" / "2_Bet_Tracker.py"
+    source = path.read_text(encoding="utf-8")
+    compile(source, str(path), "exec")
+    marker = '# BET_TRACKER_PERSISTED_KEY_V1'
+    assert marker in source
+    assert 'tracker["_PersistedBetKey"] = [bet_row_key(row) for _, row in tracker.iterrows()]' in source
+    assert source.index(marker) < source.index('tracker.loc[straight_mask, "market"]')
+    assert source.count('"_BetKey": str(row.get("_PersistedBetKey") or bet_row_key(row)),') == 2
+

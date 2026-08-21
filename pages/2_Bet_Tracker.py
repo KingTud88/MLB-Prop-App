@@ -532,6 +532,10 @@ if tracker.empty:
     st.info("No saved bets yet. Use Add a bet above to start the ledger.")
     st.stop()
 
+# BET_TRACKER_PERSISTED_KEY_V1
+# Capture the identity from the raw persisted row before display normalization.
+tracker["_PersistedBetKey"] = [bet_row_key(row) for _, row in tracker.iterrows()]
+
 for col in ["line", "american_odds", "stake", "projection", "model_probability", "implied_probability", "edge", "game_pk", "pitcher_id"]:
     if col in tracker.columns:
         tracker[col] = pd.to_numeric(tracker[col], errors="coerce")
@@ -606,7 +610,7 @@ with st.spinner("Checking saved bets against MLB pitching stats..."):
             result_text = "INVALID LINE" if legacy_model_line_ticket else grade.result
             profit = None if legacy_model_line_ticket else profit_for(stake, odds, grade)
             resolved_rows.append({
-                "_BetKey": bet_row_key(row),
+                "_BetKey": str(row.get("_PersistedBetKey") or bet_row_key(row)),
                 "Pitcher": f"{len(legs)}-leg parlay",
                 "Matchup": "Multiple",
                 "Date": game_date,
@@ -647,7 +651,7 @@ with st.spinner("Checking saved bets against MLB pitching stats..."):
         matchup = f"{team} vs {opponent}" if team and opponent else "—"
         source_text = _clean_text(row.get("source"))
         resolved_rows.append({
-            "_BetKey": bet_row_key(row),
+            "_BetKey": str(row.get("_PersistedBetKey") or bet_row_key(row)),
             "Pitcher": player,
             "Matchup": matchup,
             "Date": game_date,
