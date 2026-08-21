@@ -35,7 +35,10 @@ def bettable_k_label(projection: object) -> str:
 
 
 def bettable_k_result(projection: object, actual_strikeouts: object) -> str:
-    """Grade the model-derived whole-K milestone that could actually be played."""
+    """Grade the model-derived whole-K milestone supported by the frozen projection.
+
+    This is model-ladder research, not sportsbook execution grading.
+    """
     target = bettable_k_target(projection)
     actual = _numeric(actual_strikeouts)
     if target is None:
@@ -46,8 +49,12 @@ def bettable_k_result(projection: object, actual_strikeouts: object) -> str:
 
 
 def directional_k_result(projection: object, actual_strikeouts: object) -> str:
-    """Backward-compatible alias for the bettable milestone result."""
-    return bettable_k_result(projection, actual_strikeouts)
+    """Grade whether actual strikeouts finished above the exact frozen projection."""
+    projected = _numeric(projection)
+    actual = _numeric(actual_strikeouts)
+    if projected is None or actual is None:
+        return "PENDING"
+    return "✅ WIN" if actual > projected else "❌ MISS"
 
 
 def _current_win_streak(group: pd.DataFrame) -> int:
@@ -62,15 +69,18 @@ def _current_win_streak(group: pd.DataFrame) -> int:
 
 
 def crusher_report(history: pd.DataFrame) -> pd.DataFrame:
-    """Summarize pitchers who repeatedly beat the model-derived K ladder target.
+    """Summarize pitchers who repeatedly finish above the exact frozen K projection.
 
-    This is a descriptive decision/evaluation view only. It does not feed the
-    baseball forecast, calibration, or Top Plays ranking.
+    This is descriptive research only. It does not feed the baseball forecast,
+    calibration, sportsbook execution, or Top Plays ranking.
     """
     columns = [
-        "Pitcher", "Resolved Starts", "Ladder Wins", "Win Rate",
-        "Avg K Above Target", "Avg Win Margin", "Total K Above Target",
+        "Pitcher", "Resolved Starts", "Projection Wins", "Win Rate",
+        "Avg K vs Projection", "Avg Win Margin", "Total K Above Projection",
         "2+ K Crushes", "Recent 5 Win Rate", "Current Win Streak", "Crusher Status",
+        # Transitional aliases keep older Projection History renderers safe while
+        # the UI moves from ladder-target Crusher semantics back to exact projection.
+        "Ladder Wins", "Avg K Above Target", "Total K Above Target",
     ]
     if history is None or history.empty:
         return pd.DataFrame(columns=columns)
@@ -83,20 +93,19 @@ def crusher_report(history: pd.DataFrame) -> pd.DataFrame:
 
     frame["_projection"] = pd.to_numeric(frame.get("projection"), errors="coerce")
     frame["_actual"] = pd.to_numeric(frame.get("actual_strikeouts"), errors="coerce")
-    frame["_target"] = frame["_projection"].map(bettable_k_target)
-    frame = frame.loc[frame["_target"].notna() & frame["_actual"].notna()].copy()
+    frame = frame.loc[frame["_projection"].notna() & frame["_actual"].notna()].copy()
     if frame.empty:
         return pd.DataFrame(columns=columns)
 
-    frame["_target"] = frame["_target"].astype(float)
-    frame["_margin"] = frame["_actual"] - frame["_target"]
-    frame["_win"] = frame["_actual"] >= frame["_target"]
+    frame["_margin"] = frame["_actual"] - frame["_projection"]
+    frame["_win"] = frame["_margin"].gt(0.0)
     frame["_game_date"] = pd.to_datetime(frame.get("game_date"), errors="coerce")
     frame["_captured"] = pd.to_datetime(frame.get("captured_at_utc"), errors="coerce", utc=True)
 
     if "pitcher_id" in frame.columns:
         ids = frame["pitcher_id"].astype(str)
-        frame["_pitcher_key"] = np.where(ids.notna() & ids.ne("") & ids.ne("nan"), ids, frame.get("player", "Unknown").astype(str))
+        player_names = frame.get("player", pd.Series("Unknown", index=frame.index)).astype(str)
+        frame["_pitcher_key"] = np.where(ids.notna() & ids.ne("") & ids.ne("nan"), ids, player_names)
     else:
         frame["_pitcher_key"] = frame.get("player", pd.Series("Unknown", index=frame.index)).astype(str)
 
@@ -115,29 +124,33 @@ def crusher_report(history: pd.DataFrame) -> pd.DataFrame:
             status = "LEARNING"
         elif win_rate >= (2.0 / 3.0) and avg_margin > 0.5:
             status = "🔥 CRUSHER"
-        elif win_rate >= 0.55 and avg_margin >= 0.0:
-            status = "✅ ABOVE TARGET"
+        elif win_rate >= 0.55 and avg_margin > 0.0:
+            status = "✅ ABOVE PROJECTION"
         else:
             status = "MIXED"
+        total_above = float(margins.clip(lower=0.0).sum())
         rows.append({
             "Pitcher": str(ordered.get("player", pd.Series(["Unknown"])).iloc[-1]),
             "Resolved Starts": starts,
-            "Ladder Wins": wins,
+            "Projection Wins": wins,
             "Win Rate": win_rate,
-            "Avg K Above Target": avg_margin,
+            "Avg K vs Projection": avg_margin,
             "Avg Win Margin": float(win_margins.mean()) if not win_margins.empty else np.nan,
-            "Total K Above Target": float(margins.clip(lower=0.0).sum()),
+            "Total K Above Projection": total_above,
             "2+ K Crushes": int((margins >= 2.0).sum()),
             "Recent 5 Win Rate": recent_rate,
             "Current Win Streak": _current_win_streak(ordered),
             "Crusher Status": status,
+            "Ladder Wins": wins,
+            "Avg K Above Target": avg_margin,
+            "Total K Above Target": total_above,
         })
 
     report = pd.DataFrame(rows, columns=columns)
-    status_rank = {"🔥 CRUSHER": 0, "✅ ABOVE TARGET": 1, "LEARNING": 2, "MIXED": 3}
+    status_rank = {"🔥 CRUSHER": 0, "✅ ABOVE PROJECTION": 1, "LEARNING": 2, "MIXED": 3}
     report["_status_rank"] = report["Crusher Status"].map(status_rank).fillna(9)
     report = report.sort_values(
-        ["_status_rank", "Ladder Wins", "Win Rate", "Avg K Above Target", "Resolved Starts"],
+        ["_status_rank", "Projection Wins", "Win Rate", "Avg K vs Projection", "Resolved Starts"],
         ascending=[True, False, False, False, False],
     ).drop(columns=["_status_rank"]).reset_index(drop=True)
     return report
