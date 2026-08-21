@@ -5,9 +5,18 @@ from pathlib import Path
 
 import pandas as pd
 
+from training.calibration_common_mode_v2 import (
+    MIN_DISTINCT_PITCHERS as CAL_V2_MIN_DISTINCT_PITCHERS,
+    MIN_EVIDENCE_DAYS as CAL_V2_MIN_EVIDENCE_DAYS,
+    MIN_OOS_STARTS as CAL_V2_MIN_OOS_STARTS,
+)
+from training.input_quality_matched_v2 import (
+    MIN_MATCHED_PAIRS as INPUT_QUALITY_MIN_MATCHED_PAIRS,
+    PRIMARY_RULE as INPUT_QUALITY_PRIMARY_RULE,
+)
 from training.research_evidence_command_center import COLUMNS, build_command_center
 
-VERSION = "research-promotion-command-center-v2-all-lanes"
+VERSION = "research-promotion-command-center-v3-all-lanes"
 REPORT_ONLY = True
 PRODUCTION_AUTHORITY = "NONE"
 NO_AUTO_PROMOTION = True
@@ -53,6 +62,8 @@ def _integer(value: object) -> int | None:
 
 
 def _truthy(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
     return str(value).strip().lower() in {"true", "1", "yes", "y"}
 
 
@@ -69,17 +80,37 @@ def _pct(value: object, *, signed: bool = False) -> str:
     return f"{number:+.2%}" if signed else f"{number:.1%}"
 
 
+def _source_contract(row: pd.Series) -> tuple[bool, str]:
+    report_only = _truthy(row.get("Report_Only", row.get("Report Only", REPORT_ONLY)))
+    authority = _clean(row.get("Production_Authority", row.get("Production Authority", PRODUCTION_AUTHORITY)))
+    return report_only, authority or PRODUCTION_AUTHORITY
+
+
 def _base_row(
-    *, lane: str, source_path: str, status: str, direction: str,
-    current_starts: int | None, required_starts: int | None,
-    current_days: int | None, required_days: int | None,
-    current_breadth: int | None, required_breadth: int | None,
-    breadth_label: str, secondary: str, ready: bool, action: str,
-    reason: str, source_version: str,
+    *,
+    lane: str,
+    category: str,
+    source_path: str,
+    status: str,
+    direction: str = "",
+    current_starts: int | None = None,
+    required_starts: int | None = None,
+    current_days: int | None = None,
+    required_days: int | None = None,
+    breadth_label: str = "",
+    current_breadth: int | None = None,
+    required_breadth: int | None = None,
+    secondary: str = "",
+    ready: bool = False,
+    action: str = "",
+    reason: str = "",
+    report_only: bool = REPORT_ONLY,
+    authority: str = PRODUCTION_AUTHORITY,
+    source_version: str = "",
 ) -> dict[str, object]:
     return {
         "Lane": lane,
-        "Category": "K_RESEARCH",
+        "Category": category,
         "Source_Path": source_path,
         "Status": status or "UNKNOWN",
         "Evidence_Direction": direction,
@@ -97,107 +128,87 @@ def _base_row(
         "Ready_For_Manual_Review": bool(ready),
         "Recommended_Action": action,
         "Source_Reason": reason,
-        "Report_Only": REPORT_ONLY,
-        "Production_Authority": PRODUCTION_AUTHORITY,
+        "Report_Only": bool(report_only),
+        "Production_Authority": authority or PRODUCTION_AUTHORITY,
         "No_Auto_Promotion": NO_AUTO_PROMOTION,
         "Source_Version": source_version,
         "Command_Center_Version": VERSION,
     }
 
 
-def _missing(lane: str, source_path: str) -> dict[str, object]:
+def _missing(lane: str, category: str, source_path: str) -> dict[str, object]:
     return _base_row(
         lane=lane,
+        category=category,
         source_path=source_path,
         status="SOURCE_MISSING",
-        direction="",
-        current_starts=None,
-        required_starts=None,
-        current_days=None,
-        required_days=None,
-        current_breadth=None,
-        required_breadth=None,
-        breadth_label="PITCHERS",
-        secondary="",
-        ready=False,
         action="REFRESH_REPORT_ONLY_RESEARCH_SOURCE",
-        reason="Report-only research source is missing; no evidence is reconstructed.",
-        source_version="",
+        reason="Authoritative report-only research source is missing; no evidence is reconstructed.",
     )
 
 
 def _crusher_lane(data_dir: Path) -> dict[str, object]:
     filename = "projection_crusher_shadow_gate.csv"
-    source_path = f"data/{filename}"
+    source = f"data/{filename}"
     frame = _read(data_dir, filename)
     if frame.empty:
-        return _missing("Projection Crusher Shadow", source_path)
+        return _missing("Projection Crusher Shadow", "K_RESEARCH", source)
     row = frame.iloc[0]
+    report_only, authority = _source_contract(row)
     return _base_row(
-        lane="Projection Crusher Shadow",
-        source_path=source_path,
+        lane="Projection Crusher Shadow", category="K_RESEARCH", source_path=source,
         status=_clean(row.get("Status")),
         direction=(
             f"beat_projection_rate={_pct(row.get('Beat_Projection_Rate'))}; "
             f"material_crusher_rate={_pct(row.get('Material_Crusher_Rate'))}; "
             f"mean_k_residual={_number(row.get('Mean_K_Residual')) if _number(row.get('Mean_K_Residual')) is not None else 'NA'}"
         ),
-        current_starts=_integer(row.get("Resolved_Starts")),
-        required_starts=_integer(row.get("Required_Starts")),
-        current_days=_integer(row.get("Resolved_Days")),
-        required_days=_integer(row.get("Required_Days")),
-        current_breadth=_integer(row.get("Distinct_Pitchers")),
-        required_breadth=_integer(row.get("Required_Pitchers")),
-        breadth_label="PITCHERS",
+        current_starts=_integer(row.get("Resolved_Starts")), required_starts=_integer(row.get("Required_Starts")),
+        current_days=_integer(row.get("Resolved_Days")), required_days=_integer(row.get("Required_Days")),
+        breadth_label="PITCHERS", current_breadth=_integer(row.get("Distinct_Pitchers")), required_breadth=_integer(row.get("Required_Pitchers")),
         secondary=f"cohorts_tracked={_integer(row.get('Cohorts_Tracked')) or 0}; exact_projection_outcome=true",
-        ready=_truthy(row.get("Ready_For_Manual_Review")),
-        action=_clean(row.get("Recommended_Action")),
-        reason=_clean(row.get("Reason")),
+        ready=_truthy(row.get("Ready_For_Manual_Review")), action=_clean(row.get("Recommended_Action")),
+        reason=_clean(row.get("Reason")), report_only=report_only, authority=authority,
         source_version=_clean(row.get("Research_Version")),
     )
 
 
 def _underperformer_lane(data_dir: Path) -> dict[str, object]:
     filename = "projection_underperformer_shadow_gate.csv"
-    source_path = f"data/{filename}"
+    source = f"data/{filename}"
     frame = _read(data_dir, filename)
     if frame.empty:
-        return _missing("Projection Underperformer Shadow", source_path)
+        return _missing("Projection Underperformer Shadow", "K_RESEARCH", source)
     row = frame.iloc[0]
+    report_only, authority = _source_contract(row)
     return _base_row(
-        lane="Projection Underperformer Shadow",
-        source_path=source_path,
+        lane="Projection Underperformer Shadow", category="K_RESEARCH", source_path=source,
         status=_clean(row.get("Status")),
         direction=(
             f"below_projection_rate={_pct(row.get('Below_Projection_Rate'))}; "
             f"material_underperform_rate={_pct(row.get('Material_Underperform_Rate'))}; "
             f"mean_k_residual={_number(row.get('Mean_K_Residual')) if _number(row.get('Mean_K_Residual')) is not None else 'NA'}"
         ),
-        current_starts=_integer(row.get("Resolved_Starts")),
-        required_starts=_integer(row.get("Required_Starts")),
-        current_days=_integer(row.get("Resolved_Days")),
-        required_days=_integer(row.get("Required_Days")),
-        current_breadth=_integer(row.get("Distinct_Pitchers")),
-        required_breadth=_integer(row.get("Required_Pitchers")),
-        breadth_label="PITCHERS",
+        current_starts=_integer(row.get("Resolved_Starts")), required_starts=_integer(row.get("Required_Starts")),
+        current_days=_integer(row.get("Resolved_Days")), required_days=_integer(row.get("Required_Days")),
+        breadth_label="PITCHERS", current_breadth=_integer(row.get("Distinct_Pitchers")), required_breadth=_integer(row.get("Required_Pitchers")),
         secondary=f"cohorts_tracked={_integer(row.get('Cohorts_Tracked')) or 0}; exact_projection_outcome=true; negative_tail=true",
-        ready=_truthy(row.get("Ready_For_Manual_Review")),
-        action=_clean(row.get("Recommended_Action")),
-        reason=_clean(row.get("Reason")),
+        ready=_truthy(row.get("Ready_For_Manual_Review")), action=_clean(row.get("Recommended_Action")),
+        reason=_clean(row.get("Reason")), report_only=report_only, authority=authority,
         source_version=_clean(row.get("Research_Version")),
     )
 
 
 def _ladder_lane(data_dir: Path) -> dict[str, object]:
     filename = "k_ladder_reliability_shadow_gate.csv"
-    source_path = f"data/{filename}"
+    source = f"data/{filename}"
     frame = _read(data_dir, filename)
     if frame.empty:
-        return _missing("K Ladder Reliability Shadow", source_path)
+        return _missing("K Ladder Reliability Shadow", "K_RESEARCH", source)
     row = frame.iloc[0]
+    report_only, authority = _source_contract(row)
     return _base_row(
-        lane="K Ladder Reliability Shadow",
-        source_path=source_path,
+        lane="K Ladder Reliability Shadow", category="K_RESEARCH", source_path=source,
         status=_clean(row.get("Status")),
         direction=(
             f"ladder_win_rate={_pct(row.get('Ladder_Win_Rate'))}; "
@@ -205,29 +216,156 @@ def _ladder_lane(data_dir: Path) -> dict[str, object]:
             f"calibration_gap={_pct(row.get('Calibration_Gap'), signed=True)}; "
             f"brier={_number(row.get('Brier_Score')) if _number(row.get('Brier_Score')) is not None else 'NA'}"
         ),
-        current_starts=_integer(row.get("Resolved_Calls")),
-        required_starts=_integer(row.get("Required_Calls")),
-        current_days=_integer(row.get("Resolved_Days")),
-        required_days=_integer(row.get("Required_Days")),
-        current_breadth=_integer(row.get("Distinct_Pitchers")),
-        required_breadth=_integer(row.get("Required_Pitchers")),
-        breadth_label="PITCHERS",
+        current_starts=_integer(row.get("Resolved_Calls")), required_starts=_integer(row.get("Required_Calls")),
+        current_days=_integer(row.get("Resolved_Days")), required_days=_integer(row.get("Required_Days")),
+        breadth_label="PITCHERS", current_breadth=_integer(row.get("Distinct_Pitchers")), required_breadth=_integer(row.get("Required_Pitchers")),
         secondary=(
-            f"probability_coverage={_pct(row.get('Probability_Coverage'))}/"
-            f"{_pct(row.get('Required_Probability_Coverage'))}; cohorts_tracked={_integer(row.get('Cohorts_Tracked')) or 0}; "
-            "sportsbook_execution=false"
+            f"probability_coverage={_pct(row.get('Probability_Coverage'))}/{_pct(row.get('Required_Probability_Coverage'))}; "
+            f"cohorts_tracked={_integer(row.get('Cohorts_Tracked')) or 0}; sportsbook_execution=false"
         ),
-        ready=_truthy(row.get("Ready_For_Manual_Review")),
-        action=_clean(row.get("Recommended_Action")),
-        reason=_clean(row.get("Reason")),
+        ready=_truthy(row.get("Ready_For_Manual_Review")), action=_clean(row.get("Recommended_Action")),
+        reason=_clean(row.get("Reason")), report_only=report_only, authority=authority,
         source_version=_clean(row.get("Research_Version")),
+    )
+
+
+def _input_quality_lane(data_dir: Path, metric: str) -> dict[str, object]:
+    filename = "input_quality_matched_v2_summary.csv"
+    source = f"data/{filename}"
+    frame = _read(data_dir, filename)
+    lane = f"Input Quality v2 · {metric.title() if metric != 'STRIKEOUTS' else 'Strikeouts'}"
+    if frame.empty:
+        return _missing(lane, "INPUT_QUALITY", source)
+    rule = frame.get("Rule", pd.Series(index=frame.index, dtype=str)).astype(str)
+    metrics = frame.get("Metric", pd.Series(index=frame.index, dtype=str)).astype(str).str.upper()
+    selected = frame.loc[rule.eq(INPUT_QUALITY_PRIMARY_RULE.name) & metrics.eq(metric)]
+    if selected.empty:
+        return _missing(lane, "INPUT_QUALITY", source)
+    row = selected.iloc[0]
+    status = _clean(row.get("Status"))
+    authority = _clean(row.get("Production_Authority")) or PRODUCTION_AUTHORITY
+    return _base_row(
+        lane=lane, category="INPUT_QUALITY", source_path=source, status=status,
+        direction=(
+            f"relative_mae_deep_vs_shallow={_pct(row.get('Relative_MAE_Improvement_Deep_vs_Shallow'), signed=True)}; "
+            f"shallow_bias={_number(row.get('Shallow_Bias')) if _number(row.get('Shallow_Bias')) is not None else 'NA'}; "
+            f"deep_bias={_number(row.get('Deep_Bias')) if _number(row.get('Deep_Bias')) is not None else 'NA'}"
+        ),
+        current_starts=_integer(row.get("Matched_Pairs")), required_starts=INPUT_QUALITY_MIN_MATCHED_PAIRS,
+        breadth_label="MATCHED PAIRS", current_breadth=_integer(row.get("Matched_Pairs")), required_breadth=INPUT_QUALITY_MIN_MATCHED_PAIRS,
+        secondary=(
+            f"eligible_shallow={_integer(row.get('Eligible_Shallow')) or 0}; eligible_deep={_integer(row.get('Eligible_Deep')) or 0}; "
+            f"future_only={_clean(row.get('Future_Only_Start'))}; rule={INPUT_QUALITY_PRIMARY_RULE.name}"
+        ),
+        ready=False,
+        action="PRESERVE_FROZEN_MATCHED_COHORT_AND_LEARN" if status == "LEARNING" else "MANUAL_RESEARCH_REVIEW_ONLY",
+        reason="Primary frozen matched-cohort source verdict; same-pitcher sensitivity remains diagnostic and no production behavior is activated.",
+        authority=authority, source_version=_clean(row.get("Audit_Version")),
+    )
+
+
+def _calibration_common_mode_lane(data_dir: Path) -> dict[str, object]:
+    filename = "calibration_common_mode_v2_summary.csv"
+    source = f"data/{filename}"
+    frame = _read(data_dir, filename)
+    if frame.empty:
+        return _missing("Calibration Common-Mode v2", "CALIBRATION", source)
+    row = frame.iloc[0]
+    status = _clean(row.get("Status"))
+    authority = _clean(row.get("Production_Authority")) or PRODUCTION_AUTHORITY
+    return _base_row(
+        lane="Calibration Common-Mode v2", category="CALIBRATION", source_path=source, status=status,
+        direction=(
+            f"relative_mae={_pct(row.get('Relative_MAE_Improvement'), signed=True)}; "
+            f"win_share={_pct(row.get('Candidate_Win_Share'))}; "
+            f"baseline_bias={_number(row.get('Baseline_Bias')) if _number(row.get('Baseline_Bias')) is not None else 'NA'}; "
+            f"candidate_bias={_number(row.get('Candidate_Bias')) if _number(row.get('Candidate_Bias')) is not None else 'NA'}"
+        ),
+        current_starts=_integer(row.get("OOS_Starts")), required_starts=CAL_V2_MIN_OOS_STARTS,
+        current_days=_integer(row.get("Evidence_Days")), required_days=CAL_V2_MIN_EVIDENCE_DAYS,
+        breadth_label="PITCHERS", current_breadth=_integer(row.get("Distinct_Pitchers")), required_breadth=CAL_V2_MIN_DISTINCT_PITCHERS,
+        secondary=f"eligible_future={_integer(row.get('Eligible_Future_Starts')) or 0}; future_only={_clean(row.get('Future_Only_Start'))}",
+        ready=status == "HELPING",
+        action="MANUAL_RESEARCH_REVIEW_ONLY" if status == "HELPING" else "KEEP_COMMON_MODE_V2_FROZEN_AND_LEARN",
+        reason="Frozen future-only post-blend common-mode challenger; source status controls the verdict and automatic activation remains forbidden.",
+        authority=authority, source_version=_clean(row.get("Audit_Version")),
+    )
+
+
+def _ml_challenger_lane(data_dir: Path) -> dict[str, object]:
+    filename = "ml_shadow_summary.csv"
+    source = f"data/{filename}"
+    frame = _read(data_dir, filename)
+    if frame.empty:
+        return _missing("ML Challenger", "ML", source)
+    challenger = frame.get("Challenger", pd.Series(index=frame.index, dtype=str)).astype(str)
+    primary = frame.loc[challenger.eq("ML_SHADOW")]
+    row = (primary if not primary.empty else frame.head(1)).iloc[0]
+    report_only, authority = _source_contract(row)
+    equal = frame.loc[challenger.eq("SIM_MATH_ML_EQUAL_THIRDS")]
+    equal_status = _clean(equal.iloc[0].get("Status")) if not equal.empty else "NA"
+    return _base_row(
+        lane="ML Challenger", category="ML", source_path=source, status=_clean(row.get("Status")),
+        direction=(
+            f"relative_mae={_pct(row.get('Relative_MAE_Improvement'), signed=True)}; "
+            f"win_share={_pct(row.get('Candidate_Win_Share'))}; "
+            f"existing_bias={_number(row.get('Existing_Bias')) if _number(row.get('Existing_Bias')) is not None else 'NA'}; "
+            f"candidate_bias={_number(row.get('Candidate_Bias')) if _number(row.get('Candidate_Bias')) is not None else 'NA'}"
+        ),
+        current_starts=_integer(row.get("OOS_Starts")), breadth_label="OOS STARTS",
+        secondary=(
+            f"equal_thirds_status={equal_status}; live_projection_use={_clean(row.get('Live_Projection_Use'))}; "
+            f"market_features_used={_clean(row.get('Market_Features_Used'))}"
+        ),
+        ready=False, action="PRESERVE_NEGATIVE_ML_EVIDENCE_NO_PROMOTION",
+        reason=_clean(row.get("Reason")) or "Native ML shadow verdict; challenger remains report-only.",
+        report_only=report_only, authority=authority, source_version=_clean(row.get("Validation_Version")),
+    )
+
+
+def _workload_v25_lane(data_dir: Path) -> dict[str, object]:
+    filename = "workload_v25_summary.csv"
+    source = f"data/{filename}"
+    frame = _read(data_dir, filename)
+    if frame.empty:
+        return _missing("Workload v2.5 Candidates", "WORKLOAD", source)
+    season = pd.to_numeric(frame.get("Season"), errors="coerce")
+    latest_season = int(season.max()) if season.notna().any() else None
+    latest = frame.loc[season.eq(latest_season)].copy() if latest_season is not None else frame.copy()
+    statuses = sorted({_clean(value) for value in latest.get("V25_Status", pd.Series(dtype=str)) if _clean(value)})
+    status = " / ".join(statuses) if statuses else "UNKNOWN"
+    signals: list[str] = []
+    adjusted: list[str] = []
+    for _, row in latest.iterrows():
+        metric = _clean(row.get("Metric")) or "UNKNOWN"
+        signals.append(f"{metric}:mae_vs_v23={_pct(row.get('Relative_MAE_vs_v23'), signed=True)},win={_pct(row.get('V25_Win_Share_vs_v23'))}")
+        adjusted.append(f"{metric}={_integer(row.get('V25_Adjusted_Starts')) or 0}")
+    return _base_row(
+        lane="Workload v2.5 Candidates", category="WORKLOAD", source_path=source, status=status,
+        direction="; ".join(signals),
+        current_starts=_integer(latest.get("Evaluated_Starts", pd.Series(dtype=float)).max()) if not latest.empty else None,
+        breadth_label="METRICS", current_breadth=int(len(latest)), required_breadth=3,
+        secondary=f"season={latest_season if latest_season is not None else 'NA'}; adjusted_starts=" + ",".join(adjusted),
+        ready=False, action="PRESERVE_WORKLOAD_V25_REPORT_ONLY",
+        reason="Cross-season workload challenger evidence is retained for accountability; it is not a live workload activation path.",
+        source_version=_clean(latest.iloc[0].get("Candidate_Version")) if not latest.empty else "",
     )
 
 
 def build_promotion_command_center(data_dir: Path | str = "data") -> pd.DataFrame:
     root = Path(data_dir)
     base = build_command_center(root).copy()
-    extra = pd.DataFrame([_crusher_lane(root), _underperformer_lane(root), _ladder_lane(root)], columns=COLUMNS)
+    extra = pd.DataFrame([
+        _crusher_lane(root),
+        _underperformer_lane(root),
+        _ladder_lane(root),
+        _input_quality_lane(root, "STRIKEOUTS"),
+        _input_quality_lane(root, "HITS"),
+        _input_quality_lane(root, "OUTS"),
+        _calibration_common_mode_lane(root),
+        _ml_challenger_lane(root),
+        _workload_v25_lane(root),
+    ], columns=COLUMNS)
     extra_names = set(extra["Lane"].astype(str))
     if not base.empty:
         base = base.loc[~base["Lane"].astype(str).isin(extra_names)].copy()
