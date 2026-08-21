@@ -324,11 +324,61 @@ def _ml_challenger_lane(data_dir: Path) -> dict[str, object]:
 
 
 def _workload_v25_lane(data_dir: Path) -> dict[str, object]:
+    decision_filename = "workload_promotion_decisions.csv"
+    decision_source = f"data/{decision_filename}"
+    decisions = _read(data_dir, decision_filename)
+    if not decisions.empty:
+        work = decisions.copy()
+        work["_metric"] = work.get("Metric", pd.Series(index=work.index, dtype=str)).fillna("").astype(str).str.upper()
+        metric_order = {"PITCHES": 0, "BF": 1, "OUTS": 2}
+        work["_metric_order"] = work["_metric"].map(metric_order).fillna(99)
+        work = work.sort_values(["_metric_order", "_metric"]).reset_index(drop=True)
+
+        source_decisions = [_clean(value).upper() for value in work.get("Decision", pd.Series(dtype=str)) if _clean(value)]
+        decision_rank = {"PROMOTE": 0, "HOLD": 1, "REJECT": 2}
+        unique_decisions = sorted(set(source_decisions), key=lambda value: (decision_rank.get(value, 99), value))
+        status = " / ".join(unique_decisions) if unique_decisions else "UNKNOWN"
+
+        signals: list[str] = []
+        passing: list[str] = []
+        better: list[str] = []
+        for _, row in work.iterrows():
+            metric = _clean(row.get("Metric")).upper() or "UNKNOWN"
+            decision = _clean(row.get("Decision")).upper() or "UNKNOWN"
+            version = _clean(row.get("Recommended_Version")) or "NONE"
+            signals.append(f"{metric}:{decision} {version} pooled_relative_mae={_pct(row.get('Pooled_Relative_MAE'), signed=True)}")
+            passing.append(f"{metric}={_integer(row.get('Passing_Seasons')) or 0}/{_integer(row.get('Required_Seasons')) or 0}")
+            better.append(f"{metric}={_integer(row.get('MAE_Better_Seasons')) or 0}")
+
+        report_values = work.get("Report_Only", pd.Series(True, index=work.index)).map(_truthy)
+        report_only = bool(report_values.all()) if not report_values.empty else REPORT_ONLY
+        authority_values = sorted({_clean(value).upper() for value in work.get("Production_Authority", pd.Series(dtype=str)) if _clean(value)})
+        authority = authority_values[0] if len(authority_values) == 1 else " / ".join(authority_values)
+        ready = "PROMOTE" in unique_decisions
+        source_versions = sorted({_clean(value) for value in work.get("Report_Version", pd.Series(dtype=str)) if _clean(value)})
+
+        return _base_row(
+            lane="Workload v2.5 Candidates", category="WORKLOAD", source_path=decision_source, status=status,
+            direction="; ".join(signals),
+            breadth_label="METRICS", current_breadth=int(len(work)), required_breadth=3,
+            secondary="passing_seasons=" + ",".join(passing) + "; mae_better_seasons=" + ",".join(better),
+            ready=ready,
+            action="MANUAL_RESEARCH_REVIEW_ONLY" if ready else "PRESERVE_WORKLOAD_PROMOTION_DECISIONS_REPORT_ONLY",
+            reason=(
+                "Authoritative cross-season workload promotion decisions are displayed without regrading; "
+                "every metric remains report-only and any PROMOTE decision opens manual review only."
+            ),
+            report_only=report_only,
+            authority=authority or PRODUCTION_AUTHORITY,
+            source_version=" / ".join(source_versions),
+        )
+
+    # Backward-compatible fallback for isolated tests or incomplete research refreshes.
     filename = "workload_v25_summary.csv"
     source = f"data/{filename}"
     frame = _read(data_dir, filename)
     if frame.empty:
-        return _missing("Workload v2.5 Candidates", "WORKLOAD", source)
+        return _missing("Workload v2.5 Candidates", "WORKLOAD", decision_source)
     season = pd.to_numeric(frame.get("Season"), errors="coerce")
     latest_season = int(season.max()) if season.notna().any() else None
     latest = frame.loc[season.eq(latest_season)].copy() if latest_season is not None else frame.copy()
@@ -347,10 +397,9 @@ def _workload_v25_lane(data_dir: Path) -> dict[str, object]:
         breadth_label="METRICS", current_breadth=int(len(latest)), required_breadth=3,
         secondary=f"season={latest_season if latest_season is not None else 'NA'}; adjusted_starts=" + ",".join(adjusted),
         ready=False, action="PRESERVE_WORKLOAD_V25_REPORT_ONLY",
-        reason="Cross-season workload challenger evidence is retained for accountability; it is not a live workload activation path.",
+        reason="Fallback latest-season v2.5 evidence only; authoritative cross-season promotion decisions are not available in this refresh.",
         source_version=_clean(latest.iloc[0].get("Candidate_Version")) if not latest.empty else "",
     )
-
 
 def build_promotion_command_center(data_dir: Path | str = "data") -> pd.DataFrame:
     root = Path(data_dir)
