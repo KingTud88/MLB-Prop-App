@@ -28,10 +28,10 @@ def test_bet_tracker_command_filters_and_sections_are_present():
     source = path.read_text(encoding="utf-8")
     assert "BET_TRACKER_FILTERS_V1" in source
     for label in (
-        'selectbox("Status", ["All", "Open / Live", "Settled", "Invalid"]',
-        'selectbox("Ticket type", ["All", "Straight", "Parlay"]',
-        'selectbox("Pitcher", ["All"] + pitcher_options',
-        'selectbox("Game date", ["All"] + date_options',
+        'selectbox("Status", status_options',
+        'selectbox("Ticket type", type_options',
+        'selectbox("Pitcher", pitcher_choices',
+        'selectbox("Game date", date_choices',
         '"OPEN / LIVE STRAIGHTS"',
         '"PARLAY TICKETS"',
         '"SETTLED STRAIGHTS"',
@@ -61,7 +61,7 @@ def test_bet_tracker_delete_and_filters_are_fragment_scoped():
     start = source.index(marker)
     block = source[start:]
     assert "@st.fragment\ndef render_tracker_workspace(" in block
-    assert 'selectbox("Status", ["All", "Open / Live", "Settled", "Invalid"]' in block
+    assert 'selectbox("Status", status_options' in block
     assert 'with st.expander("🗑️ Delete a saved bet"' in block
     assert '"Confirm deletion of this saved ticket"' in block
     assert '"🗑️ Delete selected bet"' in block
@@ -82,4 +82,22 @@ def test_bet_tracker_preserves_raw_persisted_key_before_display_normalization():
     assert 'tracker["_PersistedBetKey"] = [bet_row_key(row) for _, row in tracker.iterrows()]' in source
     assert source.index(marker) < source.index('tracker.loc[straight_mask, "market"]')
     assert source.count('"_BetKey": str(row.get("_PersistedBetKey") or bet_row_key(row)),') == 2
+
+def test_bet_tracker_filter_and_delete_choices_wait_for_submit():
+    path = Path(__file__).resolve().parents[1] / "pages" / "2_Bet_Tracker.py"
+    source = path.read_text(encoding="utf-8")
+    compile(source, str(path), "exec")
+    marker = "# BET_TRACKER_SUBMIT_CONTROLS_V1"
+    assert marker in source
+    block = source[source.index("# BET_TRACKER_FRAGMENT_WORKSPACE_V1"):]
+    assert 'with st.form("bet_tracker_filter_form", clear_on_submit=False):' in block
+    assert 'apply_filters = st.form_submit_button("Apply filters"' in block
+    assert 'st.session_state["_bet_tracker_applied_status_filter"] = status_draft' in block
+    assert 'st.session_state["_bet_tracker_applied_type_filter"] = type_draft' in block
+    assert 'with st.form("bet_tracker_delete_form", clear_on_submit=False):' in block
+    assert 'delete_submitted = st.form_submit_button(' in block
+    delete_block = block[block.index('with st.expander("🗑️ Delete a saved bet"'):block.index("# BET_TRACKER_TICKET_CARDS_V1")]
+    assert "st.button(" not in delete_block
+    assert 'st.session_state["_bet_tracker_reset_delete_key"] = True' in block
+    assert 'st.rerun(scope="fragment")' in block
 
