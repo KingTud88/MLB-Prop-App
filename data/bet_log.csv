@@ -1,2 +1,1 @@
 player,game_date,line,side,american_odds,entered_at_utc,projection,model_probability,implied_probability,edge,confidence,actual_strikeouts,game_pk,pitcher_id,bet_type,parlay_legs,market,stake,book,source,data_quality,app_version,probability_semantics,snapshot_captured_at_utc,bet_id
-George Kirby,2026-08-08,4.5,over,-145.0,,5.57269009562685,0.60696,0.5918367346938775,0.0151232653061225,Low,,823102.0,669923.0,,,,,,,,,,,
