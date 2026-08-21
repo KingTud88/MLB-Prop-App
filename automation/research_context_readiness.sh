@@ -31,6 +31,7 @@ PYTHONPATH=. pytest -q \
   tests/test_research_evidence_command_center.py \
   tests/test_research_promotion_command_center.py \
   tests/test_research_governance_v2.py \
+  tests/test_research_governance_uncertainty_extensions.py \
   tests/test_research_direction_flip_review.py \
   tests/test_calibration_shadow_governance_metadata.py \
   tests/test_research_promotion_governance_integration.py \

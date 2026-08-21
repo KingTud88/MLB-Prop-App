@@ -463,6 +463,30 @@ def _date_block_interval(
     return estimate, float(low), float(high), int(len(work)), block_count
 
 
+def _paired_bootstrap_interval(
+    frame: pd.DataFrame,
+    *,
+    value_col: str,
+    token: str,
+) -> tuple[float | None, float | None, float | None, int, int]:
+    if frame is None or frame.empty or value_col not in frame.columns:
+        return None, None, None, 0, 0
+    values = pd.to_numeric(frame[value_col], errors="coerce").dropna().to_numpy(float)
+    n = int(len(values))
+    if n == 0:
+        return None, None, None, 0, 0
+    estimate = float(values.mean())
+    if n < 2:
+        return estimate, None, None, n, n
+    rng = np.random.default_rng(_stable_seed(token))
+    samples = np.empty(BOOTSTRAP_SAMPLES, dtype=float)
+    for pos in range(BOOTSTRAP_SAMPLES):
+        chosen = rng.integers(0, n, size=n)
+        samples[pos] = float(values[chosen].mean())
+    low, high = np.quantile(samples, [0.025, 0.975])
+    return estimate, float(low), float(high), n, n
+
+
 def _uncertainty_row(
     lane: str,
     segment: str,
@@ -503,6 +527,43 @@ def build_uncertainty_report(data_dir: Path | str = "data") -> pd.DataFrame:
                 "Baseline_Brier_minus_Candidate_Brier",
                 _date_block_interval(group, date_col="game_date", value_col="_improvement", token=token),
             ))
+
+    input_quality = _read(root, "input_quality_matched_v2_pairs.csv")
+    if not input_quality.empty and {"Rule", "Metric", "Absolute_Error_Delta_Shallow_Minus_Deep"}.issubset(input_quality.columns):
+        primary = input_quality.loc[input_quality["Rule"].astype(str).eq("primary_pregame_matched")].copy()
+        for metric, group in primary.groupby("Metric", dropna=False):
+            metric_name = str(metric).upper()
+            lane_metric = "Strikeouts" if metric_name == "STRIKEOUTS" else metric_name.title()
+            rows.append(_uncertainty_row(
+                f"Input Quality v2 · {lane_metric}",
+                "PRIMARY FROZEN MATCHED PAIRS",
+                "Shallow_Absolute_Error_minus_Deep_Absolute_Error",
+                _paired_bootstrap_interval(
+                    group,
+                    value_col="Absolute_Error_Delta_Shallow_Minus_Deep",
+                    token=f"Input Quality v2|{metric_name}|paired-mae",
+                ),
+                method="paired bootstrap of frozen one-to-one matched-pair error deltas; 1000 deterministic resamples",
+            ))
+
+    common_mode = _read(root, "calibration_common_mode_v2_detail.csv")
+    if not common_mode.empty and {"Game_Date", "Candidate_Ready", "Baseline_Absolute_Error", "Candidate_Absolute_Error"}.issubset(common_mode.columns):
+        ready = common_mode.loc[common_mode["Candidate_Ready"].map(_truthy)].copy()
+        ready["_improvement"] = (
+            pd.to_numeric(ready["Baseline_Absolute_Error"], errors="coerce")
+            - pd.to_numeric(ready["Candidate_Absolute_Error"], errors="coerce")
+        )
+        rows.append(_uncertainty_row(
+            "Calibration Common-Mode v2",
+            "FUTURE-ONLY READY STARTS",
+            "Absolute_Error_Improvement",
+            _date_block_interval(
+                ready,
+                date_col="Game_Date",
+                value_col="_improvement",
+                token="Calibration Common-Mode v2|mae",
+            ),
+        ))
 
     starter = _read(root, "live_role_shadow_detail.csv")
     if not starter.empty and {"Baseline_Error", "Candidate_Error", "Role", "Metric"}.issubset(starter.columns):
