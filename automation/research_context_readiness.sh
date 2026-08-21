@@ -68,6 +68,7 @@ PYTHONPATH=. python -m training.research_evidence_history \
 PYTHONPATH=. python -m training.research_evidence_transition_digest \
   --refresh-at-utc "${RESEARCH_REFRESH_AT_UTC}"
 PYTHONPATH=. python -m training.research_manual_review_packet \
+  --command-center data/research_promotion_command_center.csv \
   --refresh-at-utc "${RESEARCH_REFRESH_AT_UTC}"
 PYTHONPATH=. python -m training.research_multicell_review_injector \
   --refresh-at-utc "${RESEARCH_REFRESH_AT_UTC}"
