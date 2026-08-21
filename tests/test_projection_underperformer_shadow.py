@@ -87,9 +87,9 @@ def test_underperformer_gate_never_authorizes_production_change():
 
 def test_future_or_legacy_outcomes_are_not_reconstructed_into_current_shadow():
     frame = pd.DataFrame([
-        {"player": "Legacy", "projection": 7.0, "actual_strikeouts": 1, "history_semantics": "legacy"},
-        {"player": "Current", "projection": 6.0, "actual_strikeouts": 4, "history_semantics": HISTORY_SEMANTICS},
-        {"player": "Pending", "projection": 6.0, "actual_strikeouts": None, "history_semantics": HISTORY_SEMANTICS},
+        {"player": "Legacy", "game_date": "2026-08-01", "projection": 7.0, "actual_strikeouts": 1, "history_semantics": "legacy"},
+        {"player": "Current", "game_date": "2026-08-02", "projection": 6.0, "actual_strikeouts": 4, "history_semantics": HISTORY_SEMANTICS},
+        {"player": "Pending", "game_date": "2026-08-03", "projection": 6.0, "actual_strikeouts": None, "history_semantics": HISTORY_SEMANTICS},
     ])
     detail = build_detail(frame)
     assert detail["Pitcher"].tolist() == ["Current"]
