@@ -24,6 +24,7 @@ jobs:
           if ! grep -q 'BET_TRACKER_SUBMIT_CONTROLS_V1' pages/2_Bet_Tracker.py; then
             python tools/patch_bet_tracker_submit_controls.py
           fi
+          python tools/patch_bet_tracker_submit_test_contracts.py
       - name: Install and validate
         run: |
           pip install -r requirements.txt pytest
