@@ -2,7 +2,6 @@ Pitcher,Resolved_Starts,Beat_Projection_Count,Beat_Projection_Rate,Mean_K_Residu
 Reid Detmers,1,1,1.0,5.695457211979475,5.695457211979475,1,1.0,True,NONE,projection-crusher-shadow-v1-report-only
 Cade Cavalli,2,2,1.0,5.059375164964646,5.059375164964646,2,1.0,True,NONE,projection-crusher-shadow-v1-report-only
 Shota Imanaga,1,1,1.0,4.681753329290379,4.681753329290379,1,1.0,True,NONE,projection-crusher-shadow-v1-report-only
-Chris Sale,1,1,1.0,3.5145405028303056,3.5145405028303056,1,1.0,True,NONE,projection-crusher-shadow-v1-report-only
 Aaron Nola,2,2,1.0,3.3075348894204177,3.3075348894204177,2,1.0,True,NONE,projection-crusher-shadow-v1-report-only
 Ian Seymour,2,2,1.0,3.21151256254819,3.21151256254819,2,1.0,True,NONE,projection-crusher-shadow-v1-report-only
 Dylan Cease,1,1,1.0,3.202057363826029,3.202057363826029,1,1.0,True,NONE,projection-crusher-shadow-v1-report-only
@@ -21,6 +20,7 @@ Parker Messick,2,2,1.0,2.2202597089014056,2.2202597089014056,1,0.5,True,NONE,pro
 Tyler Phillips,1,1,1.0,2.133607217584105,2.133607217584105,1,1.0,True,NONE,projection-crusher-shadow-v1-report-only
 Christian Scott,1,1,1.0,2.1073788384389003,2.1073788384389003,1,1.0,True,NONE,projection-crusher-shadow-v1-report-only
 George Klassen,2,2,1.0,2.0559197379661205,2.0559197379661205,1,0.5,True,NONE,projection-crusher-shadow-v1-report-only
+Chris Sale,2,2,1.0,1.8159113860034397,1.8159113860034397,1,0.5,True,NONE,projection-crusher-shadow-v1-report-only
 J.T. Ginn,1,1,1.0,1.7444955934905835,1.7444955934905835,0,0.0,True,NONE,projection-crusher-shadow-v1-report-only
 Eric Lauer,2,2,1.0,1.701265551699013,1.701265551699013,0,0.0,True,NONE,projection-crusher-shadow-v1-report-only
 Sean Manaea,1,1,1.0,1.631810213247702,1.631810213247702,0,0.0,True,NONE,projection-crusher-shadow-v1-report-only
@@ -90,8 +90,8 @@ Andre Pallante,1,0,0.0,-0.03553366262685209,-0.03553366262685209,0,0.0,True,NONE
 Hunter Brown,1,0,0.0,-0.07281672738434875,-0.07281672738434875,0,0.0,True,NONE,projection-crusher-shadow-v1-report-only
 Shane Drohan,1,0,0.0,-0.0949913260599402,-0.0949913260599402,0,0.0,True,NONE,projection-crusher-shadow-v1-report-only
 Ryan Johnson,1,0,0.0,-0.1194260457116112,-0.1194260457116112,0,0.0,True,NONE,projection-crusher-shadow-v1-report-only
-Jacob Misiorowski,1,0,0.0,-0.33777522229199874,-0.33777522229199874,0,0.0,True,NONE,projection-crusher-shadow-v1-report-only
 Blake Snell,1,0,0.0,-0.35864760222480285,-0.35864760222480285,0,0.0,True,NONE,projection-crusher-shadow-v1-report-only
+Jacob Misiorowski,2,0,0.0,-0.38039195137511683,-0.38039195137511683,0,0.0,True,NONE,projection-crusher-shadow-v1-report-only
 Paul Skenes,1,0,0.0,-0.44336649740909273,-0.44336649740909273,0,0.0,True,NONE,projection-crusher-shadow-v1-report-only
 Walker Buehler,1,0,0.0,-0.52204327956815,-0.52204327956815,0,0.0,True,NONE,projection-crusher-shadow-v1-report-only
 Bailey Ober,1,0,0.0,-0.5526924260745343,-0.5526924260745343,0,0.0,True,NONE,projection-crusher-shadow-v1-report-only
