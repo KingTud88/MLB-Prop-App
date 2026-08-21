@@ -402,7 +402,7 @@ if o_resolved.any() and df.loc[o_resolved, "outs_projection"].notna().any():
     o_valid_error = o_error.dropna()
     o_mae_n = int(len(o_valid_error))
     o_mae_value = float(o_valid_error.abs().mean()) if o_mae_n else None
-mae3.metric("Total Outs MAE", f"{o_mae_value:.2f} outs" if o_mae_value is not None else "—", help=metric_help("history_outs_mae", current=(f"{o_mae_value:.2f} outs average absolute miss across {o_mae_n} valid projection/result pairs" if o_mae_value is not None else "No valid resolved Outs pairs yet")))
+mae3.metric("Total Outs MAE", f"{o_mae_value:.2f} outs" if o_mae_value is not None else "—", help=metric_help("history_outs_mae", current=(f"{o_mae_value:.2f} outs average absolute miss across {o_mae_n} valid pair(s)" if o_mae_value is not None else "No valid resolved Outs pairs yet")))
 
 st.caption("ⓘ Every scorecard now has its own info icon. 80% range coverage means the final result landed inside that market's frozen pregame interval; it is not a sportsbook win/loss grade. MAE measures average miss size.")
 explain_popover(
