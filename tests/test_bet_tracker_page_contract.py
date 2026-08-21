@@ -40,3 +40,14 @@ def test_bet_tracker_command_filters_and_sections_are_present():
         '"PRICED TRACKED BET"',
     ):
         assert label in source
+
+
+def test_bet_tracker_avoids_streamlit_cache_replay_for_data_helpers():
+    path = Path(__file__).resolve().parents[1] / "pages" / "2_Bet_Tracker.py"
+    source = path.read_text(encoding="utf-8")
+    assert "BET_TRACKER_PROCESS_TTL_CACHE_V1" in source
+    assert "@st.cache_data(" not in source
+    assert "@_local_ttl_cache(15)\ndef live_pitcher_prop(" in source
+    assert "@_local_ttl_cache(120)\ndef todays_slate(" in source
+    assert "@_local_ttl_cache(30)\ndef frozen_snapshot(" in source
+    assert "live_pitcher_prop.clear()" in source
