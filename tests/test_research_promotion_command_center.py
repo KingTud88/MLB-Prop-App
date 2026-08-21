@@ -168,14 +168,15 @@ def test_ml_negative_evidence_is_preserved_as_a_visible_lane(tmp_path: Path) -> 
     assert row["Production_Authority"] == "NONE"
 
 
-def test_workload_v25_latest_season_evidence_is_visible_but_not_promotion_ready(tmp_path: Path) -> None:
+def test_workload_lane_fails_closed_without_cross_season_decisions(tmp_path: Path) -> None:
     _write(tmp_path, "workload_v25_summary.csv", [
         {"Season": 2026, "Metric": "PITCHES", "Evaluated_Starts": 2032, "Relative_MAE_vs_v23": 0.0077, "V25_Adjusted_Starts": 312, "V25_Win_Share_vs_v23": 0.654, "V25_Status": "MIXED", "Candidate_Version": "v25-test"},
         {"Season": 2026, "Metric": "BF", "Evaluated_Starts": 2032, "Relative_MAE_vs_v23": 0.0019, "V25_Adjusted_Starts": 312, "V25_Win_Share_vs_v23": 0.551, "V25_Status": "MIXED", "Candidate_Version": "v25-test"},
         {"Season": 2026, "Metric": "OUTS", "Evaluated_Starts": 2032, "Relative_MAE_vs_v23": 0.0013, "V25_Adjusted_Starts": 312, "V25_Win_Share_vs_v23": 0.542, "V25_Status": "MIXED", "Candidate_Version": "v25-test"},
     ])
     row = build_promotion_command_center(tmp_path).set_index("Lane").loc["Workload v2.5 Candidates"]
-    assert row["Status"] == "MIXED"
-    assert int(row["Current_Breadth"]) == 3
+    assert row["Source_Path"] == "data/workload_promotion_decisions.csv"
+    assert row["Status"] == "SOURCE_MISSING"
+    assert row["Recommended_Action"] == "REFRESH_REPORT_ONLY_RESEARCH_SOURCE"
     assert not bool(row["Ready_For_Manual_Review"])
     assert row["Production_Authority"] == "NONE"
