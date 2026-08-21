@@ -120,7 +120,7 @@ def test_tracker_live_stats_prefer_boxscore_before_date_range_fallback():
     path = Path(__file__).resolve().parents[1] / "pages" / "2_Bet_Tracker.py"
     source = path.read_text(encoding="utf-8")
     start = source.index("def live_pitcher_prop(")
-    end = source.index("@st.cache_data(ttl=120", start)
+    end = source.index("@_local_ttl_cache(120)", start)
     block = source[start:end]
     live_pos = block.index("stat = _live_pitching_stats(found_game_pk, resolved_id)")
     fallback_pos = block.index("stat = _date_pitching_stats(resolved_id, game_date)")

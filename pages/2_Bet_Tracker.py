@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import time
+from functools import wraps
+from threading import RLock
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -38,6 +40,36 @@ MLB_HEADERS = {"Cache-Control": "no-cache", "Pragma": "no-cache", "Accept": "app
 ROOT = Path(__file__).resolve().parents[1]
 BET_LOG = ROOT / "data" / "bet_log.csv"
 EASTERN = ZoneInfo("America/New_York")
+
+
+# BET_TRACKER_PROCESS_TTL_CACHE_V1
+def _local_ttl_cache(ttl_seconds: float):
+    """Process-local TTL cache that never records/replays Streamlit elements."""
+    def decorator(func):
+        cache = {}
+        lock = RLock()
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            key = (args, tuple(sorted(kwargs.items())))
+            now = time.monotonic()
+            with lock:
+                cached = cache.get(key)
+                if cached is not None and now - cached[0] < ttl_seconds:
+                    return cached[1]
+            value = func(*args, **kwargs)
+            with lock:
+                cache[key] = (now, value)
+            return value
+
+        def clear() -> None:
+            with lock:
+                cache.clear()
+
+        wrapper.clear = clear
+        return wrapper
+
+    return decorator
 
 st.set_page_config(page_title="Bet Tracker", page_icon="📊", layout="wide")
 apply_page_theme()
@@ -232,7 +264,7 @@ def _live_status(game_pk: int | None, fallback: str) -> tuple[str, bool]:
     return fallback, final
 
 
-@st.cache_data(ttl=15, show_spinner=False)
+@_local_ttl_cache(15)
 def live_pitcher_prop(
     player_name: str,
     market: str,
@@ -267,7 +299,7 @@ def live_pitcher_prop(
         return None, f"{normalized} stat unavailable · {status}", final
 
 
-@st.cache_data(ttl=120, show_spinner=False)
+@_local_ttl_cache(120)
 def todays_slate(day: str) -> tuple[list[dict], str | None]:
     try:
         return daily_schedule(day), None
@@ -275,7 +307,7 @@ def todays_slate(day: str) -> tuple[list[dict], str | None]:
         return [], f"Today's MLB slate could not be loaded: {exc}"
 
 
-@st.cache_data(ttl=30, show_spinner=False)
+@_local_ttl_cache(30)
 def frozen_snapshot(day: str, pitcher_id: int, game_pk: int) -> dict | None:
     if not PROJECTION_LOG.exists():
         return None
