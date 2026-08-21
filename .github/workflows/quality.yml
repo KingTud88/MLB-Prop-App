@@ -4,98 +4,14 @@ on:
   push:
   pull_request:
 
-permissions:
-  contents: write
-
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
-      - name: Apply branch-only Bet Tracker command-center repair
-        if: github.event_name == 'pull_request' && github.head_ref == 'fix/bet-tracker-command-filters'
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          page = Path("pages/2_Bet_Tracker.py")
-          source = page.read_text(encoding="utf-8")
-
-          helper_marker = '''def _clean_text(value: object) -> str:\n    try:\n        if pd.isna(value):\n            return ""\n    except Exception:\n        pass\n    return str(value or "").strip()\n\n\ndef load_tracker() -> pd.DataFrame:\n'''
-          helper_replacement = '''def _clean_text(value: object) -> str:\n    try:\n        if pd.isna(value):\n            return ""\n    except Exception:\n        pass\n    return str(value or "").strip()\n\n\ndef _tracking_mode(result: object, source: object, odds: object) -> str:\n    result_text = str(result or "").strip().upper()\n    source_text = _clean_text(source)\n    if result_text == "INVALID LINE":\n        return "LEGACY INVALID LINE"\n    if _num(odds) is not None:\n        return "PRICED TRACKED BET"\n    source_lower = source_text.lower()\n    if "model" in source_lower or "ladder" in source_lower:\n        return "MODEL-ONLY / UNPRICED"\n    return "TRACKED / UNPRICED"\n\n\ndef load_tracker() -> pd.DataFrame:\n'''
-          if helper_marker not in source:
-              raise SystemExit("tracking-mode insertion marker not found")
-          source = source.replace(helper_marker, helper_replacement, 1)
-
-          parlay_marker = '''                "Projection": None,\n                "Model Probability": None,\n                "Edge": None,\n                "_Legs": leg_details,\n'''
-          parlay_replacement = '''                "Projection": None,\n                "Model Probability": None,\n                "Edge": None,\n                "Source": source_text or "—",\n                "_TrackingMode": _tracking_mode(result_text, source_text, odds),\n                "_TicketType": "Parlay",\n                "_Legs": leg_details,\n'''
-          if parlay_marker not in source:
-              raise SystemExit("parlay resolved-row marker not found")
-          source = source.replace(parlay_marker, parlay_replacement, 1)
-
-          straight_marker = '''        team = _clean_text(row.get("team"))\n        opponent = _clean_text(row.get("opponent"))\n        matchup = f"{team} vs {opponent}" if team and opponent else "—"\n        resolved_rows.append({\n'''
-          straight_replacement = '''        team = _clean_text(row.get("team"))\n        opponent = _clean_text(row.get("opponent"))\n        matchup = f"{team} vs {opponent}" if team and opponent else "—"\n        source_text = _clean_text(row.get("source"))\n        resolved_rows.append({\n'''
-          if straight_marker not in source:
-              raise SystemExit("straight resolved-row setup marker not found")
-          source = source.replace(straight_marker, straight_replacement, 1)
-
-          straight_fields_marker = '''            "Projection": _num(row.get("projection")),\n            "Model Probability": _num(row.get("model_probability")),\n            "Edge": _num(row.get("edge")),\n            "_Legs": [{\n'''
-          straight_fields_replacement = '''            "Projection": _num(row.get("projection")),\n            "Model Probability": _num(row.get("model_probability")),\n            "Edge": _num(row.get("edge")),\n            "Source": source_text or "—",\n            "_TrackingMode": _tracking_mode(grade.result, source_text, odds),\n            "_TicketType": "Straight",\n            "_Legs": [{\n'''
-          if straight_fields_marker not in source:
-              raise SystemExit("straight resolved-row field marker not found")
-          source = source.replace(straight_fields_marker, straight_fields_replacement, 1)
-
-          filter_marker = '''st.markdown('<div class="bt-section">Tracked Tickets</div>', unsafe_allow_html=True)\n\nticket_labels: dict[str, str] = {}\n'''
-          filter_replacement = '''# BET_TRACKER_FILTERS_V1\ndef _ticket_has_pitcher(legs: object, pitcher: str) -> bool:\n    if not isinstance(legs, list):\n        return False\n    target = str(pitcher or "").strip().lower()\n    return any(str(leg.get("Player", "")).strip().lower() == target for leg in legs if isinstance(leg, dict))\n\n\ndef _ticket_section(ticket: pd.Series) -> str:\n    if str(ticket.get("_TicketType", "Straight")) == "Parlay":\n        return "PARLAY TICKETS"\n    result = str(ticket.get("Result", "PENDING")).upper()\n    if result == "INVALID LINE":\n        return "LEGACY INVALID"\n    if result in {"WIN", "LOSS", "PUSH", "PUSH LEG"}:\n        return "SETTLED STRAIGHTS"\n    return "OPEN / LIVE STRAIGHTS"\n\n\nst.markdown('<div class="bt-section">Ticket Filters</div>', unsafe_allow_html=True)\nsettled_states = {"WIN", "LOSS", "PUSH", "PUSH LEG"}\npitcher_options = sorted({\n    str(leg.get("Player", "")).strip()\n    for legs in results["_Legs"]\n    if isinstance(legs, list)\n    for leg in legs\n    if isinstance(leg, dict) and str(leg.get("Player", "")).strip()\n})\ndate_options = sorted({str(value) for value in results["Date"].dropna().tolist() if str(value).strip()}, reverse=True)\nf1, f2, f3, f4 = st.columns([1.0, 1.0, 1.45, 1.0])\nstatus_filter = f1.selectbox("Status", ["All", "Open / Live", "Settled", "Invalid"], key="bet_tracker_status_filter")\ntype_filter = f2.selectbox("Ticket type", ["All", "Straight", "Parlay"], key="bet_tracker_type_filter")\npitcher_filter = f3.selectbox("Pitcher", ["All"] + pitcher_options, key="bet_tracker_pitcher_filter")\ndate_filter = f4.selectbox("Game date", ["All"] + date_options, key="bet_tracker_date_filter")\n\ndisplay_results = results.copy()\nresult_upper = display_results["Result"].astype(str).str.upper()\nif status_filter == "Open / Live":\n    display_results = display_results.loc[~result_upper.isin(settled_states | {"INVALID LINE"})]\nelif status_filter == "Settled":\n    display_results = display_results.loc[result_upper.isin(settled_states)]\nelif status_filter == "Invalid":\n    display_results = display_results.loc[result_upper.eq("INVALID LINE")]\nif type_filter != "All":\n    display_results = display_results.loc[display_results["_TicketType"].eq(type_filter)]\nif pitcher_filter != "All":\n    display_results = display_results.loc[display_results["_Legs"].map(lambda legs: _ticket_has_pitcher(legs, pitcher_filter))]\nif date_filter != "All":\n    display_results = display_results.loc[display_results["Date"].astype(str).eq(date_filter)]\nsection_order = {"OPEN / LIVE STRAIGHTS": 0, "PARLAY TICKETS": 1, "SETTLED STRAIGHTS": 2, "LEGACY INVALID": 3}\ndisplay_results = display_results.copy()\ndisplay_results["_SectionOrder"] = display_results.apply(lambda row: section_order[_ticket_section(row)], axis=1)\ndisplay_results = display_results.sort_values(["_SectionOrder", "_StatusPriority", "Date"], ascending=[True, True, False], kind="stable")\nst.caption(f"Showing {len(display_results)} of {len(results)} saved tickets. Summary metrics above remain all-time; filters only change the ticket cards below.")\n\nticket_labels: dict[str, str] = {}\n'''
-          if filter_marker not in source:
-              raise SystemExit("ticket-filter marker not found")
-          source = source.replace(filter_marker, filter_replacement, 1)
-
-          loop_marker = '''st.caption("Open any ticket to see each pitcher leg, live stat progress, line, game status, projection, and current grade.")\nfor ticket_index, (_, ticket) in enumerate(results.iterrows()):\n    ticket_result = str(ticket.get("Result", "PENDING"))\n'''
-          loop_replacement = '''st.caption("Open any ticket to see each pitcher leg, live stat progress, line, game status, projection, and current grade.")\nif display_results.empty:\n    st.info("No saved tickets match the current filters.")\n_last_ticket_section = None\nfor ticket_index, (_, ticket) in enumerate(display_results.iterrows()):\n    current_section = _ticket_section(ticket)\n    if current_section != _last_ticket_section:\n        st.markdown(f'<div class="bt-section">{current_section}</div>', unsafe_allow_html=True)\n        _last_ticket_section = current_section\n    ticket_result = str(ticket.get("Result", "PENDING"))\n'''
-          if loop_marker not in source:
-              raise SystemExit("ticket-card loop marker not found")
-          source = source.replace(loop_marker, loop_replacement, 1)
-
-          card_marker = '''        explain_popover(ticket_explanation(ticket),label="ⓘ WHY THIS TICKET STATUS?")\n        h1, h2, h3, h4, h5, h6 = st.columns(6)\n'''
-          card_replacement = '''        explain_popover(ticket_explanation(ticket),label="ⓘ WHY THIS TICKET STATUS?")\n        st.caption(f"{ticket.get('_TrackingMode', 'TRACKED BET')} · Source: {ticket.get('Source', '—')}")\n        h1, h2, h3, h4, h5, h6 = st.columns(6)\n'''
-          if card_marker not in source:
-              raise SystemExit("ticket-card metadata marker not found")
-          source = source.replace(card_marker, card_replacement, 1)
-
-          download_marker = '''    results.drop(columns=["_BetKey", "_StatusPriority"], errors="ignore").to_csv(index=False),\n'''
-          download_replacement = '''    results.drop(columns=["_BetKey", "_StatusPriority", "_SectionOrder"], errors="ignore").to_csv(index=False),\n'''
-          if download_marker not in source:
-              raise SystemExit("tracker download marker not found")
-          source = source.replace(download_marker, download_replacement, 1)
-
-          if "BET_TRACKER_FILTERS_V1" not in source:
-              raise SystemExit("filter contract marker missing after rewrite")
-          page.write_text(source, encoding="utf-8")
-
-          test_path = Path("tests/test_bet_tracker_page_contract.py")
-          test_source = test_path.read_text(encoding="utf-8")
-          addition = '''\n\ndef test_main_projection_routes_bet_tracker_to_command_page_before_schedule_work():\n    main = Path(__file__).resolve().parents[1] / "streamlit_app.py"\n    source = main.read_text(encoding="utf-8")\n    route = 'if nav == "Bet Tracker":\\n        st.switch_page("pages/2_Bet_Tracker.py")'\n    assert route in source\n    assert source.index(route) < source.index("schedule,err=get_schedule")\n\n\ndef test_bet_tracker_command_filters_and_sections_are_present():\n    path = Path(__file__).resolve().parents[1] / "pages" / "2_Bet_Tracker.py"\n    source = path.read_text(encoding="utf-8")\n    assert "BET_TRACKER_FILTERS_V1" in source\n    for label in (\n        'selectbox("Status", ["All", "Open / Live", "Settled", "Invalid"]',\n        'selectbox("Ticket type", ["All", "Straight", "Parlay"]',\n        'selectbox("Pitcher", ["All"] + pitcher_options',\n        'selectbox("Game date", ["All"] + date_options',\n        '"OPEN / LIVE STRAIGHTS"',\n        '"PARLAY TICKETS"',\n        '"SETTLED STRAIGHTS"',\n        '"LEGACY INVALID"',\n        '"MODEL-ONLY / UNPRICED"',\n        '"PRICED TRACKED BET"',\n    ):\n        assert label in source\n'''
-          if "test_main_projection_routes_bet_tracker_to_command_page_before_schedule_work" not in test_source:
-              test_path.write_text(test_source + addition, encoding="utf-8")
-          PY
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt pytest
       - run: python -m compileall -q streamlit_app.py navigation.py engine automation tests
       - run: pytest -q --durations=20
-      - name: Commit validated generated Bet Tracker repair
-        if: github.event_name == 'pull_request' && github.head_ref == 'fix/bet-tracker-command-filters'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pages/2_Bet_Tracker.py tests/test_bet_tracker_page_contract.py
-          if git diff --cached --quiet; then
-            echo "No generated Bet Tracker changes to commit."
-          else
-            git commit -m "Organize Bet Tracker command center"
-            git push origin HEAD:fix/bet-tracker-command-filters
-          fi
