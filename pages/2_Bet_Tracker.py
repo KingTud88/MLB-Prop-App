@@ -320,6 +320,19 @@ def _clean_text(value: object) -> str:
     return str(value or "").strip()
 
 
+def _tracking_mode(result: object, source: object, odds: object) -> str:
+    result_text = str(result or "").strip().upper()
+    source_text = _clean_text(source)
+    if result_text == "INVALID LINE":
+        return "LEGACY INVALID LINE"
+    if _num(odds) is not None:
+        return "PRICED TRACKED BET"
+    source_lower = source_text.lower()
+    if "model" in source_lower or "ladder" in source_lower:
+        return "MODEL-ONLY / UNPRICED"
+    return "TRACKED / UNPRICED"
+
+
 def load_tracker() -> pd.DataFrame:
     try:
         return load_bet_log(BET_LOG, st.secrets)
@@ -577,6 +590,9 @@ with st.spinner("Checking saved bets against MLB pitching stats..."):
                 "Projection": None,
                 "Model Probability": None,
                 "Edge": None,
+                "Source": source_text or "—",
+                "_TrackingMode": _tracking_mode(result_text, source_text, odds),
+                "_TicketType": "Parlay",
                 "_Legs": leg_details,
             })
             continue
@@ -597,6 +613,7 @@ with st.spinner("Checking saved bets against MLB pitching stats..."):
         team = _clean_text(row.get("team"))
         opponent = _clean_text(row.get("opponent"))
         matchup = f"{team} vs {opponent}" if team and opponent else "—"
+        source_text = _clean_text(row.get("source"))
         resolved_rows.append({
             "_BetKey": bet_row_key(row),
             "Pitcher": player,
@@ -614,6 +631,9 @@ with st.spinner("Checking saved bets against MLB pitching stats..."):
             "Projection": _num(row.get("projection")),
             "Model Probability": _num(row.get("model_probability")),
             "Edge": _num(row.get("edge")),
+            "Source": source_text or "—",
+            "_TrackingMode": _tracking_mode(grade.result, source_text, odds),
+            "_TicketType": "Straight",
             "_Legs": [{
                 "Player": player,
                 "Market": market,
@@ -669,7 +689,60 @@ if stake_series.isna().any():
 if "american_odds" in tracker.columns and pd.to_numeric(tracker["american_odds"], errors="coerce").isna().any():
     st.caption("Unpriced model tickets are still graded WIN/LOSS from MLB results, but they stay excluded from P/L and ROI because no sportsbook price was assumed.")
 
-st.markdown('<div class="bt-section">Tracked Tickets</div>', unsafe_allow_html=True)
+# BET_TRACKER_FILTERS_V1
+def _ticket_has_pitcher(legs: object, pitcher: str) -> bool:
+    if not isinstance(legs, list):
+        return False
+    target = str(pitcher or "").strip().lower()
+    return any(str(leg.get("Player", "")).strip().lower() == target for leg in legs if isinstance(leg, dict))
+
+
+def _ticket_section(ticket: pd.Series) -> str:
+    if str(ticket.get("_TicketType", "Straight")) == "Parlay":
+        return "PARLAY TICKETS"
+    result = str(ticket.get("Result", "PENDING")).upper()
+    if result == "INVALID LINE":
+        return "LEGACY INVALID"
+    if result in {"WIN", "LOSS", "PUSH", "PUSH LEG"}:
+        return "SETTLED STRAIGHTS"
+    return "OPEN / LIVE STRAIGHTS"
+
+
+st.markdown('<div class="bt-section">Ticket Filters</div>', unsafe_allow_html=True)
+settled_states = {"WIN", "LOSS", "PUSH", "PUSH LEG"}
+pitcher_options = sorted({
+    str(leg.get("Player", "")).strip()
+    for legs in results["_Legs"]
+    if isinstance(legs, list)
+    for leg in legs
+    if isinstance(leg, dict) and str(leg.get("Player", "")).strip()
+})
+date_options = sorted({str(value) for value in results["Date"].dropna().tolist() if str(value).strip()}, reverse=True)
+f1, f2, f3, f4 = st.columns([1.0, 1.0, 1.45, 1.0])
+status_filter = f1.selectbox("Status", ["All", "Open / Live", "Settled", "Invalid"], key="bet_tracker_status_filter")
+type_filter = f2.selectbox("Ticket type", ["All", "Straight", "Parlay"], key="bet_tracker_type_filter")
+pitcher_filter = f3.selectbox("Pitcher", ["All"] + pitcher_options, key="bet_tracker_pitcher_filter")
+date_filter = f4.selectbox("Game date", ["All"] + date_options, key="bet_tracker_date_filter")
+
+display_results = results.copy()
+result_upper = display_results["Result"].astype(str).str.upper()
+if status_filter == "Open / Live":
+    display_results = display_results.loc[~result_upper.isin(settled_states | {"INVALID LINE"})]
+elif status_filter == "Settled":
+    display_results = display_results.loc[result_upper.isin(settled_states)]
+elif status_filter == "Invalid":
+    display_results = display_results.loc[result_upper.eq("INVALID LINE")]
+if type_filter != "All":
+    display_results = display_results.loc[display_results["_TicketType"].eq(type_filter)]
+if pitcher_filter != "All":
+    display_results = display_results.loc[display_results["_Legs"].map(lambda legs: _ticket_has_pitcher(legs, pitcher_filter))]
+if date_filter != "All":
+    display_results = display_results.loc[display_results["Date"].astype(str).eq(date_filter)]
+section_order = {"OPEN / LIVE STRAIGHTS": 0, "PARLAY TICKETS": 1, "SETTLED STRAIGHTS": 2, "LEGACY INVALID": 3}
+display_results = display_results.copy()
+display_results["_SectionOrder"] = display_results.apply(lambda row: section_order[_ticket_section(row)], axis=1)
+display_results = display_results.sort_values(["_SectionOrder", "_StatusPriority", "Date"], ascending=[True, True, False], kind="stable")
+st.caption(f"Showing {len(display_results)} of {len(results)} saved tickets. Summary metrics above remain all-time; filters only change the ticket cards below.")
 
 ticket_labels: dict[str, str] = {}
 for _, ticket in results.iterrows():
@@ -745,7 +818,14 @@ def _progress_value(actual: object, line: object) -> float:
 
 
 st.caption("Open any ticket to see each pitcher leg, live stat progress, line, game status, projection, and current grade.")
-for ticket_index, (_, ticket) in enumerate(results.iterrows()):
+if display_results.empty:
+    st.info("No saved tickets match the current filters.")
+_last_ticket_section = None
+for ticket_index, (_, ticket) in enumerate(display_results.iterrows()):
+    current_section = _ticket_section(ticket)
+    if current_section != _last_ticket_section:
+        st.markdown(f'<div class="bt-section">{current_section}</div>', unsafe_allow_html=True)
+        _last_ticket_section = current_section
     ticket_result = str(ticket.get("Result", "PENDING"))
     ticket_pitcher = str(ticket.get("Pitcher", "Unknown"))
     ticket_date = str(ticket.get("Date", ""))
@@ -760,6 +840,7 @@ for ticket_index, (_, ticket) in enumerate(results.iterrows()):
             unsafe_allow_html=True,
         )
         explain_popover(ticket_explanation(ticket),label="ⓘ WHY THIS TICKET STATUS?")
+        st.caption(f"{ticket.get('_TrackingMode', 'TRACKED BET')} · Source: {ticket.get('Source', '—')}")
         h1, h2, h3, h4, h5, h6 = st.columns(6)
         h1.metric("Book", str(ticket.get("Book", "") or "—"))
         stake_value = _num(ticket.get("Stake"))
@@ -816,7 +897,7 @@ for ticket_index, (_, ticket) in enumerate(results.iterrows()):
 
 st.download_button(
     "Download bet tracker CSV",
-    results.drop(columns=["_BetKey", "_StatusPriority"], errors="ignore").to_csv(index=False),
+    results.drop(columns=["_BetKey", "_StatusPriority", "_SectionOrder"], errors="ignore").to_csv(index=False),
     file_name="bet_tracker.csv",
     mime="text/csv",
 )
