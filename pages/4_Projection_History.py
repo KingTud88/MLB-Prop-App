@@ -429,22 +429,22 @@ explain_popover(
     label="ⓘ EXPLAIN EVIDENCE SCOREBOARD",
 )
 
-# RESEARCH_PROMOTION_SCOREBOARD_V1 · presentation/reporting only.
+# RESEARCH_PROMOTION_SCOREBOARD_V2_ALL_LANES · presentation/reporting only.
 render_research_promotion_scoreboard(ROOT)
 
 st.divider()
-st.markdown('<div class="history-kicker">Actionable K results</div>', unsafe_allow_html=True)
-st.subheader("🔥 Bettable K Wins & Crushers")
+st.markdown('<div class="history-kicker">K research diagnostics</div>', unsafe_allow_html=True)
+st.subheader("🔥 K Ladder Reliability & Projection Crushers")
 st.caption(
-    "Archive K grading uses the highest whole-K ladder milestone fully supported by the frozen projection: floor(Projected K), within our 3+–12+ ladder. "
-    "Example: 5.07 projects to a 5+ target, so 5 actual Ks = ✅ WIN. Exact projection error and 80% range coverage remain separate model diagnostics."
+    "Two separate report-only signals live here. K Ladder Reliability grades the highest whole-K milestone supported by the frozen projection: floor(Projected K), within the 3+–12+ ladder. "
+    "Projection Crushers use the exact frozen point projection instead: a projection win requires Actual Ks > Projected Ks. Example: 5.07 projected and 5 actual Ks is a ladder win but an exact-projection miss. Neither signal is sportsbook execution grading."
 )
 _bettable_ready = df["projection"].notna() & df["actual_strikeouts"].notna()
 _bettable = df.loc[_bettable_ready].copy()
 _bettable["K Target Value"] = pd.to_numeric(_bettable["projection"], errors="coerce").map(bettable_k_target)
 _bettable = _bettable.loc[_bettable["K Target Value"].notna()].copy()
 if _bettable.empty:
-    st.info("Bettable K wins will appear as supported 3+–12+ frozen projections resolve.")
+    st.info("K ladder reliability will appear as supported 3+–12+ frozen projections resolve.")
 else:
     _bettable["K Target"] = _bettable["projection"].map(bettable_k_label)
     _bettable["K vs Target"] = pd.to_numeric(_bettable["actual_strikeouts"], errors="coerce") - pd.to_numeric(_bettable["K Target Value"], errors="coerce")
@@ -457,8 +457,16 @@ else:
     kw1.metric("Resolved ladder calls", len(_bettable), help=metric_help("history_ladder_calls", current=f"{len(_bettable)} valid resolved whole-K target call(s)"))
     kw2.metric("Ladder wins", _wins, help=metric_help("history_ladder_wins", current=f"{_wins}/{len(_bettable)} resolved ladder call(s) reached target"))
     kw3.metric("Ladder win rate", f"{_win_rate:.1%}", help=metric_help("history_ladder_win_rate", current=f"{_wins}/{len(_bettable)} = {_win_rate:.1%}"))
-    kw4.metric("Consistent crushers", _crusher_count, help=metric_help("history_crushers", current=f"{_crusher_count} pitcher(s) currently meet the existing Crusher tracking rule"))
-    explain_popover(Explanation("Bettable K Wins & Crushers","This block grades the model-supported whole-K milestone derived from each frozen strikeout projection and identifies pitchers who have repeatedly cleared those targets.","K Target is floor(Projected K) inside the supported 3+–12+ ladder. Crushers require the existing minimum resolved-call count, win-rate threshold and average margin above target.",note="This is descriptive model tracking. It does not retroactively change old projections or create a new live ranking rule."),label="ⓘ EXPLAIN K RESULTS")
+    kw4.metric("Projection crushers", _crusher_count, help=metric_help("history_crushers", current=f"{_crusher_count} pitcher(s) currently meet the exact-projection Crusher tracking rule"))
+    explain_popover(
+        Explanation(
+            "K Ladder Reliability & Projection Crushers",
+            "This block keeps two model-research questions separate: whether a frozen projection supports a whole-K milestone that is later reached, and whether a pitcher repeatedly finishes above the exact frozen point projection.",
+            "K Ladder target = floor(Projected K) inside the supported 3+–12+ ladder. Crusher margin = Actual Ks − exact frozen Projected Ks; only positive exact-projection residuals count as projection wins.",
+            note="Both are descriptive report-only research signals. Neither substitutes for an authentic sportsbook line, changes a live projection, or creates a live ranking rule.",
+        ),
+        label="ⓘ EXPLAIN K RESEARCH",
+    )
 
     high_calls = _bettable.loc[_bettable.get("confidence", pd.Series(index=_bettable.index, dtype=str)).astype(str).str.upper().eq("HIGH")].copy()
     if not high_calls.empty:
@@ -471,18 +479,20 @@ else:
         high_styled = high_styled.map(lambda _: "color:#38bdf8;font-weight:800;", subset=["K Target"])
         high_styled = high_styled.map(lambda _: "color:#facc15;font-weight:800;", subset=["Actual"])
         st.dataframe(high_styled, hide_index=True, width="stretch")
+        st.caption("Ladder Result is model research only: it grades the model-supported whole-K target, not a sportsbook bet or execution line.")
 
-    st.markdown("#### Projection Crushers")
+    st.markdown("#### Projection Crushers · exact frozen projection")
     if _crushers.empty:
-        st.info("Crusher tracking will populate as current starter-only K ladder calls resolve.")
+        st.info("Crusher tracking will populate as current starter-only exact frozen K projections resolve.")
     else:
         crusher_view = _crushers.copy()
         for col in ["Win Rate", "Recent 5 Win Rate"]:
             crusher_view[col] = crusher_view[col].map(lambda x: "—" if pd.isna(x) else f"{float(x):.1%}")
-        for col in ["Avg K Above Target", "Avg Win Margin", "Total K Above Target"]:
+        for col in ["Avg K vs Projection", "Avg Win Margin", "Total K Above Projection"]:
             crusher_view[col] = crusher_view[col].map(lambda x: "—" if pd.isna(x) else f"{float(x):+.2f}")
+        crusher_view = crusher_view.drop(columns=["Ladder Wins", "Avg K Above Target", "Total K Above Target"], errors="ignore")
         st.dataframe(crusher_view, hide_index=True, width="stretch")
-        st.caption("🔥 CRUSHER requires at least 3 resolved current-model ladder calls, a win rate of at least 66.7%, and average actual Ks more than 0.5 above the bettable target. This board is descriptive tracking only.")
+        st.caption("🔥 CRUSHER requires at least 3 resolved current-model exact-projection outcomes, a projection-win rate of at least 66.7%, and average Actual Ks − Projected Ks greater than +0.50. This board is descriptive tracking only.")
 
 st.divider()
 st.markdown('<div class="history-kicker">Learning diagnostics</div>', unsafe_allow_html=True)
