@@ -1,0 +1,42 @@
+name: temp-legacy-bet-delete-key
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    if: github.head_ref == 'fix/legacy-bet-delete-key'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Apply guarded legacy-key patch
+        run: |
+          if ! grep -q 'BET_TRACKER_PERSISTED_KEY_V1' pages/2_Bet_Tracker.py; then
+            python tools/patch_legacy_bet_delete_key.py
+          fi
+      - name: Install and validate
+        run: |
+          pip install -r requirements.txt pytest
+          python -m compileall -q pages/2_Bet_Tracker.py tests/test_bet_tracker_page_contract.py
+          pytest -q --durations=20
+      - name: Commit validated repair
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add pages/2_Bet_Tracker.py tests/test_bet_tracker_page_contract.py
+          if git diff --cached --quiet; then
+            echo 'No generated changes to commit.'
+            exit 0
+          fi
+          git commit -m 'Preserve legacy Bet Tracker delete identity'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
