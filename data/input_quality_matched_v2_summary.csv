@@ -1,0 +1,7 @@
+Audit_Version,Production_Authority,Rule,Metric,Eligible_Shallow,Eligible_Deep,Matched_Pairs,Shallow_MAE,Deep_MAE,Relative_MAE_Improvement_Deep_vs_Shallow,Shallow_Bias,Deep_Bias,Status,Future_Only_Start,Min_Matched_Pairs
+input-quality-matched-v2-report-only,NONE,primary_pregame_matched,STRIKEOUTS,0,18,0,,,,,,LEARNING,2026-08-20,20
+input-quality-matched-v2-report-only,NONE,primary_pregame_matched,HITS,0,18,0,,,,,,LEARNING,2026-08-20,20
+input-quality-matched-v2-report-only,NONE,primary_pregame_matched,OUTS,0,18,0,,,,,,LEARNING,2026-08-20,20
+input-quality-matched-v2-report-only,NONE,same_pitcher_sensitivity,STRIKEOUTS,0,18,0,,,,,,LEARNING,2026-08-20,20
+input-quality-matched-v2-report-only,NONE,same_pitcher_sensitivity,HITS,0,18,0,,,,,,LEARNING,2026-08-20,20
+input-quality-matched-v2-report-only,NONE,same_pitcher_sensitivity,OUTS,0,18,0,,,,,,LEARNING,2026-08-20,20
