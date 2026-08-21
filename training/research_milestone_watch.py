@@ -76,6 +76,21 @@ def _remaining(value: object) -> int | float | None:
     return int(number) if number.is_integer() else number
 
 
+def _matched_pair_sample_dimension_is_duplicate(row: pd.Series) -> bool:
+    if _clean(row.get("Breadth_Label")).upper() != "MATCHED PAIRS":
+        return False
+    for sample_field, breadth_field in (
+        ("Current_Starts", "Current_Breadth"),
+        ("Required_Starts", "Required_Breadth"),
+        ("Starts_Remaining", "Breadth_Remaining"),
+    ):
+        sample = _number(row.get(sample_field))
+        breadth = _number(row.get(breadth_field))
+        if sample is None or breadth is None or sample != breadth:
+            return False
+    return True
+
+
 def _source_contract_ok(frame: pd.DataFrame) -> bool:
     if frame is None or frame.empty:
         return False
@@ -97,11 +112,15 @@ def _primary_gate_state(row: pd.Series) -> tuple[str, str]:
     if _truthy(row.get("Ready_For_Manual_Review")):
         return "MANUAL_REVIEW_READY", ""
 
-    dimensions = [
-        ("STARTS", row.get("Required_Starts"), row.get("Starts_Remaining")),
-        ("DAYS", row.get("Required_Days"), row.get("Days_Remaining")),
-        (_clean(row.get("Breadth_Label")).upper() or "BREADTH", row.get("Required_Breadth"), row.get("Breadth_Remaining")),
-    ]
+    dimensions: list[tuple[str, object, object]] = []
+    if not _matched_pair_sample_dimension_is_duplicate(row):
+        dimensions.append(("STARTS", row.get("Required_Starts"), row.get("Starts_Remaining")))
+    dimensions.extend(
+        [
+            ("DAYS", row.get("Required_Days"), row.get("Days_Remaining")),
+            (_clean(row.get("Breadth_Label")).upper() or "BREADTH", row.get("Required_Breadth"), row.get("Breadth_Remaining")),
+        ]
+    )
     applicable = [(label, _remaining(remaining)) for label, required, remaining in dimensions if _number(required) is not None]
     if not applicable:
         return "NONSTANDARD_GATE_TRACKED_ELSEWHERE", ""
