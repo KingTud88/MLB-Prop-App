@@ -24,6 +24,7 @@ def test_runner_orders_dependency_chain_before_freshness_audit() -> None:
         "training.confirmed_lineup_review_snapshot",
         "training.research_review_snapshot_freshness",
         "training.research_evidence_command_center",
+        "training.research_promotion_command_center",
         "training.research_milestone_watch",
         "training.research_evidence_history",
         "training.research_evidence_transition_digest",
@@ -36,9 +37,27 @@ def test_runner_orders_dependency_chain_before_freshness_audit() -> None:
     assert positions == sorted(positions)
 
 
+def test_runner_routes_milestones_and_history_through_all_lane_promotion_center() -> None:
+    text = _text()
+    command_center_arg = "--command-center data/research_promotion_command_center.csv"
+    assert text.count(command_center_arg) == 2
+    milestone_pos = text.index("training.research_milestone_watch")
+    history_pos = text.index("training.research_evidence_history")
+    first_arg_pos = text.index(command_center_arg, milestone_pos)
+    second_arg_pos = text.index(command_center_arg, history_pos)
+    assert milestone_pos < first_arg_pos < history_pos < second_arg_pos
+
+
 def test_runner_persists_freshness_review_watch_and_shadow_outputs() -> None:
     text = _text()
     expected = (
+        "data/projection_crusher_shadow_detail.csv",
+        "data/projection_crusher_shadow_pitchers.csv",
+        "data/projection_crusher_shadow_cohorts.csv",
+        "data/projection_crusher_shadow_gate.csv",
+        "data/k_ladder_reliability_shadow_detail.csv",
+        "data/k_ladder_reliability_shadow_cohorts.csv",
+        "data/k_ladder_reliability_shadow_gate.csv",
         "data/umpire_k_up_cap_shadow_detail.csv",
         "data/umpire_k_up_cap_shadow_summary.csv",
         "data/umpire_context_review_snapshot.csv",
@@ -48,6 +67,8 @@ def test_runner_persists_freshness_review_watch_and_shadow_outputs() -> None:
         "data/research_review_snapshot_freshness.csv",
         "data/research_review_snapshot_freshness_summary.csv",
         "data/research_evidence_command_center.csv",
+        "data/research_promotion_command_center.csv",
+        "data/research_promotion_command_center_summary.csv",
         "data/research_milestone_watch.csv",
         "data/research_milestone_watch_summary.csv",
         "data/research_evidence_history.csv",
@@ -63,11 +84,16 @@ def test_runner_persists_freshness_review_watch_and_shadow_outputs() -> None:
 
 def test_runner_keeps_report_only_contract_tests_in_path() -> None:
     text = _text()
+    assert "tests/test_projection_crushers.py" in text
+    assert "tests/test_projection_crusher_shadow.py" in text
+    assert "tests/test_k_ladder_reliability_shadow.py" in text
     assert "tests/test_umpire_k_up_cap_shadow.py" in text
     assert "tests/test_umpire_context_review_snapshot.py" in text
     assert "tests/test_umpire_context_review_pipeline.py" in text
     assert "tests/test_confirmed_lineup_review_snapshot.py" in text
     assert "tests/test_research_review_snapshot_freshness.py" in text
+    assert "tests/test_research_promotion_command_center.py" in text
+    assert "tests/test_research_promotion_scoreboard.py" in text
     assert "tests/test_research_milestone_watch.py" in text
     assert "tests/test_research_multicell_review_injector.py" in text
     assert "tests/test_research_pipeline_freshness_audit.py" in text

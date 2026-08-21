@@ -31,12 +31,15 @@ def test_projection_history_has_rolling_accuracy_and_starts_used():
     assert 'NumberColumn("Starts Used"' in text
 
 
-def test_projection_history_bettable_wins_and_clean_archive():
+def test_projection_history_k_research_and_clean_archive():
     text = _page_text()
-    assert "Bettable K Wins & Crushers" in text
-    assert "highest whole-K ladder milestone fully supported" in text
-    assert "5.07 projects to a 5+ target, so 5 actual Ks = ✅ WIN" in text
-    assert "Projection Crushers" in text
+    assert "K Ladder Reliability & Projection Crushers" in text
+    assert "highest whole-K milestone supported by the frozen projection" in text
+    assert "5.07 projected and 5 actual Ks is a ladder win but an exact-projection miss" in text
+    assert "Projection Crushers · exact frozen projection" in text
+    assert "Actual Ks − Projected Ks greater than +0.50" in text
+    assert "Neither signal is sportsbook execution grading" in text
+    assert "Bettable K Wins & Crushers" not in text
     assert 'TextColumn("K Target"' in text
     assert 'TextColumn("K Result"' in text
     assert 'NumberColumn("Vs Target"' in text
