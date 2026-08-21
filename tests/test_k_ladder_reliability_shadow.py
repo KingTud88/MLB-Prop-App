@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 from engine.starter_history import HISTORY_SEMANTICS
 from training.k_ladder_reliability_shadow import build_cohort_summary, build_detail, build_gate
@@ -26,9 +27,9 @@ def test_ladder_shadow_tracks_model_supported_target_not_exact_projection() -> N
     assert row["K_Target"] == 5
     assert row["Target_Label"] == "5+"
     assert bool(row["Ladder_Win"])
-    assert row["Projection_Headroom"] == 0.8
-    assert row["Target_Probability"] == 0.7
-    assert abs(float(row["Brier"]) - 0.09) < 1e-12
+    assert row["Projection_Headroom"] == pytest.approx(0.8)
+    assert row["Target_Probability"] == pytest.approx(0.7)
+    assert float(row["Brier"]) == pytest.approx(0.09)
     assert row["Production_Authority"] == "NONE"
     assert bool(row["Report_Only"])
     assert bool(row["No_Projection_Adjustment"])
@@ -37,7 +38,6 @@ def test_ladder_shadow_tracks_model_supported_target_not_exact_projection() -> N
 def test_ladder_shadow_maturity_remains_manual_review_only() -> None:
     rows = []
     for index in range(60):
-        target = 5
         rows.append({
             "pitcher_id": index % 20,
             "player": f"Pitcher {index % 20}",
