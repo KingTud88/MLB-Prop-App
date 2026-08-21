@@ -55,6 +55,10 @@ def test_runner_persists_freshness_review_watch_and_shadow_outputs() -> None:
         "data/projection_crusher_shadow_pitchers.csv",
         "data/projection_crusher_shadow_cohorts.csv",
         "data/projection_crusher_shadow_gate.csv",
+        "data/projection_underperformer_shadow_detail.csv",
+        "data/projection_underperformer_shadow_pitchers.csv",
+        "data/projection_underperformer_shadow_cohorts.csv",
+        "data/projection_underperformer_shadow_gate.csv",
         "data/k_ladder_reliability_shadow_detail.csv",
         "data/k_ladder_reliability_shadow_cohorts.csv",
         "data/k_ladder_reliability_shadow_gate.csv",
@@ -86,6 +90,7 @@ def test_runner_keeps_report_only_contract_tests_in_path() -> None:
     text = _text()
     assert "tests/test_projection_crushers.py" in text
     assert "tests/test_projection_crusher_shadow.py" in text
+    assert "tests/test_projection_underperformer_shadow.py" in text
     assert "tests/test_k_ladder_reliability_shadow.py" in text
     assert "tests/test_umpire_k_up_cap_shadow.py" in text
     assert "tests/test_umpire_context_review_snapshot.py" in text

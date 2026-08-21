@@ -157,6 +157,37 @@ def _crusher_lane(data_dir: Path) -> dict[str, object]:
     )
 
 
+def _underperformer_lane(data_dir: Path) -> dict[str, object]:
+    filename = "projection_underperformer_shadow_gate.csv"
+    source_path = f"data/{filename}"
+    frame = _read(data_dir, filename)
+    if frame.empty:
+        return _missing("Projection Underperformer Shadow", source_path)
+    row = frame.iloc[0]
+    return _base_row(
+        lane="Projection Underperformer Shadow",
+        source_path=source_path,
+        status=_clean(row.get("Status")),
+        direction=(
+            f"below_projection_rate={_pct(row.get('Below_Projection_Rate'))}; "
+            f"material_underperform_rate={_pct(row.get('Material_Underperform_Rate'))}; "
+            f"mean_k_residual={_number(row.get('Mean_K_Residual')) if _number(row.get('Mean_K_Residual')) is not None else 'NA'}"
+        ),
+        current_starts=_integer(row.get("Resolved_Starts")),
+        required_starts=_integer(row.get("Required_Starts")),
+        current_days=_integer(row.get("Resolved_Days")),
+        required_days=_integer(row.get("Required_Days")),
+        current_breadth=_integer(row.get("Distinct_Pitchers")),
+        required_breadth=_integer(row.get("Required_Pitchers")),
+        breadth_label="PITCHERS",
+        secondary=f"cohorts_tracked={_integer(row.get('Cohorts_Tracked')) or 0}; exact_projection_outcome=true; negative_tail=true",
+        ready=_truthy(row.get("Ready_For_Manual_Review")),
+        action=_clean(row.get("Recommended_Action")),
+        reason=_clean(row.get("Reason")),
+        source_version=_clean(row.get("Research_Version")),
+    )
+
+
 def _ladder_lane(data_dir: Path) -> dict[str, object]:
     filename = "k_ladder_reliability_shadow_gate.csv"
     source_path = f"data/{filename}"
@@ -196,7 +227,7 @@ def _ladder_lane(data_dir: Path) -> dict[str, object]:
 def build_promotion_command_center(data_dir: Path | str = "data") -> pd.DataFrame:
     root = Path(data_dir)
     base = build_command_center(root).copy()
-    extra = pd.DataFrame([_crusher_lane(root), _ladder_lane(root)], columns=COLUMNS)
+    extra = pd.DataFrame([_crusher_lane(root), _underperformer_lane(root), _ladder_lane(root)], columns=COLUMNS)
     extra_names = set(extra["Lane"].astype(str))
     if not base.empty:
         base = base.loc[~base["Lane"].astype(str).isin(extra_names)].copy()

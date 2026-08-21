@@ -20,17 +20,18 @@ def test_promotion_command_center_shows_all_base_and_new_shadow_lanes(tmp_path: 
     center = build_promotion_command_center(tmp_path)
     lanes = set(center["Lane"].astype(str))
 
-    assert len(center) == 15
+    assert len(center) == 16
     assert "Pitch-Mix Whiff Forward" in lanes
     assert "Opponent Asymmetric Challenger" in lanes
     assert "Projection Crusher Shadow" in lanes
+    assert "Projection Underperformer Shadow" in lanes
     assert "K Ladder Reliability Shadow" in lanes
     assert set(center["Production_Authority"].astype(str)) == {"NONE"}
     assert center["Report_Only"].astype(bool).all()
     assert center["No_Auto_Promotion"].astype(bool).all()
 
     summary = build_summary(center).iloc[0]
-    assert summary["Total_Lanes"] == 15
+    assert summary["Total_Lanes"] == 16
     assert summary["Scoreboard_Mode"] == SCOREBOARD_MODE == "ALL_LANES"
     assert bool(summary["All_Report_Only"])
     assert bool(summary["All_Production_Authority_None"])
@@ -56,6 +57,25 @@ def test_new_shadow_lane_verdicts_are_source_owned_not_regraded(tmp_path: Path) 
         "Report_Only": True,
         "Production_Authority": "NONE",
         "Research_Version": "crusher-test",
+    })
+    _write(tmp_path, "projection_underperformer_shadow_gate.csv", {
+        "Status": "LEARNING",
+        "Resolved_Starts": 44,
+        "Required_Starts": 60,
+        "Resolved_Days": 6,
+        "Required_Days": 10,
+        "Distinct_Pitchers": 18,
+        "Required_Pitchers": 20,
+        "Below_Projection_Rate": 0.55,
+        "Material_Underperform_Rate": 0.20,
+        "Mean_K_Residual": -0.17,
+        "Cohorts_Tracked": 8,
+        "Ready_For_Manual_Review": False,
+        "Recommended_Action": "COLLECT_EXACT_PROJECTION_UNDERPERFORMER_EVIDENCE",
+        "Reason": "native underperformer gate reason",
+        "Report_Only": True,
+        "Production_Authority": "NONE",
+        "Research_Version": "underperformer-test",
     })
     _write(tmp_path, "k_ladder_reliability_shadow_gate.csv", {
         "Status": "READY_FOR_MANUAL_RESEARCH_REVIEW",
@@ -83,6 +103,9 @@ def test_new_shadow_lane_verdicts_are_source_owned_not_regraded(tmp_path: Path) 
     center = build_promotion_command_center(tmp_path).set_index("Lane")
     assert center.loc["Projection Crusher Shadow", "Status"] == "LEARNING"
     assert center.loc["Projection Crusher Shadow", "Source_Reason"] == "native Crusher gate reason"
+    assert center.loc["Projection Underperformer Shadow", "Status"] == "LEARNING"
+    assert center.loc["Projection Underperformer Shadow", "Source_Reason"] == "native underperformer gate reason"
+    assert center.loc["Projection Underperformer Shadow", "Production_Authority"] == "NONE"
     assert center.loc["K Ladder Reliability Shadow", "Status"] == "READY_FOR_MANUAL_RESEARCH_REVIEW"
     assert bool(center.loc["K Ladder Reliability Shadow", "Ready_For_Manual_Review"])
     assert center.loc["K Ladder Reliability Shadow", "Recommended_Action"] == "MANUAL_RESEARCH_REVIEW"
