@@ -20,6 +20,8 @@ PYTHONPATH=. pytest -q \
   tests/test_projection_crusher_shadow.py \
   tests/test_projection_underperformer_shadow.py \
   tests/test_k_ladder_reliability_shadow.py \
+  tests/test_input_quality_matched_v2.py \
+  tests/test_calibration_common_mode_v2.py \
   tests/test_umpire_k_up_cap_shadow.py \
   tests/test_umpire_context_review_snapshot.py \
   tests/test_umpire_context_review_pipeline.py \
@@ -50,6 +52,7 @@ PYTHONPATH=. python -m training.pitch_mix_whiff_forward_evaluation
 PYTHONPATH=. python -m training.projection_crusher_shadow
 PYTHONPATH=. python -m training.projection_underperformer_shadow
 PYTHONPATH=. python -m training.k_ladder_reliability_shadow
+PYTHONPATH=. python -m training.input_quality_matched_v2
 PYTHONPATH=. python -m training.catcher_prior_maturity
 PYTHONPATH=. python -m training.umpire_k_up_cap_shadow
 PYTHONPATH=. python -m training.umpire_context_review_snapshot
@@ -101,6 +104,9 @@ git add \
   data/k_ladder_reliability_shadow_detail.csv \
   data/k_ladder_reliability_shadow_cohorts.csv \
   data/k_ladder_reliability_shadow_gate.csv \
+  data/input_quality_matched_v2_pairs.csv \
+  data/input_quality_matched_v2_summary.csv \
+  data/input_quality_matched_v2_preregistration.csv \
   data/umpire_k_up_cap_shadow_detail.csv \
   data/umpire_k_up_cap_shadow_summary.csv \
   data/umpire_context_review_snapshot.csv \
