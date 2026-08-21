@@ -200,6 +200,6 @@ def render_research_promotion_scoreboard(root: Path) -> None:
         st.markdown("**Status is source-owned.** Native research verdicts are displayed as written by each validator. The scoreboard does not recalculate them.")
         st.markdown("**Gate Progress shows the evidence bottleneck.** Starts alone are not enough; time diversity, entity breadth, probability coverage, matched pairs, seasons, or other source-owned requirements can keep a lane from review.")
         st.markdown("**Manual Review Ready is also source/control-plane owned.** A positive-looking status alone does not silently authorize production.")
-        st.markdown("**Production Authority is the hard boundary.** NONE means the lane cannot change live projections, probabilities, Top Plays, recommendation thresholds, or sportsbook execution.")
+        st.markdown("**Production Authority is the hard boundary.** NONE means the lane cannot change the live baseball projection, probabilities, Top Plays, recommendation thresholds, or sportsbook execution.")
         detail = board[["Lane", "Status", "Manual Review Ready", "Reason", "Source", "Production Authority"]].copy()
         st.dataframe(detail, hide_index=True, width="stretch")
