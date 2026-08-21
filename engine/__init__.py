@@ -109,7 +109,8 @@ try:
                 service = str(row.get("service") or host)
                 status = str(row.get("status") or "NOT CHECKED")
                 checked = _source_health_checked_text(row)
-                _st.caption(f"{service}: {status} · {checked}")
+                with _st.container(border=True):
+                    _st.caption(f"{service}: {status} · {checked}")
 
     _set_source_health_observer(_render_source_health)
 
