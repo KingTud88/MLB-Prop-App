@@ -5,7 +5,6 @@ from pathlib import Path
 import pandas as pd
 
 from training.research_evidence_command_center import (
-    LOCKED_PROMOTION_SCOREBOARD_CARDS,
     NO_AUTO_PROMOTION,
     PRODUCTION_AUTHORITY,
     REPORT_ONLY,
@@ -319,7 +318,7 @@ def test_summary_is_operational_only_not_a_composite_research_score(tmp_path: Pa
     assert summary["All_Report_Only"] in (True, 1)
     assert summary["All_Production_Authority_None"] in (True, 1)
     assert summary["No_Auto_Promotion"] in (True, 1)
-    assert summary["Locked_Promotion_Scoreboard_Cards"] == 8
+    assert "Locked_Promotion_Scoreboard_Cards" not in summary.index
     assert "Score" not in summary.index
 
 
@@ -334,9 +333,8 @@ def test_current_repository_evidence_sources_are_readable_and_non_authoritative(
     assert set(center["Production_Authority"]) == {"NONE"}
 
 
-def test_command_center_contract_is_report_only_and_preserves_locked_scoreboard() -> None:
+def test_command_center_contract_is_report_only_without_presentation_lock() -> None:
     assert REPORT_ONLY is True
     assert PRODUCTION_AUTHORITY == "NONE"
     assert NO_AUTO_PROMOTION is True
-    assert LOCKED_PROMOTION_SCOREBOARD_CARDS == 8
     assert VERSION == "research-evidence-command-center-v1-report-only"
