@@ -82,6 +82,16 @@ def _disagreement_bucket(value: object) -> str:
     return "1.00+ K"
 
 
+def _pitcher_status(starts: int, below_rate: float, mean_residual: float) -> str:
+    if starts < 3:
+        return "LEARNING"
+    if below_rate >= (2.0 / 3.0) and mean_residual < -0.5:
+        return "UNDERPERFORMER"
+    if below_rate >= 0.55 and mean_residual < 0.0:
+        return "BELOW_PROJECTION"
+    return "MIXED"
+
+
 def build_detail(history: pd.DataFrame) -> pd.DataFrame:
     base = build_residual_detail(history)
     if base.empty:
@@ -101,7 +111,7 @@ def build_pitcher_summary(detail: pd.DataFrame) -> pd.DataFrame:
     columns = [
         "Pitcher", "Resolved_Starts", "Below_Projection_Count", "Below_Projection_Rate",
         "Mean_K_Residual", "Median_K_Residual", "Material_Underperform_Events", "Material_Underperform_Rate",
-        "Report_Only", "Production_Authority", "Research_Version",
+        "Underperformer_Status", "Report_Only", "Production_Authority", "Research_Version",
     ]
     if detail is None or detail.empty:
         return pd.DataFrame(columns=columns)
@@ -110,23 +120,30 @@ def build_pitcher_summary(detail: pd.DataFrame) -> pd.DataFrame:
         residual = pd.to_numeric(group["K_Residual"], errors="coerce")
         below = group["Below_Projection"].astype(bool)
         material = group["Material_Underperform_Event"].astype(bool)
+        starts = int(len(group))
+        below_rate = float(below.mean())
+        mean_residual = float(residual.mean())
         rows.append({
             "Pitcher": str(pitcher),
-            "Resolved_Starts": int(len(group)),
+            "Resolved_Starts": starts,
             "Below_Projection_Count": int(below.sum()),
-            "Below_Projection_Rate": float(below.mean()),
-            "Mean_K_Residual": float(residual.mean()),
+            "Below_Projection_Rate": below_rate,
+            "Mean_K_Residual": mean_residual,
             "Median_K_Residual": float(residual.median()),
             "Material_Underperform_Events": int(material.sum()),
             "Material_Underperform_Rate": float(material.mean()),
+            "Underperformer_Status": _pitcher_status(starts, below_rate, mean_residual),
             "Report_Only": REPORT_ONLY,
             "Production_Authority": PRODUCTION_AUTHORITY,
             "Research_Version": VERSION,
         })
-    return pd.DataFrame(rows, columns=columns).sort_values(
-        ["Below_Projection_Rate", "Mean_K_Residual", "Resolved_Starts"],
-        ascending=[False, True, False],
-    ).reset_index(drop=True)
+    status_rank = {"UNDERPERFORMER": 0, "BELOW_PROJECTION": 1, "LEARNING": 2, "MIXED": 3}
+    report = pd.DataFrame(rows, columns=columns)
+    report["_status_rank"] = report["Underperformer_Status"].map(status_rank).fillna(9)
+    return report.sort_values(
+        ["_status_rank", "Below_Projection_Rate", "Mean_K_Residual", "Resolved_Starts"],
+        ascending=[True, False, True, False],
+    ).drop(columns=["_status_rank"]).reset_index(drop=True)
 
 
 def build_cohort_summary(detail: pd.DataFrame) -> pd.DataFrame:
