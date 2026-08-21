@@ -149,3 +149,9 @@ def test_sidebar_contract_is_operator_only_and_schedule_anchored():
     assert "_st.sidebar.empty()" in source
     assert '_original_markdown("#### SOURCE HEALTH")' in source
     assert '_st.caption(f"{service}: {status} · {checked}")' in source
+
+
+def test_sidebar_source_health_slot_is_created_once_per_session():
+    source = ENGINE_INIT.read_text(encoding="utf-8")
+    assert "and session_id not in _source_health_slots" in source
+    assert source.count("_st.sidebar.empty()") == 1
