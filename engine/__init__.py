@@ -97,6 +97,7 @@ try:
         if (
             event_host == "statsapi.mlb.com"
             and str(event.get("last_path") or "") == "/api/v1/schedule"
+            and session_id not in _source_health_slots
         ):
             _source_health_slots[session_id] = _st.sidebar.empty()
         slot = _source_health_slots.get(session_id)
