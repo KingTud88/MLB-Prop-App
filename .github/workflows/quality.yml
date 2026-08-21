@@ -61,6 +61,14 @@ jobs:
           addition = '''\n\ndef test_bet_tracker_avoids_streamlit_cache_replay_for_data_helpers():\n    path = Path(__file__).resolve().parents[1] / "pages" / "2_Bet_Tracker.py"\n    source = path.read_text(encoding="utf-8")\n    assert "BET_TRACKER_PROCESS_TTL_CACHE_V1" in source\n    assert "@st.cache_data(" not in source\n    assert "@_local_ttl_cache(15)\\ndef live_pitcher_prop(" in source\n    assert "@_local_ttl_cache(120)\\ndef todays_slate(" in source\n    assert "@_local_ttl_cache(30)\\ndef frozen_snapshot(" in source\n    assert "live_pitcher_prop.clear()" in source\n'''
           if "test_bet_tracker_avoids_streamlit_cache_replay_for_data_helpers" not in test_source:
               test_path.write_text(test_source + addition, encoding="utf-8")
+
+          contract_path = Path("tests/test_bet_add_buttons_contract.py")
+          contract_source = contract_path.read_text(encoding="utf-8")
+          old_boundary = 'end = source.index("@st.cache_data(ttl=120", start)'
+          new_boundary = 'end = source.index("@_local_ttl_cache(120)", start)'
+          if old_boundary not in contract_source:
+              raise SystemExit("live-stats contract boundary marker not found")
+          contract_path.write_text(contract_source.replace(old_boundary, new_boundary, 1), encoding="utf-8")
           PY
       - uses: actions/setup-python@v6
         with:
@@ -73,7 +81,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pages/2_Bet_Tracker.py tests/test_bet_tracker_page_contract.py
+          git add pages/2_Bet_Tracker.py tests/test_bet_tracker_page_contract.py tests/test_bet_add_buttons_contract.py
           if git diff --cached --quiet; then
             echo "No generated Bet Tracker cache changes to commit."
           else
