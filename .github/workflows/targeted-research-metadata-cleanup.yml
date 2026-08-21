@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - cleanup/remove-eight-card-metadata
+  pull_request:
 
 permissions:
   contents: read
