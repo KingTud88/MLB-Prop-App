@@ -31,6 +31,7 @@ from engine.decision_learning import decision_tier_report
 from engine.signal_validation import context_performance_report, paired_signal_report
 from engine.team_leash import team_leash_walk_forward_report
 from engine.projection_crushers import bettable_k_label, bettable_k_result, bettable_k_target, crusher_report
+from engine.projection_underperformer_ui import render_projection_underperformers
 from engine.execution_history import backfill_legacy_execution_sides, grade_frozen_execution
 from engine.research_promotion_scoreboard import render_research_promotion_scoreboard
 
@@ -493,6 +494,8 @@ else:
         crusher_view = crusher_view.drop(columns=["Ladder Wins", "Avg K Above Target", "Total K Above Target"], errors="ignore")
         st.dataframe(crusher_view, hide_index=True, width="stretch")
         st.caption("🔥 CRUSHER requires at least 3 resolved current-model exact-projection outcomes, a projection-win rate of at least 66.7%, and average Actual Ks − Projected Ks greater than +0.50. This board is descriptive tracking only.")
+
+    render_projection_underperformers(df)
 
 st.divider()
 st.markdown('<div class="history-kicker">Learning diagnostics</div>', unsafe_allow_html=True)
