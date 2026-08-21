@@ -16,6 +16,9 @@ PYTHONPATH=. pytest -q \
   tests/test_pitch_mix_readiness_audit.py \
   tests/test_pitch_mix_whiff_score_capture.py \
   tests/test_pitch_mix_whiff_forward_evaluation.py \
+  tests/test_projection_crushers.py \
+  tests/test_projection_crusher_shadow.py \
+  tests/test_k_ladder_reliability_shadow.py \
   tests/test_umpire_k_up_cap_shadow.py \
   tests/test_umpire_context_review_snapshot.py \
   tests/test_umpire_context_review_pipeline.py \
@@ -23,6 +26,8 @@ PYTHONPATH=. pytest -q \
   tests/test_confirmed_lineup_review_pipeline.py \
   tests/test_research_review_snapshot_freshness.py \
   tests/test_research_evidence_command_center.py \
+  tests/test_research_promotion_command_center.py \
+  tests/test_research_promotion_scoreboard.py \
   tests/test_research_milestone_watch.py \
   tests/test_research_evidence_history.py \
   tests/test_research_evidence_transition_digest.py \
@@ -41,12 +46,15 @@ PYTHONPATH=. python -m training.batter_pitch_whiff_capture
 PYTHONPATH=. python -m training.pitch_mix_readiness_audit
 PYTHONPATH=. python -m training.pitch_mix_whiff_score_capture
 PYTHONPATH=. python -m training.pitch_mix_whiff_forward_evaluation
+PYTHONPATH=. python -m training.projection_crusher_shadow
+PYTHONPATH=. python -m training.k_ladder_reliability_shadow
 PYTHONPATH=. python -m training.catcher_prior_maturity
 PYTHONPATH=. python -m training.umpire_k_up_cap_shadow
 PYTHONPATH=. python -m training.umpire_context_review_snapshot
 PYTHONPATH=. python -m training.confirmed_lineup_review_snapshot
 PYTHONPATH=. python -m training.research_review_snapshot_freshness
 PYTHONPATH=. python -m training.research_evidence_command_center
+PYTHONPATH=. python -m training.research_promotion_command_center
 PYTHONPATH=. python -m training.research_milestone_watch
 PYTHONPATH=. python -m training.research_evidence_history \
   --observed-at-utc "${RESEARCH_REFRESH_AT_UTC}"
@@ -78,6 +86,13 @@ git add \
   data/pitch_mix_whiff_forward_detail.csv \
   data/pitch_mix_whiff_forward_summary.csv \
   data/pitch_mix_whiff_forward_gate.csv \
+  data/projection_crusher_shadow_detail.csv \
+  data/projection_crusher_shadow_pitchers.csv \
+  data/projection_crusher_shadow_cohorts.csv \
+  data/projection_crusher_shadow_gate.csv \
+  data/k_ladder_reliability_shadow_detail.csv \
+  data/k_ladder_reliability_shadow_cohorts.csv \
+  data/k_ladder_reliability_shadow_gate.csv \
   data/umpire_k_up_cap_shadow_detail.csv \
   data/umpire_k_up_cap_shadow_summary.csv \
   data/umpire_context_review_snapshot.csv \
@@ -88,6 +103,8 @@ git add \
   data/research_review_snapshot_freshness_summary.csv \
   data/research_evidence_command_center.csv \
   data/research_evidence_command_center_summary.csv \
+  data/research_promotion_command_center.csv \
+  data/research_promotion_command_center_summary.csv \
   data/research_milestone_watch.csv \
   data/research_milestone_watch_summary.csv \
   data/research_evidence_history.csv \
