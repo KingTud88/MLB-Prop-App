@@ -5,11 +5,18 @@ on:
     branches:
       - research/governance-v2-hardening
 
+permissions:
+  contents: write
+
 jobs:
   targeted:
+    if: github.event.head_commit.message == 'Run targeted governance v2 validation with marker'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: research/governance-v2-hardening
+          fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -27,3 +34,11 @@ jobs:
           tests/test_research_promotion_command_center.py
           tests/test_research_manual_review_packet.py
           tests/test_research_context_readiness_runner.py
+      - name: Record targeted validation success
+        run: |
+          printf 'governance-v2-targeted-pass\n' > .github/governance-v2-targeted.pass
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/governance-v2-targeted.pass
+          git commit -m "Record governance v2 targeted pass"
+          git push origin HEAD:research/governance-v2-hardening
