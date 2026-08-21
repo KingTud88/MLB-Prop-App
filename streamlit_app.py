@@ -1468,11 +1468,6 @@ with h3:
         unsafe_allow_html=True,
     )
 
-render_projection_betting_workspace(
-    game,selected_date,proj,hits_proj,kdf,k_reco,out_reco,hit_reco,
-    odds_rows,odds_err,odds_source,
-)
-
 st.markdown('<div class="section-head">OPPOSING BATTER BOX</div>',unsafe_allow_html=True)
 lineup_label="✅ CONFIRMED BATTING ORDER" if lineup_context.confirmed else "ACTIVE ROSTER FALLBACK · lineup not posted yet"
 st.caption(f"{lineup_label} · {game.opponent} hitters vs a {pitcher_hand or 'unknown-hand'} pitcher. Pitcher-hand K% and H/PA feed the baseball matchup; incomplete hitter splits shrink safely toward league rates.")
@@ -1516,5 +1511,10 @@ else:
             "Split Available":st.column_config.TextColumn("Data"),
         },
     )
+
+render_projection_betting_workspace(
+    game,selected_date,proj,hits_proj,kdf,k_reco,out_reco,hit_reco,
+    odds_rows,odds_err,odds_source,
+)
 
 st.markdown(f'<div class="search-note">Data status: {proj.confidence} confidence · quality {proj.quality}/100 · locked: {locked} · engine v{APP_VERSION}</div>',unsafe_allow_html=True)
