@@ -369,7 +369,8 @@ def build_promotion_command_center(data_dir: Path | str = "data") -> pd.DataFram
     extra_names = set(extra["Lane"].astype(str))
     if not base.empty:
         base = base.loc[~base["Lane"].astype(str).isin(extra_names)].copy()
-    return pd.concat([base, extra], ignore_index=True)[COLUMNS]
+    rows = base.to_dict("records") + extra.to_dict("records")
+    return pd.DataFrame(rows, columns=COLUMNS)
 
 
 def build_summary(command_center: pd.DataFrame) -> pd.DataFrame:
