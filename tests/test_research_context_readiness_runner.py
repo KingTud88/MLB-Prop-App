@@ -16,9 +16,10 @@ def test_runner_keeps_one_shared_refresh_timestamp() -> None:
     assert '--queued-at-utc "${RESEARCH_REFRESH_AT_UTC}"' in text
 
 
-def test_runner_orders_dependency_chain_before_freshness_audit() -> None:
+def test_runner_orders_research_sources_before_control_plane_and_freshness() -> None:
     text = _text()
     stages = (
+        "training.input_quality_matched_v2",
         "training.umpire_k_up_cap_shadow",
         "training.umpire_context_review_snapshot",
         "training.confirmed_lineup_review_snapshot",
@@ -62,6 +63,9 @@ def test_runner_persists_freshness_review_watch_and_shadow_outputs() -> None:
         "data/k_ladder_reliability_shadow_detail.csv",
         "data/k_ladder_reliability_shadow_cohorts.csv",
         "data/k_ladder_reliability_shadow_gate.csv",
+        "data/input_quality_matched_v2_pairs.csv",
+        "data/input_quality_matched_v2_summary.csv",
+        "data/input_quality_matched_v2_preregistration.csv",
         "data/umpire_k_up_cap_shadow_detail.csv",
         "data/umpire_k_up_cap_shadow_summary.csv",
         "data/umpire_context_review_snapshot.csv",
@@ -88,23 +92,37 @@ def test_runner_persists_freshness_review_watch_and_shadow_outputs() -> None:
 
 def test_runner_keeps_report_only_contract_tests_in_path() -> None:
     text = _text()
-    assert "tests/test_projection_crushers.py" in text
-    assert "tests/test_projection_crusher_shadow.py" in text
-    assert "tests/test_projection_underperformer_shadow.py" in text
-    assert "tests/test_k_ladder_reliability_shadow.py" in text
-    assert "tests/test_umpire_k_up_cap_shadow.py" in text
-    assert "tests/test_umpire_context_review_snapshot.py" in text
-    assert "tests/test_umpire_context_review_pipeline.py" in text
-    assert "tests/test_confirmed_lineup_review_snapshot.py" in text
-    assert "tests/test_research_review_snapshot_freshness.py" in text
-    assert "tests/test_research_promotion_command_center.py" in text
-    assert "tests/test_research_promotion_scoreboard.py" in text
-    assert "tests/test_research_milestone_watch.py" in text
-    assert "tests/test_research_multicell_review_injector.py" in text
-    assert "tests/test_research_pipeline_freshness_audit.py" in text
-    assert "tests/test_research_evidence_command_center.py" in text
-    assert "tests/test_research_manual_review_queue.py" in text
+    expected_tests = (
+        "tests/test_projection_crushers.py",
+        "tests/test_projection_crusher_shadow.py",
+        "tests/test_projection_underperformer_shadow.py",
+        "tests/test_k_ladder_reliability_shadow.py",
+        "tests/test_input_quality_matched_v2.py",
+        "tests/test_calibration_common_mode_v2.py",
+        "tests/test_umpire_k_up_cap_shadow.py",
+        "tests/test_umpire_context_review_snapshot.py",
+        "tests/test_umpire_context_review_pipeline.py",
+        "tests/test_confirmed_lineup_review_snapshot.py",
+        "tests/test_research_review_snapshot_freshness.py",
+        "tests/test_research_promotion_command_center.py",
+        "tests/test_research_promotion_scoreboard.py",
+        "tests/test_research_milestone_watch.py",
+        "tests/test_research_multicell_review_injector.py",
+        "tests/test_research_pipeline_freshness_audit.py",
+        "tests/test_research_evidence_command_center.py",
+        "tests/test_research_manual_review_queue.py",
+    )
+    for test_path in expected_tests:
+        assert test_path in text
     assert 'git commit -m "Automate projection capture and game resolution: refresh research context readiness"' in text
+
+
+def test_runner_advances_input_quality_before_building_promotion_center() -> None:
+    text = _text()
+    input_quality_pos = text.index("PYTHONPATH=. python -m training.input_quality_matched_v2")
+    promotion_pos = text.index("PYTHONPATH=. python -m training.research_promotion_command_center")
+    assert input_quality_pos < promotion_pos
+    assert "PYTHONPATH=. python -m training.calibration_common_mode_v2" not in text
 
 
 def test_runner_supports_deferred_push_for_primary_resolver() -> None:
