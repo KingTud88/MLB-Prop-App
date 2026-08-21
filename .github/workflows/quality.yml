@@ -4,87 +4,14 @@ on:
   push:
   pull_request:
 
-permissions:
-  contents: write
-
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
-      - name: Apply branch-only Bet Tracker cache replay repair
-        if: github.event_name == 'pull_request' && github.head_ref == 'fix/bet-tracker-cache-replay'
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          page = Path("pages/2_Bet_Tracker.py")
-          source = page.read_text(encoding="utf-8")
-
-          if "BET_TRACKER_PROCESS_TTL_CACHE_V1" in source:
-              raise SystemExit("Bet Tracker process-local cache repair already present")
-          if source.count("@st.cache_data(") != 3:
-              raise SystemExit(f"expected exactly 3 Bet Tracker cache decorators, found {source.count('@st.cache_data(')}")
-
-          import_marker = "import time\nfrom datetime import datetime\n"
-          import_replacement = "import time\nfrom functools import wraps\nfrom threading import RLock\nfrom datetime import datetime\n"
-          if import_marker not in source:
-              raise SystemExit("Bet Tracker import marker not found")
-          source = source.replace(import_marker, import_replacement, 1)
-
-          helper_marker = 'EASTERN = ZoneInfo("America/New_York")\n'
-          helper = '''EASTERN = ZoneInfo("America/New_York")\n\n\n# BET_TRACKER_PROCESS_TTL_CACHE_V1\ndef _local_ttl_cache(ttl_seconds: float):\n    """Process-local TTL cache that never records/replays Streamlit elements."""\n    def decorator(func):\n        cache = {}\n        lock = RLock()\n\n        @wraps(func)\n        def wrapper(*args, **kwargs):\n            key = (args, tuple(sorted(kwargs.items())))\n            now = time.monotonic()\n            with lock:\n                cached = cache.get(key)\n                if cached is not None and now - cached[0] < ttl_seconds:\n                    return cached[1]\n            value = func(*args, **kwargs)\n            with lock:\n                cache[key] = (now, value)\n            return value\n\n        def clear() -> None:\n            with lock:\n                cache.clear()\n\n        wrapper.clear = clear\n        return wrapper\n\n    return decorator\n'''
-          if helper_marker not in source:
-              raise SystemExit("Bet Tracker cache helper insertion marker not found")
-          source = source.replace(helper_marker, helper, 1)
-
-          replacements = {
-              "@st.cache_data(ttl=15, show_spinner=False)\ndef live_pitcher_prop(": "@_local_ttl_cache(15)\ndef live_pitcher_prop(",
-              "@st.cache_data(ttl=120, show_spinner=False)\ndef todays_slate(": "@_local_ttl_cache(120)\ndef todays_slate(",
-              "@st.cache_data(ttl=30, show_spinner=False)\ndef frozen_snapshot(": "@_local_ttl_cache(30)\ndef frozen_snapshot(",
-          }
-          for old, new in replacements.items():
-              if old not in source:
-                  raise SystemExit(f"cache decorator marker not found: {old.splitlines()[0]}")
-              source = source.replace(old, new, 1)
-
-          if "@st.cache_data(" in source:
-              raise SystemExit("Bet Tracker still contains a Streamlit cache decorator")
-          if "live_pitcher_prop.clear()" not in source:
-              raise SystemExit("manual live-results cache clear contract missing")
-          page.write_text(source, encoding="utf-8")
-
-          test_path = Path("tests/test_bet_tracker_page_contract.py")
-          test_source = test_path.read_text(encoding="utf-8")
-          addition = '''\n\ndef test_bet_tracker_avoids_streamlit_cache_replay_for_data_helpers():\n    path = Path(__file__).resolve().parents[1] / "pages" / "2_Bet_Tracker.py"\n    source = path.read_text(encoding="utf-8")\n    assert "BET_TRACKER_PROCESS_TTL_CACHE_V1" in source\n    assert "@st.cache_data(" not in source\n    assert "@_local_ttl_cache(15)\\ndef live_pitcher_prop(" in source\n    assert "@_local_ttl_cache(120)\\ndef todays_slate(" in source\n    assert "@_local_ttl_cache(30)\\ndef frozen_snapshot(" in source\n    assert "live_pitcher_prop.clear()" in source\n'''
-          if "test_bet_tracker_avoids_streamlit_cache_replay_for_data_helpers" not in test_source:
-              test_path.write_text(test_source + addition, encoding="utf-8")
-
-          contract_path = Path("tests/test_bet_add_buttons_contract.py")
-          contract_source = contract_path.read_text(encoding="utf-8")
-          old_boundary = 'end = source.index("@st.cache_data(ttl=120", start)'
-          new_boundary = 'end = source.index("@_local_ttl_cache(120)", start)'
-          if old_boundary not in contract_source:
-              raise SystemExit("live-stats contract boundary marker not found")
-          contract_path.write_text(contract_source.replace(old_boundary, new_boundary, 1), encoding="utf-8")
-          PY
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt pytest
       - run: python -m compileall -q streamlit_app.py navigation.py engine automation tests
       - run: pytest -q --durations=20
-      - name: Commit validated generated Bet Tracker cache repair
-        if: github.event_name == 'pull_request' && github.head_ref == 'fix/bet-tracker-cache-replay'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pages/2_Bet_Tracker.py tests/test_bet_tracker_page_contract.py tests/test_bet_add_buttons_contract.py
-          if git diff --cached --quiet; then
-            echo "No generated Bet Tracker cache changes to commit."
-          else
-            git commit -m "Fix Bet Tracker Streamlit cache replay"
-            git push origin HEAD:fix/bet-tracker-cache-replay
-          fi
