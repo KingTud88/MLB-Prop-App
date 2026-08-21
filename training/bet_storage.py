@@ -14,6 +14,7 @@ import requests
 
 DEFAULT_REPO = "KingTud88/MLB-Prop-App"
 DEFAULT_PATH = "data/bet_log.csv"
+BET_LOG_BRANCH = "bet-data"
 
 
 def _config(secrets: Any = None) -> tuple[str | None, str, str]:
@@ -71,7 +72,12 @@ def load_bet_log(local_path: str | Path, secrets: Any = None) -> pd.DataFrame:
     token, repo, path = _config(secrets)
     if token:
         url = f"https://api.github.com/repos/{repo}/contents/{path}"
-        response = requests.get(url, headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}, timeout=15)
+        response = requests.get(
+            url,
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
+            params={"ref": BET_LOG_BRANCH},
+            timeout=15,
+        )
         if response.status_code == 200:
             payload = response.json()
             raw = base64.b64decode(payload["content"]).decode("utf-8")
@@ -91,7 +97,7 @@ def append_bet(local_path: str | Path, record: dict[str, Any], secrets: Any = No
     if token:
         url = f"https://api.github.com/repos/{repo}/contents/{path}"
         headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
-        response = requests.get(url, headers=headers, timeout=15)
+        response = requests.get(url, headers=headers, params={"ref": BET_LOG_BRANCH}, timeout=15)
         if response.status_code == 200:
             payload = response.json()
             raw = base64.b64decode(payload["content"]).decode("utf-8")
@@ -105,7 +111,7 @@ def append_bet(local_path: str | Path, record: dict[str, Any], secrets: Any = No
         tracker = pd.concat([tracker, pd.DataFrame([record])], ignore_index=True)
         content = tracker.to_csv(index=False)
         encoded = base64.b64encode(content.encode("utf-8")).decode("ascii")
-        body = {"message": "Record sportsbook bet", "content": encoded, "branch": "main"}
+        body = {"message": "Record sportsbook bet", "content": encoded, "branch": BET_LOG_BRANCH}
         if sha:
             body["sha"] = sha
         write = requests.put(url, headers=headers, json=body, timeout=15)
@@ -124,7 +130,7 @@ def delete_bet(local_path: str | Path, key: str, secrets: Any = None) -> bool:
     if token:
         url = f"https://api.github.com/repos/{repo}/contents/{path}"
         headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
-        response = requests.get(url, headers=headers, timeout=15)
+        response = requests.get(url, headers=headers, params={"ref": BET_LOG_BRANCH}, timeout=15)
         if response.status_code == 404:
             return False
         response.raise_for_status()
@@ -139,7 +145,7 @@ def delete_bet(local_path: str | Path, key: str, secrets: Any = None) -> bool:
         body = {
             "message": "Delete tracked bet",
             "content": encoded,
-            "branch": "main",
+            "branch": BET_LOG_BRANCH,
             "sha": payload["sha"],
         }
         write = requests.put(url, headers=headers, json=body, timeout=15)
