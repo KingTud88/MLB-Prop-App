@@ -4,60 +4,14 @@ on:
   push:
   pull_request:
 
-permissions:
-  contents: write
-
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
-      - name: Apply branch-only batter-box layout repair
-        if: github.event_name == 'pull_request' && github.head_ref == 'fix/opposing-batter-box-order'
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          app=Path("streamlit_app.py")
-          source=app.read_text(encoding="utf-8")
-          workspace='''render_projection_betting_workspace(\n    game,selected_date,proj,hits_proj,kdf,k_reco,out_reco,hit_reco,\n    odds_rows,odds_err,odds_source,\n)\n\n'''
-          batter='st.markdown(\'<div class="section-head">OPPOSING BATTER BOX</div>\',unsafe_allow_html=True)'
-          footer='st.markdown(f\'<div class="search-note">Data status:'
-          if source.count(workspace) != 1:
-              raise SystemExit(f"expected one betting workspace render call, found {source.count(workspace)}")
-          if source.count(batter) != 1:
-              raise SystemExit(f"expected one batter box header, found {source.count(batter)}")
-          if source.count(footer) != 1:
-              raise SystemExit(f"expected one projection footer marker, found {source.count(footer)}")
-          if not source.index(workspace) < source.index(batter) < source.index(footer):
-              raise SystemExit("unexpected current layout order; refusing to rewrite")
-          source=source.replace(workspace,"",1)
-          footer_index=source.index(footer)
-          source=source[:footer_index] + workspace + source[footer_index:]
-          if not source.index(batter) < source.index(workspace) < source.index(footer):
-              raise SystemExit("failed to restore batter box before betting workspace")
-          app.write_text(source,encoding="utf-8")
-
-          test=Path("tests/test_main_projection_layout_order.py")
-          test.write_text('''from pathlib import Path\n\n\ndef test_opposing_batter_box_precedes_betting_workspace():\n    source=Path("streamlit_app.py").read_text(encoding="utf-8")\n    summary=source.index('PROJECTION SUMMARY')\n    batter=source.index('OPPOSING BATTER BOX')\n    betting=source.rindex('render_projection_betting_workspace(')\n    footer=source.index('Data status:')\n    assert summary < batter < betting < footer\n''',encoding="utf-8")
-          PY
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt pytest
       - run: python -m compileall -q streamlit_app.py navigation.py engine automation tests
       - run: pytest -q --durations=20
-      - name: Commit validated generated layout repair
-        if: github.event_name == 'pull_request' && github.head_ref == 'fix/opposing-batter-box-order'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add streamlit_app.py tests/test_main_projection_layout_order.py
-          if git diff --cached --quiet; then
-            echo "No generated layout changes to commit."
-          else
-            git commit -m "Restore opposing batter box above betting workspace"
-            git push origin HEAD:fix/opposing-batter-box-order
-          fi
