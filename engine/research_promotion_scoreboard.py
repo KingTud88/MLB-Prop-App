@@ -8,7 +8,7 @@ import streamlit as st
 
 from training.research_promotion_command_center import build_promotion_command_center
 
-SCOREBOARD_VERSION = "research-promotion-scoreboard-v2-all-lanes"
+SCOREBOARD_VERSION = "research-promotion-scoreboard-v3-all-lanes"
 
 COLUMNS = [
     "Lane",
@@ -17,6 +17,7 @@ COLUMNS = [
     "Gate Progress",
     "Signal",
     "Recommended Action",
+    "Manual Review Ready",
     "Production Authority",
     "Reason",
     "Source",
@@ -34,6 +35,12 @@ def _text(value: object, default: str = "—") -> str:
         pass
     text = str(value).strip()
     return text if text else default
+
+
+def _truthy(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"true", "1", "yes", "y"}
 
 
 def _int_or_none(value: object) -> int | None:
@@ -82,8 +89,7 @@ def _gate_progress(row: pd.Series) -> str:
 
 def build_research_promotion_scoreboard(root: Path) -> pd.DataFrame:
     """Display every registered report-only research lane without re-grading it."""
-    data = Path(root) / "data"
-    command_center = build_promotion_command_center(data)
+    command_center = build_promotion_command_center(Path(root) / "data")
     rows: list[dict[str, object]] = []
     for _, source in command_center.iterrows():
         rows.append({
@@ -93,6 +99,7 @@ def build_research_promotion_scoreboard(root: Path) -> pd.DataFrame:
             "Gate Progress": _gate_progress(source),
             "Signal": _text(source.get("Evidence_Direction")),
             "Recommended Action": _text(source.get("Recommended_Action"), "KEEP LEARNING"),
+            "Manual Review Ready": _truthy(source.get("Ready_For_Manual_Review")),
             "Production Authority": _text(source.get("Production_Authority"), "NONE"),
             "Reason": _text(source.get("Source_Reason"), ""),
             "Source": _text(source.get("Source_Path"), ""),
@@ -104,13 +111,13 @@ def build_research_promotion_scoreboard(root: Path) -> pd.DataFrame:
 def _status_class(status: str) -> str:
     key = str(status).strip().upper()
     if key in {
-        "PASS", "SUPPORTED", "STRONG EVIDENCE", "PROMOTE", "HELPING",
+        "PASS", "SUPPORTED", "SUPPORTIVE", "STRONG EVIDENCE", "PROMOTE", "HELPING",
         "LEAN_SUPPORTED", "LEAN_CONSISTENT", "READY_FOR_MANUAL_RESEARCH_REVIEW",
     }:
         return "research-good"
-    if key in {"FAIL", "HURTING", "HURTING_BOTH", "REJECT", "CAUTION"}:
+    if key in {"FAIL", "HURTING", "HURTING_BOTH", "CONTRADICTORY", "REJECT", "CAUTION"}:
         return "research-bad"
-    if key in {"HOLD", "LEARNING", "INCONCLUSIVE", "MIXED", "SOURCE_MISSING"}:
+    if key in {"HOLD", "LEARNING", "INCONCLUSIVE", "MIXED", "GUARDED", "SOURCE_MISSING"}:
         return "research-watch"
     return "research-neutral"
 
@@ -120,7 +127,7 @@ def render_research_promotion_scoreboard(root: Path) -> None:
     st.markdown(
         """
         <style>
-        /* RESEARCH_PROMOTION_SCOREBOARD_V2_ALL_LANES · presentation/reporting only */
+        /* RESEARCH_PROMOTION_SCOREBOARD_V3_ALL_LANES · presentation/reporting only */
         .research-board-head{margin:1.1rem 0 .25rem;padding:.88rem 1rem;border:1px solid rgba(73,111,151,.62);border-left:4px solid #ff3655;border-radius:14px;background:linear-gradient(110deg,rgba(10,34,59,.95),rgba(5,20,37,.97));}
         .research-board-kicker{color:#ff6a7d;font:900 .66rem/1.2 system-ui;letter-spacing:.11em;text-transform:uppercase}
         .research-board-title{margin:.16rem 0;color:#f5f1e9;font:900 1.28rem/1.15 system-ui}
@@ -135,12 +142,10 @@ def render_research_promotion_scoreboard(root: Path) -> None:
         .research-neutral{color:#9fb3c6;border:1px solid rgba(159,179,198,.38);background:rgba(159,179,198,.08)}
         .research-label{margin-top:.38rem;color:#7fa4c2;font:900 .57rem/1.15 system-ui;letter-spacing:.09em;text-transform:uppercase}
         .research-value{margin-top:.06rem;color:#dfe9f0;font:720 .73rem/1.30 system-ui}
-        .research-label-sample{color:#6f93b0}
-        .research-value-sample{color:#b8c8d5;font-weight:680}
+        .research-label-sample{color:#6f93b0}.research-value-sample{color:#b8c8d5;font-weight:680}
         .research-label-gate{margin-top:.40rem;color:#91c6eb}
         .research-value-gate{margin-top:.09rem;padding:.26rem .36rem;border-left:2px solid #38bdf8;border-radius:7px;background:rgba(56,189,248,.055);color:#f4f8fb;font:900 .78rem/1.30 system-ui}
-        .research-label-action{color:#7899b4}
-        .research-value-action{color:#c8d5df;font-weight:760}
+        .research-label-action{color:#7899b4}.research-value-action{color:#c8d5df;font-weight:760}
         .research-authority-strip{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-top:.48rem;padding:.30rem .42rem;border-top:1px solid rgba(255,54,85,.30);border-radius:7px;background:rgba(105,14,33,.10)}
         .research-authority-label{color:#7595ae;font:900 .56rem/1.15 system-ui;letter-spacing:.085em;text-transform:uppercase}
         .research-authority{color:#ff8a9a;font:900 .68rem/1.15 system-ui;letter-spacing:.035em;text-transform:uppercase}
@@ -153,18 +158,18 @@ def render_research_promotion_scoreboard(root: Path) -> None:
         '<div class="research-board-head">'
         '<div class="research-board-kicker">Research command center · report only · all lanes</div>'
         '<div class="research-board-title">Research Promotion Command Center</div>'
-        '<div class="research-board-copy">Every registered research lane is shown. Native verdicts remain source-owned; this board never re-grades, auto-promotes, or activates a model feature.</div>'
+        '<div class="research-board-copy">Every registered promotion lane is shown. Supporting diagnostics remain in their native reports. Native verdicts and readiness stay source-owned; this board never auto-promotes or activates a model feature.</div>'
         '</div>',
         unsafe_allow_html=True,
     )
 
     statuses = board["Status"].astype(str).str.upper()
     authority = board["Production Authority"].astype(str).str.upper()
-    ready = statuses.eq("READY_FOR_MANUAL_RESEARCH_REVIEW")
+    ready = board["Manual Review Ready"].astype(bool)
     a, b, c, d = st.columns(4)
-    a.metric("Research lanes", len(board), help="All registered report-only research lanes; there is no fixed card ceiling.")
-    b.metric("Still learning", int(statuses.isin({"LEARNING", "INCONCLUSIVE", "MIXED"}).sum()), help="Lanes still accumulating or resolving evidence.")
-    c.metric("Manual review ready", int(ready.sum()), help="Maturity gate reached; still requires explicit manual review before any production proposal.")
+    a.metric("Research lanes", len(board), help="All registered report-only promotion lanes; there is no fixed card ceiling.")
+    b.metric("Still learning", int(statuses.isin({"LEARNING", "INCONCLUSIVE", "MIXED", "GUARDED"}).sum()), help="Lanes still accumulating evidence or carrying a source-owned mixed/guarded verdict.")
+    c.metric("Manual review ready", int(ready.sum()), help="Source-owned maturity/readiness has been reached; explicit human approval is still required before any production proposal.")
     d.metric("Production authority", int(authority.ne("NONE").sum()), help="Research-only lanes should remain zero until an explicitly approved production change is implemented.")
 
     for start in range(0, len(board), 2):
@@ -187,23 +192,14 @@ def render_research_promotion_scoreboard(root: Path) -> None:
                     '<div class="research-authority-strip">'
                     '<span class="research-authority-label">Production authority</span>'
                     f'<span class="research-authority">{escape(_text(row["Production Authority"]))}</span>'
-                    '</div>'
-                    '</div>',
+                    '</div></div>',
                     unsafe_allow_html=True,
                 )
 
     with st.expander("ⓘ How to read the Research Promotion Command Center", expanded=False):
-        st.markdown(
-            "**Status is source-owned.** Native research verdicts are displayed as written by each validator. The scoreboard does not recalculate them."
-        )
-        st.markdown(
-            "**Gate Progress shows the evidence bottleneck.** Starts alone are not enough; time diversity, pitcher/opponent/catcher/umpire breadth, probability coverage, seasons, or other source-owned requirements can keep a lane in learning."
-        )
-        st.markdown(
-            "**Current Signal is descriptive evidence, not activation.** Positive movement can justify a later frozen challenger, but same-sample research does not authorize a live adjustment."
-        )
-        st.markdown(
-            "**Production Authority is the hard boundary.** NONE means the lane cannot change the live baseball projection, probabilities, Top Plays ranking, recommendation thresholds, or sportsbook execution."
-        )
-        detail = board[["Lane", "Status", "Reason", "Source", "Production Authority"]].copy()
+        st.markdown("**Status is source-owned.** Native research verdicts are displayed as written by each validator; the scoreboard does not recalculate them.")
+        st.markdown("**Gate Progress shows the evidence bottleneck.** Starts alone are not enough; time diversity, entity breadth, probability coverage, matched pairs, seasons, or other source-owned requirements can keep a lane from review.")
+        st.markdown("**Manual Review Ready is also source/control-plane owned.** A positive-looking status alone does not silently authorize production.")
+        st.markdown("**Production Authority is the hard boundary.** NONE means the lane cannot change live projections, probabilities, Top Plays, recommendation thresholds, or sportsbook execution.")
+        detail = board[["Lane", "Status", "Manual Review Ready", "Reason", "Source", "Production Authority"]].copy()
         st.dataframe(detail, hide_index=True, width="stretch")
