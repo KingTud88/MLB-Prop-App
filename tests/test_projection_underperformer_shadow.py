@@ -61,6 +61,11 @@ def test_underperformer_pitcher_and_cohort_summaries_preserve_negative_evidence(
     assert "Below_Projection_Rate" in pitchers.columns
     assert "Median_K_Residual" in pitchers.columns
     assert "Material_Underperform_Events" in pitchers.columns
+    assert "Underperformer_Status" in pitchers.columns
+    chronic = pitchers.loc[pitchers["Pitcher"].eq("Pitcher 1")].iloc[0]
+    assert chronic["Below_Projection_Rate"] == 1.0
+    assert chronic["Mean_K_Residual"] < -0.5
+    assert chronic["Underperformer_Status"] == "UNDERPERFORMER"
     assert not cohorts.empty
     assert "UNDERINDEX" in set(cohorts["Signal"]) or "LEARNING" in set(cohorts["Signal"]) or "NEUTRAL" in set(cohorts["Signal"])
     assert cohorts["Production_Authority"].eq("NONE").all()
