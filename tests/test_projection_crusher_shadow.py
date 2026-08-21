@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 from engine.starter_history import HISTORY_SEMANTICS
 from training.projection_crusher_shadow import build_cohort_summary, build_detail, build_gate
@@ -31,9 +32,9 @@ def test_crusher_shadow_uses_exact_frozen_projection_residual() -> None:
     ])
     detail = build_detail(history).set_index("Pitcher")
 
-    assert detail.loc["Pitcher A", "K_Residual"] == -0.8
+    assert detail.loc["Pitcher A", "K_Residual"] == pytest.approx(-0.8)
     assert not bool(detail.loc["Pitcher A", "Beat_Projection"])
-    assert detail.loc["Pitcher B", "K_Residual"] == 2.2
+    assert detail.loc["Pitcher B", "K_Residual"] == pytest.approx(2.2)
     assert bool(detail.loc["Pitcher B", "Beat_Projection"])
     assert bool(detail.loc["Pitcher B", "Material_Crusher_Event"])
     assert set(detail["Production_Authority"].astype(str)) == {"NONE"}
