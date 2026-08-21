@@ -18,6 +18,7 @@ PYTHONPATH=. pytest -q \
   tests/test_pitch_mix_whiff_forward_evaluation.py \
   tests/test_projection_crushers.py \
   tests/test_projection_crusher_shadow.py \
+  tests/test_projection_underperformer_shadow.py \
   tests/test_k_ladder_reliability_shadow.py \
   tests/test_umpire_k_up_cap_shadow.py \
   tests/test_umpire_context_review_snapshot.py \
@@ -47,6 +48,7 @@ PYTHONPATH=. python -m training.pitch_mix_readiness_audit
 PYTHONPATH=. python -m training.pitch_mix_whiff_score_capture
 PYTHONPATH=. python -m training.pitch_mix_whiff_forward_evaluation
 PYTHONPATH=. python -m training.projection_crusher_shadow
+PYTHONPATH=. python -m training.projection_underperformer_shadow
 PYTHONPATH=. python -m training.k_ladder_reliability_shadow
 PYTHONPATH=. python -m training.catcher_prior_maturity
 PYTHONPATH=. python -m training.umpire_k_up_cap_shadow
@@ -92,6 +94,10 @@ git add \
   data/projection_crusher_shadow_pitchers.csv \
   data/projection_crusher_shadow_cohorts.csv \
   data/projection_crusher_shadow_gate.csv \
+  data/projection_underperformer_shadow_detail.csv \
+  data/projection_underperformer_shadow_pitchers.csv \
+  data/projection_underperformer_shadow_cohorts.csv \
+  data/projection_underperformer_shadow_gate.csv \
   data/k_ladder_reliability_shadow_detail.csv \
   data/k_ladder_reliability_shadow_cohorts.csv \
   data/k_ladder_reliability_shadow_gate.csv \
