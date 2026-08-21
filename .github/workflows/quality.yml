@@ -14,5 +14,4 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements.txt pytest
       - run: python -m compileall -q streamlit_app.py navigation.py engine automation tests
-      - run: pytest -q tests/test_projection_history_underperformer_ui.py tests/test_projection_crushers.py tests/test_projection_history_learning_dashboard.py
       - run: pytest -q --durations=20
