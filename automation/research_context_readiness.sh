@@ -55,8 +55,10 @@ PYTHONPATH=. python -m training.confirmed_lineup_review_snapshot
 PYTHONPATH=. python -m training.research_review_snapshot_freshness
 PYTHONPATH=. python -m training.research_evidence_command_center
 PYTHONPATH=. python -m training.research_promotion_command_center
-PYTHONPATH=. python -m training.research_milestone_watch
+PYTHONPATH=. python -m training.research_milestone_watch \
+  --command-center data/research_promotion_command_center.csv
 PYTHONPATH=. python -m training.research_evidence_history \
+  --command-center data/research_promotion_command_center.csv \
   --observed-at-utc "${RESEARCH_REFRESH_AT_UTC}"
 PYTHONPATH=. python -m training.research_evidence_transition_digest \
   --refresh-at-utc "${RESEARCH_REFRESH_AT_UTC}"
