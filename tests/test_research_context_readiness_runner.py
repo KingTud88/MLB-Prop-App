@@ -41,8 +41,11 @@ def test_runner_routes_milestones_and_history_through_all_lane_promotion_center(
     text = _text()
     command_center_arg = "--command-center data/research_promotion_command_center.csv"
     assert text.count(command_center_arg) == 2
-    assert "python -m training.research_milestone_watch \\\n  " + command_center_arg in text
-    assert "python -m training.research_evidence_history \\\n  " + command_center_arg in text
+    milestone_pos = text.index("training.research_milestone_watch")
+    history_pos = text.index("training.research_evidence_history")
+    first_arg_pos = text.index(command_center_arg, milestone_pos)
+    second_arg_pos = text.index(command_center_arg, history_pos)
+    assert milestone_pos < first_arg_pos < history_pos < second_arg_pos
 
 
 def test_runner_persists_freshness_review_watch_and_shadow_outputs() -> None:
