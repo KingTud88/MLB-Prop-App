@@ -238,7 +238,7 @@ def _read_csv(path: Path) -> pd.DataFrame:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Append change-only report-only research evidence history.")
-    parser.add_argument("--command-center", default="data/research_evidence_command_center.csv")
+    parser.add_argument("--command-center", default="data/research_promotion_command_center.csv")
     parser.add_argument("--history", default="data/research_evidence_history.csv")
     parser.add_argument("--summary-output", default="data/research_evidence_history_summary.csv")
     parser.add_argument("--observed-at-utc", default=None)
