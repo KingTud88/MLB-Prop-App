@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import logging
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from threading import RLock
+from typing import NamedTuple
 from urllib.parse import urlparse
 
 import requests
@@ -34,8 +36,7 @@ _SOURCE_HEALTH = {
 _SOURCE_HEALTH_OBSERVER: Callable[[list[dict[str, str | None]], str], None] | None = None
 
 
-@dataclass(frozen=True)
-class ServiceFailure:
+class ServiceFailure(NamedTuple):
     service: str
     host: str
     method: str
