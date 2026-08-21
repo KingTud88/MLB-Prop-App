@@ -194,7 +194,7 @@ def render_research_promotion_scoreboard(root: Path) -> None:
 
     with st.expander("ⓘ How to read the Research Promotion Command Center", expanded=False):
         st.markdown(
-            "**Status is source-owned.** LEARNING, HOLD, FAIL, HURTING, INCONCLUSIVE, READY_FOR_MANUAL_RESEARCH_REVIEW, and other labels come from each lane's report. The command center does not recalculate them."
+            "**Status is source-owned.** Native research verdicts are displayed as written by each validator. The scoreboard does not recalculate them."
         )
         st.markdown(
             "**Gate Progress shows the evidence bottleneck.** Starts alone are not enough; time diversity, pitcher/opponent/catcher/umpire breadth, probability coverage, seasons, or other source-owned requirements can keep a lane in learning."
@@ -203,7 +203,7 @@ def render_research_promotion_scoreboard(root: Path) -> None:
             "**Current Signal is descriptive evidence, not activation.** Positive movement can justify a later frozen challenger, but same-sample research does not authorize a live adjustment."
         )
         st.markdown(
-            "**Production Authority is the hard boundary.** NONE means the lane cannot change live projections, probabilities, Top Plays ranking, recommendation thresholds, or sportsbook execution."
+            "**Production Authority is the hard boundary.** NONE means the lane cannot change the live baseball projection, probabilities, Top Plays ranking, recommendation thresholds, or sportsbook execution."
         )
         detail = board[["Lane", "Status", "Reason", "Source", "Production Authority"]].copy()
         st.dataframe(detail, hide_index=True, width="stretch")
