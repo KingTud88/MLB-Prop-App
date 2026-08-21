@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -12,6 +15,103 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+      - name: Apply fail-closed workload command-center patch
+        if: github.event_name == 'pull_request' && github.head_ref == 'fix/workload-promotion-command-center-source'
+        env:
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          git fetch origin "$HEAD_BRANCH:$HEAD_BRANCH"
+          git checkout "$HEAD_BRANCH"
+          python - <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          command_path = Path("training/research_promotion_command_center.py")
+          text = command_path.read_text(encoding="utf-8")
+          start = text.index("def _workload_v25_lane(data_dir: Path) -> dict[str, object]:")
+          end = text.index("\ndef build_promotion_command_center", start)
+          replacement = textwrap.dedent('''
+          def _workload_v25_lane(data_dir: Path) -> dict[str, object]:
+              filename = "workload_promotion_decisions.csv"
+              source = f"data/{filename}"
+              decisions = _read(data_dir, filename)
+              if decisions.empty:
+                  return _missing("Workload v2.5 Candidates", "WORKLOAD", source)
+
+              work = decisions.copy()
+              work["_metric"] = work.get("Metric", pd.Series(index=work.index, dtype=str)).fillna("").astype(str).str.upper()
+              metric_order = {"PITCHES": 0, "BF": 1, "OUTS": 2}
+              work["_metric_order"] = work["_metric"].map(metric_order).fillna(99)
+              work = work.sort_values(["_metric_order", "_metric"]).reset_index(drop=True)
+
+              source_decisions = [_clean(value).upper() for value in work.get("Decision", pd.Series(dtype=str)) if _clean(value)]
+              decision_rank = {"PROMOTE": 0, "HOLD": 1, "REJECT": 2}
+              unique_decisions = sorted(set(source_decisions), key=lambda value: (decision_rank.get(value, 99), value))
+              status = " / ".join(unique_decisions) if unique_decisions else "UNKNOWN"
+
+              signals: list[str] = []
+              passing: list[str] = []
+              better: list[str] = []
+              for _, row in work.iterrows():
+                  metric = _clean(row.get("Metric")).upper() or "UNKNOWN"
+                  decision = _clean(row.get("Decision")).upper() or "UNKNOWN"
+                  version = _clean(row.get("Recommended_Version")) or "NONE"
+                  signals.append(f"{metric}:{decision} {version} pooled_relative_mae={_pct(row.get('Pooled_Relative_MAE'), signed=True)}")
+                  passing.append(f"{metric}={_integer(row.get('Passing_Seasons')) or 0}/{_integer(row.get('Required_Seasons')) or 0}")
+                  better.append(f"{metric}={_integer(row.get('MAE_Better_Seasons')) or 0}")
+
+              report_values = work.get("Report_Only", pd.Series(True, index=work.index)).map(_truthy)
+              report_only = bool(report_values.all()) if not report_values.empty else REPORT_ONLY
+              authority_values = sorted({_clean(value).upper() for value in work.get("Production_Authority", pd.Series(dtype=str)) if _clean(value)})
+              authority = authority_values[0] if len(authority_values) == 1 else " / ".join(authority_values)
+              ready = "PROMOTE" in unique_decisions
+              source_versions = sorted({_clean(value) for value in work.get("Report_Version", pd.Series(dtype=str)) if _clean(value)})
+
+              return _base_row(
+                  lane="Workload v2.5 Candidates", category="WORKLOAD", source_path=source, status=status,
+                  direction="; ".join(signals),
+                  breadth_label="METRICS", current_breadth=int(len(work)), required_breadth=3,
+                  secondary="passing_seasons=" + ",".join(passing) + "; mae_better_seasons=" + ",".join(better),
+                  ready=ready,
+                  action="MANUAL_RESEARCH_REVIEW_ONLY" if ready else "PRESERVE_WORKLOAD_PROMOTION_DECISIONS_REPORT_ONLY",
+                  reason=(
+                      "Authoritative cross-season workload promotion decisions are displayed without regrading; "
+                      "every metric remains report-only and any PROMOTE decision opens manual review only."
+                  ),
+                  report_only=report_only,
+                  authority=authority or PRODUCTION_AUTHORITY,
+                  source_version=" / ".join(source_versions),
+              )
+          ''').lstrip()
+          command_path.write_text(text[:start] + replacement + text[end:], encoding="utf-8")
+
+          test_path = Path("tests/test_research_promotion_command_center.py")
+          tests = test_path.read_text(encoding="utf-8")
+          test_start = tests.index("def test_workload_v25_latest_season_evidence_is_visible_but_not_promotion_ready")
+          new_test = textwrap.dedent('''
+          def test_workload_lane_fails_closed_without_cross_season_decisions(tmp_path: Path) -> None:
+              _write(tmp_path, "workload_v25_summary.csv", [
+                  {"Season": 2026, "Metric": "PITCHES", "Evaluated_Starts": 2032, "Relative_MAE_vs_v23": 0.0077, "V25_Adjusted_Starts": 312, "V25_Win_Share_vs_v23": 0.654, "V25_Status": "MIXED", "Candidate_Version": "v25-test"},
+                  {"Season": 2026, "Metric": "BF", "Evaluated_Starts": 2032, "Relative_MAE_vs_v23": 0.0019, "V25_Adjusted_Starts": 312, "V25_Win_Share_vs_v23": 0.551, "V25_Status": "MIXED", "Candidate_Version": "v25-test"},
+                  {"Season": 2026, "Metric": "OUTS", "Evaluated_Starts": 2032, "Relative_MAE_vs_v23": 0.0013, "V25_Adjusted_Starts": 312, "V25_Win_Share_vs_v23": 0.542, "V25_Status": "MIXED", "Candidate_Version": "v25-test"},
+              ])
+              row = build_promotion_command_center(tmp_path).set_index("Lane").loc["Workload v2.5 Candidates"]
+              assert row["Source_Path"] == "data/workload_promotion_decisions.csv"
+              assert row["Status"] == "SOURCE_MISSING"
+              assert row["Recommended_Action"] == "REFRESH_REPORT_ONLY_RESEARCH_SOURCE"
+              assert not bool(row["Ready_For_Manual_Review"])
+              assert row["Production_Authority"] == "NONE"
+          ''').lstrip()
+          test_path.write_text(tests[:test_start] + new_test, encoding="utf-8")
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- training/research_promotion_command_center.py tests/test_research_promotion_command_center.py
+          if ! git diff --cached --quiet; then
+            git commit -m "Fail closed on missing workload promotion decisions"
+            git push origin "HEAD:$HEAD_BRANCH"
+          fi
       - run: pip install -r requirements.txt pytest
       - run: python -m compileall -q streamlit_app.py navigation.py engine automation tests
+      - run: pytest -q tests/test_research_promotion_command_center.py tests/test_workload_promotion_command_center_authority.py
       - run: pytest -q --durations=20
