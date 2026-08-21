@@ -1,10 +1,10 @@
 {
   "consensus_line_fallback": false,
   "error": "",
-  "event_count": 15,
-  "fetched_at_utc": "2026-08-21T18:03:35.890998+00:00",
+  "event_count": 14,
+  "fetched_at_utc": "2026-08-21T20:55:27.162955+00:00",
   "notice": "",
-  "offer_count": 722,
+  "offer_count": 677,
   "pages": 1,
   "production_authority": "MARKET_INPUT_ONLY",
   "projection_adjustment": false,
@@ -14,8 +14,8 @@
     "pitcher_outs",
     "pitcher_strikeouts"
   ],
-  "selected_offer_count": 164,
-  "selected_pair_count": 82,
-  "selected_pitchers": 28,
+  "selected_offer_count": 158,
+  "selected_pair_count": 79,
+  "selected_pitchers": 27,
   "slate_date": "2026-08-21"
 }
