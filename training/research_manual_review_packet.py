@@ -295,7 +295,7 @@ def main() -> None:
     )
     parser.add_argument("--digest", default="data/research_evidence_transition_digest.csv")
     parser.add_argument("--history", default="data/research_evidence_history.csv")
-    parser.add_argument("--command-center", default="data/research_evidence_command_center.csv")
+    parser.add_argument("--command-center", default="data/research_promotion_command_center.csv")
     parser.add_argument("--refresh-at-utc", default=os.getenv("RESEARCH_REFRESH_AT_UTC"))
     parser.add_argument("--output", default="data/research_manual_review_packet.csv")
     parser.add_argument("--summary-output", default="data/research_manual_review_packet_summary.csv")
