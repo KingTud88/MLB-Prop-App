@@ -30,6 +30,11 @@ PYTHONPATH=. pytest -q \
   tests/test_research_review_snapshot_freshness.py \
   tests/test_research_evidence_command_center.py \
   tests/test_research_promotion_command_center.py \
+  tests/test_research_governance_v2.py \
+  tests/test_research_direction_flip_review.py \
+  tests/test_calibration_shadow_governance_metadata.py \
+  tests/test_research_promotion_governance_integration.py \
+  tests/test_research_governance_pipeline_contract.py \
   tests/test_research_promotion_scoreboard.py \
   tests/test_research_milestone_watch.py \
   tests/test_research_evidence_history.py \
@@ -60,6 +65,7 @@ PYTHONPATH=. python -m training.confirmed_lineup_review_snapshot
 PYTHONPATH=. python -m training.research_review_snapshot_freshness
 PYTHONPATH=. python -m training.research_evidence_command_center
 PYTHONPATH=. python -m training.research_promotion_command_center
+PYTHONPATH=. python -m training.research_governance_v2
 PYTHONPATH=. python -m training.research_milestone_watch \
   --command-center data/research_promotion_command_center.csv
 PYTHONPATH=. python -m training.research_evidence_history \
@@ -120,6 +126,9 @@ git add \
   data/research_evidence_command_center_summary.csv \
   data/research_promotion_command_center.csv \
   data/research_promotion_command_center_summary.csv \
+  data/research_hypothesis_manifest.csv \
+  data/research_uncertainty_v2.csv \
+  data/research_governance_v2_summary.csv \
   data/research_milestone_watch.csv \
   data/research_milestone_watch_summary.csv \
   data/research_evidence_history.csv \

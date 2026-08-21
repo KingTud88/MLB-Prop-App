@@ -90,6 +90,31 @@ def _number(value: object) -> float | None:
     return None if pd.isna(parsed) else float(parsed)
 
 
+POSITIVE_DIRECTION_TOKENS = (
+    "STRONG EVIDENCE", "SUPPORTED", "SUPPORTIVE", "HELPING", "LEAN_CONSISTENT", "PROMOTE", "PASS",
+)
+NEGATIVE_DIRECTION_TOKENS = (
+    "UNDERPERFORMING", "CONTRADICTORY", "HURTING", "REJECT", "FAIL",
+)
+
+
+def _direction_polarity(value: object) -> str:
+    text = _clean(value).upper()
+    positive = any(token in text for token in POSITIVE_DIRECTION_TOKENS)
+    negative = any(token in text for token in NEGATIVE_DIRECTION_TOKENS)
+    if positive == negative:
+        return ""
+    return "POSITIVE" if positive else "NEGATIVE"
+
+
+def _material_direction_flip(current: pd.Series, previous: pd.Series) -> bool:
+    if not _truthy(current.get("Evidence_Direction_Changed")) or previous is None or previous.empty:
+        return False
+    current_polarity = _direction_polarity(current.get("Evidence_Direction"))
+    previous_polarity = _direction_polarity(previous.get("Evidence_Direction"))
+    return bool(current_polarity and previous_polarity and current_polarity != previous_polarity)
+
+
 def _control_violation(row: pd.Series) -> bool:
     return not (
         _truthy(row.get("Report_Only"))
@@ -126,6 +151,7 @@ def _trigger(row: pd.Series, previous: pd.Series) -> str:
     status = _truthy(row.get("Status_Changed"))
     readiness = _truthy(row.get("Readiness_Changed"))
     action = _truthy(row.get("Action_Changed"))
+    direction_flip = _material_direction_flip(row, previous)
     milestone = _primary_milestone_crossed(row, previous)
     if status and readiness:
         return "STATUS_AND_READINESS_TRANSITION"
@@ -133,6 +159,8 @@ def _trigger(row: pd.Series, previous: pd.Series) -> str:
         return "STATUS_TRANSITION"
     if readiness:
         return "READINESS_TRANSITION"
+    if direction_flip:
+        return "EVIDENCE_DIRECTION_FLIP"
     if action:
         return "ACTION_TRANSITION"
     if milestone:
