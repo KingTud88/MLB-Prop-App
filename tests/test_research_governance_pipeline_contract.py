@@ -35,8 +35,13 @@ def test_governance_v2_outputs_are_persisted() -> None:
 
 def test_governance_v2_does_not_enter_production_or_execution_paths() -> None:
     text = Path("training/research_governance_v2.py").read_text(encoding="utf-8")
+    lowered = text.lower()
     assert 'PRODUCTION_AUTHORITY = "NONE"' in text
     assert "AUTOMATIC_DECISION_ALLOWED = False" in text
-    assert "sportsbook" not in text.lower()
-    assert "bet_log" not in text.lower()
-    assert "projection =" not in text.lower()
+    assert "sportsbook" not in lowered
+    assert "bet_log" not in lowered
+    assert "from engine.projection" not in lowered
+    assert "import engine.projection" not in lowered
+    assert "data/projection_log.csv" not in lowered
+    assert "data/bet_log.csv" not in lowered
+    assert "streamlit" not in lowered
