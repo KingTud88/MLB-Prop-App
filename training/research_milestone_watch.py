@@ -191,7 +191,7 @@ def _read_csv(path: Path) -> pd.DataFrame:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build a report-only watch of exact blockers on existing research evidence gates.")
-    parser.add_argument("--command-center", default="data/research_evidence_command_center.csv")
+    parser.add_argument("--command-center", default="data/research_promotion_command_center.csv")
     parser.add_argument("--output", default="data/research_milestone_watch.csv")
     parser.add_argument("--summary-output", default="data/research_milestone_watch_summary.csv")
     args = parser.parse_args()
