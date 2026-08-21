@@ -1,0 +1,29 @@
+name: governance-v2-targeted
+
+on:
+  push:
+    branches:
+      - research/governance-v2-hardening
+
+jobs:
+  targeted:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt pytest
+      - run: python -m compileall -q training/research_governance_v2.py training/research_manual_review_packet.py training/research_promotion_command_center.py training/calibration_shadow_replay.py tests
+      - run: >-
+          pytest -q
+          tests/test_research_governance_v2.py
+          tests/test_research_governance_uncertainty_extensions.py
+          tests/test_research_direction_flip_review.py
+          tests/test_calibration_shadow_governance_metadata.py
+          tests/test_research_promotion_governance_integration.py
+          tests/test_research_governance_source_readiness.py
+          tests/test_research_governance_pipeline_contract.py
+          tests/test_research_promotion_command_center.py
+          tests/test_research_manual_review_packet.py
+          tests/test_research_context_readiness_runner.py
