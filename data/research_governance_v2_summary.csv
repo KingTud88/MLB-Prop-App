@@ -1,0 +1,2 @@
+Total_Lanes,Review_Ready_Lanes,Governance_Blocked_Lanes,Control_Blocked_Lanes,Manifest_Lanes,Uncertainty_Rows,Report_Only,Production_Authority,No_Auto_Promotion,Automatic_Decision_Allowed,Governance_Version
+22,3,0,0,22,16,True,NONE,True,False,research-governance-v2-report-only
