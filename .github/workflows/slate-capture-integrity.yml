@@ -7,6 +7,7 @@ on:
     # cannot disappear silently from the durable archive.
     - cron: '20 14,17,20,23 * * *'
   push:
+    branches: [main]
     paths:
       - training/slate_capture_integrity.py
       - .github/workflows/slate-capture-integrity.yml
@@ -30,7 +31,7 @@ jobs:
       - name: Audit announced starter capture coverage
         run: python -m training.slate_capture_integrity --fail-on-missing
       - name: Commit clean audit report
-        if: success()
+        if: success() && github.ref == 'refs/heads/main'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
