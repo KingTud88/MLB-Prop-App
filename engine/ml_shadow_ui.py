@@ -40,9 +40,7 @@ def _integer(row: pd.Series, name: str) -> int:
     return int(value)
 
 
-def render_ml_shadow_dashboard(game: object) -> None:
-    """Render report-only ML evidence without importing or training the ML model."""
-    st.markdown("### ML SHADOW CHALLENGER · REPORT ONLY")
+def _render_ml_shadow_content(game: object) -> None:
     st.caption(
         "Gradient-boosted K challenger trained chronologically on earlier resolved starter rows only. "
         "Sportsbook data and postgame features are banned. Nothing here changes SIM, MATH, the headline projection, Top Plays, or bet leans."
@@ -103,3 +101,9 @@ def render_ml_shadow_dashboard(game: object) -> None:
     ]
     if display_cols:
         st.dataframe(summary[display_cols], use_container_width=True, hide_index=True)
+
+
+def render_ml_shadow_dashboard(game: object) -> None:
+    """Render report-only ML evidence without importing or training the ML model."""
+    with st.expander("Research detail · ML challenger (report only)", expanded=False):
+        _render_ml_shadow_content(game)

@@ -9,13 +9,15 @@ def test_daily_runner_captures_raw_k_path_means_for_future_three_path_research()
     assert '"math_sd_k": result.mathematical_sd' in source
 
 
-def test_model_card_reads_shadow_reports_without_training_in_streamlit():
+def test_model_card_keeps_ml_shadow_in_collapsed_research_detail_without_training_in_streamlit():
     app = Path("streamlit_app.py").read_text(encoding="utf-8")
     ui = Path("engine/ml_shadow_ui.py").read_text(encoding="utf-8")
     assert "render_ml_shadow_dashboard" in app
-    assert "ML SHADOW CHALLENGER · REPORT ONLY" in ui
+    assert 'st.expander("Research detail · ML challenger (report only)", expanded=False)' in ui
+    assert 'st.markdown("### ML SHADOW CHALLENGER · REPORT ONLY")' not in ui
     assert "ml_shadow_summary.csv" in ui
     assert "ml_shadow_live_candidates.csv" in ui
+    assert "Nothing here changes SIM, MATH, the headline projection, Top Plays, or bet leans." in ui
     assert "GradientBoostingRegressor" not in app
     assert "GradientBoostingRegressor" not in ui
 
