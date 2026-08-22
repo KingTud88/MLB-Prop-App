@@ -55,5 +55,7 @@ def test_closed_human_review_overlay_uses_queue_without_rewriting_source_status(
 
     source = Path("engine/research_promotion_scoreboard.py").read_text(encoding="utf-8")
     assert "Status is source-owned" in source
-    assert "Human review · closed" in source
-    assert "does not replace the source-owned status badge" in source
+    assert '<div class="research-pill research-review-closed">HUMAN REVIEW CLOSED</div>' in source
+    assert '<span class="research-source-status-label">Source status</span>' in source
+    assert "the native source status remains explicitly displayed as secondary context" in source
+    assert 'if review\n                else f\'<div class="research-pill {_status_class(status)}">{escape(status)}</div>\'' in source
