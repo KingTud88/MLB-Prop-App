@@ -1,0 +1,95 @@
+name: Outs Opponent Pressure Audit
+
+on:
+  schedule:
+    - cron: "45 13 * * *"
+    - cron: "45 16 * * *"
+    - cron: "45 18 * * *"
+    - cron: "45 20 * * *"
+    - cron: "45 22 * * *"
+    - cron: "45 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: outs-opponent-pressure-audit
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Sync to current main
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest
+
+      - name: Validate frozen opponent-pressure contracts
+        run: PYTHONPATH=. pytest -q tests/test_outs_opponent_pressure_capture.py tests/test_outs_opponent_pressure_audit.py tests/test_outs_opponent_pressure_workflow.py tests/test_research_signal_coverage_audit.py
+
+      - name: Capture future-only pregame opponent pressure
+        run: PYTHONPATH=. python -m training.outs_opponent_pressure_capture
+
+      - name: Refresh future-only outs opponent-pressure evidence
+        run: PYTHONPATH=. python -m training.outs_opponent_pressure_audit
+
+      - name: Refresh supporting signal coverage audit
+        run: PYTHONPATH=. python -m training.research_signal_coverage_audit
+
+      - name: Commit report-only opponent-pressure evidence
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            data/outs_opponent_pressure_context_log.csv \
+            data/outs_opponent_pressure_preregistration.csv \
+            data/outs_opponent_pressure_detail.csv \
+            data/outs_opponent_pressure_summary.csv \
+            data/outs_opponent_pressure_gate.csv \
+            data/research_signal_coverage_audit.csv \
+            data/research_signal_coverage_audit_summary.csv
+          if git diff --cached --quiet; then
+            echo "No outs opponent-pressure research changes to commit."
+            exit 0
+          fi
+          git commit -m "Refresh report-only outs opponent pressure audit"
+
+      - name: Push safely against latest main
+        run: |
+          if git diff --quiet origin/main...HEAD; then
+            echo "No opponent-pressure commit to push."
+            exit 0
+          fi
+          for attempt in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main; then
+              if git push origin HEAD:main; then
+                exit 0
+              fi
+            else
+              git rebase --abort || true
+              echo "Rebase conflict while publishing opponent-pressure audit; refusing to overwrite main."
+              exit 1
+            fi
+            echo "Push race on attempt ${attempt}; retrying against latest main."
+            sleep $((attempt * 2))
+          done
+          echo "Opponent-pressure audit push failed after 3 attempts."
+          exit 1
