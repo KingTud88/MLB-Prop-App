@@ -38,6 +38,17 @@ def test_runner_orders_research_sources_before_control_plane_and_freshness() -> 
     assert positions == sorted(positions)
 
 
+def test_runner_evaluates_underperformer_forward_after_source_shadow() -> None:
+    text = _text()
+    shadow_pos = text.index("PYTHONPATH=. python -m training.projection_underperformer_shadow")
+    forward_pos = text.index(
+        "PYTHONPATH=. python -m training.projection_underperformer_forward_challenger"
+    )
+    ladder_pos = text.index("PYTHONPATH=. python -m training.k_ladder_reliability_shadow")
+    promotion_pos = text.index("PYTHONPATH=. python -m training.research_promotion_command_center")
+    assert shadow_pos < forward_pos < ladder_pos < promotion_pos
+
+
 def test_runner_routes_milestones_history_and_review_packet_through_all_lane_promotion_center() -> None:
     text = _text()
     command_center_arg = "--command-center data/research_promotion_command_center.csv"
@@ -62,6 +73,10 @@ def test_runner_persists_freshness_review_watch_and_shadow_outputs() -> None:
         "data/projection_underperformer_shadow_pitchers.csv",
         "data/projection_underperformer_shadow_cohorts.csv",
         "data/projection_underperformer_shadow_gate.csv",
+        "data/projection_underperformer_forward_preregistration.csv",
+        "data/projection_underperformer_forward_detail.csv",
+        "data/projection_underperformer_forward_evaluation.csv",
+        "data/projection_underperformer_forward_summary.csv",
         "data/k_ladder_reliability_shadow_detail.csv",
         "data/k_ladder_reliability_shadow_cohorts.csv",
         "data/k_ladder_reliability_shadow_gate.csv",
@@ -98,6 +113,7 @@ def test_runner_keeps_report_only_contract_tests_in_path() -> None:
         "tests/test_projection_crushers.py",
         "tests/test_projection_crusher_shadow.py",
         "tests/test_projection_underperformer_shadow.py",
+        "tests/test_projection_underperformer_forward_challenger.py",
         "tests/test_k_ladder_reliability_shadow.py",
         "tests/test_input_quality_matched_v2.py",
         "tests/test_calibration_common_mode_v2.py",
