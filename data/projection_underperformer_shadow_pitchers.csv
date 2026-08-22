@@ -40,12 +40,14 @@ José Soriano,2,2,1.0,-1.8000448005018415,-1.8000448005018415,1,0.5,LEARNING,Tru
 Jack Perkins,2,2,1.0,-1.7292570553422042,-1.7292570553422042,1,0.5,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Brandon Young,1,1,1.0,-1.7143342823678456,-1.7143342823678456,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Davis Martin,1,1,1.0,-1.7094753010985961,-1.7094753010985961,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
+Ryan Weathers,2,2,1.0,-1.7033259123984799,-1.7033259123984799,1,0.5,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Troy Melton,2,2,1.0,-1.68113688493656,-1.68113688493656,1,0.5,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Ryan Feltner,2,2,1.0,-1.6744250055017886,-1.6744250055017886,1,0.5,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Shane McClanahan,1,1,1.0,-1.6660884420266138,-1.6660884420266138,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Casey Mize,1,1,1.0,-1.6268563024798919,-1.6268563024798919,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Carlos Rodón,1,1,1.0,-1.6153745497699799,-1.6153745497699799,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Brady Singer,2,2,1.0,-1.5989303769464382,-1.5989303769464382,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
+Martín Pérez,2,2,1.0,-1.5521862677793377,-1.5521862677793377,1,0.5,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Landen Roupp,2,2,1.0,-1.5409061120481122,-1.5409061120481122,1,0.5,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Bryce Miller,2,2,1.0,-1.4651059947920464,-1.4651059947920464,1,0.5,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Kumar Rocker,2,2,1.0,-1.4513401866924869,-1.4513401866924869,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
@@ -54,12 +56,10 @@ Grant Holmes,2,2,1.0,-1.3072523182657,-1.3072523182657,0,0.0,LEARNING,True,NONE,
 Drew Rasmussen,2,2,1.0,-1.301744290713882,-1.301744290713882,1,0.5,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Seth Lugo,2,2,1.0,-1.2612306340168162,-1.2612306340168162,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 AJ Smith-Shawver,1,1,1.0,-1.2330271442072887,-1.2330271442072887,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
-Ryan Weathers,1,1,1.0,-1.1991569227585774,-1.1991569227585774,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Zebby Matthews,2,2,1.0,-1.187590214052698,-1.187590214052698,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Daniel Lynch IV,2,2,1.0,-1.1605163132894944,-1.1605163132894944,1,0.5,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Will Warren,2,2,1.0,-1.092464790385677,-1.092464790385677,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Jackson Jobe,2,2,1.0,-1.009758886504843,-1.009758886504843,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
-Martín Pérez,1,1,1.0,-0.9979221975604622,-0.9979221975604622,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Robbie Ray,2,2,1.0,-0.9927477035727912,-0.9927477035727912,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Framber Valdez,2,2,1.0,-0.9796262174191384,-0.9796262174191384,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Tomoyuki Sugano,1,1,1.0,-0.9399266163000446,-0.9399266163000446,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
@@ -94,6 +94,7 @@ Taj Bradley,2,1,0.5,-0.6033457912400837,-0.6033457912400837,1,0.5,LEARNING,True,
 Ryan Gusto,2,1,0.5,-0.34583244521374734,-0.34583244521374734,1,0.5,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Jackson Kent,2,1,0.5,-0.3001351947507489,-0.3001351947507489,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Payton Tolle,2,1,0.5,-0.2928098045416694,-0.2928098045416694,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
+Logan Henderson,2,1,0.5,-0.2192851558315505,-0.2192851558315505,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Rhett Lowder,2,1,0.5,-0.1818908697541941,-0.1818908697541941,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Cam Schlittler,2,1,0.5,-0.11338377464362148,-0.11338377464362148,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Andrew Abbott,2,1,0.5,-0.09995266031163075,-0.09995266031163075,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
@@ -124,7 +125,6 @@ Cristopher Sánchez,1,0,0.0,0.03663612785718762,0.03663612785718762,0,0.0,LEARNI
 Michael Soroka,1,0,0.0,0.36169500632233387,0.36169500632233387,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Patrick Sandoval,1,0,0.0,0.638451355353995,0.638451355353995,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Nick Martinez,1,0,0.0,0.7804626937848251,0.7804626937848251,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
-Logan Henderson,1,0,0.0,0.8334132309031013,0.8334132309031013,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Jake Bennett,1,0,0.0,0.8633486261132708,0.8633486261132708,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Ethan Pecko,1,0,0.0,0.8762942868855199,0.8762942868855199,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Cristian Javier,1,0,0.0,0.9199711300989595,0.9199711300989595,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
@@ -155,6 +155,7 @@ Chris Sale,2,0,0.0,1.8159113860034397,1.8159113860034397,0,0.0,LEARNING,True,NON
 George Klassen,2,0,0.0,2.0559197379661205,2.0559197379661205,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Christian Scott,1,0,0.0,2.1073788384389003,2.1073788384389003,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Tyler Phillips,1,0,0.0,2.133607217584105,2.133607217584105,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
+Dylan Cease,2,0,0.0,2.1431071496588503,2.1431071496588503,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Parker Messick,2,0,0.0,2.2202597089014056,2.2202597089014056,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Chase Burns,2,0,0.0,2.480662184825445,2.480662184825445,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Matthew Liberatore,2,0,0.0,2.5782806584270057,2.5782806584270057,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
@@ -163,7 +164,6 @@ Jesús Luzardo,2,0,0.0,2.8151525020227797,2.8151525020227797,0,0.0,LEARNING,True
 Brandon Pfaadt,2,0,0.0,2.9629154764134578,2.9629154764134578,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Kyle Harrison,1,0,0.0,3.0122020245658625,3.0122020245658625,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Yoshinobu Yamamoto,2,0,0.0,3.0585591039861995,3.0585591039861995,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
-Dylan Cease,1,0,0.0,3.202057363826029,3.202057363826029,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Ian Seymour,2,0,0.0,3.21151256254819,3.21151256254819,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Aaron Nola,2,0,0.0,3.3075348894204177,3.3075348894204177,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
 Shota Imanaga,1,0,0.0,4.681753329290379,4.681753329290379,0,0.0,LEARNING,True,NONE,projection-underperformer-shadow-v1-report-only
