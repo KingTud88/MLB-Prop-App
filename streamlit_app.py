@@ -1300,9 +1300,22 @@ elif nav=="Form & Workload":
     )
     d=log.tail(15).copy(); st.line_chart(d.set_index("date")[["pitches","bf","outs","k"]]); st.dataframe(d.sort_values("date",ascending=False),use_container_width=True,hide_index=True); explain_popover(static_explanation("form_history"),label="ⓘ EXPLAIN RECENT STARTS"); st.stop()
 elif nav=="Model Card":
-    st.markdown('<div class="section-head">MODEL CARD</div>',unsafe_allow_html=True); st.write("Two independent paths: (1) plate-appearance Monte Carlo game simulation with workload uncertainty; (2) independent mathematical Negative-Binomial probability model. Milestone probabilities are calibrated from resolved pregame projections when enough observations exist. Sportsbook prices are used only for edge display, never to create the baseball forecast."); st.markdown("### Path comparison"); path_df=pd.DataFrame([{"Path":"Simulation","Mean K":proj.engine.simulation_mean,"SD":proj.engine.simulation_sd},{"Path":"Mathematical","Mean K":proj.engine.mathematical_mean,"SD":proj.engine.mathematical_sd},{"Path":"Ensemble","Mean K":proj.mean_k,"SD":proj.k_sd}]); path_df["Mean K"]=path_df["Mean K"].map(lambda v:f"{v:.2f}"); path_df["SD"]=path_df["SD"].map(lambda v:f"{v:.2f}"); st.dataframe(path_df,use_container_width=True,hide_index=True); explain_popover(static_explanation("model_paths"),label="ⓘ EXPLAIN MODEL PATHS"); model_view=kdf[["Line","Probability","Simulation","Math","Sim Weight"]].copy()
-    for c in ("Probability","Simulation","Math","Sim Weight"): model_view[c]=model_view[c].map(lambda v:f"{v:.1%}")
-    st.dataframe(model_view,use_container_width=True,hide_index=True); explain_popover(static_explanation("model_ladder"),label="ⓘ EXPLAIN MILESTONE TABLE"); st.markdown("### Calibration diagnostics"); render_calibration_dashboard(); st.dataframe(calibration_summary(load_projection_history()),use_container_width=True,hide_index=True); explain_popover(static_explanation("calibration"),label="ⓘ EXPLAIN CALIBRATION"); render_ml_shadow_dashboard(game); explain_popover(static_explanation("ml_shadow"),label="ⓘ EXPLAIN ML SHADOW"); st.stop()
+    from engine.model_card_ui import render_model_card_markets
+
+    def _model_card_explain(key, label):
+        explain_popover(static_explanation(key), label=label)
+
+    render_model_card_markets(
+        proj=proj,
+        kdf=kdf,
+        hits_proj=hits_proj,
+        history=load_projection_history(),
+        render_k_calibration_dashboard=render_calibration_dashboard,
+        explain=_model_card_explain,
+    )
+    render_ml_shadow_dashboard(game)
+    explain_popover(static_explanation("ml_shadow"),label="ⓘ EXPLAIN ML SHADOW")
+    st.stop()
 elif nav=="Bet Tracker":
     st.markdown('<div class="section-head">BET TRACKER</div>',unsafe_allow_html=True); st.caption("Current pitcher markets available from the Odds API are shown here when posted.")
     if odds_err: st.info(odds_err)
