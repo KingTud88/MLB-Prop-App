@@ -1247,7 +1247,7 @@ active_outs_source=str(out_reco.get("active_line_source","") or "").strip().uppe
 active_hits_source=str(hit_reco.get("active_line_source","") or "").strip().upper()
 
 if nav=="Distribution":
-    st.markdown('<div class="section-head">DISTRIBUTION</div>',unsafe_allow_html=True); st.caption(f"{game.pitcher_name} · {game.team} vs {game.opponent}"); a,b=st.columns(2)
+    st.markdown('<div class="section-head">DISTRIBUTION</div>',unsafe_allow_html=True); st.caption(f"{game.pitcher_name} · {game.team} vs {game.opponent}"); a,b,c=st.columns(3)
     with a:
         st.markdown("### Strikeout probability distribution")
         st.bar_chart(pd.DataFrame({"Probability":proj.k_probs},index=np.arange(len(proj.k_probs))))
@@ -1256,6 +1256,12 @@ if nav=="Distribution":
         st.markdown("### Outs probability distribution")
         st.bar_chart(pd.DataFrame({"Probability":proj.outs_probs},index=np.arange(len(proj.outs_probs))))
         explain_popover(static_explanation("distribution_outs"),label="ⓘ EXPLAIN OUTS DISTRIBUTION")
+    with c:
+        st.markdown("### Hits Allowed probability distribution")
+        hits_distribution=np.bincount(np.asarray(hits_proj.simulation_samples,dtype=int))
+        hits_distribution=hits_distribution/hits_distribution.sum()
+        st.bar_chart(pd.DataFrame({"Probability":hits_distribution},index=np.arange(len(hits_distribution))))
+        explain_popover(static_explanation("distribution_hits"),label="ⓘ EXPLAIN HITS DISTRIBUTION")
     st.stop()
 elif nav=="Form & Workload":
     st.markdown('<div class="section-head">FORM & WORKLOAD</div>',unsafe_allow_html=True); st.caption(f"{game.pitcher_name} · workload-v1 uses starter history only; sportsbook data is not an input.")

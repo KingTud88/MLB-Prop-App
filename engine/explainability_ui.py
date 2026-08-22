@@ -311,6 +311,12 @@ def static_explanation(key: str) -> Explanation:
             "The independent outs model uses starter-only workload history and its own simulation/math paths. The displayed distribution comes from its simulation samples.",
             note="Outs are projected independently from strikeouts; they are not derived by multiplying the K projection.",
         ),
+        "distribution_hits": Explanation(
+            "Hits Allowed probability distribution",
+            "The bars show how often each Hits Allowed total occurred in the independent Hits Allowed simulation path for this start.",
+            "The existing Hits Allowed simulation samples workload/batters faced and a pregame matchup hit rate, then draws game-level hit totals. This chart only summarizes those already-computed simulation outcomes.",
+            note="This is the Hits Allowed simulation path only. It does not use sportsbook prices and does not change the projection or recommendation.",
+        ),
         "workload_primary": Explanation(
             "Primary workload forecast",
             "Expected pitches, batters faced and outs describe how much opportunity the starter is expected to receive before being removed.",
