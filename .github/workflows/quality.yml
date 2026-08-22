@@ -4,33 +4,14 @@ on:
   push:
   pull_request:
 
-permissions:
-  contents: write
-
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: ui/hits-distribution-parity
-          fetch-depth: 0
-      - name: Apply Hits distribution patch once
-        run: |
-          if grep -q '### Hits Allowed probability distribution' streamlit_app.py; then
-            echo 'Hits distribution patch already applied'
-          else
-            python automation/_patch_hits_distribution.py
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add streamlit_app.py engine/explainability_ui.py
-            git commit -m 'Add Hits Allowed distribution parity'
-            git push origin HEAD:ui/hits-distribution-parity
-          fi
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt pytest
       - run: python -m compileall -q streamlit_app.py navigation.py engine automation tests
-      - run: pytest -q tests/test_hits_distribution_ui_contract.py
       - run: pytest -q --durations=20
