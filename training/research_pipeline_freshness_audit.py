@@ -40,6 +40,7 @@ VERSION = "research-pipeline-freshness-v4-governance-v2-report-only"
 REPORT_ONLY = True
 PRODUCTION_AUTHORITY = "NONE"
 NO_AUTO_PROMOTION = True
+GOVERNANCE_UNCERTAINTY_SIGNATURE_DIGITS = 12
 
 STAGE_COLUMNS = [
     "Stage", "Depends_On", "Freshness_Status", "Current_Items", "Expected_Items",
@@ -77,7 +78,7 @@ def _truthy(value: object) -> bool:
     return _clean(value).lower() in {"true", "1", "yes", "y"}
 
 
-def _normalize(value: object) -> object:
+def _normalize(value: object, float_significant_digits: int | None = None) -> object:
     if value is None:
         return None
     try:
@@ -89,7 +90,11 @@ def _normalize(value: object) -> object:
         return value
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         number = float(value)
-        return int(number) if number.is_integer() else number
+        if number.is_integer():
+            return int(number)
+        if float_significant_digits is not None:
+            return float(f"{number:.{float_significant_digits}g}")
+        return number
     text = str(value).strip()
     if not text or text.lower() == "nan":
         return None
@@ -98,7 +103,11 @@ def _normalize(value: object) -> object:
         return lowered == "true"
     try:
         number = float(text)
-        return int(number) if number.is_integer() else number
+        if number.is_integer():
+            return int(number)
+        if float_significant_digits is not None:
+            return float(f"{number:.{float_significant_digits}g}")
+        return number
     except ValueError:
         return text
 
@@ -112,7 +121,12 @@ def _read_csv(path: Path) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def _frame_signature(frame: pd.DataFrame, columns: list[str], sort_columns: list[str] | None = None) -> tuple[tuple[object, ...], ...]:
+def _frame_signature(
+    frame: pd.DataFrame,
+    columns: list[str],
+    sort_columns: list[str] | None = None,
+    float_significant_digits: int | None = None,
+) -> tuple[tuple[object, ...], ...]:
     if frame is None or frame.empty:
         return tuple()
     working = frame.copy()
@@ -124,7 +138,7 @@ def _frame_signature(frame: pd.DataFrame, columns: list[str], sort_columns: list
         if present:
             working = working.sort_values(present, kind="stable", na_position="last")
     return tuple(
-        tuple(_normalize(row.get(column)) for column in columns)
+        tuple(_normalize(row.get(column), float_significant_digits) for column in columns)
         for _, row in working[columns].iterrows()
     )
 
@@ -285,7 +299,17 @@ def _build_governance_stage(root: Path, expected_center: pd.DataFrame, promotion
         )
 
     manifest_match = _frame_signature(manifest, GOVERNANCE_MANIFEST_COLUMNS, ["Lane"]) == _frame_signature(expected_manifest, GOVERNANCE_MANIFEST_COLUMNS, ["Lane"])
-    uncertainty_match = _frame_signature(uncertainty, GOVERNANCE_UNCERTAINTY_COLUMNS, ["Lane", "Segment", "Metric"]) == _frame_signature(expected_uncertainty, GOVERNANCE_UNCERTAINTY_COLUMNS, ["Lane", "Segment", "Metric"])
+    uncertainty_match = _frame_signature(
+        uncertainty,
+        GOVERNANCE_UNCERTAINTY_COLUMNS,
+        ["Lane", "Segment", "Metric"],
+        float_significant_digits=GOVERNANCE_UNCERTAINTY_SIGNATURE_DIGITS,
+    ) == _frame_signature(
+        expected_uncertainty,
+        GOVERNANCE_UNCERTAINTY_COLUMNS,
+        ["Lane", "Segment", "Metric"],
+        float_significant_digits=GOVERNANCE_UNCERTAINTY_SIGNATURE_DIGITS,
+    )
     summary_match = _frame_signature(summary, GOVERNANCE_SUMMARY_COLUMNS) == _frame_signature(expected_summary, GOVERNANCE_SUMMARY_COLUMNS)
     mismatch = int(not manifest_match) + int(not uncertainty_match) + int(not summary_match)
     status = DERIVED_DRIFT if mismatch else CURRENT
