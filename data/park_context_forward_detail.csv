@@ -1,0 +1,1 @@
+Game_Date,Game_PK,Pitcher_ID,Pitcher,Team,Opponent,Venue,Venue_Normalized,Market,Projection,Actual,Residual,Source_Year,Factor_Metric,Park_Factor,Factor_Delta,Factor_Bucket,Expected_Direction,Source_URL,Source_SHA256,Report_Only,Production_Authority,No_Projection_Adjustment,Evaluation_Version
