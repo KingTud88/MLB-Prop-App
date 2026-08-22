@@ -11,6 +11,7 @@ from training.calibration_shadow_gate import (
     MIN_OOS_STARTS as CALIBRATION_MIN_OOS_STARTS,
 )
 from training.research_evidence_history import append_history
+from training.research_governance_v2 import build_governance_summary, build_hypothesis_manifest, build_uncertainty_report
 from training.research_evidence_transition_digest import build_digest_summary, build_transition_digest
 from training.research_manual_review_packet import build_manual_review_packet, build_packet_summary
 from training.research_manual_review_queue import QUEUE_COLUMNS, append_review_queue, build_queue_summary
@@ -49,6 +50,12 @@ def _center(secondary: str = "sample=1", lane: str = "Synthetic Lane") -> pd.Dat
 def _write_pipeline(root: Path, base: pd.DataFrame, promotion: pd.DataFrame, history: pd.DataFrame, refresh: str) -> None:
     base.to_csv(root / "research_evidence_command_center.csv", index=False)
     promotion.to_csv(root / "research_promotion_command_center.csv", index=False)
+    manifest = build_hypothesis_manifest(promotion)
+    uncertainty = build_uncertainty_report(root)
+    governance_summary = build_governance_summary(promotion, manifest, uncertainty)
+    manifest.to_csv(root / "research_hypothesis_manifest.csv", index=False)
+    uncertainty.to_csv(root / "research_uncertainty_v2.csv", index=False)
+    governance_summary.to_csv(root / "research_governance_v2_summary.csv", index=False)
     history.to_csv(root / "research_evidence_history.csv", index=False)
     digest = build_transition_digest(history, refresh)
     digest.to_csv(root / "research_evidence_transition_digest.csv", index=False)
@@ -92,13 +99,13 @@ def test_exact_recomputation_marks_full_all_lane_pipeline_current(tmp_path: Path
     summary = freshness.build_freshness_summary(audit).iloc[0]
 
     assert audit["Stage"].tolist() == [
-        "COMMAND_CENTER", "PROMOTION_COMMAND_CENTER", "HISTORY",
+        "COMMAND_CENTER", "PROMOTION_COMMAND_CENTER", "GOVERNANCE_V2", "HISTORY",
         "TRANSITION_DIGEST", "MANUAL_REVIEW_PACKET", "MANUAL_REVIEW_QUEUE",
     ]
-    assert audit["Freshness_Status"].tolist() == [freshness.CURRENT] * 6
+    assert audit["Freshness_Status"].tolist() == [freshness.CURRENT] * 7
     assert summary["Overall_Status"] == "HEALTHY"
-    assert int(summary["Current_Stages"]) == 6
-    assert int(summary["Total_Stages"]) == 6
+    assert int(summary["Current_Stages"]) == 7
+    assert int(summary["Total_Stages"]) == 7
 
 
 def test_promotion_center_detects_extra_lane_drift_even_when_base_center_is_current(tmp_path: Path, monkeypatch) -> None:
@@ -153,7 +160,7 @@ def test_multicell_injection_and_later_human_close_remain_fresh(tmp_path: Path, 
     assert int(audit.loc["MANUAL_REVIEW_PACKET", "Current_Items"]) == 1
     assert audit.loc["MANUAL_REVIEW_QUEUE", "Freshness_Status"] == freshness.CURRENT
     assert summary["Overall_Status"] == "HEALTHY"
-    assert int(summary["Current_Stages"]) == 6
+    assert int(summary["Current_Stages"]) == 7
 
 
 def test_base_command_center_detects_source_mismatch_without_time_thresholds(tmp_path: Path, monkeypatch) -> None:
@@ -236,6 +243,56 @@ def test_freshness_contract_is_report_only_all_lane_and_has_no_card_lock() -> No
     assert freshness.REPORT_ONLY is True
     assert freshness.PRODUCTION_AUTHORITY == "NONE"
     assert freshness.NO_AUTO_PROMOTION is True
-    assert freshness.VERSION == "research-pipeline-freshness-v3-all-lanes-report-only"
+    assert freshness.VERSION == "research-pipeline-freshness-v4-governance-v2-report-only"
     assert "Locked_Promotion_Scoreboard_Cards" not in freshness.SUMMARY_COLUMNS
     assert "Score" not in freshness.SUMMARY_COLUMNS
+
+
+def test_governance_v2_missing_artifact_is_incomplete_without_relabeling_history(tmp_path: Path, monkeypatch) -> None:
+    center = _center()
+    history = append_history(center, observed_at_utc="2026-08-18T12:00:00+00:00")
+    refresh = "2026-08-18T13:00:00+00:00"
+    _write_pipeline(tmp_path, center, center, history, refresh)
+    (tmp_path / "research_governance_v2_summary.csv").unlink()
+    _patch_centers(monkeypatch, center, center)
+
+    audit = freshness.build_pipeline_freshness_audit(tmp_path).set_index("Stage")
+    summary = freshness.build_freshness_summary(audit.reset_index()).iloc[0]
+    assert audit.loc["GOVERNANCE_V2", "Freshness_Status"] == freshness.DERIVED_MISSING
+    assert audit.loc["HISTORY", "Freshness_Status"] == freshness.CURRENT
+    assert audit.loc["MANUAL_REVIEW_QUEUE", "Freshness_Status"] == freshness.CURRENT
+    assert summary["Overall_Status"] == "INCOMPLETE"
+
+
+def test_governance_v2_manifest_drift_is_detected_without_changing_source_verdicts(tmp_path: Path, monkeypatch) -> None:
+    center = _center()
+    history = append_history(center, observed_at_utc="2026-08-18T12:00:00+00:00")
+    refresh = "2026-08-18T13:00:00+00:00"
+    _write_pipeline(tmp_path, center, center, history, refresh)
+    manifest_path = tmp_path / "research_hypothesis_manifest.csv"
+    manifest = pd.read_csv(manifest_path)
+    manifest.loc[0, "Source_Fingerprint"] = "drifted"
+    manifest.to_csv(manifest_path, index=False)
+    _patch_centers(monkeypatch, center, center)
+
+    audit = freshness.build_pipeline_freshness_audit(tmp_path).set_index("Stage")
+    assert audit.loc["GOVERNANCE_V2", "Freshness_Status"] == freshness.DERIVED_DRIFT
+    assert audit.loc["PROMOTION_COMMAND_CENTER", "Freshness_Status"] == freshness.CURRENT
+    assert audit.loc["HISTORY", "Freshness_Status"] == freshness.CURRENT
+
+
+def test_governance_v2_control_violation_is_loud(tmp_path: Path, monkeypatch) -> None:
+    center = _center()
+    history = append_history(center, observed_at_utc="2026-08-18T12:00:00+00:00")
+    refresh = "2026-08-18T13:00:00+00:00"
+    _write_pipeline(tmp_path, center, center, history, refresh)
+    manifest_path = tmp_path / "research_hypothesis_manifest.csv"
+    manifest = pd.read_csv(manifest_path)
+    manifest.loc[0, "Report_Only"] = False
+    manifest.to_csv(manifest_path, index=False)
+    _patch_centers(monkeypatch, center, center)
+
+    audit = freshness.build_pipeline_freshness_audit(tmp_path).set_index("Stage")
+    summary = freshness.build_freshness_summary(audit.reset_index()).iloc[0]
+    assert audit.loc["GOVERNANCE_V2", "Freshness_Status"] == freshness.CONTROL_VIOLATION
+    assert summary["Overall_Status"] == freshness.CONTROL_VIOLATION
