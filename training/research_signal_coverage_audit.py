@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
-VERSION = "research-signal-coverage-audit-v1-report-only"
+VERSION = "research-signal-coverage-audit-v2-report-only"
 REPORT_ONLY = True
 PRODUCTION_AUTHORITY = "NONE"
 SUPPORTING_DIAGNOSTIC_ONLY = True
@@ -96,10 +96,10 @@ SIGNALS = (
         "Markets": "K; H; OUTS",
         "Production_State": "K_PARTIAL_8_VENUES; H_ENGINE_CAPABILITY_NOT_WIRED; OUTS_ABSENT",
         "Research_Lanes": "",
-        "Coverage_State": "HIGH_CONFIDENCE_COVERAGE_GAP",
-        "Gap_Priority": "HIGH",
-        "Evidence_Basis": "Live K uses a hand-maintained factor table for eight venues only. Hits projection accepts a park factor but the live call does not pass one. Outs projection has no park input. No registered promotion lane owns park-factor validation.",
-        "Recommended_Next_Step": "PREREGISTER_REPORT_ONLY_PARK_CONTEXT_AUDIT_BEFORE_ANY_MODEL_CHANGE",
+        "Coverage_State": "COVERED_PREREGISTERED_SUPPORTING_DIAGNOSTIC",
+        "Gap_Priority": "NONE",
+        "Evidence_Basis": "A dedicated future-only Park Context Audit is preregistered from 2026-08-23. It freezes prior-completed-season three-year Baseball Savant park factors for SO and H, treats OBP as exploratory-only for Outs, and has no production or promotion-row authority.",
+        "Recommended_Next_Step": "COLLECT_FORWARD_PARK_CONTEXT_EVIDENCE_NO_PRODUCTION_CHANGE",
     },
     {
         "Signal_Class": "Opponent contact/on-base pressure for starter outs",

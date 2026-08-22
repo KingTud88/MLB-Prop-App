@@ -1,0 +1,83 @@
+name: Park Context Audit
+
+on:
+  schedule:
+    - cron: "10 16 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: park-context-audit
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Sync to current main
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest
+
+      - name: Validate park context contracts
+        run: |
+          PYTHONPATH=. pytest -q \
+            tests/test_park_context_audit.py \
+            tests/test_park_context_audit_workflow.py \
+            tests/test_research_signal_coverage_audit.py
+
+      - name: Refresh report-only park context evidence
+        run: PYTHONPATH=. python -m training.park_context_audit --refresh-missing-source
+
+      - name: Persist park context research artifacts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            data/park_context_preregistration.csv \
+            data/park_context_statcast_source.csv \
+            data/park_context_forward_detail.csv \
+            data/park_context_forward_summary.csv \
+            data/park_context_gate.csv
+
+          if git diff --cached --quiet; then
+            echo "No park context audit changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Refresh report-only park context audit"
+
+          for attempt in 1 2 3; do
+            git fetch origin main
+            if git rebase origin/main; then
+              if git push origin HEAD:main; then
+                exit 0
+              fi
+            else
+              git rebase --abort || true
+              echo "Rebase conflict while refreshing park context audit; refusing to overwrite main."
+              exit 1
+            fi
+            echo "Push race on attempt ${attempt}; retrying against latest main."
+            sleep $((attempt * 2))
+          done
+
+          echo "Park context audit push failed after 3 attempts."
+          exit 1
