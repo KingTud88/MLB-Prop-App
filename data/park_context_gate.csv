@@ -1,2 +1,2 @@
 Status,Markets_Tracked,Markets_Source_Ready,Markets_Mature,Markets_Ready_For_Manual_Review,Recommended_Action,Preregistered_Game_Date,First_Eligible_Game_Date,Report_Only,Production_Authority,No_Projection_Adjustment,No_Auto_Promotion,Automatic_Decision_Allowed,Supporting_Diagnostic_Only,Promotion_Row_Registered,Evaluation_Version
-SOURCE_MISSING,3,0,0,0,CAPTURE_PRIOR_COMPLETED_SEASON_STATCAST_PARK_FACTORS_THEN_COLLECT_FORWARD_EVIDENCE,2026-08-22,2026-08-23,True,NONE,True,True,False,True,False,park-context-audit-v1-preregistered-report-only
+LEARNING,3,0,0,0,KEEP_FROZEN_AND_COLLECT_FORWARD_EVIDENCE,2026-08-22,2026-08-23,True,NONE,True,True,False,True,False,park-context-audit-v1-preregistered-report-only
