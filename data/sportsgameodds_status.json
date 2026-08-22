@@ -1,21 +1,20 @@
 {
   "consensus_line_fallback": false,
   "error": "",
-  "event_count": 9,
-  "fetched_at_utc": "2026-08-21T23:43:57.183879+00:00",
+  "event_count": 14,
+  "fetched_at_utc": "2026-08-22T04:11:02.952480+00:00",
   "notice": "",
-  "offer_count": 482,
+  "offer_count": 113,
   "pages": 1,
   "production_authority": "MARKET_INPUT_ONLY",
   "projection_adjustment": false,
   "provider": "SPORTSGAMEODDS",
   "selected_markets": [
-    "pitcher_hits_allowed",
     "pitcher_outs",
     "pitcher_strikeouts"
   ],
-  "selected_offer_count": 108,
-  "selected_pair_count": 54,
-  "selected_pitchers": 18,
-  "slate_date": "2026-08-21"
+  "selected_offer_count": 60,
+  "selected_pair_count": 30,
+  "selected_pitchers": 21,
+  "slate_date": "2026-08-22"
 }
