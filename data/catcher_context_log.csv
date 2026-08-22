@@ -264,12 +264,6 @@ game_date,game_pk,pitcher_id,player,team,team_id,catcher_id,catcher_name,catcher
 2026-08-21,823911,696149,Bubba Chandler,PIT,134,804668.0,Rafael Flores Jr.,MLB_POSTED_LINEUP,True,2026-08-22T04:11:08.836691+00:00,1.0,REPORT_ONLY,6.0,88.0,19.0,12.0,catcher-context-v1-report-only
 2026-08-21,823101,571510,Matthew Boyd,CHC,112,608348.0,Carson Kelly,MLB_POSTED_LINEUP,True,2026-08-21T23:00:59.964345+00:00,1.0,REPORT_ONLY,3.0,86.0,27.0,18.0,catcher-context-v1-report-only
 2026-08-21,823101,676106,Emerson Hancock,SEA,136,663728.0,Cal Raleigh,MLB_POSTED_LINEUP,True,2026-08-21T23:00:59.964345+00:00,1.0,REPORT_ONLY,6.0,98.0,27.0,17.0,catcher-context-v1-report-only
-2026-08-22,823509,656302,Dylan Cease,TOR,141,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
-2026-08-22,823509,677960,Ryan Weathers,NYY,147,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
-2026-08-22,823743,527048,Martín Pérez,ATL,144,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
-2026-08-22,823743,701656,Logan Henderson,MIL,158,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
-2026-08-22,823831,663623,Jake Irvin,WSH,120,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
-2026-08-22,823831,691587,Eury Pérez,MIA,146,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-22,823422,691725,Andrew Painter,PHI,143,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-22,824798,663556,Shane McClanahan,TBR,139,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-22,824798,687064,Brandon Young,BAL,110,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
@@ -292,3 +286,9 @@ game_date,game_pk,pitcher_id,player,team,team_id,catcher_id,catcher_name,catcher
 2026-08-22,824316,687312,Gabriel Hughes,COL,115,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-22,823261,665152,Dean Kremer,MIN,142,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
 2026-08-22,823261,663554,Casey Mize,SDP,135,,,UNAVAILABLE,False,,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-22,823509,656302,Dylan Cease,TOR,141,672386.0,Alejandro Kirk,MLB_POSTED_LINEUP,True,2026-08-22T17:02:22.082761+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-22,823509,677960,Ryan Weathers,NYY,147,669224.0,Austin Wells,MLB_POSTED_LINEUP,True,2026-08-22T17:02:22.082761+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-22,823743,527048,Martín Pérez,ATL,144,686948.0,Drake Baldwin,MLB_POSTED_LINEUP,True,2026-08-22T17:02:22.082761+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-22,823743,701656,Logan Henderson,MIL,158,661388.0,William Contreras,MLB_POSTED_LINEUP,True,2026-08-22T17:02:22.082761+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-22,823831,663623,Jake Irvin,WSH,120,695670.0,Harry Ford,MLB_POSTED_LINEUP,True,2026-08-22T17:02:22.082761+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
+2026-08-22,823831,691587,Eury Pérez,MIA,146,691788.0,Joe Mack,MLB_POSTED_LINEUP,True,2026-08-22T17:02:22.082761+00:00,1.0,REPORT_ONLY,,,,,catcher-context-v1-report-only
