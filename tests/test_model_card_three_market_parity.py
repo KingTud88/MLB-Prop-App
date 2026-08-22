@@ -50,3 +50,20 @@ def test_model_card_helper_is_three_market_presentation_only():
     assert "aligned_bet_lean" not in source
     assert "project_hits_allowed" not in source
     assert "project_total_outs" not in source
+
+
+def test_streamlit_model_card_routes_existing_outputs_without_recomputing():
+    source = Path("streamlit_app.py").read_text(encoding="utf-8")
+    block = source.split('elif nav=="Model Card":', 1)[1].split('elif nav=="Bet Tracker":', 1)[0]
+
+    assert "from engine.model_card_ui import render_model_card_markets" in block
+    assert "proj=proj" in block
+    assert "kdf=kdf" in block
+    assert "hits_proj=hits_proj" in block
+    assert "history=load_projection_history()" in block
+    assert "render_k_calibration_dashboard=render_calibration_dashboard" in block
+    assert "render_ml_shadow_dashboard(game)" in block
+    assert "project_hits_allowed" not in block
+    assert "project_total_outs" not in block
+    assert "load_pitcher_market_odds" not in block
+    assert "aligned_bet_lean" not in block
