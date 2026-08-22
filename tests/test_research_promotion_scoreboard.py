@@ -4,7 +4,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from engine.research_promotion_scoreboard import build_research_promotion_scoreboard
+from engine.research_promotion_scoreboard import (
+    PROJECTION_HISTORY_STAGES,
+    build_research_promotion_scoreboard,
+    projection_history_stage_map_html,
+)
 
 
 def _write(root: Path, name: str, row: dict[str, object]) -> None:
@@ -35,6 +39,31 @@ def test_scoreboard_has_no_fixed_card_ceiling_and_shows_registered_programs(tmp_
     assert board["Lane"].is_unique
     assert set(board["Production Authority"].astype(str)) == {"NONE"}
     assert "Manual Review Ready" in board.columns
+
+
+def test_projection_history_stage_map_matches_existing_page_hierarchy() -> None:
+    assert PROJECTION_HISTORY_STAGES == (
+        "Archive & frozen evidence",
+        "Promotion scoreboard",
+        "Lane drilldowns",
+        "Deep diagnostics",
+    )
+    html = projection_history_stage_map_html(active_stage=2)
+    rendered_labels = [label.replace("&", "&amp;") for label in PROJECTION_HISTORY_STAGES]
+    positions = [html.index(label) for label in rendered_labels]
+    assert positions == sorted(positions)
+    assert html.count("history-stage-active") == 1
+    assert '<b>2</b> · Promotion scoreboard' in html
+    assert 'history-stage-pill history-stage-active' in html
+
+
+def test_projection_history_stage_map_is_presentation_only() -> None:
+    source = Path("engine/research_promotion_scoreboard.py").read_text(encoding="utf-8")
+    assert "Stage 2 of 4 · research command center · report only · all lanes" in source
+    assert "lane drilldowns are next; deep diagnostics follow" in source
+    assert "Projection History flow" in source
+    assert "Auto_Promote" not in projection_history_stage_map_html(active_stage=2)
+    assert "Projection_Delta" not in projection_history_stage_map_html(active_stage=2)
 
 
 def test_scoreboard_preserves_shadow_native_status_gate_and_readiness(tmp_path: Path) -> None:

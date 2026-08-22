@@ -9,6 +9,12 @@ import streamlit as st
 from training.research_promotion_command_center import build_promotion_command_center
 
 SCOREBOARD_VERSION = "research-promotion-scoreboard-v3-all-lanes"
+PROJECTION_HISTORY_STAGES = (
+    "Archive & frozen evidence",
+    "Promotion scoreboard",
+    "Lane drilldowns",
+    "Deep diagnostics",
+)
 
 COLUMNS = [
     "Lane",
@@ -87,6 +93,17 @@ def _gate_progress(row: pd.Series) -> str:
     return " · ".join(pieces) if pieces else "Source-owned gate; see reason"
 
 
+def projection_history_stage_map_html(active_stage: int = 2) -> str:
+    """Return a presentation-only map of the existing Projection History order."""
+    pieces: list[str] = []
+    for number, label in enumerate(PROJECTION_HISTORY_STAGES, start=1):
+        active = " history-stage-active" if number == active_stage else ""
+        pieces.append(
+            f'<span class="history-stage-pill{active}"><b>{number}</b> · {escape(label)}</span>'
+        )
+    return '<div class="history-stage-map">' + '<span class="history-stage-arrow">→</span>'.join(pieces) + '</div>'
+
+
 def build_research_promotion_scoreboard(root: Path) -> pd.DataFrame:
     """Display every registered report-only research lane without re-grading it."""
     command_center = build_promotion_command_center(Path(root) / "data")
@@ -128,7 +145,13 @@ def render_research_promotion_scoreboard(root: Path) -> None:
         """
         <style>
         /* RESEARCH_PROMOTION_SCOREBOARD_V3_ALL_LANES · presentation/reporting only */
-        .research-board-head{margin:1.1rem 0 .25rem;padding:.88rem 1rem;border:1px solid rgba(73,111,151,.62);border-left:4px solid #ff3655;border-radius:14px;background:linear-gradient(110deg,rgba(10,34,59,.95),rgba(5,20,37,.97));}
+        .history-stage-map{display:flex;align-items:center;justify-content:center;gap:.42rem;flex-wrap:wrap;margin:1.25rem 0 .55rem;padding:.54rem .68rem;border:1px solid rgba(73,111,151,.42);border-radius:12px;background:rgba(5,20,37,.72)}
+        .history-stage-pill{padding:.28rem .52rem;border:1px solid rgba(87,119,151,.48);border-radius:999px;background:rgba(10,31,54,.82);color:#9fb3c6;font:850 .66rem/1.2 system-ui;letter-spacing:.025em;text-transform:uppercase;white-space:nowrap}
+        .history-stage-pill b{color:#dbe7ef}
+        .history-stage-active{border-color:rgba(255,54,85,.72);background:rgba(151,14,40,.22);color:#fff;box-shadow:0 0 0 1px rgba(255,54,85,.08)}
+        .history-stage-active b{color:#ff6a7d}
+        .history-stage-arrow{color:#5f7f9d;font:900 .74rem/1 system-ui}
+        .research-board-head{margin:.55rem 0 .25rem;padding:.88rem 1rem;border:1px solid rgba(73,111,151,.62);border-left:4px solid #ff3655;border-radius:14px;background:linear-gradient(110deg,rgba(10,34,59,.95),rgba(5,20,37,.97));}
         .research-board-kicker{color:#ff6a7d;font:900 .66rem/1.2 system-ui;letter-spacing:.11em;text-transform:uppercase}
         .research-board-title{margin:.16rem 0;color:#f5f1e9;font:900 1.28rem/1.15 system-ui}
         .research-board-copy{color:#aebfd2;font:650 .80rem/1.42 system-ui}
@@ -149,16 +172,17 @@ def render_research_promotion_scoreboard(root: Path) -> None:
         .research-authority-strip{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-top:.48rem;padding:.30rem .42rem;border-top:1px solid rgba(255,54,85,.30);border-radius:7px;background:rgba(105,14,33,.10)}
         .research-authority-label{color:#7595ae;font:900 .56rem/1.15 system-ui;letter-spacing:.085em;text-transform:uppercase}
         .research-authority{color:#ff8a9a;font:900 .68rem/1.15 system-ui;letter-spacing:.035em;text-transform:uppercase}
-        @media(max-width:700px){.research-card{min-height:0}.research-card-top{align-items:flex-start;flex-direction:column}.research-authority-strip{align-items:flex-start}}
+        @media(max-width:700px){.research-card{min-height:0}.research-card-top{align-items:flex-start;flex-direction:column}.research-authority-strip{align-items:flex-start}.history-stage-map{justify-content:flex-start}.history-stage-arrow{display:none}.history-stage-pill{white-space:normal}}
         </style>
         """,
         unsafe_allow_html=True,
     )
+    st.markdown(projection_history_stage_map_html(active_stage=2), unsafe_allow_html=True)
     st.markdown(
         '<div class="research-board-head">'
-        '<div class="research-board-kicker">Research command center · report only · all lanes</div>'
+        '<div class="research-board-kicker">Stage 2 of 4 · research command center · report only · all lanes</div>'
         '<div class="research-board-title">Research Promotion Command Center</div>'
-        '<div class="research-board-copy">Every registered promotion lane is shown. Supporting diagnostics remain in their native reports. Native verdicts and readiness stay source-owned; this board never auto-promotes or activates a model feature.</div>'
+        '<div class="research-board-copy">Every registered promotion lane is shown. Supporting diagnostics remain in their native reports. Native verdicts and readiness stay source-owned; this board never auto-promotes or activates a model feature. Lane drilldowns follow this board; deeper calibration, workload, lineup, and signal diagnostics remain afterward.</div>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -196,6 +220,7 @@ def render_research_promotion_scoreboard(root: Path) -> None:
                     unsafe_allow_html=True,
                 )
 
+    st.caption("Projection History flow: lane drilldowns are next; deep diagnostics follow. This map changes navigation emphasis only—not lane order, evidence, readiness, or authority.")
     with st.expander("ⓘ How to read the Research Promotion Command Center", expanded=False):
         st.markdown("**Status is source-owned.** Native research verdicts are displayed as written by each validator. The scoreboard does not recalculate them.")
         st.markdown("**Gate Progress shows the evidence bottleneck.** Starts alone are not enough; time diversity, entity breadth, probability coverage, matched pairs, seasons, or other source-owned requirements can keep a lane from review.")
