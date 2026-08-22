@@ -15,6 +15,7 @@ from engine.explainability_ui import (
     metric_help, projection_metric_explanation, recommendation_explanation, static_explanation,
     ticket_explanation, top_play_explanation, weather_explanation,
 )
+from engine.card_explainability import apply_card_info_theme, card_info_popover
 from engine.command_center_consistency import apply_command_center_consistency
 
 from automation.daily_projection_runner import LOG_PATH
@@ -40,6 +41,7 @@ apply_page_theme()
 render_sidebar("top")
 apply_command_center_consistency("top_plays")
 apply_explainability_theme()
+apply_card_info_theme()
 st.markdown(
     """
     <style>
@@ -68,7 +70,7 @@ st.markdown(
     [class*="st-key-top_play_card_"]:has(.tp-status.model){border-color:rgba(50,229,141,.5)!important}
     .st-key-top_play_card_1{box-shadow:inset 0 1px 0 rgba(255,255,255,.055),0 0 0 1px rgba(236,22,56,.12),0 18px 38px rgba(0,0,0,.32)!important}
 
-    .tp-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:.65rem;margin-bottom:.52rem}
+    .tp-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:.65rem;margin-bottom:.52rem;padding-right:2.15rem}
     .tp-rank-wrap{display:flex;align-items:center;gap:.58rem;min-width:0}
     .tp-rank{display:flex;align-items:center;justify-content:center;width:40px;height:40px;flex:0 0 40px;border-radius:50%;border:2px solid rgba(236,22,56,.78);background:radial-gradient(circle at 35% 30%,#173e69,#07182b 66%);color:#fff;font:900 .96rem/1 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;box-shadow:0 8px 18px rgba(0,0,0,.26)}
     .st-key-top_play_card_1 .tp-rank{width:46px;height:46px;flex-basis:46px;font-size:1.08rem;background:radial-gradient(circle at 35% 30%,#7d1730,#250815 70%)}
@@ -487,7 +489,7 @@ for target_col, (_, play_row) in layout_slots:
                 """,
                 unsafe_allow_html=True,
             )
-            explain_popover(top_play_explanation(play_row),label=f"ⓘ WHY IS THIS #{rank}?")
+            card_info_popover(top_play_explanation(play_row), key=f"top-play-{rank}")
             if live_offer:
                 odds_value = int(float(play_row["Odds"]))
                 book_value = str(play_row.get("Book", "") or "Live book")
