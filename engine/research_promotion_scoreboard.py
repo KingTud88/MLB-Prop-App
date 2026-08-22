@@ -277,7 +277,7 @@ def render_research_promotion_scoreboard(root: Path) -> None:
 
     st.caption("Projection History flow: lane drilldowns are next; deep diagnostics follow. Source status and human-review disposition are intentionally separate; this presentation never rewrites native evidence, readiness, or authority.")
     with st.expander("ⓘ How to read the Research Promotion Command Center", expanded=False):
-        st.markdown("**Status is source-owned.** Native research verdicts are displayed as written by each validator. The scoreboard does not recalculate or rewrite them after a human review.")
+        st.markdown("**Status is source-owned.** Native research verdicts are displayed as written by each validator. The scoreboard does not recalculate them or rewrite them after a human review.")
         st.markdown("**Gate Progress shows the evidence bottleneck.** Starts alone are not enough; time diversity, entity breadth, probability coverage, matched pairs, seasons, or other source-owned requirements can keep a lane from review.")
         st.markdown("**Human Review is a separate governance record.** CLOSED means the durable manual-review queue has a completed human disposition for that lane; it does not replace the source-owned status badge.")
         st.markdown("**Production Authority is the hard boundary.** NONE means the lane cannot change the live baseball projection, probabilities, Top Plays, recommendation thresholds, or sportsbook execution.")
