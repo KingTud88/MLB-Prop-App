@@ -1,2 +1,2 @@
 Signal_Classes,High_Priority_Gaps,Medium_Priority_Candidates,Rows_With_Missing_Research_Source,Report_Only,Production_Authority,Supporting_Diagnostic_Only,Promotion_Row_Registered,No_Auto_Promotion,Audit_Version
-16,1,2,0,True,NONE,True,False,True,research-signal-coverage-audit-v2-report-only
+16,0,2,0,True,NONE,True,False,True,research-signal-coverage-audit-v3-report-only
