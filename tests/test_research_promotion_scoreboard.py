@@ -49,7 +49,8 @@ def test_projection_history_stage_map_matches_existing_page_hierarchy() -> None:
         "Deep diagnostics",
     )
     html = projection_history_stage_map_html(active_stage=2)
-    positions = [html.index(label) for label in PROJECTION_HISTORY_STAGES]
+    rendered_labels = [label.replace("&", "&amp;") for label in PROJECTION_HISTORY_STAGES]
+    positions = [html.index(label) for label in rendered_labels]
     assert positions == sorted(positions)
     assert html.count("history-stage-active") == 1
     assert '<b>2</b> · Promotion scoreboard' in html
