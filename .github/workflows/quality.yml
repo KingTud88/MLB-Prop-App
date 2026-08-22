@@ -14,4 +14,5 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements.txt pytest
       - run: python -m compileall -q streamlit_app.py navigation.py engine automation tests
+      - run: pytest -q tests/test_research_pipeline_freshness_audit.py
       - run: pytest -q --durations=20
