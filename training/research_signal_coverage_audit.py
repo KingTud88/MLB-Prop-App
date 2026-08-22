@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
-VERSION = "research-signal-coverage-audit-v2-report-only"
+VERSION = "research-signal-coverage-audit-v3-report-only"
 REPORT_ONLY = True
 PRODUCTION_AUTHORITY = "NONE"
 SUPPORTING_DIAGNOSTIC_ONLY = True
@@ -104,12 +104,12 @@ SIGNALS = (
     {
         "Signal_Class": "Opponent contact/on-base pressure for starter outs",
         "Markets": "OUTS",
-        "Production_State": "ABSENT_DIRECTLY; WORKLOAD_ONLY",
+        "Production_State": "PRODUCTION_ABSENT; RESEARCH_ONLY_PREREGISTERED",
         "Research_Lanes": "",
-        "Coverage_State": "HIGH_CONFIDENCE_COVERAGE_GAP",
-        "Gap_Priority": "HIGH",
-        "Evidence_Basis": "Outs projection receives recent outs and shared workload targets but no opponent contact/on-base input. Existing opponent promotion research evaluates K adjustments and Actual_Strikeouts rather than total outs.",
-        "Recommended_Next_Step": "PREREGISTER_REPORT_ONLY_OUTS_OPPONENT_PRESSURE_AUDIT",
+        "Coverage_State": "COVERED_PREREGISTERED_SUPPORTING_DIAGNOSTIC",
+        "Gap_Priority": "NONE",
+        "Evidence_Basis": "A dedicated future-only Outs Opponent Pressure Audit is preregistered from 2026-08-23. It captures true opponent OBP and contact rate versus pitcher hand before first pitch, validates confirmed-lineup fingerprints when available, and grades only exact frozen Outs residuals. It has no production or promotion-row authority.",
+        "Recommended_Next_Step": "COLLECT_FUTURE_ONLY_OUTS_OPPONENT_PRESSURE_EVIDENCE_NO_PRODUCTION_CHANGE",
     },
     {
         "Signal_Class": "Same-day bullpen availability and hook pressure",
