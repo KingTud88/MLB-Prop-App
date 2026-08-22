@@ -54,7 +54,7 @@ def test_frozen_maturity_gates_only_enable_manual_review():
     for i in range(60):
         game_pk = 1000 + i
         pitcher_id = 500 + (i % 20)
-        date = pd.Timestamp("2026-08-23") + pd.Timedelta(days=i % 10)
+        date = pd.Timestamp("2026-08-23") + pd.Timedelta(i % 10, unit="D")
         projection_rows.append({
             "game_date": date.date().isoformat(), "game_pk": game_pk, "pitcher_id": pitcher_id,
             "player": f"P{pitcher_id}", "team": "CLE", "opponent": opponents[i % 15],
