@@ -73,3 +73,13 @@ def test_signal_coverage_summary_counts_current_gap_classes():
     assert summary["Production_Authority"] == "NONE"
     assert bool(summary["Supporting_Diagnostic_Only"])
     assert not bool(summary["Promotion_Row_Registered"])
+
+
+def test_checked_in_signal_coverage_artifacts_match_deterministic_recompute():
+    expected = build_coverage_audit(ROOT).reset_index(drop=True)
+    actual = pd.read_csv(ROOT / "data" / "research_signal_coverage_audit.csv").reset_index(drop=True)
+    pd.testing.assert_frame_equal(actual, expected, check_dtype=False)
+
+    expected_summary = build_summary(expected).reset_index(drop=True)
+    actual_summary = pd.read_csv(ROOT / "data" / "research_signal_coverage_audit_summary.csv").reset_index(drop=True)
+    pd.testing.assert_frame_equal(actual_summary, expected_summary, check_dtype=False)
