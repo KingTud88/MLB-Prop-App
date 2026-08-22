@@ -7,6 +7,14 @@ import pandas as pd
 
 from training.research_evidence_command_center import build_command_center
 from training.research_promotion_command_center import build_promotion_command_center
+from training.research_governance_v2 import (
+    MANIFEST_COLUMNS as GOVERNANCE_MANIFEST_COLUMNS,
+    UNCERTAINTY_COLUMNS as GOVERNANCE_UNCERTAINTY_COLUMNS,
+    SUMMARY_COLUMNS as GOVERNANCE_SUMMARY_COLUMNS,
+    build_governance_summary,
+    build_hypothesis_manifest,
+    build_uncertainty_report,
+)
 from training.research_evidence_history import fingerprint_row
 from training.research_evidence_transition_digest import (
     DIGEST_COLUMNS,
@@ -28,7 +36,7 @@ from training.research_manual_review_queue import (
 )
 from training.research_multicell_review_injector import inject_multicell_reviews
 
-VERSION = "research-pipeline-freshness-v3-all-lanes-report-only"
+VERSION = "research-pipeline-freshness-v4-governance-v2-report-only"
 REPORT_ONLY = True
 PRODUCTION_AUTHORITY = "NONE"
 NO_AUTO_PROMOTION = True
@@ -216,6 +224,79 @@ def _compare_center_stage(root: Path, expected: pd.DataFrame, filename: str, sta
     return _stage(stage_name, depends_on, status, len(saved_fp), len(expected_fp), len(mismatches), detail), saved
 
 
+def _read_governance_artifact(path: Path, required_columns: list[str]) -> tuple[bool, pd.DataFrame]:
+    if not path.exists():
+        return False, pd.DataFrame(columns=required_columns)
+    try:
+        frame = pd.read_csv(path)
+    except (OSError, pd.errors.EmptyDataError, pd.errors.ParserError):
+        return False, pd.DataFrame(columns=required_columns)
+    return set(required_columns).issubset(frame.columns), frame
+
+
+def _governance_control_violation(manifest: pd.DataFrame, uncertainty: pd.DataFrame, summary: pd.DataFrame) -> bool:
+    if _contract_violation(manifest) or _contract_violation(summary):
+        return True
+    if uncertainty is not None and not uncertainty.empty:
+        report_only = uncertainty.get("Report_Only", pd.Series(index=uncertainty.index, dtype=object)).map(_truthy)
+        authority = uncertainty.get("Production_Authority", pd.Series(index=uncertainty.index, dtype=object)).map(_clean).str.upper()
+        if bool((~report_only | ~authority.eq("NONE")).any()):
+            return True
+    if summary is not None and not summary.empty:
+        automatic = summary.get("Automatic_Decision_Allowed", pd.Series(index=summary.index, dtype=object)).map(_truthy)
+        if bool(automatic.any()):
+            return True
+    return False
+
+
+def _build_governance_stage(root: Path, expected_center: pd.DataFrame, promotion_status: str) -> dict[str, object]:
+    manifest_ok, manifest = _read_governance_artifact(root / "research_hypothesis_manifest.csv", GOVERNANCE_MANIFEST_COLUMNS)
+    uncertainty_ok, uncertainty = _read_governance_artifact(root / "research_uncertainty_v2.csv", GOVERNANCE_UNCERTAINTY_COLUMNS)
+    summary_ok, summary = _read_governance_artifact(root / "research_governance_v2_summary.csv", GOVERNANCE_SUMMARY_COLUMNS)
+    current_items = int(len(manifest) + len(uncertainty) + len(summary))
+
+    if promotion_status != CURRENT:
+        return _stage(
+            "GOVERNANCE_V2", "PROMOTION_COMMAND_CENTER", UPSTREAM_STALE, current_items, 0, 1,
+            "Promotion command center is not current, so Governance v2 artifacts cannot be certified fresh.",
+        )
+
+    expected_manifest = build_hypothesis_manifest(expected_center)
+    expected_uncertainty = build_uncertainty_report(root)
+    expected_summary = build_governance_summary(expected_center, expected_manifest, expected_uncertainty)
+    expected_items = int(len(expected_manifest) + len(expected_uncertainty) + len(expected_summary))
+
+    missing = [
+        name for name, ok in (
+            ("research_hypothesis_manifest.csv", manifest_ok),
+            ("research_uncertainty_v2.csv", uncertainty_ok),
+            ("research_governance_v2_summary.csv", summary_ok),
+        ) if not ok
+    ]
+    if missing:
+        return _stage(
+            "GOVERNANCE_V2", "PROMOTION_COMMAND_CENTER", DERIVED_MISSING, current_items, expected_items, len(missing),
+            "Governance v2 artifact(s) are missing or unreadable: " + ", ".join(missing),
+        )
+    if _governance_control_violation(manifest, uncertainty, summary):
+        return _stage(
+            "GOVERNANCE_V2", "PROMOTION_COMMAND_CENTER", CONTROL_VIOLATION, current_items, expected_items, 1,
+            "Governance v2 artifacts violate report-only, Production Authority NONE, no-auto-promotion, or automatic-decision controls.",
+        )
+
+    manifest_match = _frame_signature(manifest, GOVERNANCE_MANIFEST_COLUMNS, ["Lane"]) == _frame_signature(expected_manifest, GOVERNANCE_MANIFEST_COLUMNS, ["Lane"])
+    uncertainty_match = _frame_signature(uncertainty, GOVERNANCE_UNCERTAINTY_COLUMNS, ["Lane", "Segment", "Metric"]) == _frame_signature(expected_uncertainty, GOVERNANCE_UNCERTAINTY_COLUMNS, ["Lane", "Segment", "Metric"])
+    summary_match = _frame_signature(summary, GOVERNANCE_SUMMARY_COLUMNS) == _frame_signature(expected_summary, GOVERNANCE_SUMMARY_COLUMNS)
+    mismatch = int(not manifest_match) + int(not uncertainty_match) + int(not summary_match)
+    status = DERIVED_DRIFT if mismatch else CURRENT
+    detail = (
+        "Governance v2 manifest, uncertainty diagnostics, or summary do not reproduce from current all-lane evidence."
+        if mismatch else
+        "Governance v2 manifest, uncertainty diagnostics, and summary exactly reproduce from current all-lane evidence."
+    )
+    return _stage("GOVERNANCE_V2", "PROMOTION_COMMAND_CENTER", status, current_items, expected_items, mismatch, detail)
+
+
 def _build_history_stage(root: Path, expected_center: pd.DataFrame, upstream_status: str) -> tuple[dict[str, object], pd.DataFrame]:
     history = _read_csv(root / "research_evidence_history.csv")
     expected_fp = _lane_fingerprints(expected_center)
@@ -321,11 +402,12 @@ def build_pipeline_freshness_audit(data_dir: Path | str = "data") -> pd.DataFram
     expected_promotion = build_promotion_command_center(root)
     command_stage, _ = _compare_center_stage(root, expected_base, "research_evidence_command_center.csv", "COMMAND_CENTER", "AUTHORITATIVE_EVIDENCE")
     promotion_stage, _ = _compare_center_stage(root, expected_promotion, "research_promotion_command_center.csv", "PROMOTION_COMMAND_CENTER", "COMMAND_CENTER + PROMOTION_SOURCES")
+    governance_stage = _build_governance_stage(root, expected_promotion, str(promotion_stage["Freshness_Status"]))
     history_stage, history = _build_history_stage(root, expected_promotion, str(promotion_stage["Freshness_Status"]))
     digest_stage, digest, refresh = _build_digest_stage(root, history, str(history_stage["Freshness_Status"]))
     packet_stage, packet = _build_packet_stage(root, digest, history, expected_promotion, refresh, str(digest_stage["Freshness_Status"]))
     queue_stage = _build_queue_stage(root, packet, refresh, str(packet_stage["Freshness_Status"]))
-    return pd.DataFrame([command_stage, promotion_stage, history_stage, digest_stage, packet_stage, queue_stage], columns=STAGE_COLUMNS)
+    return pd.DataFrame([command_stage, promotion_stage, governance_stage, history_stage, digest_stage, packet_stage, queue_stage], columns=STAGE_COLUMNS)
 
 
 def build_freshness_summary(audit: pd.DataFrame) -> pd.DataFrame:
