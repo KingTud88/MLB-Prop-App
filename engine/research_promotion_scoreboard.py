@@ -211,13 +211,13 @@ def render_research_promotion_scoreboard(root: Path) -> None:
         .research-label-gate{margin-top:.40rem;color:#91c6eb}
         .research-value-gate{margin-top:.09rem;padding:.26rem .36rem;border-left:2px solid #38bdf8;border-radius:7px;background:rgba(56,189,248,.055);color:#f4f8fb;font:900 .78rem/1.30 system-ui}
         .research-label-action{color:#7899b4}.research-value-action{color:#c8d5df;font-weight:760}
-        .research-human-review{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-top:.44rem;padding:.30rem .42rem;border:1px solid rgba(74,191,230,.35);border-radius:7px;background:rgba(10,65,83,.16)}
+        .research-human-review{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-top:.34rem;padding:.26rem .40rem;border:1px solid rgba(74,191,230,.35);border-radius:7px;background:rgba(10,65,83,.16)}
         .research-human-review-label{color:#8eddf4;font:900 .56rem/1.15 system-ui;letter-spacing:.075em;text-transform:uppercase}
         .research-human-review-disposition{color:#e7f8ff;font:900 .65rem/1.15 system-ui;letter-spacing:.025em;text-align:right;text-transform:uppercase}
-        .research-source-status{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-top:.30rem;padding:.25rem .40rem;border:1px solid rgba(159,179,198,.22);border-radius:7px;background:rgba(159,179,198,.045)}
+        .research-source-status{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-top:.18rem;padding:.20rem .38rem;border:1px solid rgba(159,179,198,.22);border-radius:7px;background:rgba(159,179,198,.045)}
         .research-source-status-label{color:#7899b4;font:900 .54rem/1.15 system-ui;letter-spacing:.075em;text-transform:uppercase}
         .research-source-status-value{color:#9fb3c6;font:800 .58rem/1.15 system-ui;letter-spacing:.018em;text-align:right;text-transform:uppercase}
-        .research-authority-strip{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-top:.48rem;padding:.30rem .42rem;border-top:1px solid rgba(255,54,85,.30);border-radius:7px;background:rgba(105,14,33,.10)}
+        .research-authority-strip{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-top:.30rem;padding:.26rem .40rem;border-top:1px solid rgba(255,54,85,.30);border-radius:7px;background:rgba(105,14,33,.10)}
         .research-authority-label{color:#7595ae;font:900 .56rem/1.15 system-ui;letter-spacing:.085em;text-transform:uppercase}
         .research-authority{color:#ff8a9a;font:900 .68rem/1.15 system-ui;letter-spacing:.035em;text-transform:uppercase}
         @media(max-width:700px){.research-card{min-height:0}.research-card-top{align-items:flex-start;flex-direction:column}.research-human-review,.research-source-status,.research-authority-strip{align-items:flex-start;flex-direction:column}.research-human-review-disposition,.research-source-status-value{text-align:left}.history-stage-map{justify-content:flex-start}.history-stage-arrow{display:none}.history-stage-pill{white-space:normal}}
